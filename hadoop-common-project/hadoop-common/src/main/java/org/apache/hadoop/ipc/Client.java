@@ -33,6 +33,7 @@ import java.io.BufferedOutputStream;
 import java.io.FilterInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.InterruptedIOException;
 
 import java.security.PrivilegedExceptionAction;
 import java.util.Hashtable;
@@ -665,7 +666,11 @@ public class Client {
       // otherwise back off and retry
       try {
         Thread.sleep(1000);
-      } catch (InterruptedException ignored) {}
+      } catch (InterruptedException interrupted) {
+        throw (IOException) new InterruptedIOException(
+            "Interrupted while waiting to retry connecting to "+ server)
+            .initCause(ioe);
+      }
       
       LOG.info("Retrying connect to server: " + server + 
           ". Already tried " + curRetries + " time(s).");
@@ -1115,6 +1120,8 @@ public class Client {
       return (SocketTimeoutException)new SocketTimeoutException(
            "Call to " + addr + " failed on socket timeout exception: "
                       + exception).initCause(exception);
+    } else if (exception instanceof InterruptedIOException) {
+        return exception;
     } else {
       return (IOException)new IOException(
            "Call to " + addr + " failed on local exception: " + exception)

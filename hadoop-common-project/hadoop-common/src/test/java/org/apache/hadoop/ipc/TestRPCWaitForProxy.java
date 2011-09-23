@@ -18,6 +18,11 @@
 package org.apache.hadoop.ipc;
 
 import junit.framework.Assert;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.KerberosInfo;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenInfo;
+import org.apache.hadoop.security.token.delegation.TestDelegationToken;
 import org.junit.Test;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -42,7 +47,7 @@ public class TestRPCWaitForProxy extends Assert {
 
   /**
    * This tests that the time-bounded wait for a proxy operation works, and
-   * times out.
+   * times out immediately
    * @throws Throwable any exception other than that which was expected
    */
   @Test
@@ -51,11 +56,11 @@ public class TestRPCWaitForProxy extends Assert {
     worker.start();
     worker.join();
     Throwable caught = worker.getCaught();
-    assertNotNull("No exception was raised", caught);
+    assertNotNull("No exception was raised from " + worker, caught);
     if (!(caught instanceof ConnectException)) {
       throw caught;
     }
-
+    LOG.debug("Caught "+caught, caught);
   }
 
   /**
@@ -65,15 +70,16 @@ public class TestRPCWaitForProxy extends Assert {
    */
   @Test
   public void testInterruptedWaitForProxy() throws Throwable {
-    RpcThread worker = new RpcThread(10000);
+    RpcThread worker = new RpcThread(60000L);
     worker.start();
     worker.interrupt();
     worker.join();
     Throwable caught = worker.getCaught();
-    assertNotNull("No exception was raised", caught);
+    assertNotNull("No exception was raised from " + worker, caught);
     if (!(caught instanceof InterruptedIOException)) {
       throw caught;
     }
+    LOG.debug("Caught "+caught, caught);
   }
 
 
@@ -85,6 +91,7 @@ public class TestRPCWaitForProxy extends Assert {
   private class RpcThread extends Thread {
     private Throwable caught;
     private long timeout;
+    protected WaitProtocol protocol;
 
     private RpcThread(long timeout) {
       this.timeout = timeout;
@@ -93,11 +100,12 @@ public class TestRPCWaitForProxy extends Assert {
     @Override
     public void run() {
       try {
-        RPC.waitForProxy(TestRPC.TestProtocol.class,
-                         TestRPC.TestProtocol.versionID,
-                         new InetSocketAddress(ADDRESS, 20),
-                         conf,
-                         timeout);
+        protocol =
+            RPC.waitForProxy(WaitProtocol.class,
+                             WaitProtocol.versionID,
+                             new InetSocketAddress(ADDRESS, 20),
+                             conf,
+                             timeout);
       } catch (Throwable throwable) {
         caught = throwable;
       }
@@ -105,6 +113,47 @@ public class TestRPCWaitForProxy extends Assert {
 
     public Throwable getCaught() {
       return caught;
+    }
+
+    public WaitProtocol getProtocol() {
+      return protocol;
+    }
+
+    @Override
+    public String toString() {
+      return "RpcThread with timeout " + timeout + " protocol class "
+          +(protocol != null? protocol.getClass() : "(null)")
+          +" caught: " + caught;
+    }
+  }
+
+  private static interface WaitProtocol extends VersionedProtocol {
+    public static final long versionID = 1L;
+    public long getStartTimeNanos();
+  }
+  
+  private class WaitProtocolImpl implements WaitProtocol {
+    @Override
+    public long getStartTimeNanos() {
+      return 0;
+    }
+
+    @Override
+    public long getProtocolVersion(String protocol, long clientVersion)
+        throws IOException {
+      if (protocol.equals(WaitProtocol.class.getName()))
+        return versionID;
+      throw new IOException("Unknown protocol: " + protocol);
+    }
+
+    @Override
+    public ProtocolSignature getProtocolSignature(String protocol,
+                                                  long clientVersion,
+                                                  int clientMethodsHash)
+        throws IOException {
+      if (protocol.equals(WaitProtocol.class.getName()))
+        return new ProtocolSignature(versionID, null);
+      throw new IOException("Unknown protocol: " + protocol);
     }
   }
 }
