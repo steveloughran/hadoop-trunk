@@ -184,7 +184,7 @@ public class TestNetUtils {
       throws Throwable {
     assertNotNull("Null Exception", e);
     IOException wrapped =
-        NetUtils.wrapException("desthost", DEST_PORT, 
+        NetUtils.wrapException("desthost", DEST_PORT,
                                "localhost", LOCAL_PORT,
                                e);
     if(!(wrapped.getClass().equals(expectedClass))) {

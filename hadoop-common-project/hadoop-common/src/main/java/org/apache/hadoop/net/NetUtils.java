@@ -532,7 +532,7 @@ public class NetUtils {
    * If the exception is BindException or ConnectException or
    * UnknownHostException or SocketTimeoutException, return a new one of the
    * same type; Otherwise return an IOException.
-   * 
+   *
    * @param destHost target host (nullable)
    * @param destPort target port
    * @param localHost local host (nullable)
@@ -596,14 +596,14 @@ public class NetUtils {
     }
     else {
       return (IOException) new IOException("Failed on local exception: "
-          + exception 
+          + exception
           + "; Host Details : "
           + getHostDetailsAsString(destHost, destPort, localHost))
           .initCause(exception);
 
     }
   }
-  
+
   private static String see(final String entry) {
     return FOR_MORE_DETAILS_SEE + HADOOP_WIKI + entry;
   }
