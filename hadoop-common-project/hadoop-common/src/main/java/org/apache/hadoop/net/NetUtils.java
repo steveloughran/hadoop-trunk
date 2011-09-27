@@ -48,7 +48,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.VersionedProtocol;
-import org.apache.hadoop.util.PureJavaCrc32;
 import org.apache.hadoop.util.ReflectionUtils;
 
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})

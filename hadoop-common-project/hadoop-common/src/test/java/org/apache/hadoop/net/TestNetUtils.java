@@ -34,7 +34,7 @@ import java.net.UnknownHostException;
 import org.apache.hadoop.conf.Configuration;
 
 public class TestNetUtils {
-  
+
   private static final Log LOG = LogFactory.getLog(TestNetUtils.class);
   private static final int DEST_PORT = 4040;
   private static final String DEST_PORT_NAME = Integer.toString(DEST_PORT);
@@ -99,7 +99,7 @@ public class TestNetUtils {
       fail("NetUtils.verifyHostnames threw unexpected UnknownHostException");
     }
   }
-  
+
   @Test
   public void testWrapConnectException() throws Throwable {
     IOException e = new ConnectException("failed");
@@ -116,7 +116,7 @@ public class TestNetUtils {
     IOException e = new BindException("failed");
     IOException wrapped = verifyExceptionClass(e, BindException.class);
     assertInException(wrapped, "failed");
-    assertWikified(wrapped);
+    assertLocalDetailsIncluded(wrapped);
     assertNotInException(wrapped, DEST_PORT_NAME);
     assertInException(wrapped, "/BindException");
   }
@@ -131,7 +131,7 @@ public class TestNetUtils {
     assertRemoteDetailsIncluded(wrapped);
     assertInException(wrapped, "/UnknownHost");
   }
-  
+
   private void assertRemoteDetailsIncluded(IOException wrapped)
       throws Throwable {
     assertInException(wrapped, "desthost");
@@ -147,9 +147,8 @@ public class TestNetUtils {
   private void assertWikified(Exception e) throws Throwable {
     assertInException(e, NetUtils.HADOOP_WIKI);
   }
-  
-  private void assertInException(Exception e, String text) 
-      throws Throwable{
+
+  private void assertInException(Exception e, String text) throws Throwable {
     String message = extractExceptionMessage(e);
     if (!(message.contains(text))) {
       throw new AssertionFailedError("Wrong text in message "
@@ -180,13 +179,14 @@ public class TestNetUtils {
     }
   }
 
-  
   private IOException verifyExceptionClass(IOException e,
                                            Class expectedClass)
       throws Throwable {
     assertNotNull("Null Exception", e);
     IOException wrapped =
-        NetUtils.wrapException("desthost", DEST_PORT, "localhost", LOCAL_PORT, e);
+        NetUtils.wrapException("desthost", DEST_PORT, 
+                               "localhost", LOCAL_PORT,
+                               e);
     if(!(wrapped.getClass().equals(expectedClass))) {
       throw new AssertionFailedError("Wrong exception class; expected "
         + expectedClass
