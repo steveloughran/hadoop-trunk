@@ -103,6 +103,34 @@ public class TestNetUtils {
       fail("NetUtils.verifyHostnames threw unexpected UnknownHostException");
     }
   }
+  
+  /** 
+   * Test for {@link NetUtils#isLocalAddress(java.net.InetAddress)}
+   */
+  @Test
+  public void testIsLocalAddress() throws Exception {
+    // Test - local host is local address
+    assertTrue(NetUtils.isLocalAddress(InetAddress.getLocalHost()));
+    
+    // Test - all addresses bound network interface is local address
+    Enumeration<NetworkInterface> interfaces = NetworkInterface
+        .getNetworkInterfaces();
+    if (interfaces != null) { // Iterate through all network interfaces
+      while (interfaces.hasMoreElements()) {
+        NetworkInterface i = interfaces.nextElement();
+        Enumeration<InetAddress> addrs = i.getInetAddresses();
+        if (addrs == null) {
+          continue;
+        }
+        // Iterate through all the addresses of a network interface
+        while (addrs.hasMoreElements()) {
+          InetAddress addr = addrs.nextElement();
+          assertTrue(NetUtils.isLocalAddress(addr));
+        }
+      }
+    }
+    assertFalse(NetUtils.isLocalAddress(InetAddress.getByName("8.8.8.8")));
+  }
 
   @Test
   public void testWrapConnectException() throws Throwable {
@@ -156,8 +184,8 @@ public class TestNetUtils {
     String message = extractExceptionMessage(e);
     if (!(message.contains(text))) {
       throw new AssertionFailedError("Wrong text in message "
-          + "\"" + message + "\""
-          + " expected \"" + text + "\"")
+                                         + "\"" + message + "\""
+                                         + " expected \"" + text + "\"")
           .initCause(e);
     }
   }
@@ -193,37 +221,9 @@ public class TestNetUtils {
                                e);
     if(!(wrapped.getClass().equals(expectedClass))) {
       throw new AssertionFailedError("Wrong exception class; expected "
-        + expectedClass
-        + " got " + wrapped.getClass() + ": " + wrapped).initCause(wrapped);
+                                         + expectedClass
+                                         + " got " + wrapped.getClass() + ": " + wrapped).initCause(wrapped);
     }
     return wrapped;
-  }
-
-  /** 
-   * Test for {@link NetUtils#isLocalAddress(java.net.InetAddress)}
-   */
-  @Test
-  public void testIsLocalAddress() throws Exception {
-    // Test - local host is local address
-    assertTrue(NetUtils.isLocalAddress(InetAddress.getLocalHost()));
-    
-    // Test - all addresses bound network interface is local address
-    Enumeration<NetworkInterface> interfaces = NetworkInterface
-        .getNetworkInterfaces();
-    if (interfaces != null) { // Iterate through all network interfaces
-      while (interfaces.hasMoreElements()) {
-        NetworkInterface i = interfaces.nextElement();
-        Enumeration<InetAddress> addrs = i.getInetAddresses();
-        if (addrs == null) {
-          continue;
-        }
-        // Iterate through all the addresses of a network interface
-        while (addrs.hasMoreElements()) {
-          InetAddress addr = addrs.nextElement();
-          assertTrue(NetUtils.isLocalAddress(addr));
-        }
-      }
-    }
-    assertFalse(NetUtils.isLocalAddress(InetAddress.getByName("8.8.8.8")));
   }
 }

@@ -615,7 +615,7 @@ public class NetUtils {
    * @param localHost local host (nullable)
    * @return a string describing the destination host:port and the local host
    */
-  private static String getHostDetailsAsString(final String destHost, 
+  private static String getHostDetailsAsString(final String destHost,
       final int destPort,
       final String localHost) {
     StringBuilder hostDetails = new StringBuilder(27);
