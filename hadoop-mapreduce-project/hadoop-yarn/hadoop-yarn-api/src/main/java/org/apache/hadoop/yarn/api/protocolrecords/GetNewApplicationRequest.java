@@ -21,17 +21,16 @@ package org.apache.hadoop.yarn.api.protocolrecords;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.yarn.api.ClientRMProtocol;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 /**
- * <p>The response sent by the <code>ResourceManager</code> to the client
- * aborting a submitted application.</p>
- *
- * <p>Currently it's empty.</p>
+ * <p>The request sent by clients to get a new {@link ApplicationId} for
+ * submitting an application.</p>
  * 
- * @see ClientRMProtocol#finishApplication(FinishApplicationRequest)
+ * @see ClientRMProtocol#getNewApplication(GetNewApplicationRequest)
  */
 @Public
 @Stable
-public interface FinishApplicationResponse {
+public interface GetNewApplicationRequest {
 
 }

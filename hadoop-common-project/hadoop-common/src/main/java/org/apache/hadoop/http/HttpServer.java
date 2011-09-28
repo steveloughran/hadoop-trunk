@@ -283,7 +283,7 @@ public class HttpServer implements FilterContainer {
     if (logDir != null) {
       Context logContext = new Context(parent, "/logs");
       logContext.setResourceBase(logDir);
-      logContext.addServlet(AdminAuthorizedServlet.class, "/");
+      logContext.addServlet(AdminAuthorizedServlet.class, "/*");
       logContext.setDisplayName("logs");
       setContextAttributes(logContext, conf);
       defaultContexts.put(logContext, true);
