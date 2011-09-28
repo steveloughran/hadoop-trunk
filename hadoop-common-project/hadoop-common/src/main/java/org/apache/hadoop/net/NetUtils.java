@@ -56,10 +56,13 @@ public class NetUtils {
   private static final Log LOG = LogFactory.getLog(NetUtils.class);
   
   private static Map<String, String> hostToResolved = 
-          new HashMap<String, String>();
+                                     new HashMap<String, String>();
+  /** text to point users elsewhere: {@value} */
   private static final String FOR_MORE_DETAILS_SEE
       = " For more details see:  ";
+  /** text included in wrapped exceptions if the host is null: {@value} */
   public static final String UNKNOWN_HOST = "(unknown)";
+  /** Base URL of the Hadoop Wiki: {@value} */
   public static final String HADOOP_WIKI = "http://wiki.apache.org/hadoop/";
 
   /**
@@ -523,6 +526,27 @@ public class NetUtils {
     } catch (UnknownHostException ignore) { }
     return addr;
   }
+  
+  /**
+   * Given an InetAddress, checks to see if the address is a local address, by
+   * comparing the address with all the interfaces on the node.
+   * @param addr address to check if it is local node's address
+   * @return true if the address corresponds to the local node
+   */
+  public static boolean isLocalAddress(InetAddress addr) {
+    // Check if the address is any local or loop back
+    boolean local = addr.isAnyLocalAddress() || addr.isLoopbackAddress();
+
+    // Check if the address is defined on any interface
+    if (!local) {
+      try {
+        local = NetworkInterface.getByInetAddress(addr) != null;
+      } catch (SocketException e) {
+        local = false;
+      }
+    }
+    return local;
+  }
 
   /**
    * Take an IOException , the local host port and remote host port details and
@@ -571,34 +595,34 @@ public class NetUtils {
           .initCause(exception);
     } else if (exception instanceof UnknownHostException) {
       return (UnknownHostException) new UnknownHostException(
-            "Invalid host name: "
-                + getHostDetailsAsString(destHost, destPort, localHost)
-                + exception
-                + ";"
-                + see("UnknownHost"))
-            .initCause(exception);
+          "Invalid host name: "
+              + getHostDetailsAsString(destHost, destPort, localHost)
+              + exception
+              + ";"
+              + see("UnknownHost"))
+          .initCause(exception);
     } else if (exception instanceof SocketTimeoutException) {
       return (SocketTimeoutException) new SocketTimeoutException(
-              "Call From "
-                + localHost + " to " + destHost + ":" + destPort
-                + " failed on socket timeout exception: " + exception
-                + ";"
-                + see("SocketTimeout"))
-                .initCause(exception);
+          "Call From "
+              + localHost + " to " + destHost + ":" + destPort
+              + " failed on socket timeout exception: " + exception
+              + ";"
+              + see("SocketTimeout"))
+          .initCause(exception);
     } else if (exception instanceof NoRouteToHostException) {
       return (NoRouteToHostException) new NoRouteToHostException(
           "No Route to Host from  "
-                 + localHost + " to " + destHost + ":" + destPort
-                 + " failed on socket timeout exception: " + exception
-                 + ";"
-                 + see("NoRouteToHost"))
+              + localHost + " to " + destHost + ":" + destPort
+              + " failed on socket timeout exception: " + exception
+              + ";"
+              + see("NoRouteToHost"))
           .initCause(exception);
     }
     else {
       return (IOException) new IOException("Failed on local exception: "
-          + exception
-          + "; Host Details : "
-          + getHostDetailsAsString(destHost, destPort, localHost))
+                                               + exception
+                                               + "; Host Details : "
+                                               + getHostDetailsAsString(destHost, destPort, localHost))
           .initCause(exception);
 
     }
@@ -616,8 +640,8 @@ public class NetUtils {
    * @return a string describing the destination host:port and the local host
    */
   private static String getHostDetailsAsString(final String destHost,
-      final int destPort,
-      final String localHost) {
+                                               final int destPort,
+                                               final String localHost) {
     StringBuilder hostDetails = new StringBuilder(27);
     hostDetails.append("local host is: ")
         .append(quoteHost(localHost))
@@ -637,26 +661,5 @@ public class NetUtils {
     return (hostname != null) ?
         ("\"" + hostname + "\"")
         : UNKNOWN_HOST;
-  }
-
-  /**
-   * Given an InetAddress, checks to see if the address is a local address, by
-   * comparing the address with all the interfaces on the node.
-   * @param addr address to check if it is local node's address
-   * @return true if the address corresponds to the local node
-   */
-  public static boolean isLocalAddress(InetAddress addr) {
-    // Check if the address is any local or loop back
-    boolean local = addr.isAnyLocalAddress() || addr.isLoopbackAddress();
-
-    // Check if the address is defined on any interface
-    if (!local) {
-      try {
-        local = NetworkInterface.getByInetAddress(addr) != null;
-      } catch (SocketException e) {
-        local = false;
-      }
-    }
-    return local;
   }
 }

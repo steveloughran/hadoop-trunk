@@ -219,6 +219,7 @@ public class TestNetUtils {
         NetUtils.wrapException("desthost", DEST_PORT,
                                "localhost", LOCAL_PORT,
                                e);
+    LOG.info(wrapped.toString(), wrapped);
     if(!(wrapped.getClass().equals(expectedClass))) {
       throw new AssertionFailedError("Wrong exception class; expected "
                                          + expectedClass
