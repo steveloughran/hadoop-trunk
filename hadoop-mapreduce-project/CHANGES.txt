@@ -321,6 +321,9 @@ Release 0.23.0 - Unreleased
     MAPREDUCE-3099. Add docs for setting up a single node MRv2 cluster.
     (mahadev)
 
+    MAPREDUCE-3001. Added task-specific counters to AppMaster and JobHistory
+    web-UIs. (Robert Joseph Evans via vinodkv)
+
   OPTIMIZATIONS
 
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
@@ -1471,6 +1474,15 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3078. Ensure MapReduce AM reports progress correctly for
     displaying on the RM Web-UI. (vinodkv via acmurthy)
+
+    MAPREDUCE-3114. Fixed invalid ApplicationURL on RM WebUI. (Subroto Sanyal
+    via vinodkv)
+
+    MAPREDUCE-2791. Added missing info on 'job -status' output. (Devaraj K via
+    acmurthy)
+
+    MAPREDUCE-2996. Add uber-ness information to JobHistory. (Jonathan Eagles
+    via acmurthy)
 
 Release 0.22.0 - Unreleased
 

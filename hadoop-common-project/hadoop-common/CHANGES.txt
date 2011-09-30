@@ -25,6 +25,9 @@ Trunk (unreleased changes)
 
     HADOOP-7687 Make getProtocolSignature public  (sanjay)
 
+    HADOOP-7693. Enhance AvroRpcEngine to support the new #addProtocol
+    interface introduced in HADOOP-7524.  (cutting)
+
   BUGS
 
     HADOOP-7606. Upgrade Jackson to version 1.7.1 to match the version required
@@ -39,6 +42,10 @@ Trunk (unreleased changes)
     
     HADOOP-7669  Fix newly introduced release audit warning. 
                  (Uma Maheswara Rao G via stevel)
+    
+    HADOOP-6220. HttpServer wraps InterruptedExceptions by IOExceptions if interrupted 
+                 in startup (stevel)
+                 
 
 Release 0.23.0 - Unreleased
 

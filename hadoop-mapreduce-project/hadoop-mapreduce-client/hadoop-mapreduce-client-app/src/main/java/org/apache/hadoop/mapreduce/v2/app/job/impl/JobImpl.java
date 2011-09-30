@@ -590,12 +590,12 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       if (getState() == JobState.NEW) {
         return MRBuilderUtils.newJobReport(jobId, jobName, username, state,
             startTime, finishTime, setupProgress, 0.0f,
-            0.0f, cleanupProgress);
+            0.0f, cleanupProgress, remoteJobConfFile.toString());
       }
 
       return MRBuilderUtils.newJobReport(jobId, jobName, username, state,
           startTime, finishTime, setupProgress, computeProgress(mapTasks),
-          computeProgress(reduceTasks), cleanupProgress);
+          computeProgress(reduceTasks), cleanupProgress, remoteJobConfFile.toString());
     } finally {
       readLock.unlock();
     }
@@ -1135,7 +1135,8 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
         new JobInitedEvent(job.oldJobId,
              job.startTime,
              job.numMapTasks, job.numReduceTasks,
-             job.getState().toString()); //Will transition to state running. Currently in INITED
+             job.getState().toString(),
+             job.isUber()); //Will transition to state running. Currently in INITED
       job.eventHandler.handle(new JobHistoryEvent(job.jobId, jie));
       JobInfoChangeEvent jice = new JobInfoChangeEvent(job.oldJobId,
           job.submitTime, job.startTime);
