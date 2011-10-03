@@ -19,6 +19,9 @@ Trunk (unreleased changes)
     HDFS-2340. Support getFileBlockLocations and getDelegationToken in webhdfs.
     (szetszwo)
 
+    HDFS-2348. Support getContentSummary and getFileChecksum in webhdfs.
+    (szetszwo)
+
   IMPROVEMENTS
 
     HADOOP-7524 Change RPC to allow multiple protocols including multuple 
@@ -87,6 +90,9 @@ Trunk (unreleased changes)
     info on the console with security enabled. (Arpit Gupta via suresh)
 
     HDFS-2361. hftp is broken, fixed username checks in JspHelper. (jitendra)
+
+    HDFS-2298. Fix TestDfsOverAvroRpc by changing ClientProtocol to
+    not include multiple methods of the same name. (cutting)
 
 Release 0.23.0 - Unreleased
 
