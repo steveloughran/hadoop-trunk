@@ -89,23 +89,6 @@ public class TestLog4Json extends TestCase {
     assertTrue("Not an array: " +node, node.isArray());
   }
 
-  void assertEntryEquals(ContainerNode rootNode, String key, String value) {
-    JsonNode node = assertNodeContains(rootNode, key); 
-     assertEquals(value, node.getTextValue());
-  }
-
-  private JsonNode assertNodeContains(ContainerNode rootNode, String key) {
-    JsonNode node = rootNode.get(key);
-    if (node==null) {
-      fail("No entry of name \"" + key + "\" found in " + rootNode.toString());
-    }
-    return node;
-  }
-
-  void assertEntryEquals(ContainerNode rootNode, String key, long value) {
-    JsonNode node = assertNodeContains(rootNode, key);
-    assertEquals(value, node.getNumberValue());
-  }
 
   /**
    * Create a log instance and and log to it
@@ -133,12 +116,30 @@ public class TestLog4Json extends TestCase {
   }
 
 
+  void assertEntryEquals(ContainerNode rootNode, String key, String value) {
+    JsonNode node = assertNodeContains(rootNode, key);
+    assertEquals(value, node.getTextValue());
+  }
+
+  private JsonNode assertNodeContains(ContainerNode rootNode, String key) {
+    JsonNode node = rootNode.get(key);
+    if (node==null) {
+      fail("No entry of name \"" + key + "\" found in " + rootNode.toString());
+    }
+    return node;
+  }
+
+  void assertEntryEquals(ContainerNode rootNode, String key, long value) {
+    JsonNode node = assertNodeContains(rootNode, key);
+    assertEquals(value, node.getNumberValue());
+  }
+
   /**
    * Print out what's going on. The logging APIs aren't used and the text
    * delimited for more details
    *
    * @param name name of operation
-   * @param text text to print 
+   * @param text text to print
    */
   private void println(String name, String text) {
     System.out.println(name + ": #" + text + "#");
@@ -174,7 +175,7 @@ public class TestLog4Json extends TestCase {
     }
 
   }
-  
+
   public static class TestLoggerRepository implements LoggerRepository {
     @Override
     public void addHierarchyEventListener(HierarchyEventListener listener) {
