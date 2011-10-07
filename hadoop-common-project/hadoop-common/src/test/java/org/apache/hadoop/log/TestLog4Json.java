@@ -17,8 +17,13 @@ import org.apache.log4j.spi.LoggerFactory;
 import org.apache.log4j.spi.LoggerRepository;
 import org.apache.log4j.spi.NOPLoggerRepository;
 import org.apache.log4j.spi.ThrowableInformation;
+import org.codehaus.jackson.JsonFactory;
+import org.codehaus.jackson.JsonNode;
+import org.codehaus.jackson.map.MappingJsonFactory;
+import org.codehaus.jackson.node.ContainerNode;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.net.NoRouteToHostException;
@@ -27,7 +32,8 @@ import java.util.Vector;
 
 public class TestLog4Json extends TestCase {
 
-  private static Log LOG = LogFactory.getLog(TestLog4Json.class);
+  private static final Log LOG = LogFactory.getLog(TestLog4Json.class);
+  private static final JsonFactory factory = new MappingJsonFactory();
 
   @Test
   public void testConstruction() throws Throwable {
@@ -44,9 +50,10 @@ public class TestLog4Json extends TestCase {
         new NoRouteToHostException("that box caught fire 3 years ago");
     ThrowableInformation ti = new ThrowableInformation(e);
     Log4Json l4j = new Log4Json();
+    long timeStamp = System.currentTimeMillis();
     String outcome = l4j.toJson(new StringWriter(),
                                 "testException",
-                                -4365664,
+                                timeStamp,
                                 "INFO",
                                 "quoted\"",
                                 "new line\n and {}",
@@ -56,12 +63,75 @@ public class TestLog4Json extends TestCase {
   }
 
   @Test
+  public void testNestedException() throws Throwable {
+    Exception e =
+        new NoRouteToHostException("that box caught fire 3 years ago");
+    Exception ioe = new IOException("Datacenter problems", e);
+    ThrowableInformation ti = new ThrowableInformation(ioe);
+    Log4Json l4j = new Log4Json();
+    long timeStamp = System.currentTimeMillis();
+    String outcome = l4j.toJson(new StringWriter(),
+                                "testNestedException",
+                                timeStamp,
+                                "INFO",
+                                "quoted\"",
+                                "new line\n and {}",
+                                ti)
+        .toString();
+    println("testNestedException", outcome);
+    ContainerNode rootNode = Log4Json.parse(outcome);
+    assertEntryEquals(rootNode, Log4Json.LEVEL, "INFO");
+    assertEntryEquals(rootNode, Log4Json.NAME, "testNestedException");
+    assertEntryEquals(rootNode, Log4Json.TIME, timeStamp);
+    assertEntryEquals(rootNode, Log4Json.EXCEPTION_CLASS, 
+                      ioe.getClass().getName());
+    JsonNode node = assertNodeContains(rootNode, Log4Json.STACK);
+    assertTrue("Not an array: " +node, node.isArray());
+  }
+
+  void assertEntryEquals(ContainerNode rootNode, String key, String value) {
+    JsonNode node = assertNodeContains(rootNode, key); 
+     assertEquals(value, node.getTextValue());
+  }
+
+  private JsonNode assertNodeContains(ContainerNode rootNode, String key) {
+    JsonNode node = rootNode.get(key);
+    if (node==null) {
+      fail("No entry of name \"" + key + "\" found in " + rootNode.toString());
+    }
+    return node;
+  }
+
+  void assertEntryEquals(ContainerNode rootNode, String key, long value) {
+    JsonNode node = assertNodeContains(rootNode, key);
+    assertEquals(value, node.getNumberValue());
+  }
+
+  /**
+   * Create a log instance and and log to it
+   * @throws Throwable if it all goes wrong
+   */
+  @Test
   public void testLog() throws Throwable {
     String message = "test message";
     Throwable throwable = null;
     String json = logOut(message, throwable);
     println("testLog", json);
   }
+
+  /**
+   * Create a log instance and and log to it
+   * @throws Throwable if it all goes wrong
+   */
+  @Test
+  public void testLogExceptions() throws Throwable {
+    String message = "test message";
+    Throwable inner = new IOException("Directory / not found");
+    Throwable throwable = new IOException("startup failure", inner);
+    String json = logOut(message, throwable);
+    println("testLogExceptions", json);
+  }
+
 
   /**
    * Print out what's going on. The logging APIs aren't used and the text

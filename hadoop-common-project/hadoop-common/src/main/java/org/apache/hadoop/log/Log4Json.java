@@ -27,6 +27,7 @@ import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.MappingJsonFactory;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.node.ContainerNode;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -48,12 +49,14 @@ public class Log4Json extends Layout {
    * configuration it must be done in a static intializer block.
    */
   private static final JsonFactory factory = new MappingJsonFactory();
-  public static final String TIME = "time";
+  public static final String EXCEPTION_CLASS = "exceptionclass";
   public static final String LEVEL = "level";
-  public static final String NAME = "name";
-  public static final String THREAD = "thread";
   public static final String MESSAGE = "message";
+  public static final String NAME = "name";
   public static final String STACK = "stack";
+  public static final String TIME = "time";
+  public static final String THREAD = "thread";
+
   public static final String JSON_TYPE = "application/json";
 
   public Log4Json() {
@@ -61,7 +64,6 @@ public class Log4Json extends Layout {
 
 
   /**
-   * 
    * @return the mime type of JSON
    */
   @Override
@@ -103,21 +105,22 @@ public class Log4Json extends Layout {
    * @return the writer
    * @throws IOException on problems generating the JSON
    */
-  public Writer toJson(final Writer writer, final LoggingEvent event) 
+  public Writer toJson(final Writer writer, final LoggingEvent event)
       throws IOException {
     ThrowableInformation ti = event.getThrowableInformation();
-    toJson(writer, 
+    toJson(writer,
            event.getLoggerName(),
            event.getTimeStamp(),
-           event.getLevel().toString(), 
+           event.getLevel().toString(),
            event.getThreadName(),
-           event.getRenderedMessage(), 
+           event.getRenderedMessage(),
            ti);
     return writer;
   }
 
   /**
    * Build a JSON entry from the parameters. This is public for testing.
+   *
    * @param writer destination
    * @param loggerName logger name
    * @param timeStamp time_t value
@@ -143,6 +146,13 @@ public class Log4Json extends Layout {
     json.writeStringField(THREAD, threadName);
     json.writeStringField(MESSAGE, message);
     if (ti != null) {
+      //there is some throwable info, but if the log event has been sent over the wire,
+      //there may not be a throwable inside it, just a summary.
+      Throwable thrown = ti.getThrowable();
+      String eclass = (thrown != null) ?
+          thrown.getClass().getName()
+          : "";
+      json.writeStringField(EXCEPTION_CLASS, eclass);
       String[] stackTrace = ti.getThrowableStrRep();
       json.writeArrayFieldStart(STACK);
       for (String row : stackTrace) {
@@ -156,6 +166,11 @@ public class Log4Json extends Layout {
     return writer;
   }
 
+  /**
+   * This appender does not ignore throwables
+   *
+   * @return false, always
+   */
   @Override
   public boolean ignoresThrowable() {
     return false;
@@ -175,8 +190,12 @@ public class Log4Json extends Layout {
    * @return a node tree
    * @throws IOException on any parsing problems
    */
-  public static JsonNode parse(String json) throws IOException {
+  public static ContainerNode parse(String json) throws IOException {
     ObjectMapper mapper = new ObjectMapper(factory);
-    return mapper.readTree(json);
+    JsonNode jsonNode = mapper.readTree(json);
+    if (!(jsonNode instanceof ContainerNode)) {
+      throw new IOException("Wrong JSON data: " + json);
+    }
+    return (ContainerNode) jsonNode;
   }
 }
