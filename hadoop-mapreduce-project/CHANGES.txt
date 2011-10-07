@@ -10,6 +10,8 @@ Trunk (unreleased changes)
     (Plamen Jeliazkov via shv)
 
   IMPROVEMENTS
+    MAPREDUCE-3008. Improvements to cumulative CPU emulation for short running 
+                    tasks in Gridmix. (amarrk)
 
     MAPREDUCE-2887 due to HADOOP-7524 Change RPC to allow multiple protocols
                    including multuple versions of the same protocol (sanjay Radia)
@@ -21,6 +23,9 @@ Trunk (unreleased changes)
     fair scheduler pools. (Ahmed Radwan via todd)
 
   BUG FIXES
+
+    MAPREDUCE-2950. [Gridmix] TestUserResolve fails in trunk. 
+                    (Ravi Gummadi via amarrk)
 
     MAPREDUCE-2784. [Gridmix] Bug fixes in ExecutionSummarizer and 
     ResourceUsageMatcher. (amarrk)
@@ -335,6 +340,22 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3134. Added documentation the CapacityScheduler. (acmurthy) 
 
+    MAPREDUCE-3138. Add a utility to help applications bridge changes in 
+    Context Objects APIs due to MAPREDUCE-954. (omalley via acmurthy)
+
+    MAPREDUCE-3013. Removed YarnConfiguration.YARN_SECURITY_INFO and its usage
+    as it doesn't affect security any more. (vinodkv)
+
+    MAPREDUCE-2907. Changed log level for various messages in ResourceManager
+    from INFO to DEBUG. (Ravi Prakash via vinodkv)
+
+    MAPREDUCE-2702. Added a new API in OutputCommitter for recovering
+    the outputs of tasks from a crashed job so as to support MR Application
+    Master recovery. (Sharad Agarwal and Arun C Murthy via vinodkv)
+
+    MAPREDUCE-2738. Added the missing cluster level statisticss on the RM web
+    UI. (Robert Joseph Evans via vinodkv)
+
   OPTIMIZATIONS
 
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
@@ -355,9 +376,6 @@ Release 0.23.0 - Unreleased
     (Vinay Kumar Thota via amarrk)
 
     MAPREDUCE-2539. Fixed NPE in getMapTaskReports in JobClient. (Robert Evans via
-    acmurthy) 
-
-    MAPREDUCE-2531. Fixed jobcontrol to downgrade JobID. (Robert Evans via
     acmurthy) 
 
     MAPREDUCE-1978. Rumen TraceBuilder should provide recursive
@@ -1501,6 +1519,21 @@ Release 0.23.0 - Unreleased
     MAPREDUCE-3113. Ensure bin/yarn and bin/yarn-daemon.sh identify the root
     of the install properly. (Xie Xianshan via acmurthy) 
 
+    MAPREDUCE-2792. Replace usage of node ip-addresses with hostnames.
+    (vinodkv via acmurthy) 
+
+    MAPREDUCE-3112. Fixed recursive sourcing of HADOOP_OPTS environment
+    variable. (Eric Yang)
+
+    MAPREDUCE-3056. Changed the default staging directory to not include
+    user.name to prevent issues with non-secure mode. (Devaraj K via vinodkv)
+
+    MAPREDUCE-2913. Fixed TestMRJobs.testFailingMapper to assert the correct
+    TaskCompletionEventStatus. (Jonathan Eagles via vinodkv)
+
+    MAPREDUCE-2794. [MR-279] Incorrect metrics value for AvailableGB per 
+    queue per user. (John George via mahadev)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
@@ -2088,6 +2121,9 @@ Release 0.22.0 - Unreleased
 
     MAPREDUCE-2779. JobSplitWriter.java can't handle large job.split file.
     (Ming Ma via shv)
+
+    MAPREDUCE-2531. Fixed jobcontrol to downgrade JobID. (Robert Evans via
+    acmurthy) 
 
 Release 0.21.1 - Unreleased
 

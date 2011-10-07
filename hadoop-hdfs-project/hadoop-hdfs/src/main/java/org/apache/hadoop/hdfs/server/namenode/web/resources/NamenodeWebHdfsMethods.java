@@ -19,7 +19,6 @@ package org.apache.hadoop.hdfs.server.namenode.web.resources;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.URI;
@@ -143,7 +142,8 @@ public class NamenodeWebHdfsMethods {
       final NameNode namenode, final UserGroupInformation ugi,
       final String renewer) throws IOException {
     final Credentials c = DelegationTokenSecretManager.createCredentials(
-        namenode, ugi, request.getUserPrincipal().getName());
+        namenode, ugi,
+        renewer != null? renewer: request.getUserPrincipal().getName());
     final Token<? extends TokenIdentifier> t = c.getAllTokens().iterator().next();
     t.setService(new Text(SecurityUtil.buildDTServiceName(
         NameNode.getUri(namenode.getNameNodeAddress()),
@@ -189,7 +189,6 @@ public class NamenodeWebHdfsMethods {
   @Consumes({"*/*"})
   @Produces({MediaType.APPLICATION_JSON})
   public Response put(
-      final InputStream in,
       @Context final UserGroupInformation ugi,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
@@ -218,7 +217,7 @@ public class NamenodeWebHdfsMethods {
           final AccessTimeParam accessTime,
       @QueryParam(RenameOptionSetParam.NAME) @DefaultValue(RenameOptionSetParam.DEFAULT)
           final RenameOptionSetParam renameOptions
-      ) throws IOException, URISyntaxException, InterruptedException {
+      ) throws IOException, InterruptedException {
 
     if (LOG.isTraceEnabled()) {
       LOG.trace(op + ": " + path + ", ugi=" + ugi
@@ -248,7 +247,7 @@ public class NamenodeWebHdfsMethods {
     case MKDIRS:
     {
       final boolean b = np.mkdirs(fullpath, permission.getFsPermission(), true);
-      final String js = JsonUtil.toJsonString(PutOpParam.Op.MKDIRS, b);
+      final String js = JsonUtil.toJsonString("boolean", b);
       return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
     }
     case RENAME:
@@ -257,7 +256,7 @@ public class NamenodeWebHdfsMethods {
       if (s.isEmpty()) {
         @SuppressWarnings("deprecation")
         final boolean b = np.rename(fullpath, dstPath.getValue());
-        final String js = JsonUtil.toJsonString(PutOpParam.Op.RENAME, b);
+        final String js = JsonUtil.toJsonString("boolean", b);
         return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
       } else {
         np.rename2(fullpath, dstPath.getValue(),
@@ -268,7 +267,7 @@ public class NamenodeWebHdfsMethods {
     case SETREPLICATION:
     {
       final boolean b = np.setReplication(fullpath, replication.getValue());
-      final String js = JsonUtil.toJsonString(PutOpParam.Op.SETREPLICATION, b);
+      final String js = JsonUtil.toJsonString("boolean", b);
       return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
     }
     case SETOWNER:
@@ -303,7 +302,6 @@ public class NamenodeWebHdfsMethods {
   @Consumes({"*/*"})
   @Produces({MediaType.APPLICATION_JSON})
   public Response post(
-      final InputStream in,
       @Context final UserGroupInformation ugi,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
@@ -312,7 +310,7 @@ public class NamenodeWebHdfsMethods {
           final PostOpParam op,
       @QueryParam(BufferSizeParam.NAME) @DefaultValue(BufferSizeParam.DEFAULT)
           final BufferSizeParam bufferSize
-      ) throws IOException, URISyntaxException, InterruptedException {
+      ) throws IOException, InterruptedException {
 
     if (LOG.isTraceEnabled()) {
       LOG.trace(op + ": " + path + ", ugi=" + ugi
@@ -389,7 +387,7 @@ public class NamenodeWebHdfsMethods {
           final RenewerParam renewer,
       @QueryParam(BufferSizeParam.NAME) @DefaultValue(BufferSizeParam.DEFAULT)
           final BufferSizeParam bufferSize
-      ) throws IOException, URISyntaxException, InterruptedException {
+      ) throws IOException, InterruptedException {
 
     if (LOG.isTraceEnabled()) {
       LOG.trace(op + ": " + path + ", ugi=" + ugi
@@ -482,7 +480,7 @@ public class NamenodeWebHdfsMethods {
       @Override
       public void write(final OutputStream outstream) throws IOException {
         final PrintStream out = new PrintStream(outstream);
-        out.print('[');
+        out.println("{\"" + HdfsFileStatus[].class.getSimpleName() + "\":[");
 
         final HdfsFileStatus[] partial = first.getPartialListing();
         if (partial.length > 0) {
@@ -501,7 +499,7 @@ public class NamenodeWebHdfsMethods {
           }
         }
         
-        out.println(']');
+        out.println("]}");
       }
     };
   }
@@ -537,7 +535,7 @@ public class NamenodeWebHdfsMethods {
         case DELETE:
         {
           final boolean b = namenode.getRpcServer().delete(fullpath, recursive.getValue());
-          final String js = JsonUtil.toJsonString(DeleteOpParam.Op.DELETE, b);
+          final String js = JsonUtil.toJsonString("boolean", b);
           return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
         }
         default:
