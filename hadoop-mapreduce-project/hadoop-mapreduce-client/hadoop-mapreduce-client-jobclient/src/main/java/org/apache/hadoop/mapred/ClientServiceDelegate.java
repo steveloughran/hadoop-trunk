@@ -21,6 +21,7 @@ package org.apache.hadoop.mapred;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.InetSocketAddress;
 import java.security.PrivilegedAction;
 import java.util.HashMap;
 import java.util.List;
@@ -156,8 +157,11 @@ public class ClientServiceDelegate {
           Token<ApplicationTokenIdentifier> clientToken =
             new Token<ApplicationTokenIdentifier>();
           clientToken.decodeFromUrlString(clientTokenEncoded);
-          clientToken.setService(new Text(application.getHost() + ":"
-              + application.getRpcPort()));
+          // RPC layer client expects ip:port as service for tokens
+          InetSocketAddress addr = NetUtils.createSocketAddr(application
+              .getHost(), application.getRpcPort());
+          clientToken.setService(new Text(addr.getAddress().getHostAddress()
+              + ":" + addr.getPort()));
           UserGroupInformation.getCurrentUser().addToken(clientToken);
         }
         LOG.info("Tracking Url of JOB is " + application.getTrackingUrl());
@@ -239,13 +243,9 @@ public class ClientServiceDelegate {
     realProxy = currentUser.doAs(new PrivilegedAction<MRClientProtocol>() {
       @Override
       public MRClientProtocol run() {
-        Configuration myConf = new Configuration(conf);
-        myConf.setClass(
-            YarnConfiguration.YARN_SECURITY_INFO,
-            SchedulerSecurityInfo.class, SecurityInfo.class);
-        YarnRPC rpc = YarnRPC.create(myConf);
+        YarnRPC rpc = YarnRPC.create(conf);
         return (MRClientProtocol) rpc.getProxy(MRClientProtocol.class,
-            NetUtils.createSocketAddr(serviceAddr), myConf);
+            NetUtils.createSocketAddr(serviceAddr), conf);
       }
     });
     LOG.trace("Connected to ApplicationMaster at: " + serviceAddr);

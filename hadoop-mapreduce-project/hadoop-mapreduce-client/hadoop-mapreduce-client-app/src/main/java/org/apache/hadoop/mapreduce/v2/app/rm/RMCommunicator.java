@@ -46,8 +46,8 @@ import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.EventHandler;
@@ -147,8 +147,8 @@ public abstract class RMCommunicator extends AbstractService  {
 
   protected void register() {
     //Register
-    String host =
-      clientService.getBindAddress().getAddress().getHostAddress();
+    String host = clientService.getBindAddress().getAddress()
+        .getCanonicalHostName();
     try {
       RegisterApplicationMasterRequest request =
         recordFactory.newRecordInstance(RegisterApplicationMasterRequest.class);
@@ -247,7 +247,7 @@ public abstract class RMCommunicator extends AbstractService  {
 
   protected AMRMProtocol createSchedulerProxy() {
     final YarnRPC rpc = YarnRPC.create(getConfig());
-    final Configuration conf = new Configuration(getConfig());
+    final Configuration conf = getConfig();
     final String serviceAddr = conf.get(
         YarnConfiguration.RM_SCHEDULER_ADDRESS,
         YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS);
@@ -260,9 +260,6 @@ public abstract class RMCommunicator extends AbstractService  {
     }
 
     if (UserGroupInformation.isSecurityEnabled()) {
-      conf.setClass(YarnConfiguration.YARN_SECURITY_INFO,
-          SchedulerSecurityInfo.class, SecurityInfo.class);
-
       String tokenURLEncodedStr = System.getenv().get(
           ApplicationConstants.APPLICATION_MASTER_TOKEN_ENV_NAME);
       LOG.debug("AppMasterToken is " + tokenURLEncodedStr);
