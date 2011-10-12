@@ -28,9 +28,12 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.event.Dispatcher;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.AuxServicesEvent;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.AuxServicesEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerInitEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerKillEvent;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ResourceLocalizationService;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ApplicationLocalizationEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.LocalizationEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.ContainerLogsRetentionPolicy;
@@ -43,6 +46,10 @@ import org.apache.hadoop.yarn.state.StateMachine;
 import org.apache.hadoop.yarn.state.StateMachineFactory;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
+/**
+ * The state machine for the representation of an Application
+ * within the NodeManager.
+ */
 public class ApplicationImpl implements Application {
 
   final Dispatcher dispatcher;
@@ -151,7 +158,11 @@ public class ApplicationImpl implements Application {
 
   /**
    * Notify services of new application.
+   * 
+   * In particular, this requests that the {@link ResourceLocalizationService}
+   * localize the application-scoped resources.
    */
+  @SuppressWarnings("unchecked")
   static class AppInitTransition implements
       SingleArcTransition<ApplicationImpl, ApplicationEvent> {
     @Override
@@ -180,6 +191,7 @@ public class ApplicationImpl implements Application {
     }
   }
 
+  @SuppressWarnings("unchecked")
   static class AppInitDoneTransition implements
       SingleArcTransition<ApplicationImpl, ApplicationEvent> {
     @Override
@@ -199,6 +211,7 @@ public class ApplicationImpl implements Application {
     }
   }
 
+  @SuppressWarnings("unchecked")
   static class DuplicateAppInitTransition implements
       SingleArcTransition<ApplicationImpl, ApplicationEvent> {
     @Override
@@ -229,15 +242,21 @@ public class ApplicationImpl implements Application {
     }
   }
 
+  @SuppressWarnings("unchecked")
   void handleAppFinishWithContainersCleanedup() {
     // Delete Application level resources
     this.dispatcher.getEventHandler().handle(
         new ApplicationLocalizationEvent(
             LocalizationEventType.DESTROY_APPLICATION_RESOURCES, this));
 
+    // tell any auxiliary services that the app is done 
+    this.dispatcher.getEventHandler().handle(
+        new AuxServicesEvent(AuxServicesEventType.APPLICATION_STOP, appId));
+
     // TODO: Trigger the LogsManager
   }
 
+  @SuppressWarnings("unchecked")
   static class AppFinishTriggeredTransition
       implements
       MultipleArcTransition<ApplicationImpl, ApplicationEvent, ApplicationState> {
@@ -286,6 +305,7 @@ public class ApplicationImpl implements Application {
 
   }
 
+  @SuppressWarnings("unchecked")
   static class AppCompletelyDoneTransition implements
       SingleArcTransition<ApplicationImpl, ApplicationEvent> {
     @Override

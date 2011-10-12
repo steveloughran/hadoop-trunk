@@ -30,6 +30,11 @@ Trunk (unreleased changes)
     HADOOP-7717. Move handling of concurrent client fail-overs to
                  RetryInvocationHandler (atm)
 
+    HADOOP-6490. Use StringUtils over String#replace in Path#normalizePath.
+                 (Uma Maheswara Rao G via harsh)
+
+    HADOOP-7736. Remove duplicate Path#normalizePath call. (harsh)
+
   BUGS
 
     HADOOP-7606. Upgrade Jackson to version 1.7.1 to match the version required
@@ -441,6 +446,12 @@ Release 0.23.0 - Unreleased
     (Arpit Gupta via Eric Yang)
 
     HADOOP-7624. Set things up for a top level hadoop-tools module. (tucu)
+
+    HADOOP-7627. Improve MetricsAsserts to give more understandable output
+    on failure. (todd)
+
+    HADOOP-7642. create hadoop-dist module where TAR stitching would happen.
+    (Thomas White via tucu)
 
   OPTIMIZATIONS
   

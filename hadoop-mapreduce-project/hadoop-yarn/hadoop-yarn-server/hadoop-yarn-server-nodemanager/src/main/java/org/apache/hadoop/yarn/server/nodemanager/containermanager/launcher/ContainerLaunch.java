@@ -27,7 +27,6 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -124,19 +123,18 @@ public class ContainerLaunch implements Callable<Integer> {
       FileContext lfs = FileContext.getLocalFSFileContext();
       LocalDirAllocator lDirAllocator =
           new LocalDirAllocator(YarnConfiguration.NM_LOCAL_DIRS); // TODO
+
       Path nmPrivateContainerScriptPath =
           lDirAllocator.getLocalPathForWrite(
-              ResourceLocalizationService.NM_PRIVATE_DIR + Path.SEPARATOR
-                  + appIdStr + Path.SEPARATOR + containerIdStr
-                  + Path.SEPARATOR + CONTAINER_SCRIPT, this.conf);
+              getContainerPrivateDir(appIdStr, containerIdStr) + Path.SEPARATOR
+                  + CONTAINER_SCRIPT, this.conf);
       Path nmPrivateTokensPath =
           lDirAllocator.getLocalPathForWrite(
-              ResourceLocalizationService.NM_PRIVATE_DIR
-                  + Path.SEPARATOR
-                  + containerIdStr
+              getContainerPrivateDir(appIdStr, containerIdStr)
                   + Path.SEPARATOR
                   + String.format(ContainerLocalizer.TOKEN_FILE_NAME_FMT,
                       containerIdStr), this.conf);
+
       DataOutputStream containerScriptOutStream = null;
       DataOutputStream tokensOutStream = null;
 
@@ -229,6 +227,16 @@ public class ContainerLaunch implements Callable<Integer> {
     return 0;
   }
 
+  private String getContainerPrivateDir(String appIdStr, String containerIdStr) {
+    return getAppPrivateDir(appIdStr) + Path.SEPARATOR + containerIdStr
+        + Path.SEPARATOR;
+  }
+
+  private String getAppPrivateDir(String appIdStr) {
+    return ResourceLocalizationService.NM_PRIVATE_DIR + Path.SEPARATOR
+        + appIdStr;
+  }
+
   private static class ShellScriptBuilder {
     
     private final StringBuilder sb;
@@ -260,7 +268,7 @@ public class ContainerLaunch implements Callable<Integer> {
       if (dst.toUri().getPath().indexOf('/') != -1) {
         line("mkdir -p ", dst.getParent().toString());
       }
-      line("ln -sf ", src.toUri().getPath(), " ", dst.toString());
+      line("ln -sf \"", src.toUri().getPath(), "\" \"", dst.toString(), "\"");
       return this;
     }
   
@@ -341,8 +349,8 @@ public class ContainerLaunch implements Callable<Integer> {
     putEnvIfAbsent(environment, Environment.YARN_HOME.name());
 
   }
-  
-  private static void writeLaunchEnv(OutputStream out,
+    
+  static void writeLaunchEnv(OutputStream out,
       Map<String,String> environment, Map<Path,String> resources,
       List<String> command)
       throws IOException {
