@@ -29,7 +29,6 @@ import org.apache.log4j.WriterAppender;
 import org.apache.log4j.spi.HierarchyEventListener;
 import org.apache.log4j.spi.LoggerFactory;
 import org.apache.log4j.spi.LoggerRepository;
-import org.apache.log4j.spi.NOPLoggerRepository;
 import org.apache.log4j.spi.ThrowableInformation;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonNode;
@@ -53,8 +52,8 @@ public class TestLog4Json extends TestCase {
   public void testConstruction() throws Throwable {
     Log4Json l4j = new Log4Json();
     String outcome = l4j.toJson(new StringWriter(),
-                                "name", 0, "DEBUG", "thread1",
-                                "hello, world", null).toString();
+        "name", 0, "DEBUG", "thread1",
+        "hello, world", null).toString();
     println("testConstruction", outcome);
   }
 
@@ -66,12 +65,12 @@ public class TestLog4Json extends TestCase {
     Log4Json l4j = new Log4Json();
     long timeStamp = System.currentTimeMillis();
     String outcome = l4j.toJson(new StringWriter(),
-                                "testException",
-                                timeStamp,
-                                "INFO",
-                                "quoted\"",
-                                "new line\n and {}",
-                                ti)
+        "testException",
+        timeStamp,
+        "INFO",
+        "quoted\"",
+        "new line\n and {}",
+        ti)
         .toString();
     println("testException", outcome);
   }
@@ -85,22 +84,31 @@ public class TestLog4Json extends TestCase {
     Log4Json l4j = new Log4Json();
     long timeStamp = System.currentTimeMillis();
     String outcome = l4j.toJson(new StringWriter(),
-                                "testNestedException",
-                                timeStamp,
-                                "INFO",
-                                "quoted\"",
-                                "new line\n and {}",
-                                ti)
+        "testNestedException",
+        timeStamp,
+        "INFO",
+        "quoted\"",
+        "new line\n and {}",
+        ti)
         .toString();
     println("testNestedException", outcome);
     ContainerNode rootNode = Log4Json.parse(outcome);
     assertEntryEquals(rootNode, Log4Json.LEVEL, "INFO");
     assertEntryEquals(rootNode, Log4Json.NAME, "testNestedException");
     assertEntryEquals(rootNode, Log4Json.TIME, timeStamp);
-    assertEntryEquals(rootNode, Log4Json.EXCEPTION_CLASS, 
-                      ioe.getClass().getName());
+    assertEntryEquals(rootNode, Log4Json.EXCEPTION_CLASS,
+        ioe.getClass().getName());
     JsonNode node = assertNodeContains(rootNode, Log4Json.STACK);
-    assertTrue("Not an array: " +node, node.isArray());
+    assertTrue("Not an array: " + node, node.isArray());
+    node = assertNodeContains(rootNode, Log4Json.DATE);
+    assertTrue("Not a string: " + node, node.isTextual());
+    //rather than try and make assertions about the format of the text
+    //message equalling another ISO date, this test asserts that the hypen
+    //and colon characters are in the string.
+    String dateText = node.getTextValue();
+    assertTrue("No '-' in " + dateText, dateText.contains("-"));
+    assertTrue("No '-' in " + dateText, dateText.contains(":"));
+
   }
 
 
@@ -137,7 +145,7 @@ public class TestLog4Json extends TestCase {
 
   private JsonNode assertNodeContains(ContainerNode rootNode, String key) {
     JsonNode node = rootNode.get(key);
-    if (node==null) {
+    if (node == null) {
       fail("No entry of name \"" + key + "\" found in " + rootNode.toString());
     }
     return node;

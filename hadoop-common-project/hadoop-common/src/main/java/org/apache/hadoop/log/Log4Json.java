@@ -20,6 +20,7 @@
 package org.apache.hadoop.log;
 
 import org.apache.log4j.Layout;
+import org.apache.log4j.helpers.ISO8601DateFormat;
 import org.apache.log4j.spi.LoggingEvent;
 import org.apache.log4j.spi.ThrowableInformation;
 import org.codehaus.jackson.JsonFactory;
@@ -32,6 +33,11 @@ import org.codehaus.jackson.node.ContainerNode;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
 
 /**
  * This offers a log layout for JSON, with whatever test entry points aid
@@ -49,18 +55,21 @@ public class Log4Json extends Layout {
    * configuration it must be done in a static intializer block.
    */
   private static final JsonFactory factory = new MappingJsonFactory();
+  public static final String DATE = "date";
   public static final String EXCEPTION_CLASS = "exceptionclass";
   public static final String LEVEL = "level";
   public static final String MESSAGE = "message";
   public static final String NAME = "name";
   public static final String STACK = "stack";
-  public static final String TIME = "time";
   public static final String THREAD = "thread";
-
+  public static final String TIME = "time";
   public static final String JSON_TYPE = "application/json";
 
+  private final DateFormat dateFormat;
+
   public Log4Json() {
-  }
+      dateFormat = new ISO8601DateFormat();
+    }
 
 
   /**
@@ -142,6 +151,8 @@ public class Log4Json extends Layout {
     json.writeStartObject();
     json.writeStringField(NAME, loggerName);
     json.writeNumberField(TIME, timeStamp);
+    Date date = new Date(timeStamp);
+    json.writeStringField(DATE, dateFormat.format(date));
     json.writeStringField(LEVEL, level);
     json.writeStringField(THREAD, threadName);
     json.writeStringField(MESSAGE, message);
