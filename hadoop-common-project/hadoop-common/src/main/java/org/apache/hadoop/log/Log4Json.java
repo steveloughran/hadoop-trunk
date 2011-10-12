@@ -34,20 +34,70 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
-import java.util.GregorianCalendar;
 
 /**
- * This offers a log layout for JSON, with whatever test entry points aid
- * testing.
+ * This offers a log layout for JSON, with some test entry points. It's purpose is
+ * to allow Log4J to generate events that are easy for other programs to parse, but which are somewhat
+ * human-readable.
  *
- * Some features. <ol> <li>Time is published as a time_t event since 1/1/1970
- * -this is the fastest to generate.</li> </ol>
+ * Some features.
+ *
+ * <ol>
+ *     <li>Every event is a standalone JSON clause</li>
+ *     <li>Time is published as a time_t event since 1/1/1970
+ *      -this is the fastest to generate.</li>
+ *     <li>An ISO date is generated, but this is cached and will only be accurate to within a second</li>
+ *     <li>the stack trace is included as an array</li>
+ * </ol>
+ *
+ * A simple log event will resemble the following
+ * <pre>
+ *     {"name":"test","time":1318429136789,"date":"2011-10-12 15:18:56,789","level":"INFO","thread":"main","message":"test message"}
+ * </pre>
+ *
+ * An event with an error will contain data similar to that below (which has been reformatted to be multi-line).
+ *
+ * <pre>
+ *     {
+ *     "name":"testException",
+ *     "time":1318429136789,
+ *     "date":"2011-10-12 15:18:56,789",
+ *     "level":"INFO",
+ *     "thread":"quoted\"",
+ *     "message":"new line\n and {}",
+ *     "exceptionclass":"java.net.NoRouteToHostException",
+ *     "stack":[
+ *         "java.net.NoRouteToHostException: that box caught fire 3 years ago",
+ *         "\tat org.apache.hadoop.log.TestLog4Json.testException(TestLog4Json.java:49)",
+ *         "\tat sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)",
+ *         "\tat sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:39)",
+ *         "\tat sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:25)",
+ *         "\tat java.lang.reflect.Method.invoke(Method.java:597)",
+ *         "\tat junit.framework.TestCase.runTest(TestCase.java:168)",
+ *         "\tat junit.framework.TestCase.runBare(TestCase.java:134)",
+ *         "\tat junit.framework.TestResult$1.protect(TestResult.java:110)",
+ *         "\tat junit.framework.TestResult.runProtected(TestResult.java:128)",
+ *         "\tat junit.framework.TestResult.run(TestResult.java:113)",
+ *         "\tat junit.framework.TestCase.run(TestCase.java:124)",
+ *         "\tat junit.framework.TestSuite.runTest(TestSuite.java:232)",
+ *         "\tat junit.framework.TestSuite.run(TestSuite.java:227)",
+ *         "\tat org.junit.internal.runners.JUnit38ClassRunner.run(JUnit38ClassRunner.java:83)",
+ *         "\tat org.apache.maven.surefire.junit4.JUnit4TestSet.execute(JUnit4TestSet.java:59)",
+ *         "\tat org.apache.maven.surefire.suite.AbstractDirectoryTestSuite.executeTestSet(AbstractDirectoryTestSuite.java:120)",
+ *         "\tat org.apache.maven.surefire.suite.AbstractDirectoryTestSuite.execute(AbstractDirectoryTestSuite.java:145)",
+ *         "\tat org.apache.maven.surefire.Surefire.run(Surefire.java:104)",
+ *         "\tat sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)",
+ *         "\tat sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:39)",
+ *         "\tat sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:25)",
+ *         "\tat java.lang.reflect.Method.invoke(Method.java:597)",
+ *         "\tat org.apache.maven.surefire.booter.SurefireBooter.runSuitesInProcess(SurefireBooter.java:290)",
+ *         "\tat org.apache.maven.surefire.booter.SurefireBooter.main(SurefireBooter.java:1017)"
+ *         ]
+ *     }
+ * </pre>
  */
 public class Log4Json extends Layout {
-  public static final String FIELD_THREAD = "";
 
   /**
    * Jackson factories are thread safe when constructing parsers and generators.
@@ -68,8 +118,8 @@ public class Log4Json extends Layout {
   private final DateFormat dateFormat;
 
   public Log4Json() {
-      dateFormat = new ISO8601DateFormat();
-    }
+    dateFormat = new ISO8601DateFormat();
+  }
 
 
   /**
