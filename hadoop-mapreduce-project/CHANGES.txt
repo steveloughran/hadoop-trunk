@@ -22,7 +22,13 @@ Trunk (unreleased changes)
     MAPREDUCE-2836. Provide option to fail jobs when submitted to non-existent
     fair scheduler pools. (Ahmed Radwan via todd)
 
+    MAPREDUCE-3171. normalize nodemanager native code compilation with common/hdfs 
+    native. (tucu)
+
   BUG FIXES
+
+    MAPREDUCE-3166. [Rumen] Make Rumen use job history api instead of relying
+    on current history file name format. (Ravi Gummadi)
 
     MAPREDUCE-3157. [Rumen] Fix TraceBuilder to handle 0.20 history file
     names also. (Ravi Gummadi)
@@ -38,6 +44,11 @@ Trunk (unreleased changes)
     artifacts when there are no warnings. (Tom White via vinodkv).
 
     MAPREDUCE-3081. Fix vaidya startup script. (gkesavan via suhas).
+
+    MAPREDUCE-3183. hadoop-assemblies/src/main/resources/assemblies/hadoop-mapreduce-dist.xml 
+    missing license header. (Hitesh Shah via tucu).
+
+    MAPREDUCE-2764. Fix renewal of dfs delegation tokens. (Owen via jitendra)
 
 Release 0.23.0 - Unreleased
 
@@ -367,6 +378,9 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3148. Ported MAPREDUCE-2702 to old mapred api for aiding task
     recovery. (acmurthy) 
+
+    MAPREDUCE-3133. Running a set of methods in a Single Test Class.
+    (Jonathan Eagles via mahadev)
 
   OPTIMIZATIONS
 
@@ -1590,6 +1604,17 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3125. Modified TaskImpl to consider only non-failed, non-killed
     task-attempts for obtaining task's progress. (Hitesh Shah via vinodkv)
+
+    MAPREDUCE-2666. Retrieve shuffle port number from JobHistory on MR AM
+    restart. (Jonathan Eagles via acmurthy) 
+
+    MAPREDUCE-2789. Complete schedulingInfo on CLI. (Eric Payne via acmurthy) 
+
+    MAPREDUCE-3170. Fixed job output commit for deep hierarchies. (Hitesh Shah
+    via acmurthy)
+
+    MAPREDUCE-3124. Fixed location of native libs i.e. libhadoop.so for
+    containers. (John George via acmurthy) 
 
 Release 0.22.0 - Unreleased
 
