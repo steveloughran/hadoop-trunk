@@ -1095,6 +1095,8 @@ public abstract class TaskAttemptImpl implements
 
       //set the launch time
       taskAttempt.launchTime = taskAttempt.clock.getTime();
+      taskAttempt.shufflePort = event.getShufflePort();
+
       // register it to TaskAttemptListener so that it start listening
       // for it
       taskAttempt.taskAttemptListener.register(
@@ -1116,7 +1118,7 @@ public abstract class TaskAttemptImpl implements
         new TaskAttemptStartedEvent(TypeConverter.fromYarn(taskAttempt.attemptId),
             TypeConverter.fromYarn(taskAttempt.attemptId.getTaskId().getTaskType()),
             taskAttempt.launchTime,
-            nodeHttpInetAddr.getHostName(), nodeHttpInetAddr.getPort());
+            nodeHttpInetAddr.getHostName(), nodeHttpInetAddr.getPort(), taskAttempt.shufflePort);
       taskAttempt.eventHandler.handle
           (new JobHistoryEvent(taskAttempt.attemptId.getTaskId().getJobId(), tase));
       taskAttempt.eventHandler.handle
@@ -1125,7 +1127,6 @@ public abstract class TaskAttemptImpl implements
       //make remoteTask reference as null as it is no more needed
       //and free up the memory
       taskAttempt.remoteTask = null;
-      taskAttempt.shufflePort = event.getShufflePort();
       
       //tell the Task that attempt has started
       taskAttempt.eventHandler.handle(new TaskTAttemptEvent(
@@ -1242,7 +1243,7 @@ public abstract class TaskAttemptImpl implements
          state.toString(),
          this.reportedStatus.shuffleFinishTime,
          this.reportedStatus.sortFinishTime,
-         finishTime, this.containerMgrAddress == null ? "UNKNOWN" : this.containerMgrAddress,
+         finishTime, this.nodeHostName == null ? "UNKNOWN" : this.nodeHostName,
          this.reportedStatus.stateString,
          TypeConverter.fromYarn(getCounters()),
          getProgressSplitBlock().burst());
