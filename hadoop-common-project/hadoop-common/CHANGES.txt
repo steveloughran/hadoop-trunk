@@ -42,6 +42,17 @@ Trunk (unreleased changes)
     if the override value is same as the final parameter value.
     (Ravi Prakash via suresh)
 
+    HADOOP-7737. normalize hadoop-mapreduce & hadoop-dist dist/tar build with 
+    common/hdfs. (tucu)
+
+    HADOOP-7745. Fix wrong variable name in exception message introduced
+    in HADOOP-7509. (Ravi Prakash via suresh)
+
+    HADOOP-7743. Add Maven profile to create a full source tarball. (tucu)
+
+    HADOOP-7729. Send back valid HTTP response if user hits IPC port with
+    HTTP GET. (todd)
+
   BUGS
 
     HADOOP-7606. Upgrade Jackson to version 1.7.1 to match the version required
@@ -72,6 +83,8 @@ Trunk (unreleased changes)
 
     HADOOP-7721. Add log before login in KerberosAuthenticationHandler. 
     (jitendra)
+
+    MAPREDUCE-2764. Fix renewal of dfs delegation tokens. (Owen via jitendra)
 
 Release 0.23.0 - Unreleased
 
@@ -140,6 +153,9 @@ Release 0.23.0 - Unreleased
     JT/NN/DN/TT web-consoles. (Alejandro Abdelnur via atm)
 
   IMPROVEMENTS
+
+    HADOOP-7655. Provide a small validation script that smoke tests the installed
+    cluster. (Arpit Gupta via mattf)
 
     HADOOP-7042. Updates to test-patch.sh to include failed test names and
     improve other messaging. (nigel)
@@ -465,6 +481,9 @@ Release 0.23.0 - Unreleased
     HADOOP-7709. Running a set of methods in a Single Test Class. 
     (Jonathan Eagles via mahadev)
 
+    HADOOP-7705. Add a log4j back end that can push out JSON data,
+    one per line. (stevel)
+
   OPTIMIZATIONS
   
     HADOOP-7333. Performance improvement in PureJavaCrc32. (Eric Caspole
@@ -713,6 +732,9 @@ Release 0.23.0 - Unreleased
 
     HADOOP-7724. Fixed hadoop-setup-conf.sh to put proxy user in
     core-site.xml.  (Arpit Gupta via Eric Yang)
+
+    HADOOP-7755. Detect MapReduce PreCommit Trunk builds silently failing
+    when running test-patch.sh. (Jonathan Eagles via tomwhite)
 
 Release 0.22.0 - Unreleased
 

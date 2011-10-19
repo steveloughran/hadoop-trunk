@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.mapreduce;
 
+import org.apache.hadoop.util.PlatformName;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
@@ -237,6 +238,8 @@ public interface MRJobConfig {
   public static final String REDUCE_JAVA_OPTS = "mapreduce.reduce.java.opts";
 
   public static final String REDUCE_ULIMIT = "mapreduce.reduce.ulimit";
+  
+  public static final String MAPREDUCE_JOB_DIR = "mapreduce.job.dir";
 
   public static final String REDUCE_MAX_ATTEMPTS = "mapreduce.reduce.maxattempts";
 
@@ -323,9 +326,9 @@ public interface MRJobConfig {
   public static final String DEFAULT_MR_AM_COMMAND_OPTS = "-Xmx1536m";
 
   /** Root Logging level passed to the MR app master.*/
-  public static final String MR_AM_LOG_OPTS = 
-    MR_AM_PREFIX+"log-opts";
-  public static final String DEFAULT_MR_AM_LOG_OPTS = "INFO";
+  public static final String MR_AM_LOG_LEVEL = 
+    MR_AM_PREFIX+"log.level";
+  public static final String DEFAULT_MR_AM_LOG_LEVEL = "INFO";
 
   /**The number of splits when reporting progress in MR*/
   public static final String MR_AM_NUM_PROGRESS_SPLITS = 
@@ -428,7 +431,7 @@ public interface MRJobConfig {
       "mapreduce.admin.user.env";
 
   public static final String DEFAULT_MAPRED_ADMIN_USER_ENV =
-      "LD_LIBRARY_PATH=$HADOOP_COMMON_HOME/lib";
+      "LD_LIBRARY_PATH=$HADOOP_COMMON_HOME/lib/native/" + PlatformName.getPlatformName();
 
   public static final String WORKDIR = "work";
 
@@ -436,8 +439,9 @@ public interface MRJobConfig {
 
   public static final String HADOOP_WORK_DIR = "HADOOP_WORK_DIR";
 
+  // Environment variables used by Pipes. (TODO: these
+  // do not appear to be used by current pipes source code!)
   public static final String STDOUT_LOGFILE_ENV = "STDOUT_LOGFILE_ENV";
-
   public static final String STDERR_LOGFILE_ENV = "STDERR_LOGFILE_ENV";
 
   // This should be the directory where splits file gets localized on the node

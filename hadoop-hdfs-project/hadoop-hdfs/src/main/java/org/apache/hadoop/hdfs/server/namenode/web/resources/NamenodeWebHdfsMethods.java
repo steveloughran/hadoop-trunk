@@ -28,6 +28,7 @@ import java.util.EnumSet;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -45,6 +46,7 @@ import javax.ws.rs.core.StreamingOutput;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -108,6 +110,7 @@ public class NamenodeWebHdfsMethods {
 
   private @Context ServletContext context;
   private @Context HttpServletRequest request;
+  private @Context HttpServletResponse response;
 
   private static DatanodeInfo chooseDatanode(final NameNode namenode,
       final String path, final HttpOpParam.Op op, final long openOffset
@@ -117,6 +120,9 @@ public class NamenodeWebHdfsMethods {
         || op == PostOpParam.Op.APPEND) {
       final NamenodeProtocols np = namenode.getRpcServer();
       final HdfsFileStatus status = np.getFileInfo(path);
+      if (status == null) {
+        throw new FileNotFoundException("File " + path + " not found.");
+      }
       final long len = status.getLen();
       if (op == GetOpParam.Op.OPEN && (openOffset < 0L || openOffset >= len)) {
         throw new IOException("Offset=" + openOffset + " out of the range [0, "
@@ -226,6 +232,9 @@ public class NamenodeWebHdfsMethods {
               modificationTime, accessTime, renameOptions));
     }
 
+    //clear content type
+    response.setContentType(null);
+
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override
       public Response run() throws IOException, URISyntaxException {
@@ -233,6 +242,7 @@ public class NamenodeWebHdfsMethods {
         try {
 
     final String fullpath = path.getAbsolutePath();
+    final Configuration conf = (Configuration)context.getAttribute(JspHelper.CURRENT_CONF);
     final NameNode namenode = (NameNode)context.getAttribute("name.node");
     final NamenodeProtocols np = namenode.getRpcServer();
 
@@ -254,7 +264,6 @@ public class NamenodeWebHdfsMethods {
     {
       final EnumSet<Options.Rename> s = renameOptions.getValue();
       if (s.isEmpty()) {
-        @SuppressWarnings("deprecation")
         final boolean b = np.rename(fullpath, dstPath.getValue());
         final String js = JsonUtil.toJsonString("boolean", b);
         return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
@@ -266,7 +275,7 @@ public class NamenodeWebHdfsMethods {
     }
     case SETREPLICATION:
     {
-      final boolean b = np.setReplication(fullpath, replication.getValue());
+      final boolean b = np.setReplication(fullpath, replication.getValue(conf));
       final String js = JsonUtil.toJsonString("boolean", b);
       return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
     }
@@ -316,6 +325,9 @@ public class NamenodeWebHdfsMethods {
       LOG.trace(op + ": " + path + ", ugi=" + ugi
           + Param.toSortedString(", ", bufferSize));
     }
+
+    //clear content type
+    response.setContentType(null);
 
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override
@@ -394,6 +406,8 @@ public class NamenodeWebHdfsMethods {
           + Param.toSortedString(", ", offset, length, renewer, bufferSize));
     }
 
+    //clear content type
+    response.setContentType(null);
 
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override
@@ -480,7 +494,8 @@ public class NamenodeWebHdfsMethods {
       @Override
       public void write(final OutputStream outstream) throws IOException {
         final PrintStream out = new PrintStream(outstream);
-        out.println("{\"" + HdfsFileStatus.class.getSimpleName() + "\":[");
+        out.println("{\"" + HdfsFileStatus.class.getSimpleName() + "es\":{\""
+            + HdfsFileStatus.class.getSimpleName() + "\":[");
 
         final HdfsFileStatus[] partial = first.getPartialListing();
         if (partial.length > 0) {
@@ -499,7 +514,8 @@ public class NamenodeWebHdfsMethods {
           }
         }
         
-        out.println("]}");
+        out.println();
+        out.println("]}}");
       }
     };
   }
@@ -521,6 +537,9 @@ public class NamenodeWebHdfsMethods {
       LOG.trace(op + ": " + path + ", ugi=" + ugi
           + Param.toSortedString(", ", recursive));
     }
+
+    //clear content type
+    response.setContentType(null);
 
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override
