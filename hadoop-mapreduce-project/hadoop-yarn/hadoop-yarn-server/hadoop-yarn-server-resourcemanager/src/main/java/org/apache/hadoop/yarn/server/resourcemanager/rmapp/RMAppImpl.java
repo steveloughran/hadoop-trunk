@@ -84,6 +84,7 @@ public class RMAppImpl implements RMApp {
   private final WriteLock writeLock;
   private final Map<ApplicationAttemptId, RMAppAttempt> attempts
       = new LinkedHashMap<ApplicationAttemptId, RMAppAttempt>();
+  private final long submitTime;
 
   // Mutable fields
   private long startTime;
@@ -151,8 +152,10 @@ public class RMAppImpl implements RMApp {
     .addTransition(
         RMAppState.KILLED,
         RMAppState.KILLED,
-        EnumSet.of(RMAppEventType.KILL, RMAppEventType.ATTEMPT_FINISHED,
-            RMAppEventType.ATTEMPT_FAILED, RMAppEventType.ATTEMPT_KILLED))
+        EnumSet.of(RMAppEventType.APP_ACCEPTED,
+            RMAppEventType.APP_REJECTED, RMAppEventType.KILL,
+            RMAppEventType.ATTEMPT_FINISHED, RMAppEventType.ATTEMPT_FAILED,
+            RMAppEventType.ATTEMPT_KILLED))
 
      .installTopology();
 
@@ -163,7 +166,8 @@ public class RMAppImpl implements RMApp {
       Configuration config, String name, String user, String queue,
       ApplicationSubmissionContext submissionContext, String clientTokenStr,
       ApplicationStore appStore,
-      YarnScheduler scheduler, ApplicationMasterService masterService) {
+      YarnScheduler scheduler, ApplicationMasterService masterService, 
+      long submitTime) {
 
     this.applicationId = applicationId;
     this.name = name;
@@ -178,6 +182,7 @@ public class RMAppImpl implements RMApp {
     this.appStore = appStore;
     this.scheduler = scheduler;
     this.masterService = masterService;
+    this.submitTime = submitTime;
     this.startTime = System.currentTimeMillis();
 
     this.maxRetries = conf.getInt(YarnConfiguration.RM_AM_MAX_RETRIES,
@@ -365,6 +370,11 @@ public class RMAppImpl implements RMApp {
     } finally {
       this.readLock.unlock();
     }
+  }
+
+  @Override
+  public long getSubmitTime() {
+    return this.submitTime;
   }
 
   @Override

@@ -1,14 +1,23 @@
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.application;
 
-import static org.mockito.Mockito.*;
 import static org.junit.Assert.assertEquals;
+import static org.mockito.Matchers.argThat;
+import static org.mockito.Matchers.refEq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.AuxServicesEvent;
@@ -27,6 +36,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.event.LogAggregatorEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitorEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitorEventType;
+import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.util.BuilderUtils;
 import org.junit.Test;
 import org.mockito.ArgumentMatcher;
@@ -41,11 +51,12 @@ public class TestApplication {
     WrappedApplication wa = null;
     try {
       wa = new WrappedApplication(1, 314159265358979L, "yak", 3);
-      wa.initApplication(1);
+      wa.initApplication();
+      wa.initContainer(1);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
       assertEquals(1, wa.app.getContainers().size());
-      wa.initApplication(0);
-      wa.initApplication(2);
+      wa.initContainer(0);
+      wa.initContainer(2);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
       assertEquals(3, wa.app.getContainers().size());
       wa.applicationInited();
@@ -70,7 +81,8 @@ public class TestApplication {
     WrappedApplication wa = null;
     try {
       wa = new WrappedApplication(2, 314159265358979L, "yak", 3);
-      wa.initApplication(0);
+      wa.initApplication();
+      wa.initContainer(0);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
       assertEquals(1, wa.app.getContainers().size());
 
@@ -80,8 +92,8 @@ public class TestApplication {
           argThat(new ContainerInitMatcher(wa.containers.get(0)
               .getContainerID())));
 
-      wa.initApplication(1);
-      wa.initApplication(2);
+      wa.initContainer(1);
+      wa.initContainer(2);
       assertEquals(ApplicationState.RUNNING, wa.app.getApplicationState());
       assertEquals(3, wa.app.getContainers().size());
 
@@ -105,7 +117,8 @@ public class TestApplication {
     WrappedApplication wa = null;
     try {
       wa = new WrappedApplication(3, 314159265358979L, "yak", 3);
-      wa.initApplication(-1);
+      wa.initApplication();
+      wa.initContainer(-1);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
       wa.applicationInited();
       assertEquals(ApplicationState.RUNNING, wa.app.getApplicationState());
@@ -130,7 +143,8 @@ public class TestApplication {
     WrappedApplication wa = null;
     try {
       wa = new WrappedApplication(4, 314159265358979L, "yak", 3);
-      wa.initApplication(-1);
+      wa.initApplication();
+      wa.initContainer(-1);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
       wa.applicationInited();
       assertEquals(ApplicationState.RUNNING, wa.app.getApplicationState());
@@ -185,7 +199,8 @@ public class TestApplication {
     WrappedApplication wa = null;
     try {
       wa = new WrappedApplication(5, 314159265358979L, "yak", 3);
-      wa.initApplication(-1);
+      wa.initApplication();
+      wa.initContainer(-1);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
       wa.applicationInited();
       assertEquals(ApplicationState.RUNNING, wa.app.getApplicationState());
@@ -220,7 +235,8 @@ public class TestApplication {
     WrappedApplication wa = null;
     try {
       wa = new WrappedApplication(5, 314159265358979L, "yak", 3);
-      wa.initApplication(-1);
+      wa.initApplication();
+      wa.initContainer(-1);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
       wa.applicationInited();
       assertEquals(ApplicationState.RUNNING, wa.app.getApplicationState());
@@ -256,7 +272,8 @@ public class TestApplication {
     WrappedApplication wa = null;
     try {
       wa = new WrappedApplication(1, 314159265358979L, "yak", 3);
-      wa.initApplication(0);
+      wa.initApplication();
+      wa.initContainer(0);
       assertEquals(ApplicationState.INITING, wa.app.getApplicationState());
       assertEquals(1, wa.app.getContainers().size());
 
@@ -276,7 +293,7 @@ public class TestApplication {
           refEq(new ApplicationLocalizationEvent(
               LocalizationEventType.DESTROY_APPLICATION_RESOURCES, wa.app)));
 
-      wa.initApplication(1);
+      wa.initContainer(1);
       assertEquals(ApplicationState.APPLICATION_RESOURCES_CLEANINGUP,
           wa.app.getApplicationState());
       assertEquals(0, wa.app.getContainers().size());
@@ -359,7 +376,8 @@ public class TestApplication {
       this.user = user;
       this.appId = BuilderUtils.newApplicationId(timestamp, id);
 
-      app = new ApplicationImpl(dispatcher, this.user, appId, null);
+      app = new ApplicationImpl(dispatcher, new ApplicationACLsManager(
+          new Configuration()), this.user, appId, null);
       containers = new ArrayList<Container>();
       for (int i = 0; i < numContainers; i++) {
         containers.add(createMockedContainer(this.appId, i));
@@ -376,13 +394,18 @@ public class TestApplication {
       dispatcher.stop();
     }
 
-    public void initApplication(int containerNum) {
+    public void initApplication() {
+      app.handle(new ApplicationInitEvent(appId,
+          new HashMap<ApplicationAccessType, String>()));
+    }
+
+    public void initContainer(int containerNum) {
       if (containerNum == -1) {
         for (int i = 0; i < containers.size(); i++) {
-          app.handle(new ApplicationInitEvent(containers.get(i)));
+          app.handle(new ApplicationContainerInitEvent(containers.get(i)));
         }
       } else {
-        app.handle(new ApplicationInitEvent(containers.get(containerNum)));
+        app.handle(new ApplicationContainerInitEvent(containers.get(containerNum)));
       }
       drainDispatcherEvents();
     }
@@ -417,6 +440,10 @@ public class TestApplication {
     ContainerId cId = BuilderUtils.newContainerId(appAttemptId, containerId);
     Container c = mock(Container.class);
     when(c.getContainerID()).thenReturn(cId);
+    ContainerLaunchContext launchContext = mock(ContainerLaunchContext.class);
+    when(c.getLaunchContext()).thenReturn(launchContext);
+    when(launchContext.getApplicationACLs()).thenReturn(
+        new HashMap<ApplicationAccessType, String>());
     return c;
   }
 }

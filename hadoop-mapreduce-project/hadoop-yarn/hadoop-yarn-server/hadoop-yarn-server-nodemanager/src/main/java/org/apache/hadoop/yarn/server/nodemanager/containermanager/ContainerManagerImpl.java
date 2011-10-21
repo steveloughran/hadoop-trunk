@@ -34,7 +34,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
-import org.apache.hadoop.security.SecurityInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -58,7 +57,6 @@ import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
-import org.apache.hadoop.yarn.security.ContainerManagerSecurityInfo;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrCompletedAppsEvent;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrCompletedContainersEvent;
 import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor;
@@ -69,6 +67,7 @@ import org.apache.hadoop.yarn.server.nodemanager.NMAuditLogger;
 import org.apache.hadoop.yarn.server.nodemanager.NMAuditLogger.AuditConstants;
 import org.apache.hadoop.yarn.server.nodemanager.NodeStatusUpdater;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.Application;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationContainerInitEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationImpl;
@@ -88,6 +87,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.Contai
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitorEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitorImpl;
 import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
+import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.server.security.ContainerTokenSecretManager;
 import org.apache.hadoop.yarn.service.CompositeService;
 import org.apache.hadoop.yarn.service.Service;
@@ -113,13 +113,14 @@ public class ContainerManagerImpl extends CompositeService implements
   private final RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
   
   protected final AsyncDispatcher dispatcher;
+  private final ApplicationACLsManager aclsManager;
 
   private final DeletionService deletionService;
 
   public ContainerManagerImpl(Context context, ContainerExecutor exec,
       DeletionService deletionContext, NodeStatusUpdater nodeStatusUpdater,
       NodeManagerMetrics metrics, ContainerTokenSecretManager 
-      containerTokenSecretManager) {
+      containerTokenSecretManager, ApplicationACLsManager aclsManager) {
     super(ContainerManagerImpl.class.getName());
     this.context = context;
     dispatcher = new AsyncDispatcher();
@@ -135,6 +136,7 @@ public class ContainerManagerImpl extends CompositeService implements
 
     this.nodeStatusUpdater = nodeStatusUpdater;
     this.containerTokenSecretManager = containerTokenSecretManager;
+    this.aclsManager = aclsManager;
 
     // Start configurable services
     auxiliaryServices = new AuxServices();
@@ -225,6 +227,7 @@ public class ContainerManagerImpl extends CompositeService implements
   /**
    * Start a container on this NodeManager.
    */
+  @SuppressWarnings("unchecked")
   @Override
   public StartContainerResponse startContainer(StartContainerRequest request)
       throws YarnRemoteException {
@@ -269,15 +272,19 @@ public class ContainerManagerImpl extends CompositeService implements
 
     // Create the application
     Application application = new ApplicationImpl(dispatcher,
-        launchContext.getUser(), applicationID, credentials);
+        this.aclsManager, launchContext.getUser(), applicationID, credentials);
     if (null ==
         context.getApplications().putIfAbsent(applicationID, application)) {
       LOG.info("Creating a new application reference for app "
           + applicationID);
+      dispatcher.getEventHandler().handle(
+          new ApplicationInitEvent(applicationID, container
+              .getLaunchContext().getApplicationACLs()));
     }
 
     // TODO: Validate the request
-    dispatcher.getEventHandler().handle(new ApplicationInitEvent(container));
+    dispatcher.getEventHandler().handle(
+        new ApplicationContainerInitEvent(container));
 
     NMAuditLogger.logSuccess(launchContext.getUser(), 
         AuditConstants.START_CONTAINER, "ContainerManageImpl", 

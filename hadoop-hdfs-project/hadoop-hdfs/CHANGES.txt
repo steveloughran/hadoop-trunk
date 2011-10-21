@@ -61,11 +61,16 @@ Trunk (unreleased changes)
     HDFS-2395. Add a root element in the JSON responses of webhdfs.
     (szetszwo)
 
+    HDFS-2459. Separate datatypes for Journal Protocol. (suresh)
+
 	HDFS-2181 Separate HDFS Client wire protocol data types (sanjay)
 
     HDFS-2294. Download of commons-daemon TAR should not be under target (tucu)
 
     HDFS-2322. the build fails in Windows because commons-daemon TAR cannot be fetched. (tucu)
+
+    HDFS-2427. Change the default permission in webhdfs to 755 and add range
+    check/validation for all parameters.  (szetszwo)
 
   BUG FIXES
     HDFS-2287. TestParallelRead has a small off-by-one bug. (todd)
@@ -124,6 +129,17 @@ Trunk (unreleased changes)
     of webhdfs listStatus.  (szetszwo)
 
     MAPREDUCE-2764. Fix renewal of dfs delegation tokens. (Owen via jitendra)
+
+    HDFS-2439. Fix NullPointerException in webhdfs when opening a non-existing
+    file or creating a file without specifying the replication parameter.
+    (szetszwo)
+
+    HDFS-2188. Make FSEditLog create its journals from a list of URIs rather 
+    than NNStorage. (Ivan Kelly via jitendra)
+
+    HDFS-2453. Fix http response code for partial content in webhdfs, added
+    getDefaultBlockSize() and getDefaultReplication() in WebHdfsFileSystem
+    and cleared content type in ExceptionHandler.  (szetszwo)
 
 Release 0.23.0 - Unreleased
 
@@ -821,6 +837,8 @@ Release 0.23.0 - Unreleased
     HDFS-2401. Running a set of methods in a Single Test Class.
     (Jonathan Eagles via mahadev)
 
+    HDFS-2471. Add federation documentation. (suresh)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
@@ -1153,6 +1171,9 @@ Release 0.23.0 - Unreleased
     HDFS-2422. The NN should tolerate the same number of low-resource volumes
                as failed volumes (atm)
 
+    HDFS-2467. HftpFileSystem uses incorrect compare for finding delegation
+    tokens. (omalley)
+
   BREAKDOWN OF HDFS-1073 SUBTASKS
 
     HDFS-1521. Persist transaction ID on disk between NN restarts.
@@ -1236,6 +1257,9 @@ Release 0.23.0 - Unreleased
     HDFS-2170. Address remaining TODOs in HDFS-1073 branch. (todd)
     HDFS-2172. Address findbugs and javadoc warnings in HDFS-1073 branch. 
                (todd)
+
+    HDFS-2445. Ensure failed tests exit with proper error code. (Jonathan 
+    Eagles via acmurthy)
 
 Release 0.22.0 - Unreleased
 
@@ -1732,6 +1756,9 @@ Release 0.22.0 - Unreleased
 
     HDFS-2290. Block with corrupt replica is not getting replicated.
     (Benoy Antony via shv)
+
+    HDFS-2012. Balancer incorrectly treats nodes whose utilization equals
+    avgUtilization. (Uma Maheswara Rao G via shv)
 
 Release 0.21.1 - Unreleased
 

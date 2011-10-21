@@ -21,6 +21,9 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.application;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -39,6 +42,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.even
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.ContainerLogsRetentionPolicy;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.event.LogAggregatorAppFinishedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.event.LogAggregatorAppStartedEvent;
+import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.state.InvalidStateTransitonException;
 import org.apache.hadoop.yarn.state.MultipleArcTransition;
 import org.apache.hadoop.yarn.state.SingleArcTransition;
@@ -56,18 +60,26 @@ public class ApplicationImpl implements Application {
   final String user;
   final ApplicationId appId;
   final Credentials credentials;
+  final ApplicationACLsManager aclsManager;
+  private final ReadLock readLock;
+  private final WriteLock writeLock;
 
   private static final Log LOG = LogFactory.getLog(Application.class);
 
   Map<ContainerId, Container> containers =
       new HashMap<ContainerId, Container>();
 
-  public ApplicationImpl(Dispatcher dispatcher, String user,
-      ApplicationId appId, Credentials credentials) {
+  public ApplicationImpl(Dispatcher dispatcher,
+      ApplicationACLsManager aclsManager, String user, ApplicationId appId,
+      Credentials credentials) {
     this.dispatcher = dispatcher;
     this.user = user.toString();
     this.appId = appId;
     this.credentials = credentials;
+    this.aclsManager = aclsManager;
+    ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+    readLock = lock.readLock();
+    writeLock = lock.writeLock();
     stateMachine = stateMachineFactory.make(this);
   }
 
@@ -82,15 +94,23 @@ public class ApplicationImpl implements Application {
   }
 
   @Override
-  public synchronized ApplicationState getApplicationState() {
-    // TODO: Synchro should be at statemachine level.
-    // This is only for tests?
-    return this.stateMachine.getCurrentState();
+  public ApplicationState getApplicationState() {
+    this.readLock.lock();
+    try {
+      return this.stateMachine.getCurrentState();
+    } finally {
+      this.readLock.unlock();
+    }
   }
 
   @Override
   public Map<ContainerId, Container> getContainers() {
-    return this.containers;
+    this.readLock.lock();
+    try {
+      return this.containers;
+    } finally {
+      this.readLock.unlock();
+    }
   }
 
   private static final ContainerDoneTransition CONTAINER_DONE_TRANSITION =
@@ -104,11 +124,14 @@ public class ApplicationImpl implements Application {
            // Transitions from NEW state
            .addTransition(ApplicationState.NEW, ApplicationState.INITING,
                ApplicationEventType.INIT_APPLICATION, new AppInitTransition())
+           .addTransition(ApplicationState.NEW, ApplicationState.NEW,
+               ApplicationEventType.INIT_CONTAINER,
+               new InitContainerTransition())
 
            // Transitions from INITING state
            .addTransition(ApplicationState.INITING, ApplicationState.INITING,
-               ApplicationEventType.INIT_APPLICATION,
-               new AppIsInitingTransition())
+               ApplicationEventType.INIT_CONTAINER,
+               new InitContainerTransition())
            .addTransition(ApplicationState.INITING,
                EnumSet.of(ApplicationState.FINISHING_CONTAINERS_WAIT,
                    ApplicationState.APPLICATION_RESOURCES_CLEANINGUP),
@@ -121,8 +144,8 @@ public class ApplicationImpl implements Application {
            // Transitions from RUNNING state
            .addTransition(ApplicationState.RUNNING,
                ApplicationState.RUNNING,
-               ApplicationEventType.INIT_APPLICATION,
-               new DuplicateAppInitTransition())
+               ApplicationEventType.INIT_CONTAINER,
+               new InitContainerTransition())
            .addTransition(ApplicationState.RUNNING,
                ApplicationState.RUNNING,
                ApplicationEventType.APPLICATION_CONTAINER_FINISHED,
@@ -167,9 +190,9 @@ public class ApplicationImpl implements Application {
       SingleArcTransition<ApplicationImpl, ApplicationEvent> {
     @Override
     public void transition(ApplicationImpl app, ApplicationEvent event) {
-      ApplicationInitEvent initEvent = (ApplicationInitEvent) event;
-      Container container = initEvent.getContainer();
-      app.containers.put(container.getContainerID(), container);
+      ApplicationInitEvent initEvent = (ApplicationInitEvent)event;
+      app.aclsManager.addApplication(app.getAppId(), initEvent
+          .getApplicationACLs());
       app.dispatcher.getEventHandler().handle(
           new ApplicationLocalizationEvent(
               LocalizationEventType.INIT_APPLICATION_RESOURCES, app));
@@ -177,17 +200,36 @@ public class ApplicationImpl implements Application {
   }
 
   /**
-   * Absorb initialization events while the application initializes.
+   * Handles INIT_CONTAINER events which request that we launch a new
+   * container. When we're still in the INITTING state, we simply
+   * queue these up. When we're in the RUNNING state, we pass along
+   * an ContainerInitEvent to the appropriate ContainerImpl.
    */
-  static class AppIsInitingTransition implements
+  @SuppressWarnings("unchecked")
+  static class InitContainerTransition implements
       SingleArcTransition<ApplicationImpl, ApplicationEvent> {
     @Override
     public void transition(ApplicationImpl app, ApplicationEvent event) {
-      ApplicationInitEvent initEvent = (ApplicationInitEvent) event;
+      ApplicationContainerInitEvent initEvent =
+        (ApplicationContainerInitEvent) event;
       Container container = initEvent.getContainer();
       app.containers.put(container.getContainerID(), container);
       LOG.info("Adding " + container.getContainerID()
           + " to application " + app.toString());
+      
+      switch (app.getApplicationState()) {
+      case RUNNING:
+        app.dispatcher.getEventHandler().handle(new ContainerInitEvent(
+            container.getContainerID()));
+        break;
+      case INITING:
+      case NEW:
+        // these get queued up and sent out in AppInitDoneTransition
+        break;
+      default:
+        assert false : "Invalid state for InitContainerTransition: " +
+            app.getApplicationState();
+      }
     }
   }
 
@@ -211,20 +253,6 @@ public class ApplicationImpl implements Application {
     }
   }
 
-  @SuppressWarnings("unchecked")
-  static class DuplicateAppInitTransition implements
-      SingleArcTransition<ApplicationImpl, ApplicationEvent> {
-    @Override
-    public void transition(ApplicationImpl app, ApplicationEvent event) {
-      ApplicationInitEvent initEvent = (ApplicationInitEvent) event;
-      Container container = initEvent.getContainer();
-      app.containers.put(container.getContainerID(), container);
-      LOG.info("Adding " + container.getContainerID()
-          + " to application " + app.toString());
-      app.dispatcher.getEventHandler().handle(new ContainerInitEvent(
-            container.getContainerID()));
-    }
-  }
   
   static final class ContainerDoneTransition implements
       SingleArcTransition<ApplicationImpl, ApplicationEvent> {
@@ -310,29 +338,40 @@ public class ApplicationImpl implements Application {
       SingleArcTransition<ApplicationImpl, ApplicationEvent> {
     @Override
     public void transition(ApplicationImpl app, ApplicationEvent event) {
+
+      app.aclsManager.removeApplication(app.getAppId());
+
       // Inform the logService
       app.dispatcher.getEventHandler().handle(
           new LogAggregatorAppFinishedEvent(app.appId));
+
+      // TODO: Also make logService write the acls to the aggregated file.
     }
   }
 
   @Override
-  public synchronized void handle(ApplicationEvent event) {
+  public void handle(ApplicationEvent event) {
 
-    ApplicationId applicationID = event.getApplicationID();
-    LOG.info("Processing " + applicationID + " of type " + event.getType());
+    this.writeLock.lock();
 
-    ApplicationState oldState = stateMachine.getCurrentState();
-    ApplicationState newState = null;
     try {
-      // queue event requesting init of the same app
-      newState = stateMachine.doTransition(event.getType(), event);
-    } catch (InvalidStateTransitonException e) {
-      LOG.warn("Can't handle this event at current state", e);
-    }
-    if (oldState != newState) {
-      LOG.info("Application " + applicationID + " transitioned from "
-          + oldState + " to " + newState);
+      ApplicationId applicationID = event.getApplicationID();
+      LOG.info("Processing " + applicationID + " of type " + event.getType());
+
+      ApplicationState oldState = stateMachine.getCurrentState();
+      ApplicationState newState = null;
+      try {
+        // queue event requesting init of the same app
+        newState = stateMachine.doTransition(event.getType(), event);
+      } catch (InvalidStateTransitonException e) {
+        LOG.warn("Can't handle this event at current state", e);
+      }
+      if (oldState != newState) {
+        LOG.info("Application " + applicationID + " transitioned from "
+            + oldState + " to " + newState);
+      }
+    } finally {
+      this.writeLock.unlock();
     }
   }
 

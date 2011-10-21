@@ -83,14 +83,14 @@
   </property>
 
   <property>
-    <description>Are RM acls enabled.</description>
-    <name>yarn.resourcemanager.acl.enable</name>
-    <value>false</value>
+    <description>Are acls enabled.</description>
+    <name>yarn.acl.enable</name>
+    <value>true</value>
   </property>
 
   <property>
-    <description>ACL of who can be admin of RM.</description>
-    <name>yarn.resourcemanager.admin.acl</name>
+    <description>ACL of who can be admin of the YARN cluster.</description>
+    <name>yarn.admin.acl</name>
     <value>*</value>
   </property>
 
@@ -192,6 +192,18 @@
     <description>address of node manager IPC.</description>
     <name>yarn.nodemanager.address</name>
     <value>0.0.0.0:45454</value>
+  </property>
+
+  <property>
+    <description>Environment variables that should be forwarded from the NodeManager's environment to the container's.</description>
+    <name>yarn.nodemanager.admin-env</name>
+    <value>MALLOC_ARENA_MAX=$MALLOC_ARENA_MAX</value>
+  </property>
+
+  <property>
+    <description>Environment variables that containers may override rather than use NodeManager's default.</description>
+    <name>yarn.nodemanager.env-whitelist</name>
+    <value>JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,YARN_HOME</value>
   </property>
 
   <property>

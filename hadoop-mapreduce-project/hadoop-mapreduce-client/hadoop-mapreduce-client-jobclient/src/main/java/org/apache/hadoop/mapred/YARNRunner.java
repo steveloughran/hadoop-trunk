@@ -20,7 +20,9 @@ package org.apache.hadoop.mapred;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
@@ -60,6 +62,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.YarnException;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
+import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
@@ -73,6 +76,7 @@ import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.util.BuilderUtils;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
 
@@ -320,14 +324,14 @@ public class YARNRunner implements ClientProtocol {
     }
 
     // Setup the command to run the AM
-    Vector<CharSequence> vargs = new Vector<CharSequence>(8);
+    List<String> vargs = new ArrayList<String>(8);
     vargs.add(Environment.JAVA_HOME.$() + "/bin/java");
 
+    // TODO: why do we use 'conf' some places and 'jobConf' others?
     long logSize = TaskLog.getTaskLogLength(new JobConf(conf));
-    vargs.add("-Dlog4j.configuration=container-log4j.properties");
-    vargs.add("-D" + MRJobConfig.TASK_LOG_DIR + "="
-        + ApplicationConstants.LOG_DIR_EXPANSION_VAR);
-    vargs.add("-D" + MRJobConfig.TASK_LOG_SIZE + "=" + logSize);
+    String logLevel = jobConf.get(
+        MRJobConfig.MR_AM_LOG_LEVEL, MRJobConfig.DEFAULT_MR_AM_LOG_LEVEL);
+    MRApps.addLog4jSystemProperties(logLevel, logSize, vargs);
 
     vargs.add(conf.get(MRJobConfig.MR_AM_COMMAND_OPTS,
         MRJobConfig.DEFAULT_MR_AM_COMMAND_OPTS));
@@ -358,14 +362,19 @@ public class YARNRunner implements ClientProtocol {
     // Parse distributed cache
     MRApps.setupDistributedCache(jobConf, localResources);
 
+    Map<ApplicationAccessType, String> acls
+        = new HashMap<ApplicationAccessType, String>(2);
+    acls.put(ApplicationAccessType.VIEW_APP, jobConf.get(
+        MRJobConfig.JOB_ACL_VIEW_JOB, MRJobConfig.DEFAULT_JOB_ACL_VIEW_JOB));
+    acls.put(ApplicationAccessType.MODIFY_APP, jobConf.get(
+        MRJobConfig.JOB_ACL_MODIFY_JOB,
+        MRJobConfig.DEFAULT_JOB_ACL_MODIFY_JOB));
+
     // Setup ContainerLaunchContext for AM container
-    ContainerLaunchContext amContainer =
-        recordFactory.newRecordInstance(ContainerLaunchContext.class);
-    amContainer.setResource(capability);             // Resource (mem) required
-    amContainer.setLocalResources(localResources);   // Local resources
-    amContainer.setEnvironment(environment);         // Environment
-    amContainer.setCommands(vargsFinal);             // Command for AM
-    amContainer.setContainerTokens(securityTokens);  // Security tokens
+    ContainerLaunchContext amContainer = BuilderUtils
+        .newContainerLaunchContext(null, UserGroupInformation
+            .getCurrentUser().getShortUserName(), capability, localResources,
+            environment, vargsFinal, null, securityTokens, acls);
 
     // Set up the ApplicationSubmissionContext
     ApplicationSubmissionContext appContext =

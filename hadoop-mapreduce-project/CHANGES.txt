@@ -25,6 +25,9 @@ Trunk (unreleased changes)
     MAPREDUCE-3171. normalize nodemanager native code compilation with common/hdfs 
     native. (tucu)
 
+    MAPREDUCE-3149. Add a test to verify that TokenCache handles file system 
+    uri with no authority. (John George via jitendra)
+
   BUG FIXES
 
     MAPREDUCE-3166. [Rumen] Make Rumen use job history api instead of relying
@@ -49,6 +52,13 @@ Trunk (unreleased changes)
     missing license header. (Hitesh Shah via tucu).
 
     MAPREDUCE-2764. Fix renewal of dfs delegation tokens. (Owen via jitendra)
+
+    MAPREDUCE-3192. Fix Javadoc warning in JobClient.java and Cluster.java.
+    (jitendra)
+
+    MAPREDUCE-3003. Publish MR JARs to Maven snapshot repository. (tucu)
+
+    MAPREDUCE-3204. mvn site:site fails on MapReduce. (tucu)
 
 Release 0.23.0 - Unreleased
 
@@ -91,11 +101,19 @@ Release 0.23.0 - Unreleased
     MAPREDUCE-2037. Capture intermediate progress, CPU and memory usage for
     tasks. (Dick King via acmurthy) 
 
+    MAPREDUCE-279. MapReduce 2.0. Merging MR-279 branch into trunk. Contributed by
+    Arun C Murthy, Christopher Douglas, Devaraj Das, Greg Roelofs, Jeffrey
+    Naisbitt, Josh Wills, Jonathan Eagles, Krishna Ramachandran, Luke Lu, Mahadev
+    Konar, Robert Evans, Sharad Agarwal, Siddharth Seth, Thomas Graves, and Vinod
+    Kumar Vavilapalli.
+
     MAPREDUCE-2930. Added the ability to be able to generate graphs from the
     state-machine definitions. (Binglin Chang via vinodkv)
 
     MAPREDUCE-2719. Add a simple, DistributedShell, application to illustrate
     alternate frameworks on YARN. (Hitesh Shah via acmurthy)
+
+    MAPREDUCE-3104. Implemented Application-acls. (vinodkv)
 
   IMPROVEMENTS
 
@@ -382,6 +400,23 @@ Release 0.23.0 - Unreleased
     MAPREDUCE-3133. Running a set of methods in a Single Test Class.
     (Jonathan Eagles via mahadev)
 
+    MAPREDUCE-3059. QueueMetrics do not have metrics for aggregate 
+    containers-allocated and aggregate containers-released.
+    (Devaraj K via mahadev)
+   
+    MAPREDUCE-3187. Add names for various unnamed threads in MR2.
+    (Todd Lipcon and Siddharth Seth via mahadev)
+
+    MAPREDUCE-3136. Added documentation for setting up Hadoop clusters in both
+    non-secure and secure mode for both HDFS & YARN. (acmurthy)
+
+    MAPREDUCE-3068. Added a whitelist of environment variables for containers
+    from the NodeManager and set MALLOC_ARENA_MAX for all daemons and
+    containers. (Chris Riccomini via acmurthy)
+
+    MAPREDUCE-3144. Augmented JobHistory with the information needed for
+    serving aggregated logs. (Siddharth Seth via vinodkv)
+
   OPTIMIZATIONS
 
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
@@ -392,6 +427,9 @@ Release 0.23.0 - Unreleased
     TaskAttemptContexts. (todd)
 
     MAPREDUCE-901. Efficient framework counters. (llu via acmurthy)
+
+    MAPREDUCE-2629. Workaround a JVM class loading quirk which prevents
+    JIT compilation of inner classes methods in ReduceContextImpl.
 
   BUG FIXES
 
@@ -1615,6 +1653,69 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3124. Fixed location of native libs i.e. libhadoop.so for
     containers. (John George via acmurthy) 
+
+    MAPREDUCE-3057. Job History Server goes of OutOfMemory with 1200 Jobs 
+    and Heap Size set to 10 GB. (Eric Payne via mahadev)
+
+    MAPREDUCE-2840. mr279 TestUberAM.testSleepJob test fails. (jonathan eagles
+    via mahadev)
+
+    MAPREDUCE-3190. Ensure bin/yarn fails early with a clear error message
+    when HADOOP_COMMON_HOME or HADOOP_HDFS_HOME are not set. (todd & acmurthy 
+    via acmurthy)
+
+    MAPREDUCE-3189. Add link decoration back to MR2's CSS. (Todd Lipcon via
+    mahadev)
+    
+    MAPREDUCE-3127. Changed default value of yarn.resourcemanager.acl.enable
+    to true and added some more documentation. (acmurthy) 
+
+    MAPREDUCE-3032. Fixed TaskAttemptImpl so that JobHistory can have error
+    information about failed tasks. (Devaraj K via vinodkv)
+
+    MAPREDUCE-3196. TestLinuxContainerExecutorWithMocks fails on Mac OSX.
+    (Arun Murthy via mahadev)
+
+    MAPREDUCE-3197. TestMRClientService failing on building clean checkout of 
+    branch 0.23 (mahadev)
+
+    MAPREDUCE-2762. Cleanup MR staging directory on completion. (mahadev via
+    acmurthy) 
+
+    MAPREDUCE-3165. Ensure logging options are set correctly for MR AM and
+    tasks. (todd via acmurthy) 
+
+    MAPREDUCE-3203. Fix some javac warnings in MRAppMaster. (mahadev)
+
+    MAPREDUCE-3199. Fixed pom files to include correct log4j configuration for
+    tests. (vinodkv)
+
+    MAPREDUCE-3162. Separated application-init and container-init event types
+    in NodeManager's Application state machine. (Todd Lipcon via vinodkv)
+
+    MAPREDUCE-3176. Fixed ant mapreduce tests that are timing out because
+    of wrong framework name. (Hitesh Shah via vinodkv)
+
+    MAPREDUCE-3181. Fixed MapReduce runtime to load yarn-default.xml and
+    yarn-site.xml. (acmurthy) 
+
+    MAPREDUCE-2788. Normalize resource requests in FifoScheduler
+    appropriately. (Ahmed Radwan via acmurthy) 
+
+    MAPREDUCE-2693. Fix NPE in job-blacklisting. (Hitesh Shah via acmurthy) 
+
+    MAPREDUCE-3208. Fix NPE task/container log appenders. (liangzhwa via
+    acmurthy) 
+
+    MAPREDUCE-3212. Fix usage/help message for bin/yarn. (Bhallamudi Venkata 
+    Siva Kamesh via acmurthy) 
+
+    MAPREDUCE-3179. Ensure failed tests exit with right error code. (Jonathan
+    Eagles via acmurthy)
+
+    MAPREDUCE-3188. Ensure correct shutdown in services. (todd via acmurthy) 
+
+    MAPREDUCE-3226. Fix shutdown of fetcher threads. (vinodkv via acmurthy) 
 
 Release 0.22.0 - Unreleased
 

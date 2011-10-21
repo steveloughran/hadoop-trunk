@@ -46,6 +46,7 @@ import javax.ws.rs.core.StreamingOutput;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -65,7 +66,7 @@ import org.apache.hadoop.hdfs.web.resources.BlockSizeParam;
 import org.apache.hadoop.hdfs.web.resources.BufferSizeParam;
 import org.apache.hadoop.hdfs.web.resources.DelegationParam;
 import org.apache.hadoop.hdfs.web.resources.DeleteOpParam;
-import org.apache.hadoop.hdfs.web.resources.DstPathParam;
+import org.apache.hadoop.hdfs.web.resources.DestinationParam;
 import org.apache.hadoop.hdfs.web.resources.GetOpParam;
 import org.apache.hadoop.hdfs.web.resources.GroupParam;
 import org.apache.hadoop.hdfs.web.resources.HttpOpParam;
@@ -119,6 +120,9 @@ public class NamenodeWebHdfsMethods {
         || op == PostOpParam.Op.APPEND) {
       final NamenodeProtocols np = namenode.getRpcServer();
       final HdfsFileStatus status = np.getFileInfo(path);
+      if (status == null) {
+        throw new FileNotFoundException("File " + path + " not found.");
+      }
       final long len = status.getLen();
       if (op == GetOpParam.Op.OPEN && (openOffset < 0L || openOffset >= len)) {
         throw new IOException("Offset=" + openOffset + " out of the range [0, "
@@ -197,8 +201,8 @@ public class NamenodeWebHdfsMethods {
       @PathParam(UriFsPathParam.NAME) final UriFsPathParam path,
       @QueryParam(PutOpParam.NAME) @DefaultValue(PutOpParam.DEFAULT)
           final PutOpParam op,
-      @QueryParam(DstPathParam.NAME) @DefaultValue(DstPathParam.DEFAULT)
-          final DstPathParam dstPath,
+      @QueryParam(DestinationParam.NAME) @DefaultValue(DestinationParam.DEFAULT)
+          final DestinationParam destination,
       @QueryParam(OwnerParam.NAME) @DefaultValue(OwnerParam.DEFAULT)
           final OwnerParam owner,
       @QueryParam(GroupParam.NAME) @DefaultValue(GroupParam.DEFAULT)
@@ -223,7 +227,7 @@ public class NamenodeWebHdfsMethods {
 
     if (LOG.isTraceEnabled()) {
       LOG.trace(op + ": " + path + ", ugi=" + ugi
-          + Param.toSortedString(", ", dstPath, owner, group, permission,
+          + Param.toSortedString(", ", destination, owner, group, permission,
               overwrite, bufferSize, replication, blockSize,
               modificationTime, accessTime, renameOptions));
     }
@@ -238,6 +242,7 @@ public class NamenodeWebHdfsMethods {
         try {
 
     final String fullpath = path.getAbsolutePath();
+    final Configuration conf = (Configuration)context.getAttribute(JspHelper.CURRENT_CONF);
     final NameNode namenode = (NameNode)context.getAttribute("name.node");
     final NamenodeProtocols np = namenode.getRpcServer();
 
@@ -259,19 +264,18 @@ public class NamenodeWebHdfsMethods {
     {
       final EnumSet<Options.Rename> s = renameOptions.getValue();
       if (s.isEmpty()) {
-        @SuppressWarnings("deprecation")
-        final boolean b = np.rename(fullpath, dstPath.getValue());
+        final boolean b = np.rename(fullpath, destination.getValue());
         final String js = JsonUtil.toJsonString("boolean", b);
         return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
       } else {
-        np.rename2(fullpath, dstPath.getValue(),
+        np.rename2(fullpath, destination.getValue(),
             s.toArray(new Options.Rename[s.size()]));
         return Response.ok().type(MediaType.APPLICATION_JSON).build();
       }
     }
     case SETREPLICATION:
     {
-      final boolean b = np.setReplication(fullpath, replication.getValue());
+      final boolean b = np.setReplication(fullpath, replication.getValue(conf));
       final String js = JsonUtil.toJsonString("boolean", b);
       return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
     }
