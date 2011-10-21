@@ -111,7 +111,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
    * @param expectedReplicas expected number of replicas of the block
    * @return the priority for the blocks, between 0 and ({@link #LEVEL}-1)
    */
-  private int getPriority(Block block, 
+  private int getPriority(Block block,
                           int curReplicas, 
                           int decommissionedReplicas,
                           int expectedReplicas) {
@@ -120,12 +120,13 @@ class UnderReplicatedBlocks implements Iterable<Block> {
       // Block has enough copies, but not enough racks
       return QUEUE_REPLICAS_BADLY_DISTRIBUTED;
     } else if (curReplicas == 0) {
-      // If there are zero non-decommissioned replica but there are
+      // If there are zero non-decommissioned replicas but there are
       // some decommissioned replicas, then assign them highest priority
       if (decommissionedReplicas > 0) {
         return QUEUE_HIGHEST_PRIORITY;
       }
-      return QUEUE_WITH_CORRUPT_BLOCKS; // keep these blocks in needed replication.
+      //all we have are corrupt blocks
+      return QUEUE_WITH_CORRUPT_BLOCKS;
     } else if (curReplicas == 1) {
       return QUEUE_HIGHEST_PRIORITY; // highest priority
     } else if ((curReplicas * 3) < expectedReplicas) {
