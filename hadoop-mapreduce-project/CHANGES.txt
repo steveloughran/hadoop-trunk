@@ -416,6 +416,12 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3144. Augmented JobHistory with the information needed for
     serving aggregated logs. (Siddharth Seth via vinodkv)
+  
+    MAPREDUCE-3163. JobClient spews errors when killing MR2 job.
+    (mahadev)
+
+    MAPREDUCE-3239. Use new createSocketAddr API in MRv2 to give better 
+    error messages on misconfig (Todd Lipcon via mahadev)
 
   OPTIMIZATIONS
 
@@ -1716,6 +1722,21 @@ Release 0.23.0 - Unreleased
     MAPREDUCE-3188. Ensure correct shutdown in services. (todd via acmurthy) 
 
     MAPREDUCE-3226. Fix shutdown of fetcher threads. (vinodkv via acmurthy) 
+
+    MAPREDUCE-3070. Fix NodeManager to use ephemeral ports by default.
+    (Devaraj K via acmurthy) 
+
+    MAPREDUCE-3242. Trunk compilation broken with bad interaction from 
+    MAPREDUCE-3070 and MAPREDUCE-3239. (mahadev)
+
+    MAPREDUCE-3058. Fixed MR YarnChild to report failure when task throws an
+    error and thus prevent a hanging task and job. (vinodkv)
+
+    MAPREDUCE-3087. Fixed the mapreduce classpath to correctly include the
+    generated-classpath file needed for tests. (Ravi Prakash via vinodkv)
+
+    MAPREDUCE-3233. Fixed a bug in MR Job so as to be able to restart the
+    application on AM crash. (Mahadev Konar via vinodkv)
 
 Release 0.22.0 - Unreleased
 
