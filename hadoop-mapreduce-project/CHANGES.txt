@@ -115,6 +115,9 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3104. Implemented Application-acls. (vinodkv)
 
+    MAPREDUCE-2708. Designed and implemented MR Application Master recovery to
+    make MR AMs resume their progress after restart. (Sharad Agarwal via vinodkv)
+
   IMPROVEMENTS
 
     MAPREDUCE-2187. Reporter sends progress during sort/merge. (Anupam Seth via
@@ -422,6 +425,9 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3239. Use new createSocketAddr API in MRv2 to give better 
     error messages on misconfig (Todd Lipcon via mahadev)
+
+    MAPREDUCE-2747. Cleaned up LinuxContainerExecutor binary sources and changed
+    the configuration to use yarn names. (Robert Joseph Evans via vinodkv)
 
   OPTIMIZATIONS
 
@@ -1737,6 +1743,26 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3233. Fixed a bug in MR Job so as to be able to restart the
     application on AM crash. (Mahadev Konar via vinodkv)
+
+    MAPREDUCE-3028. Added job-end notification support. (Ravi Prakash via
+    acmurthy) 
+
+    MAPREDUCE-3249. Ensure shuffle-port is correctly used duringMR AM recovery. 
+    (vinodkv via acmurthy) 
+
+    MAPREDUCE-3252. Fix map tasks to not rewrite data an extra time when
+    map output fits in spill buffer. (todd)
+
+    MAPREDUCE-3159. Ensure DefaultContainerExecutor doesn't delete application
+    directories during app-init. (todd via acmurthy)
+
+    MAPREDUCE-3248. Fixed log4j properties. (vinodkv via acmurthy) 
+
+    MAPREDUCE-2746. Yarn servers can't communicate with each other with 
+    hadoop.security.authorization set to true (acmurthy via mahadev)
+
+    MAPREDUCE-2821. Added missing fields (resourcePerMap & resourcePerReduce)
+    to JobSummary logs. (mahadev via acmurthy)
 
 Release 0.22.0 - Unreleased
 

@@ -177,11 +177,11 @@ public class ConfigUtil {
     Configuration.addDeprecation("tasktracker.contention.tracking", 
       new String[] {TTConfig.TT_CONTENTION_TRACKING});
     Configuration.addDeprecation("job.end.notification.url", 
-      new String[] {MRJobConfig.END_NOTIFICATION_URL});
+      new String[] {MRJobConfig.MR_JOB_END_NOTIFICATION_URL});
     Configuration.addDeprecation("job.end.retry.attempts", 
-      new String[] {MRJobConfig.END_NOTIFICATION_RETRIES});
+      new String[] {MRJobConfig.MR_JOB_END_RETRY_ATTEMPTS});
     Configuration.addDeprecation("job.end.retry.interval", 
-      new String[] {MRJobConfig.END_NOTIFICATION_RETRIE_INTERVAL});
+      new String[] {MRJobConfig.MR_JOB_END_RETRY_INTERVAL});
     Configuration.addDeprecation("mapred.committer.job.setup.cleanup.needed", 
       new String[] {MRJobConfig.SETUP_CLEANUP_NEEDED});
     Configuration.addDeprecation("mapred.jar", 
@@ -514,6 +514,15 @@ public class ConfigUtil {
     
     Configuration.addDeprecation("webinterface.private.actions", 
         new String[]{JTConfig.PRIVATE_ACTIONS_KEY});
+    
+    Configuration.addDeprecation("security.task.umbilical.protocol.acl", 
+        new String[] {
+        MRJobConfig.MR_AM_SECURITY_SERVICE_AUTHORIZATION_TASK_UMBILICAL   
+    });
+    Configuration.addDeprecation("security.job.submission.protocol.acl", 
+        new String[] {
+        MRJobConfig.MR_AM_SECURITY_SERVICE_AUTHORIZATION_CLIENT   
+    });
   }
 }
 

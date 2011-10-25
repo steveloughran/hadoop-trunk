@@ -341,6 +341,13 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_LINUX_CONTAINER_EXECUTOR_PATH =
     NM_PREFIX + "linux-container-executor.path";
   
+  /** 
+   * The UNIX group that the linux-container-executor should run as.
+   * This is intended to be set as part of container-executor.cfg. 
+   */
+  public static final String NM_LINUX_CONTAINER_GROUP =
+    NM_PREFIX + "linux-container-executor.group";
+  
   /** T-file compression types used to compress aggregated logs.*/
   public static final String NM_LOG_AGG_COMPRESSION_TYPE = 
     NM_PREFIX + "log-aggregation.compression-type";
@@ -365,6 +372,29 @@ public class YarnConfiguration extends Configuration {
   public static final int INVALID_CONTAINER_EXIT_STATUS = -1000;
   public static final int ABORTED_CONTAINER_EXIT_STATUS = -100;
   
+  /**
+   * YARN Service Level Authorization
+   */
+  public static final String 
+  YARN_SECURITY_SERVICE_AUTHORIZATION_RESOURCETRACKER =
+      "security.resourcetracker.protocol.acl";
+  public static final String 
+  YARN_SECURITY_SERVICE_AUTHORIZATION_CLIENT_RESOURCEMANAGER =
+      "security.client.resourcemanager.protocol.acl";
+  public static final String 
+  YARN_SECURITY_SERVICE_AUTHORIZATION_ADMIN =
+      "security.admin.protocol.acl";
+  public static final String 
+  YARN_SECURITY_SERVICE_AUTHORIZATION_APPLICATIONMASTER_RESOURCEMANAGER =
+      "security.applicationmaster.resourcemanager.protocol.acl";
+
+  public static final String 
+  YARN_SECURITY_SERVICE_AUTHORIZATION_CONTAINER_MANAGER =
+      "security.containermanager.protocol.acl";
+  public static final String 
+  YARN_SECURITY_SERVICE_AUTHORIZATION_RESOURCE_LOCALIZER =
+      "security.resourcelocalizer.protocol.acl";
+
   public YarnConfiguration() {
     super();
   }
