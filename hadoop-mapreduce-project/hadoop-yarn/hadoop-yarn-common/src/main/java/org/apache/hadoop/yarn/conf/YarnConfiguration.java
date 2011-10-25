@@ -36,14 +36,8 @@ public class YarnConfiguration extends Configuration {
   }
 
   //Configurations
-  
-  /** ACL of who can view this application.*/
-  public static final String APPLICATION_ACL_VIEW_APP =
-    "yarn.app.acl.view-job";
-  
-  /** ACL of who can modify this application.*/
-  public static final String APPLICATION_ACL_MODIFY_APP =
-    "yarn.app.acl.modify-job";
+
+  public static final String YARN_PREFIX = "yarn.";
 
   /** Delay before deleting resource to ease debugging of NM issues */
   public static final String DEBUG_NM_DELETE_DELAY_SEC =
@@ -52,7 +46,7 @@ public class YarnConfiguration extends Configuration {
   ////////////////////////////////
   // IPC Configs
   ////////////////////////////////
-  public static final String IPC_PREFIX = "yarn.ipc.";
+  public static final String IPC_PREFIX = YARN_PREFIX + "ipc.";
 
   /** Factory to create client IPC classes.*/
   public static final String IPC_CLIENT_FACTORY = 
@@ -89,9 +83,10 @@ public class YarnConfiguration extends Configuration {
   /** The address of the applications manager interface in the RM.*/
   public static final String RM_ADDRESS = 
     RM_PREFIX + "address";
+  public static final int DEFAULT_RM_PORT = 8040;
   public static final String DEFAULT_RM_ADDRESS =
-    "0.0.0.0:8040";
-  
+    "0.0.0.0:" + DEFAULT_RM_PORT;
+
   /** The number of threads used to handle applications manager requests.*/
   public static final String RM_CLIENT_THREAD_COUNT =
     RM_PREFIX + "client.thread-count";
@@ -109,7 +104,9 @@ public class YarnConfiguration extends Configuration {
   /** The address of the scheduler interface.*/
   public static final String RM_SCHEDULER_ADDRESS = 
     RM_PREFIX + "scheduler.address";
-  public static final String DEFAULT_RM_SCHEDULER_ADDRESS = "0.0.0.0:8030";
+  public static final int DEFAULT_RM_SCHEDULER_PORT = 8030;
+  public static final String DEFAULT_RM_SCHEDULER_ADDRESS = "0.0.0.0:" +
+    DEFAULT_RM_SCHEDULER_PORT;
   
   /** Number of threads to handle scheduler interface.*/
   public static final String RM_SCHEDULER_CLIENT_THREAD_COUNT =
@@ -119,27 +116,33 @@ public class YarnConfiguration extends Configuration {
   /** The address of the RM web application.*/
   public static final String RM_WEBAPP_ADDRESS = 
     RM_PREFIX + "webapp.address";
-  public static final String DEFAULT_RM_WEBAPP_ADDRESS = "0.0.0.0:8088";
+
+  public static final int DEFAULT_RM_WEBAPP_PORT = 8088;
+  public static final String DEFAULT_RM_WEBAPP_ADDRESS = "0.0.0.0:" +
+    DEFAULT_RM_WEBAPP_PORT;
   
   public static final String RM_RESOURCE_TRACKER_ADDRESS =
     RM_PREFIX + "resource-tracker.address";
+  public static final int DEFAULT_RM_RESOURCE_TRACKER_PORT = 8025;
   public static final String DEFAULT_RM_RESOURCE_TRACKER_ADDRESS =
-    "0.0.0.0:8025";
+    "0.0.0.0:" + DEFAULT_RM_RESOURCE_TRACKER_PORT;
   
-  /** Are RM acls enabled.*/
-  public static final String RM_ACL_ENABLE = 
-    RM_PREFIX + "acl.enable";
-  public static final boolean DEFAULT_RM_ACL_ENABLE = true;
+  /** Are acls enabled.*/
+  public static final String YARN_ACL_ENABLE = 
+    YARN_PREFIX + "acl.enable";
+  public static final boolean DEFAULT_YARN_ACL_ENABLE = true;
   
-  /** ACL of who can be admin of RM.*/
-  public static final String RM_ADMIN_ACL = 
-    RM_PREFIX + "admin.acl";
-  public static final String DEFAULT_RM_ADMIN_ACL = "*";
+  /** ACL of who can be admin of YARN cluster.*/
+  public static final String YARN_ADMIN_ACL = 
+    YARN_PREFIX + "admin.acl";
+  public static final String DEFAULT_YARN_ADMIN_ACL = "*";
   
   /** The address of the RM admin interface.*/
   public static final String RM_ADMIN_ADDRESS = 
     RM_PREFIX + "admin.address";
-  public static final String DEFAULT_RM_ADMIN_ADDRESS = "0.0.0.0:8141";
+  public static final int DEFAULT_RM_ADMIN_PORT = 8141;
+  public static final String DEFAULT_RM_ADMIN_ADDRESS = "0.0.0.0:" +
+      DEFAULT_RM_ADMIN_PORT;
   
   /**Number of threads used to handle RM admin interface.*/
   public static final String RM_ADMIN_CLIENT_THREAD_COUNT =
@@ -224,7 +227,9 @@ public class YarnConfiguration extends Configuration {
   
   /** address of node manager IPC.*/
   public static final String NM_ADDRESS = NM_PREFIX + "address";
-  public static final String DEFAULT_NM_ADDRESS = "0.0.0.0:45454";
+  public static final int DEFAULT_NM_PORT = 0;
+  public static final String DEFAULT_NM_ADDRESS = "0.0.0.0:"
+      + DEFAULT_NM_PORT;
   
   /** who will execute(launch) the containers.*/
   public static final String NM_CONTAINER_EXECUTOR = 
@@ -256,7 +261,9 @@ public class YarnConfiguration extends Configuration {
   /** Address where the localizer IPC is.*/
   public static final String NM_LOCALIZER_ADDRESS =
     NM_PREFIX + "localizer.address";
-  public static final String DEFAULT_NM_LOCALIZER_ADDRESS = "0.0.0.0:4344";
+  public static final int DEFAULT_NM_LOCALIZER_PORT = 4344;
+  public static final String DEFAULT_NM_LOCALIZER_ADDRESS = "0.0.0.0:" +
+    DEFAULT_NM_LOCALIZER_PORT;
   
   /** Interval in between cache cleanups.*/
   public static final String NM_LOCALIZER_CACHE_CLEANUP_INTERVAL_MS =
@@ -294,7 +301,9 @@ public class YarnConfiguration extends Configuration {
   
   /** NM Webapp address.**/
   public static final String NM_WEBAPP_ADDRESS = NM_PREFIX + "webapp.address";
-  public static final String DEFAULT_NM_WEBAPP_ADDRESS = "0.0.0.0:9999";
+  public static final int DEFAULT_NM_WEBAPP_PORT = 9999;
+  public static final String DEFAULT_NM_WEBAPP_ADDRESS = "0.0.0.0:" +
+    DEFAULT_NM_WEBAPP_PORT;
   
   /** How often to monitor containers.*/
   public final static String NM_CONTAINER_MON_INTERVAL_MS =
@@ -332,6 +341,13 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_LINUX_CONTAINER_EXECUTOR_PATH =
     NM_PREFIX + "linux-container-executor.path";
   
+  /** 
+   * The UNIX group that the linux-container-executor should run as.
+   * This is intended to be set as part of container-executor.cfg. 
+   */
+  public static final String NM_LINUX_CONTAINER_GROUP =
+    NM_PREFIX + "linux-container-executor.group";
+  
   /** T-file compression types used to compress aggregated logs.*/
   public static final String NM_LOG_AGG_COMPRESSION_TYPE = 
     NM_PREFIX + "log-aggregation.compression-type";
@@ -356,6 +372,29 @@ public class YarnConfiguration extends Configuration {
   public static final int INVALID_CONTAINER_EXIT_STATUS = -1000;
   public static final int ABORTED_CONTAINER_EXIT_STATUS = -100;
   
+  /**
+   * YARN Service Level Authorization
+   */
+  public static final String 
+  YARN_SECURITY_SERVICE_AUTHORIZATION_RESOURCETRACKER =
+      "security.resourcetracker.protocol.acl";
+  public static final String 
+  YARN_SECURITY_SERVICE_AUTHORIZATION_CLIENT_RESOURCEMANAGER =
+      "security.client.resourcemanager.protocol.acl";
+  public static final String 
+  YARN_SECURITY_SERVICE_AUTHORIZATION_ADMIN =
+      "security.admin.protocol.acl";
+  public static final String 
+  YARN_SECURITY_SERVICE_AUTHORIZATION_APPLICATIONMASTER_RESOURCEMANAGER =
+      "security.applicationmaster.resourcemanager.protocol.acl";
+
+  public static final String 
+  YARN_SECURITY_SERVICE_AUTHORIZATION_CONTAINER_MANAGER =
+      "security.containermanager.protocol.acl";
+  public static final String 
+  YARN_SECURITY_SERVICE_AUTHORIZATION_RESOURCE_LOCALIZER =
+      "security.resourcelocalizer.protocol.acl";
+
   public YarnConfiguration() {
     super();
   }

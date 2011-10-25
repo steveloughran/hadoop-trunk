@@ -32,17 +32,23 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.OutputCommitter;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
-import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.AMInfo;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskAttemptInfo;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskInfo;
+import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.apache.hadoop.mapreduce.v2.api.records.Phase;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptState;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskState;
+import org.apache.hadoop.mapreduce.v2.app.job.event.JobDiagnosticsUpdateEvent;
+import org.apache.hadoop.mapreduce.v2.app.job.event.JobEvent;
+import org.apache.hadoop.mapreduce.v2.app.job.event.JobEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptContainerAssignedEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptContainerLaunchedEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEvent;
@@ -53,6 +59,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskTAttemptEvent;
 import org.apache.hadoop.mapreduce.v2.app.launcher.ContainerLauncher;
+import org.apache.hadoop.mapreduce.v2.app.launcher.ContainerLauncherEvent;
 import org.apache.hadoop.mapreduce.v2.app.launcher.ContainerRemoteLaunchEvent;
 import org.apache.hadoop.mapreduce.v2.app.rm.ContainerAllocator;
 import org.apache.hadoop.mapreduce.v2.app.rm.ContainerAllocatorEvent;
@@ -72,6 +79,7 @@ import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.service.CompositeService;
 import org.apache.hadoop.yarn.service.Service;
+import org.apache.hadoop.yarn.util.BuilderUtils;
 
 /*
  * Recovers the completed tasks from the previous life of Application Master.
@@ -84,9 +92,6 @@ import org.apache.hadoop.yarn.service.Service;
 
 //TODO:
 //task cleanup for all non completed tasks
-//change job output committer to have 
-//    - atomic job output promotion
-//    - recover output of completed tasks
 
 public class RecoveryService extends CompositeService implements Recovery {
 
@@ -95,6 +100,7 @@ public class RecoveryService extends CompositeService implements Recovery {
   private static final Log LOG = LogFactory.getLog(RecoveryService.class);
 
   private final ApplicationAttemptId applicationAttemptId;
+  private final OutputCommitter committer;
   private final Dispatcher dispatcher;
   private final ControlledClock clock;
 
@@ -108,9 +114,10 @@ public class RecoveryService extends CompositeService implements Recovery {
   private volatile boolean recoveryMode = false;
 
   public RecoveryService(ApplicationAttemptId applicationAttemptId, 
-      Clock clock) {
+      Clock clock, OutputCommitter committer) {
     super("RecoveringDispatcher");
     this.applicationAttemptId = applicationAttemptId;
+    this.committer = committer;
     this.dispatcher = new RecoveryDispatcher();
     this.clock = new ControlledClock(clock);
       addService((Service) dispatcher);
@@ -122,17 +129,17 @@ public class RecoveryService extends CompositeService implements Recovery {
     // parse the history file
     try {
       parse();
-      if (completedTasks.size() > 0) {
-        recoveryMode = true;
-        LOG.info("SETTING THE RECOVERY MODE TO TRUE. NO OF COMPLETED TASKS " + 
-            "TO RECOVER " + completedTasks.size());
-        LOG.info("Job launch time " + jobInfo.getLaunchTime());
-        clock.setTime(jobInfo.getLaunchTime());
-      }
-    } catch (IOException e) {
+    } catch (Exception e) {
       LOG.warn(e);
       LOG.warn("Could not parse the old history file. Aborting recovery. "
-          + "Starting afresh.");
+          + "Starting afresh.", e);
+    }
+    if (completedTasks.size() > 0) {
+      recoveryMode = true;
+      LOG.info("SETTING THE RECOVERY MODE TO TRUE. NO OF COMPLETED TASKS "
+          + "TO RECOVER " + completedTasks.size());
+      LOG.info("Job launch time " + jobInfo.getLaunchTime());
+      clock.setTime(jobInfo.getLaunchTime());
     }
   }
 
@@ -307,14 +314,28 @@ public class RecoveryService extends CompositeService implements Recovery {
         TaskAttemptId aId = ((ContainerRemoteLaunchEvent) event)
             .getTaskAttemptID();
         TaskAttemptInfo attInfo = getTaskAttemptInfo(aId);
-        //TODO need to get the real port number MAPREDUCE-2666
-        actualHandler.handle(new TaskAttemptContainerLaunchedEvent(aId, -1));
+        actualHandler.handle(new TaskAttemptContainerLaunchedEvent(aId,
+            attInfo.getShufflePort()));
         // send the status update event
         sendStatusUpdateEvent(aId, attInfo);
 
         TaskAttemptState state = TaskAttemptState.valueOf(attInfo.getTaskStatus());
         switch (state) {
         case SUCCEEDED:
+          //recover the task output
+          TaskAttemptContext taskContext = new TaskAttemptContextImpl(getConfig(),
+              attInfo.getAttemptId());
+          try {
+            committer.recoverTask(taskContext);
+          } catch (IOException e) {
+            actualHandler.handle(new JobDiagnosticsUpdateEvent(
+                aId.getTaskId().getJobId(), "Error in recovering task output " + 
+                e.getMessage()));
+            actualHandler.handle(new JobEvent(aId.getTaskId().getJobId(),
+                JobEventType.INTERNAL_ERROR));
+          }
+          LOG.info("Recovered output from task attempt " + attInfo.getAttemptId());
+          
           // send the done event
           LOG.info("Sending done event to " + aId);
           actualHandler.handle(new TaskAttemptEvent(aId,
@@ -331,6 +352,16 @@ public class RecoveryService extends CompositeService implements Recovery {
               TaskAttemptEventType.TA_FAILMSG));
           break;
         }
+        return;
+      }
+
+      else if (event.getType() == 
+        ContainerLauncher.EventType.CONTAINER_REMOTE_CLEANUP) {
+        TaskAttemptId aId = ((ContainerLauncherEvent) event)
+          .getTaskAttemptID();
+        actualHandler.handle(
+           new TaskAttemptEvent(aId,
+                TaskAttemptEventType.TA_CONTAINER_CLEANED));
         return;
       }
 
@@ -362,18 +393,17 @@ public class RecoveryService extends CompositeService implements Recovery {
         TaskAttemptInfo attemptInfo) {
       LOG.info("Sending assigned event to " + yarnAttemptID);
       ContainerId cId = attemptInfo.getContainerId();
-      Container container = recordFactory
-          .newRecordInstance(Container.class);
-      container.setId(cId);
-      container.setNodeId(recordFactory
-          .newRecordInstance(NodeId.class));
-      // NodeId can be obtained from TaskAttemptInfo.hostname - but this will
-      // eventually contain rack info.
-      container.setContainerToken(null);
-      container.setNodeHttpAddress(attemptInfo.getTrackerName() + ":" + 
-          attemptInfo.getHttpPort());
+      String[] splits = attemptInfo.getHostname().split(":");
+      NodeId nodeId = BuilderUtils.newNodeId(splits[0], Integer
+          .parseInt(splits[1]));
+      // Resource/Priority/ApplicationACLs are only needed while launching the
+      // container on an NM, these are already completed tasks, so setting them
+      // to null
+      Container container = BuilderUtils.newContainer(cId, nodeId,
+          attemptInfo.getTrackerName() + ":" + attemptInfo.getHttpPort(),
+          null, null, null);
       actualHandler.handle(new TaskAttemptContainerAssignedEvent(yarnAttemptID,
-          container));
+          container, null));
     }
   }
 

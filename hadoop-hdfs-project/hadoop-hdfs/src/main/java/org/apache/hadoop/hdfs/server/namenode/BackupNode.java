@@ -28,10 +28,12 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocolR23Compatible.JournalProtocolServerSideTranslatorR23;
+import org.apache.hadoop.hdfs.protocolR23Compatible.JournalWireProtocol;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.Storage;
-import org.apache.hadoop.hdfs.server.protocol.JournalProtocol;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
+import org.apache.hadoop.hdfs.server.protocol.JournalProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
@@ -176,7 +178,9 @@ public class BackupNode extends NameNode {
       }
     }
     // Stop the RPC client
-    RPC.stopProxy(namenode);
+    if (namenode != null) {
+      RPC.stopProxy(namenode);
+    }
     namenode = null;
     // Stop the checkpoint manager
     if(checkpointManager != null) {
@@ -187,13 +191,17 @@ public class BackupNode extends NameNode {
     super.stop();
   }
 
-  static class BackupNodeRpcServer extends NameNodeRpcServer implements JournalProtocol {
+  static class BackupNodeRpcServer extends NameNodeRpcServer implements
+      JournalProtocol {
     private final String nnRpcAddress;
     
     private BackupNodeRpcServer(Configuration conf, BackupNode nn)
         throws IOException {
       super(conf, nn);
-      this.server.addProtocol(JournalProtocol.class, this);
+      JournalProtocolServerSideTranslatorR23 journalProtocolTranslator = 
+          new JournalProtocolServerSideTranslatorR23(this);
+      this.clientRpcServer.addProtocol(JournalWireProtocol.class,
+          journalProtocolTranslator);
       nnRpcAddress = nn.nnRpcAddress;
     }
 
@@ -202,9 +210,8 @@ public class BackupNode extends NameNode {
         throws IOException {
       if (protocol.equals(JournalProtocol.class.getName())) {
         return JournalProtocol.versionID;
-      } else {
-        return super.getProtocolVersion(protocol, clientVersion);
       }
+      return super.getProtocolVersion(protocol, clientVersion);
     }
   
     /////////////////////////////////////////////////////
@@ -246,7 +253,7 @@ public class BackupNode extends NameNode {
       verifyRequest(nnReg);
       if(!nnRpcAddress.equals(nnReg.getAddress()))
         throw new IOException("Journal request from unexpected name-node: "
-            + nnReg.getAddress() + " expecting " + rpcAddress);
+            + nnReg.getAddress() + " expecting " + clientRpcAddress);
       getBNImage().journal(firstTxId, numTxns, records);
     }
   
@@ -281,7 +288,7 @@ public class BackupNode extends NameNode {
     // connect to name node
     InetSocketAddress nnAddress = NameNode.getServiceAddress(conf, true);
     this.namenode =
-      (NamenodeProtocol) RPC.waitForProxy(NamenodeProtocol.class,
+      RPC.waitForProxy(NamenodeProtocol.class,
           NamenodeProtocol.versionID, nnAddress, conf);
     this.nnRpcAddress = getHostPortString(nnAddress);
     this.nnHttpAddress = getHostPortString(super.getHttpServerAddress(conf));
@@ -295,7 +302,9 @@ public class BackupNode extends NameNode {
         LOG.info("Problem connecting to server: " + nnAddress);
         try {
           Thread.sleep(1000);
-        } catch (InterruptedException ie) {}
+        } catch (InterruptedException ie) {
+          LOG.warn("Encountered exception ", e);
+        }
       }
     }
     return nsInfo;
@@ -344,7 +353,9 @@ public class BackupNode extends NameNode {
         LOG.info("Problem connecting to name-node: " + nnRpcAddress);
         try {
           Thread.sleep(1000);
-        } catch (InterruptedException ie) {}
+        } catch (InterruptedException ie) {
+          LOG.warn("Encountered exception ", e);
+        }
       }
     }
 

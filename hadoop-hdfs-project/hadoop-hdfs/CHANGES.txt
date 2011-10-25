@@ -61,11 +61,24 @@ Trunk (unreleased changes)
     HDFS-2395. Add a root element in the JSON responses of webhdfs.
     (szetszwo)
 
-	HDFS-2181 Separate HDFS Client wire protocol data types (sanjay)
+    HDFS-2459. Separate datatypes for JournalProtocol. (suresh)
+
+    HDFS-2480. Separate datatypes for NamenodeProtocol. (suresh)
+
+    HDFS-2181 Separate HDFS Client wire protocol data types (sanjay)
 
     HDFS-2294. Download of commons-daemon TAR should not be under target (tucu)
 
-    HDFS-2322. the build fails in Windows because commons-daemon TAR cannot be fetched. (tucu)
+    HDFS-2322. the build fails in Windows because commons-daemon TAR cannot be 
+    fetched. (tucu)
+
+    HDFS-2427. Change the default permission in webhdfs to 755 and add range
+    check/validation for all parameters. (szetszwo)
+
+    HDFS-2489. Move Finalize and Register to separate file out of
+    DatanodeCommand.java. (suresh)
+
+    HDFS-2488. Separate datatypes for InterDatanodeProtocol. (suresh)
 
   BUG FIXES
     HDFS-2287. TestParallelRead has a small off-by-one bug. (todd)
@@ -131,6 +144,15 @@ Trunk (unreleased changes)
 
     HDFS-2188. Make FSEditLog create its journals from a list of URIs rather 
     than NNStorage. (Ivan Kelly via jitendra)
+
+    HDFS-2453. Fix http response code for partial content in webhdfs, added
+    getDefaultBlockSize() and getDefaultReplication() in WebHdfsFileSystem
+    and cleared content type in ExceptionHandler.  (szetszwo)
+
+    HDFS-2481 Unknown protocol: org.apache.hadoop.hdfs.protocol.ClientProtocol.
+    (sanjay)
+
+    HDFS-2497 Fix TestBackupNode failure. (suresh)
 
 Release 0.23.0 - Unreleased
 
@@ -828,6 +850,11 @@ Release 0.23.0 - Unreleased
     HDFS-2401. Running a set of methods in a Single Test Class.
     (Jonathan Eagles via mahadev)
 
+    HDFS-2471. Add federation documentation. (suresh)
+
+    HDFS-2485. Improve code layout and constants in UnderReplicatedBlocks
+    (stevel)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
@@ -1246,6 +1273,9 @@ Release 0.23.0 - Unreleased
     HDFS-2170. Address remaining TODOs in HDFS-1073 branch. (todd)
     HDFS-2172. Address findbugs and javadoc warnings in HDFS-1073 branch. 
                (todd)
+
+    HDFS-2445. Ensure failed tests exit with proper error code. (Jonathan 
+    Eagles via acmurthy)
 
 Release 0.22.0 - Unreleased
 
@@ -1745,6 +1775,12 @@ Release 0.22.0 - Unreleased
 
     HDFS-2012. Balancer incorrectly treats nodes whose utilization equals
     avgUtilization. (Uma Maheswara Rao G via shv)
+
+    HDFS-2491. TestBalancer can fail when datanode utilization and 
+    avgUtilization is exactly same. (Uma Maheswara Rao G via shv)
+
+    HDFS-2452. OutOfMemoryError in DataXceiverServer takes down the DataNode
+    (Uma Maheswara Rao via cos)
 
 Release 0.21.1 - Unreleased
 

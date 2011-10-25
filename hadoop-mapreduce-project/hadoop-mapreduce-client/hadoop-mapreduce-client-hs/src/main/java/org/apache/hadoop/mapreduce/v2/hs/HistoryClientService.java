@@ -27,11 +27,12 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.apache.avro.ipc.Server;
+import org.apache.hadoop.ipc.Server;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.mapreduce.JobACL;
 import org.apache.hadoop.mapreduce.v2.api.MRClientProtocol;
 import org.apache.hadoop.mapreduce.v2.api.protocolrecords.FailTaskAttemptRequest;
@@ -62,6 +63,7 @@ import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskType;
 import org.apache.hadoop.mapreduce.v2.app.job.Job;
 import org.apache.hadoop.mapreduce.v2.app.job.Task;
+import org.apache.hadoop.mapreduce.v2.app.security.authorize.MRAMPolicyProvider;
 import org.apache.hadoop.mapreduce.v2.hs.webapp.HsWebApp;
 import org.apache.hadoop.mapreduce.v2.jobhistory.JHAdminConfig;
 import org.apache.hadoop.mapreduce.v2.security.client.ClientHSSecurityInfo;
@@ -106,7 +108,9 @@ public class HistoryClientService extends AbstractService {
     initializeWebApp(conf);
     String serviceAddr = conf.get(JHAdminConfig.MR_HISTORY_ADDRESS,
         JHAdminConfig.DEFAULT_MR_HISTORY_ADDRESS);
-    InetSocketAddress address = NetUtils.createSocketAddr(serviceAddr);
+    InetSocketAddress address = NetUtils.createSocketAddr(serviceAddr,
+      JHAdminConfig.DEFAULT_MR_HISTORY_PORT,
+      JHAdminConfig.DEFAULT_MR_HISTORY_ADDRESS);
     InetAddress hostNameResolved = null;
     try {
       hostNameResolved = InetAddress.getLocalHost(); //address.getAddress().getLocalHost();
@@ -119,6 +123,14 @@ public class HistoryClientService extends AbstractService {
             conf, null,
             conf.getInt(JHAdminConfig.MR_HISTORY_CLIENT_THREAD_COUNT, 
                 JHAdminConfig.DEFAULT_MR_HISTORY_CLIENT_THREAD_COUNT));
+    
+    // Enable service authorization?
+    if (conf.getBoolean(
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, 
+        false)) {
+      server.refreshServiceAcl(conf, new MRAMPolicyProvider());
+    }
+    
     server.start();
     this.bindAddress =
         NetUtils.createSocketAddr(hostNameResolved.getHostAddress()
@@ -138,7 +150,7 @@ public class HistoryClientService extends AbstractService {
   @Override
   public void stop() {
     if (server != null) {
-      server.close();
+      server.stop();
     }
     if (webApp != null) {
       webApp.stop();

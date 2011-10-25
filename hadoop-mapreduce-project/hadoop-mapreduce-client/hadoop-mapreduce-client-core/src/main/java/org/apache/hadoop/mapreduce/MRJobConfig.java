@@ -91,12 +91,6 @@ public interface MRJobConfig {
 
   public static final String WORKING_DIR = "mapreduce.job.working.dir";
 
-  public static final String END_NOTIFICATION_URL = "mapreduce.job.end-notification.url";
-
-  public static final String END_NOTIFICATION_RETRIES = "mapreduce.job.end-notification.retry.attempts";
-
-  public static final String END_NOTIFICATION_RETRIE_INTERVAL = "mapreduce.job.end-notification.retry.interval";
-
   public static final String CLASSPATH_ARCHIVES = "mapreduce.job.classpath.archives";
 
   public static final String CLASSPATH_FILES = "mapreduce.job.classpath.files";
@@ -275,7 +269,12 @@ public interface MRJobConfig {
 
   public static final String JOB_ACL_VIEW_JOB = "mapreduce.job.acl-view-job";
 
+  public static final String DEFAULT_JOB_ACL_VIEW_JOB = " ";
+
   public static final String JOB_ACL_MODIFY_JOB = "mapreduce.job.acl-modify-job";
+
+  public static final String DEFAULT_JOB_ACL_MODIFY_JOB = " ";
+
   public static final String JOB_SUBMITHOST =
     "mapreduce.job.submithostname";
   public static final String JOB_SUBMITHOSTADDR =
@@ -444,6 +443,8 @@ public interface MRJobConfig {
   public static final String STDOUT_LOGFILE_ENV = "STDOUT_LOGFILE_ENV";
   public static final String STDERR_LOGFILE_ENV = "STDERR_LOGFILE_ENV";
 
+  public static final String APPLICATION_ATTEMPT_ID_ENV = "APPLICATION_ATTEMPT_ID_ENV";
+
   // This should be the directory where splits file gets localized on the node
   // running ApplicationMaster.
   public static final String JOB_SUBMIT_DIR = "jobSubmitDir";
@@ -479,4 +480,33 @@ public interface MRJobConfig {
 
   public static final String APPLICATION_ATTEMPT_ID =
       "mapreduce.job.application.attempt.id";
+
+  /**
+   * Job end notification.
+   */
+  public static final String MR_JOB_END_NOTIFICATION_URL =
+    "mapreduce.job.end-notification.url";
+
+  public static final String MR_JOB_END_RETRY_ATTEMPTS =
+    "mapreduce.job.end-notification.retry.attempts";
+
+  public static final String MR_JOB_END_RETRY_INTERVAL =
+    "mapreduce.job.end-notification.retry.interval";
+
+  public static final String MR_JOB_END_NOTIFICATION_MAX_ATTEMPTS =
+    "mapreduce.job.end-notification.max.attempts";
+
+  public static final String MR_JOB_END_NOTIFICATION_MAX_RETRY_INTERVAL =
+    "mapreduce.job.end-notification.max.retry.interval";
+
+  /*
+   * MR AM Service Authorization
+   */
+  public static final String   
+  MR_AM_SECURITY_SERVICE_AUTHORIZATION_TASK_UMBILICAL =
+      "security.job.task.protocol.acl";
+  public static final String   
+  MR_AM_SECURITY_SERVICE_AUTHORIZATION_CLIENT =
+      "security.job.client.protocol.acl";
+
 }

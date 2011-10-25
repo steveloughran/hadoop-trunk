@@ -176,6 +176,24 @@ Hadoop MapReduce Next Generation - Cluster Setup
       
       * <<<conf/yarn-site.xml>>>
 
+        * Configurations for ResourceManager and NodeManager:
+
+*-------------------------+-------------------------+------------------------+
+|| Parameter              || Value                  || Notes                 |
+*-------------------------+-------------------------+------------------------+
+| <<<yarn.acl.enable>>> | | |
+| | <<<true>>> / <<<false>>> | |
+| | | Enable ACLs? Defaults to <true>. |
+*-------------------------+-------------------------+------------------------+
+| <<<yarn.admin.acl>>> | | |
+| | Admin ACL | |
+| | | ACL to set admins on the cluster. |
+| | | ACLs are of for <comma-separated-users><space><comma-separated-groups>. |
+| | | Defaults to special value of <<*>> which means <anyone>. |
+| | | Special value of just <space> means no one has access. |
+*-------------------------+-------------------------+------------------------+
+
+
         * Configurations for ResourceManager:
 
 *-------------------------+-------------------------+------------------------+
@@ -205,17 +223,6 @@ Hadoop MapReduce Next Generation - Cluster Setup
 | <<<yarn.resourcemanager.scheduler.class>>> | | |
 | | <<<ResourceManager>>> Scheduler class. | |
 | | | <<<CapacityScheduler>>> (recommended) or <<<FifoScheduler>>> |
-*-------------------------+-------------------------+------------------------+
-| <<<yarn.resourcemanager.acl.enable>>> | | |
-| | <<<true>>> / <<<false>>> | |
-| | | Enable ACLs? Defaults to <true>. |
-*-------------------------+-------------------------+------------------------+
-| <<<yarn.resourcemanager.admin.acl>>> | | |
-| | Admin ACL | |
-| | | ACL to set admins on the cluster. |
-| | | ACLs are of for <comma-separated-users><space><comma-separated-groups>. |
-| | | Defaults to special value of <<*>> which means <anyone>. |
-| | | Special value of just <space> means no one has access. |
 *-------------------------+-------------------------+------------------------+
 | <<<yarn.nodemanager.remote-app-log-dir>>> | | |
 | | </logs> | |
@@ -394,19 +401,19 @@ Hadoop MapReduce Next Generation - Cluster Setup
     Format a new distributed filesystem:
   
 ----
-  $ $HADOOP_HDFS_HOME/bin/hdfs namenode -format <cluster_name>
+  $ $HADOOP_PREFIX_HOME/bin/hdfs namenode -format <cluster_name>
 ----
 
     Start the HDFS with the following command, run on the designated NameNode:
   
 ----
-  $ $HADOOP_HDFS_HOME/bin/hdfs start namenode --config $HADOOP_CONF_DIR  
+  $ $HADOOP_PREFIX_HOME/bin/hdfs start namenode --config $HADOOP_CONF_DIR  
 ----    	  
 
     Run a script to start DataNodes on all slaves:
 
 ----
-  $ $HADOOP_HDFS_HOME/bin/hdfs start datanode --config $HADOOP_CONF_DIR  
+  $ $HADOOP_PREFIX_HOME/bin/hdfs start datanode --config $HADOOP_CONF_DIR  
 ----    	  
   
     Start the YARN with the following command, run on the designated 
@@ -435,13 +442,13 @@ Hadoop MapReduce Next Generation - Cluster Setup
     NameNode:
   
 ----
-  $ $HADOOP_HDFS_HOME/bin/hdfs stop namenode --config $HADOOP_CONF_DIR  
+  $ $HADOOP_PREFIX_HOME/bin/hdfs stop namenode --config $HADOOP_CONF_DIR  
 ----    	  
 
     Run a script to stop DataNodes on all slaves:
 
 ----
-  $ $HADOOP_HDFS_HOME/bin/hdfs stop datanode --config $HADOOP_CONF_DIR  
+  $ $HADOOP_PREFIX_HOME/bin/hdfs stop datanode --config $HADOOP_CONF_DIR  
 ----    	  
   
     Stop the ResourceManager with the following command, run on the designated 
@@ -910,21 +917,21 @@ KVNO Timestamp         Principal
     Format a new distributed filesystem as <hdfs>:
   
 ----
-[hdfs]$ $HADOOP_HDFS_HOME/bin/hdfs namenode -format <cluster_name>
+[hdfs]$ $HADOOP_PREFIX_HOME/bin/hdfs namenode -format <cluster_name>
 ----
 
     Start the HDFS with the following command, run on the designated NameNode
     as <hdfs>:
   
 ----
-[hdfs]$ $HADOOP_HDFS_HOME/bin/hdfs start namenode --config $HADOOP_CONF_DIR  
+[hdfs]$ $HADOOP_PREFIX_HOME/bin/hdfs start namenode --config $HADOOP_CONF_DIR  
 ----    	  
 
     Run a script to start DataNodes on all slaves as <root> with a special
     environment variable <<<HADOOP_SECURE_DN_USER>>> set to <hdfs>:
 
 ----
-[root]$ HADOOP_SECURE_DN_USER=hdfs $HADOOP_HDFS_HOME/bin/hdfs start datanode --config $HADOOP_CONF_DIR  
+[root]$ HADOOP_SECURE_DN_USER=hdfs $HADOOP_PREFIX_HOME/bin/hdfs start datanode --config $HADOOP_CONF_DIR  
 ----    	  
   
     Start the YARN with the following command, run on the designated 
@@ -953,13 +960,13 @@ KVNO Timestamp         Principal
     as <hdfs>:
   
 ----
-[hdfs]$ $HADOOP_HDFS_HOME/bin/hdfs stop namenode --config $HADOOP_CONF_DIR  
+[hdfs]$ $HADOOP_PREFIX_HOME/bin/hdfs stop namenode --config $HADOOP_CONF_DIR  
 ----    	  
 
     Run a script to stop DataNodes on all slaves as <root>:
 
 ----
-[root]$ $HADOOP_HDFS_HOME/bin/hdfs stop datanode --config $HADOOP_CONF_DIR  
+[root]$ $HADOOP_PREFIX_HOME/bin/hdfs stop datanode --config $HADOOP_CONF_DIR  
 ----    	  
   
     Stop the ResourceManager with the following command, run on the designated 

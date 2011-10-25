@@ -53,6 +53,8 @@ Trunk (unreleased changes)
     HADOOP-7729. Send back valid HTTP response if user hits IPC port with
     HTTP GET. (todd)
 
+    HADOOP-7758. Make GlobFilter class public. (tucu)
+
   BUGS
 
     HADOOP-7606. Upgrade Jackson to version 1.7.1 to match the version required
@@ -484,6 +486,9 @@ Release 0.23.0 - Unreleased
     HADOOP-7705. Add a log4j back end that can push out JSON data,
     one per line. (stevel)
 
+    HADOOP-7749. Add a NetUtils createSocketAddr call which provides more
+    help in exception messages. (todd)
+
   OPTIMIZATIONS
   
     HADOOP-7333. Performance improvement in PureJavaCrc32. (Eric Caspole
@@ -735,6 +740,9 @@ Release 0.23.0 - Unreleased
 
     HADOOP-7755. Detect MapReduce PreCommit Trunk builds silently failing
     when running test-patch.sh. (Jonathan Eagles via tomwhite)
+
+    HADOOP-7744. Ensure failed tests exit with proper error code. (Jonathan
+    Eagles via acmurthy) 
 
 Release 0.22.0 - Unreleased
 

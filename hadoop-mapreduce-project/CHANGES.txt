@@ -25,6 +25,9 @@ Trunk (unreleased changes)
     MAPREDUCE-3171. normalize nodemanager native code compilation with common/hdfs 
     native. (tucu)
 
+    MAPREDUCE-3149. Add a test to verify that TokenCache handles file system 
+    uri with no authority. (John George via jitendra)
+
   BUG FIXES
 
     MAPREDUCE-3166. [Rumen] Make Rumen use job history api instead of relying
@@ -54,6 +57,8 @@ Trunk (unreleased changes)
     (jitendra)
 
     MAPREDUCE-3003. Publish MR JARs to Maven snapshot repository. (tucu)
+
+    MAPREDUCE-3204. mvn site:site fails on MapReduce. (tucu)
 
 Release 0.23.0 - Unreleased
 
@@ -107,6 +112,11 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-2719. Add a simple, DistributedShell, application to illustrate
     alternate frameworks on YARN. (Hitesh Shah via acmurthy)
+
+    MAPREDUCE-3104. Implemented Application-acls. (vinodkv)
+
+    MAPREDUCE-2708. Designed and implemented MR Application Master recovery to
+    make MR AMs resume their progress after restart. (Sharad Agarwal via vinodkv)
 
   IMPROVEMENTS
 
@@ -409,6 +419,15 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3144. Augmented JobHistory with the information needed for
     serving aggregated logs. (Siddharth Seth via vinodkv)
+  
+    MAPREDUCE-3163. JobClient spews errors when killing MR2 job.
+    (mahadev)
+
+    MAPREDUCE-3239. Use new createSocketAddr API in MRv2 to give better 
+    error messages on misconfig (Todd Lipcon via mahadev)
+
+    MAPREDUCE-2747. Cleaned up LinuxContainerExecutor binary sources and changed
+    the configuration to use yarn names. (Robert Joseph Evans via vinodkv)
 
   OPTIMIZATIONS
 
@@ -420,6 +439,9 @@ Release 0.23.0 - Unreleased
     TaskAttemptContexts. (todd)
 
     MAPREDUCE-901. Efficient framework counters. (llu via acmurthy)
+
+    MAPREDUCE-2629. Workaround a JVM class loading quirk which prevents
+    JIT compilation of inner classes methods in ReduceContextImpl.
 
   BUG FIXES
 
@@ -1682,6 +1704,65 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3162. Separated application-init and container-init event types
     in NodeManager's Application state machine. (Todd Lipcon via vinodkv)
+
+    MAPREDUCE-3176. Fixed ant mapreduce tests that are timing out because
+    of wrong framework name. (Hitesh Shah via vinodkv)
+
+    MAPREDUCE-3181. Fixed MapReduce runtime to load yarn-default.xml and
+    yarn-site.xml. (acmurthy) 
+
+    MAPREDUCE-2788. Normalize resource requests in FifoScheduler
+    appropriately. (Ahmed Radwan via acmurthy) 
+
+    MAPREDUCE-2693. Fix NPE in job-blacklisting. (Hitesh Shah via acmurthy) 
+
+    MAPREDUCE-3208. Fix NPE task/container log appenders. (liangzhwa via
+    acmurthy) 
+
+    MAPREDUCE-3212. Fix usage/help message for bin/yarn. (Bhallamudi Venkata 
+    Siva Kamesh via acmurthy) 
+
+    MAPREDUCE-3179. Ensure failed tests exit with right error code. (Jonathan
+    Eagles via acmurthy)
+
+    MAPREDUCE-3188. Ensure correct shutdown in services. (todd via acmurthy) 
+
+    MAPREDUCE-3226. Fix shutdown of fetcher threads. (vinodkv via acmurthy) 
+
+    MAPREDUCE-3070. Fix NodeManager to use ephemeral ports by default.
+    (Devaraj K via acmurthy) 
+
+    MAPREDUCE-3242. Trunk compilation broken with bad interaction from 
+    MAPREDUCE-3070 and MAPREDUCE-3239. (mahadev)
+
+    MAPREDUCE-3058. Fixed MR YarnChild to report failure when task throws an
+    error and thus prevent a hanging task and job. (vinodkv)
+
+    MAPREDUCE-3087. Fixed the mapreduce classpath to correctly include the
+    generated-classpath file needed for tests. (Ravi Prakash via vinodkv)
+
+    MAPREDUCE-3233. Fixed a bug in MR Job so as to be able to restart the
+    application on AM crash. (Mahadev Konar via vinodkv)
+
+    MAPREDUCE-3028. Added job-end notification support. (Ravi Prakash via
+    acmurthy) 
+
+    MAPREDUCE-3249. Ensure shuffle-port is correctly used duringMR AM recovery. 
+    (vinodkv via acmurthy) 
+
+    MAPREDUCE-3252. Fix map tasks to not rewrite data an extra time when
+    map output fits in spill buffer. (todd)
+
+    MAPREDUCE-3159. Ensure DefaultContainerExecutor doesn't delete application
+    directories during app-init. (todd via acmurthy)
+
+    MAPREDUCE-3248. Fixed log4j properties. (vinodkv via acmurthy) 
+
+    MAPREDUCE-2746. Yarn servers can't communicate with each other with 
+    hadoop.security.authorization set to true (acmurthy via mahadev)
+
+    MAPREDUCE-2821. Added missing fields (resourcePerMap & resourcePerReduce)
+    to JobSummary logs. (mahadev via acmurthy)
 
 Release 0.22.0 - Unreleased
 

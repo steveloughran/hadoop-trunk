@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ServiceLoader;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -62,7 +64,11 @@ public class Cluster {
   private Path sysDir = null;
   private Path stagingAreaDir = null;
   private Path jobHistoryDir = null;
+  private static final Log LOG = LogFactory.getLog(Cluster.class);
 
+  private static ServiceLoader<ClientProtocolProvider> frameworkLoader =
+      ServiceLoader.load(ClientProtocolProvider.class);
+  
   static {
     ConfigUtil.loadResources();
   }
@@ -81,19 +87,34 @@ public class Cluster {
   private void initialize(InetSocketAddress jobTrackAddr, Configuration conf)
       throws IOException {
 
-    for (ClientProtocolProvider provider : ServiceLoader
-        .load(ClientProtocolProvider.class)) {
-      ClientProtocol clientProtocol = null;
-      if (jobTrackAddr == null) {
-        clientProtocol = provider.create(conf);
-      } else {
-        clientProtocol = provider.create(jobTrackAddr, conf);
-      }
+    synchronized (frameworkLoader) {
+      for (ClientProtocolProvider provider : frameworkLoader) {
+        LOG.debug("Trying ClientProtocolProvider : "
+            + provider.getClass().getName());
+        ClientProtocol clientProtocol = null; 
+        try {
+          if (jobTrackAddr == null) {
+            clientProtocol = provider.create(conf);
+          } else {
+            clientProtocol = provider.create(jobTrackAddr, conf);
+          }
 
-      if (clientProtocol != null) {
-        clientProtocolProvider = provider;
-        client = clientProtocol;
-        break;
+          if (clientProtocol != null) {
+            clientProtocolProvider = provider;
+            client = clientProtocol;
+            LOG.debug("Picked " + provider.getClass().getName()
+                + " as the ClientProtocolProvider");
+            break;
+          }
+          else {
+            LOG.info("Cannot pick " + provider.getClass().getName()
+                + " as the ClientProtocolProvider - returned null protocol");
+          }
+        } 
+        catch (Exception e) {
+          LOG.info("Failed to use " + provider.getClass().getName()
+              + " due to error: " + e.getMessage());
+        }
       }
     }
 
