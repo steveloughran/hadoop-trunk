@@ -118,6 +118,9 @@ Release 0.23.0 - Unreleased
     MAPREDUCE-2708. Designed and implemented MR Application Master recovery to
     make MR AMs resume their progress after restart. (Sharad Agarwal via vinodkv)
 
+    MAPREDUCE-2858. Added a WebApp Proxy for applications. (Robert Evans via
+    acmurthy) 
+
   IMPROVEMENTS
 
     MAPREDUCE-2187. Reporter sends progress during sort/merge. (Anupam Seth via
@@ -1763,6 +1766,21 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-2821. Added missing fields (resourcePerMap & resourcePerReduce)
     to JobSummary logs. (mahadev via acmurthy)
+
+    MAPREDUCE-3253. Fixed ContextFactory to clone JobContext correctly.
+    (acmurthy) 
+
+    MAPREDUCE-3263. Fixed the MAPREDUCE-3028 commit which broke MR1. (Hitesh
+    Shah via acmurthy) 
+
+    MAPREDUCE-3269. Fixed log4j properties to correctly set logging options
+    for JobHistoryServer vis-a-vis JobSummary logs. (mahadev via acmurthy) 
+
+    MAPREDUCE-2977. Fix ResourceManager to renew HDFS delegation tokens for
+    applications. (acmurthy) 
+
+    MAPREDUCE-3250. When AM restarts, client keeps reconnecting to the new AM 
+    and prints a lots of logs. (vinodkv via mahadev)
 
 Release 0.22.0 - Unreleased
 
