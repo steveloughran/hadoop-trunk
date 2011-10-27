@@ -88,6 +88,15 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2764. Fix renewal of dfs delegation tokens. (Owen via jitendra)
 
+    HADOOP-7769. TestJMXJsonServlet is failing. (tomwhite)
+
+    HADOOP-7766. The auth to local mappings are not being respected, with webhdfs 
+    and security enabled. (jitendra)
+
+  OPTIMIZATIONS
+
+    HADOOP-7761. Improve the performance of raw comparisons. (todd)
+
 Release 0.23.0 - Unreleased
 
   INCOMPATIBLE CHANGES
@@ -743,6 +752,9 @@ Release 0.23.0 - Unreleased
 
     HADOOP-7744. Ensure failed tests exit with proper error code. (Jonathan
     Eagles via acmurthy) 
+
+    HADOOP-7764. Allow HttpServer to set both ACL list and path spec filters. 
+    (Jonathan Eagles via acmurthy) 
 
 Release 0.22.0 - Unreleased
 

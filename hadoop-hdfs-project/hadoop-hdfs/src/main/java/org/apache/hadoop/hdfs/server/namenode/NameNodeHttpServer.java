@@ -109,7 +109,7 @@ public class NameNodeHttpServer {
                 //add SPNEGO authentication filter for webhdfs
                 final String name = "SPNEGO";
                 final String classname =  AuthFilter.class.getName();
-                final String pathSpec = "/" + WebHdfsFileSystem.PATH_PREFIX + "/*";
+                final String pathSpec = WebHdfsFileSystem.PATH_PREFIX + "/*";
                 Map<String, String> params = getAuthFilterParams(conf);
                 defineFilter(webAppContext, name, classname, params,
                     new String[]{pathSpec});
@@ -141,8 +141,6 @@ public class NameNodeHttpServer {
                     DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY,
                     httpKeytab);
               }
-              params.put("kerberos.name.rules",
-                  conf.get("hadoop.security.auth_to_local", "DEFAULT"));
               return params;
             }
           };

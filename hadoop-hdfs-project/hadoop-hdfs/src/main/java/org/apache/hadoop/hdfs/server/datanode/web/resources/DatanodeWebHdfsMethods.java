@@ -78,8 +78,35 @@ import com.sun.jersey.spi.container.ResourceFilters;
 public class DatanodeWebHdfsMethods {
   public static final Log LOG = LogFactory.getLog(DatanodeWebHdfsMethods.class);
 
+  private static final UriFsPathParam ROOT = new UriFsPathParam("");
+
   private @Context ServletContext context;
   private @Context HttpServletResponse response;
+
+  /** Handle HTTP PUT request for the root. */
+  @PUT
+  @Path("/")
+  @Consumes({"*/*"})
+  @Produces({MediaType.APPLICATION_JSON})
+  public Response putRoot(
+      final InputStream in,
+      @Context final UserGroupInformation ugi,
+      @QueryParam(PutOpParam.NAME) @DefaultValue(PutOpParam.DEFAULT)
+          final PutOpParam op,
+      @QueryParam(PermissionParam.NAME) @DefaultValue(PermissionParam.DEFAULT)
+          final PermissionParam permission,
+      @QueryParam(OverwriteParam.NAME) @DefaultValue(OverwriteParam.DEFAULT)
+          final OverwriteParam overwrite,
+      @QueryParam(BufferSizeParam.NAME) @DefaultValue(BufferSizeParam.DEFAULT)
+          final BufferSizeParam bufferSize,
+      @QueryParam(ReplicationParam.NAME) @DefaultValue(ReplicationParam.DEFAULT)
+          final ReplicationParam replication,
+      @QueryParam(BlockSizeParam.NAME) @DefaultValue(BlockSizeParam.DEFAULT)
+          final BlockSizeParam blockSize
+      ) throws IOException, InterruptedException {
+    return put(in, ugi, ROOT, op, permission, overwrite, bufferSize,
+        replication, blockSize);
+  }
 
   /** Handle HTTP PUT request. */
   @PUT
@@ -125,17 +152,23 @@ public class DatanodeWebHdfsMethods {
     {
       final Configuration conf = new Configuration(datanode.getConf());
       final InetSocketAddress nnRpcAddr = NameNode.getAddress(conf);
-      final DFSClient dfsclient = new DFSClient(nnRpcAddr, conf);
       final int b = bufferSize.getValue(conf);
-      final FSDataOutputStream out = new FSDataOutputStream(dfsclient.create(
-          fullpath, permission.getFsPermission(), 
-          overwrite.getValue() ? EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)
-              : EnumSet.of(CreateFlag.CREATE),
-          replication.getValue(conf), blockSize.getValue(conf), null, b), null);
+      DFSClient dfsclient = new DFSClient(nnRpcAddr, conf);
+      FSDataOutputStream out = null;
       try {
+        out = new FSDataOutputStream(dfsclient.create(
+            fullpath, permission.getFsPermission(), 
+            overwrite.getValue() ? EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)
+                : EnumSet.of(CreateFlag.CREATE),
+            replication.getValue(conf), blockSize.getValue(conf), null, b), null);
         IOUtils.copyBytes(in, out, b);
-      } finally {
         out.close();
+        out = null;
+        dfsclient.close();
+        dfsclient = null;
+      } finally {
+        IOUtils.cleanup(LOG, out);
+        IOUtils.cleanup(LOG, dfsclient);
       }
       final InetSocketAddress nnHttpAddr = NameNode.getHttpAddress(conf);
       final URI uri = new URI(WebHdfsFileSystem.SCHEME, null,
@@ -147,6 +180,22 @@ public class DatanodeWebHdfsMethods {
     }
       }
     });
+  }
+
+  /** Handle HTTP POST request for the root for the root. */
+  @POST
+  @Path("/")
+  @Consumes({"*/*"})
+  @Produces({MediaType.APPLICATION_JSON})
+  public Response postRoot(
+      final InputStream in,
+      @Context final UserGroupInformation ugi,
+      @QueryParam(PostOpParam.NAME) @DefaultValue(PostOpParam.DEFAULT)
+          final PostOpParam op,
+      @QueryParam(BufferSizeParam.NAME) @DefaultValue(BufferSizeParam.DEFAULT)
+          final BufferSizeParam bufferSize
+      ) throws IOException, InterruptedException {
+    return post(in, ugi, ROOT, op, bufferSize);
   }
 
   /** Handle HTTP POST request. */
@@ -184,13 +233,19 @@ public class DatanodeWebHdfsMethods {
     {
       final Configuration conf = new Configuration(datanode.getConf());
       final InetSocketAddress nnRpcAddr = NameNode.getAddress(conf);
-      final DFSClient dfsclient = new DFSClient(nnRpcAddr, conf);
       final int b = bufferSize.getValue(conf);
-      final FSDataOutputStream out = dfsclient.append(fullpath, b, null, null);
+      DFSClient dfsclient = new DFSClient(nnRpcAddr, conf);
+      FSDataOutputStream out = null;
       try {
+        out = dfsclient.append(fullpath, b, null, null);
         IOUtils.copyBytes(in, out, b);
-      } finally {
         out.close();
+        out = null;
+        dfsclient.close();
+        dfsclient = null;
+      } finally {
+        IOUtils.cleanup(LOG, out);
+        IOUtils.cleanup(LOG, dfsclient);
       }
       return Response.ok().type(MediaType.APPLICATION_JSON).build();
     }
@@ -199,6 +254,24 @@ public class DatanodeWebHdfsMethods {
     }
       }
     });
+  }
+
+  /** Handle HTTP GET request for the root. */
+  @GET
+  @Path("/")
+  @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
+  public Response getRoot(
+      @Context final UserGroupInformation ugi,
+      @QueryParam(GetOpParam.NAME) @DefaultValue(GetOpParam.DEFAULT)
+          final GetOpParam op,
+      @QueryParam(OffsetParam.NAME) @DefaultValue(OffsetParam.DEFAULT)
+          final OffsetParam offset,
+      @QueryParam(LengthParam.NAME) @DefaultValue(LengthParam.DEFAULT)
+          final LengthParam length,
+      @QueryParam(BufferSizeParam.NAME) @DefaultValue(BufferSizeParam.DEFAULT)
+          final BufferSizeParam bufferSize
+      ) throws IOException, InterruptedException {
+    return get(ugi, ROOT, op, offset, length, bufferSize); 
   }
 
   /** Handle HTTP GET request. */
@@ -240,18 +313,36 @@ public class DatanodeWebHdfsMethods {
     case OPEN:
     {
       final int b = bufferSize.getValue(conf);
-      final DFSDataInputStream in = new DFSClient.DFSDataInputStream(
-          dfsclient.open(fullpath, b, true));
-      in.seek(offset.getValue());
-
+      DFSDataInputStream in = null;
+      try {
+        in = new DFSClient.DFSDataInputStream(
+            dfsclient.open(fullpath, b, true));
+        in.seek(offset.getValue());
+      } catch(IOException ioe) {
+        IOUtils.cleanup(LOG, in);
+        IOUtils.cleanup(LOG, dfsclient);
+        throw ioe;
+      }
+      final DFSDataInputStream dis = in;
       final StreamingOutput streaming = new StreamingOutput() {
         @Override
         public void write(final OutputStream out) throws IOException {
           final Long n = length.getValue();
-          if (n == null) {
-            IOUtils.copyBytes(in, out, b);
-          } else {
-            IOUtils.copyBytes(in, out, n, false);
+          DFSDataInputStream dfsin = dis;
+          DFSClient client = dfsclient;
+          try {
+            if (n == null) {
+              IOUtils.copyBytes(dfsin, out, b);
+            } else {
+              IOUtils.copyBytes(dfsin, out, n, false);
+            }
+            dfsin.close();
+            dfsin = null;
+            dfsclient.close();
+            client = null;
+          } finally {
+            IOUtils.cleanup(LOG, dfsin);
+            IOUtils.cleanup(LOG, client);
           }
         }
       };
@@ -263,7 +354,15 @@ public class DatanodeWebHdfsMethods {
     }
     case GETFILECHECKSUM:
     {
-      final MD5MD5CRC32FileChecksum checksum = dfsclient.getFileChecksum(fullpath);
+      MD5MD5CRC32FileChecksum checksum = null;
+      DFSClient client = dfsclient;
+      try {
+        checksum = client.getFileChecksum(fullpath);
+        client.close();
+        client = null;
+      } finally {
+        IOUtils.cleanup(LOG, client);
+      }
       final String js = JsonUtil.toJsonString(checksum);
       return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
     }

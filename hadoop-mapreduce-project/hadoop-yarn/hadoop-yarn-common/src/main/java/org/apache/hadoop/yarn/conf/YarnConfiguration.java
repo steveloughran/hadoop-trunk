@@ -296,8 +296,12 @@ public class YarnConfiguration extends Configuration {
   public static final String DEFAULT_NM_REMOTE_APP_LOG_DIR = "/tmp/logs";
   
   /** Amount of memory in GB that can be allocated for containers.*/
-  public static final String NM_VMEM_GB = NM_PREFIX + "resource.memory-gb";
-  public static final int DEFAULT_NM_VMEM_GB = 8;
+  public static final String NM_PMEM_MB = NM_PREFIX + "resource.memory-mb";
+  public static final int DEFAULT_NM_PMEM_MB = 8 * 1024;
+  
+  public static final String NM_VMEM_PMEM_RATIO =
+    NM_PREFIX + "vmem-pmem-ratio";
+  public static final float DEFAULT_NM_VMEM_PMEM_RATIO = 2.1f;
   
   /** NM Webapp address.**/
   public static final String NM_WEBAPP_ADDRESS = NM_PREFIX + "webapp.address";
@@ -313,10 +317,6 @@ public class YarnConfiguration extends Configuration {
   /** Class that calculates containers current resource utilization.*/
   public static final String NM_CONTAINER_MON_RESOURCE_CALCULATOR =
     NM_PREFIX + "container-monitor.resource-calculator.class";
-  
-  /** Amount of physical ram to reserve for other applications, -1 disables.*/
-  public static final String NM_RESERVED_MEMORY_MB =
-    NM_PREFIX + "reserved.memory-mb";
   
   /** Frequency of running node health script.*/
   public static final String NM_HEALTH_CHECK_INTERVAL_MS = 
@@ -371,6 +371,22 @@ public class YarnConfiguration extends Configuration {
 
   public static final int INVALID_CONTAINER_EXIT_STATUS = -1000;
   public static final int ABORTED_CONTAINER_EXIT_STATUS = -100;
+
+  ////////////////////////////////
+  // Web Proxy Configs
+  ////////////////////////////////
+  public static final String PROXY_PREFIX = "yarn.web-proxy.";
+  
+  /** The kerberos principal for the proxy.*/
+  public static final String PROXY_PRINCIPAL =
+    PROXY_PREFIX + "principal";
+  
+  /** Keytab for Proxy.*/
+  public static final String PROXY_KEYTAB = PROXY_PREFIX + "keytab";
+  
+  /** The address for the web proxy.*/
+  public static final String PROXY_ADDRESS =
+    PROXY_PREFIX + "address";
   
   /**
    * YARN Service Level Authorization
@@ -406,15 +422,27 @@ public class YarnConfiguration extends Configuration {
     }
   }
 
-  public static String getRMWebAppURL(Configuration conf) {
+  public static String getProxyHostAndPort(Configuration conf) {
+    String addr = conf.get(PROXY_ADDRESS);
+    if(addr == null || addr.isEmpty()) {
+      addr = getRMWebAppHostAndPort(conf);
+    }
+    return addr;
+  }
+  
+  public static String getRMWebAppHostAndPort(Configuration conf) {
     String addr = conf.get(YarnConfiguration.RM_WEBAPP_ADDRESS,
-                           YarnConfiguration.DEFAULT_RM_WEBAPP_ADDRESS);
+        YarnConfiguration.DEFAULT_RM_WEBAPP_ADDRESS);
     Iterator<String> it = ADDR_SPLITTER.split(addr).iterator();
     it.next(); // ignore the bind host
     String port = it.next();
     // Use apps manager address to figure out the host for webapp
     addr = conf.get(YarnConfiguration.RM_ADDRESS, YarnConfiguration.DEFAULT_RM_ADDRESS);
     String host = ADDR_SPLITTER.split(addr).iterator().next();
-    return JOINER.join("http://", host, ":", port);
+    return JOINER.join(host, ":", port);
+  }
+  
+  public static String getRMWebAppURL(Configuration conf) {
+    return JOINER.join("http://", getRMWebAppHostAndPort(conf));
   }
 }
