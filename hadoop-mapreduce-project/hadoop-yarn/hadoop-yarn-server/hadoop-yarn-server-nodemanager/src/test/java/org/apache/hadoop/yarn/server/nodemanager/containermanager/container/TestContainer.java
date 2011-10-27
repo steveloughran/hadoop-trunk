@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
@@ -45,6 +46,7 @@ import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.URL;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
@@ -68,6 +70,7 @@ import org.mockito.ArgumentMatcher;
 public class TestContainer {
 
   final NodeManagerMetrics metrics = NodeManagerMetrics.create();
+  final Configuration conf = new YarnConfiguration();
 
   
   /**
@@ -165,7 +168,7 @@ public class TestContainer {
       wc.localizeResources();
       wc.launchContainer();
       reset(wc.localizerBus);
-      wc.containerFailed(ExitCode.KILLED.getExitCode());
+      wc.containerFailed(ExitCode.FORCE_KILLED.getExitCode());
       assertEquals(ContainerState.EXITED_WITH_FAILURE, 
           wc.c.getContainerState());
       verifyCleanupCall(wc);
@@ -265,6 +268,26 @@ public class TestContainer {
     }
   }
 
+  @Test
+  public void testLaunchAfterKillRequest() throws Exception {
+    WrappedContainer wc = null;
+    try {
+      wc = new WrappedContainer(14, 314159265358979L, 4344, "yak");
+      wc.initContainer();
+      wc.localizeResources();
+      wc.killContainer();
+      assertEquals(ContainerState.KILLING, wc.c.getContainerState());
+      wc.launchContainer();
+      assertEquals(ContainerState.KILLING, wc.c.getContainerState());
+      wc.containerKilledOnRequest();
+      verifyCleanupCall(wc);
+    } finally {
+      if (wc != null) {
+        wc.finished();
+      }
+    }
+  }
+  
   private void verifyCleanupCall(WrappedContainer wc) throws Exception {
     ResourcesReleasedMatcher matchesReq =
         new ResourcesReleasedMatcher(wc.localResources, EnumSet.of(
@@ -384,7 +407,7 @@ public class TestContainer {
   }
 
   private Container newContainer(Dispatcher disp, ContainerLaunchContext ctx) {
-    return new ContainerImpl(disp, ctx, null, metrics);
+    return new ContainerImpl(conf, disp, ctx, null, metrics);
   }
   
   @SuppressWarnings("unchecked")
@@ -508,7 +531,7 @@ public class TestContainer {
 
     public void containerKilledOnRequest() {
       c.handle(new ContainerExitEvent(cId,
-          ContainerEventType.CONTAINER_KILLED_ON_REQUEST, ExitCode.KILLED
+          ContainerEventType.CONTAINER_KILLED_ON_REQUEST, ExitCode.FORCE_KILLED
               .getExitCode()));
       drainDispatcherEvents();
     }

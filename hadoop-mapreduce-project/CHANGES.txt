@@ -432,6 +432,13 @@ Release 0.23.0 - Unreleased
     MAPREDUCE-2747. Cleaned up LinuxContainerExecutor binary sources and changed
     the configuration to use yarn names. (Robert Joseph Evans via vinodkv)
 
+    MAPREDUCE-3205. Fix memory specifications to be physical rather than
+    virtual, allowing for a ratio between the two to be configurable. (todd
+    via acmurthy) 
+
+    MAPREDUCE-2986. Fixed MiniYARNCluster to support multiple NodeManagers.
+    (Anupam Seth via vinodkv)
+
   OPTIMIZATIONS
 
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
@@ -1781,6 +1788,28 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3250. When AM restarts, client keeps reconnecting to the new AM 
     and prints a lots of logs. (vinodkv via mahadev)
+
+    MAPREDUCE-3254. Fixed streaming to set the job.jar by using the right
+    JobConf ctor. (acmurthy) 
+
+    MAPREDUCE-3264. mapreduce.job.user.name needs to be set automatically.
+    (acmurthy via mahadev)
+
+    MAPREDUCE-3175. Add authorization to admin web-pages such as /stacks, /jmx
+    etc. (Jonathan Eagles via acmurthy)
+
+    MAPREDUCE-3257. Added authorization checks for the protocol between
+    ResourceManager and ApplicatoinMaster. (vinodkv via acmurthy) 
+
+    MAPREDUCE-3259. Added java.library.path of NodeManager to
+    ContainerLocalizer in LinuxContainerExecutor. (Kihwal Lee via acmurthy) 
+
+    MAPREDUCE-3279. Fixed TestJobHistoryParsing which assumed user name to be
+    mapred all the time. (Siddharth Seth via acmurthy)
+
+    MAPREDUCE-3240. Fixed NodeManager to be able to forcefully cleanup its
+    containers (process-trees) irrespective of whether the container succeeded,
+    or killed. (Hitesh Shah via vinodkv)
 
 Release 0.22.0 - Unreleased
 
