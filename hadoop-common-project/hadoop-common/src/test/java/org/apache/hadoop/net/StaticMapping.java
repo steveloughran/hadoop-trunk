@@ -77,7 +77,6 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
 
   /* Only one instance per JVM */
   private static final Map<String, String> nameToRackMap = new HashMap<String, String>();
-  private static volatile boolean singleSwitch = true;
 
   /**
    * Add a node to the static map. The moment any entry is added to the map,
@@ -87,10 +86,6 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
    */
   public static void addNodeToRack(String name, String rackId) {
     synchronized (nameToRackMap) {
-      //go multi-switch if the rack ID is not in the rack
-      if(singleSwitch && nameToRackMap.isEmpty()) {
-        singleSwitch = false;
-      }
       nameToRackMap.put(name, rackId);
     }
   }
@@ -112,12 +107,12 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
   }
 
   /**
-   * Return true if there is more one rack ID was added to the map.
+   * This mapping is only single switch if the map is empty
    * @return the current switching status
    */
   @Override
   public boolean isSingleSwitch() {
-    return singleSwitch;
+    return nameToRackMap.isEmpty();
   }
 
   /**
@@ -126,7 +121,6 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
   public static void resetMap() {
     synchronized (nameToRackMap) {
       nameToRackMap.clear();
-      singleSwitch = true;
     }
   }
 }
