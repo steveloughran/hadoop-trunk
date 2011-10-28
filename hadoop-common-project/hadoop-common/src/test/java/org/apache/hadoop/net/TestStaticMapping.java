@@ -47,6 +47,18 @@ public class TestStaticMapping extends Assert {
     assertTrue("Empty maps are not single switch", mapping.isSingleSwitch());
   }
 
+
+  @Test
+  public void testCachingRelaysQueries() throws Throwable {
+    StaticMapping staticMapping = newInstance();
+    CachedDNSToSwitchMapping mapping =
+        new CachedDNSToSwitchMapping(staticMapping);
+    assertTrue("Expected single switch", mapping.isSingleSwitch());
+    StaticMapping.addNodeToRack("n1", "r1");
+    assertFalse("Expected to be multi switch",
+                mapping.isSingleSwitch());
+  }
+
   @Test
   public void testAddResolveNodes() throws Throwable {
     StaticMapping mapping = newInstance();

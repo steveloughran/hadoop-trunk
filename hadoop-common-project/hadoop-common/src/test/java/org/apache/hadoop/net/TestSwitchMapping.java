@@ -20,6 +20,7 @@ package org.apache.hadoop.net;
 
 import org.junit.Assert;
 import org.junit.Test;
+import sun.security.util.Cache;
 
 import java.util.List;
 
@@ -28,12 +29,20 @@ import java.util.List;
  */
 public class TestSwitchMapping extends Assert {
 
-
   @Test
   public void testStandaloneClassesAssumedMultiswitch() throws Throwable {
     DNSToSwitchMapping mapping = new StandaloneSwitchMapping();
     assertFalse("Expected to be multi switch",
                 AbstractDNSToSwitchMapping.isMappingSingleSwitch(mapping));
+  }
+
+
+  @Test
+  public void testCachingRelays() throws Throwable {
+    CachedDNSToSwitchMapping mapping =
+        new CachedDNSToSwitchMapping(new StandaloneSwitchMapping());
+    assertFalse("Expected to be multi switch",
+                mapping.isSingleSwitch());
   }
 
   private static class StandaloneSwitchMapping implements DNSToSwitchMapping {
