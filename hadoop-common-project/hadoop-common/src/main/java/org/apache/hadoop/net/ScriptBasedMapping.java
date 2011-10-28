@@ -119,11 +119,6 @@ public final class ScriptBasedMapping extends CachedDNSToSwitchMapping
     getRawMapping().setConf(conf);
   }
 
-  @Override
-  public boolean isSingleSwitch() {
-    return getRawMapping().isSingleSwitch();
-  }
-
   /**
    * This is the uncached script mapping that is fed into the cache managed
    * by the superclass {@link CachedDNSToSwitchMapping}
