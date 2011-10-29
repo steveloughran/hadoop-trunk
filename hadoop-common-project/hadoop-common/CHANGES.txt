@@ -82,9 +82,15 @@ Trunk (unreleased changes)
 
     HADOOP-7769. TestJMXJsonServlet is failing. (tomwhite)
 
+    HADOOP-7770. ViewFS getFileChecksum throws FileNotFoundException for files in 
+    /tmp and /user. (Ravi Prakash via jitendra)
+
   OPTIMIZATIONS
 
     HADOOP-7761. Improve the performance of raw comparisons. (todd)
+
+    HADOOP-7773. Add support for protocol buffer based RPC engine.
+    (suresh)
 
 Release 0.23.0 - Unreleased
 
@@ -513,6 +519,11 @@ Release 0.23.0 - Unreleased
 
     HADOOP-7753. Support fadvise and sync_file_range in NativeIO. Add
     ReadaheadPool infrastructure for use in HDFS and MR. (todd)
+
+    HADOOP-7446. Implement CRC32C native code using SSE4.2 instructions.
+    (Kihwal Lee and todd via todd)
+
+    HADOOP-7763. Add top-level navigation to APT docs. (tomwhite)
 
   BUG FIXES
 
