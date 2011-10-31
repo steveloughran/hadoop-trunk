@@ -25,7 +25,6 @@
   <version>0.24.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>hadoop-yarn</name>
-  <url>http://hadoop.apache.org/mapreduce</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -264,6 +263,11 @@
       <artifactId>junit</artifactId>
       <version>4.8.2</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.1</version>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>

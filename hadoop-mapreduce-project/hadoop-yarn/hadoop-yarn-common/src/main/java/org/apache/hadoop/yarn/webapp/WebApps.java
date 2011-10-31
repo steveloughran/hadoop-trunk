@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.webapp;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import java.io.IOException;
 import java.net.ConnectException;
 import java.net.URL;
 import java.util.HashMap;
@@ -31,6 +32,7 @@ import javax.servlet.http.HttpServlet;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.http.HttpServer;
+import org.apache.hadoop.yarn.security.AdminACLsManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -178,7 +180,7 @@ public class WebApps {
         }
         HttpServer server =
             new HttpServer(name, bindAddress, port, findPort, conf, 
-            webapp.getServePathSpecs());
+            new AdminACLsManager(conf).getAdminAcl(), null, webapp.getServePathSpecs());
         for(ServletStruct struct: servlets) {
           server.addServlet(struct.name, struct.spec, struct.clazz);
         }
@@ -190,7 +192,9 @@ public class WebApps {
         webapp.setHttpServer(server);
         server.start();
         LOG.info("Web app /"+ name +" started at "+ server.getPort());
-      } catch (Exception e) {
+      } catch (ClassNotFoundException e) {
+        throw new WebAppException("Error starting http server", e);
+      } catch (IOException e) {
         throw new WebAppException("Error starting http server", e);
       }
       Injector injector = Guice.createInjector(webapp, new AbstractModule() {

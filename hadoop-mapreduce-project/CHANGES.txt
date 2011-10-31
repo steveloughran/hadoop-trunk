@@ -30,6 +30,8 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
+    MAPREDUCE-3241. [Rumen] Fix Rumen to ignore the AMStartedEvent. (amarrk)
+
     MAPREDUCE-3166. [Rumen] Make Rumen use job history api instead of relying
     on current history file name format. (Ravi Gummadi)
 
@@ -59,6 +61,9 @@ Trunk (unreleased changes)
     MAPREDUCE-3003. Publish MR JARs to Maven snapshot repository. (tucu)
 
     MAPREDUCE-3204. mvn site:site fails on MapReduce. (tucu)
+
+    MAPREDUCE-3014. Rename and invert logic of '-cbuild' profile to 'native' and off 
+    by default. (tucu)
 
 Release 0.23.0 - Unreleased
 
@@ -431,6 +436,21 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-2747. Cleaned up LinuxContainerExecutor binary sources and changed
     the configuration to use yarn names. (Robert Joseph Evans via vinodkv)
+
+    MAPREDUCE-3205. Fix memory specifications to be physical rather than
+    virtual, allowing for a ratio between the two to be configurable. (todd
+    via acmurthy) 
+
+    MAPREDUCE-2986. Fixed MiniYARNCluster to support multiple NodeManagers.
+    (Anupam Seth via vinodkv)
+
+    MAPREDUCE-2736. Remove unused contrib components dependent on MR1. (eli)
+
+    MAPREDUCE-2989. Modified JobHistory to link to task and AM logs from the
+    JobHistoryServer. (Siddharth Seth via vinodkv)
+
+    MAPREDUCE-3146. Added a MR specific command line to dump logs for a
+    given TaskAttemptID. (Siddharth Seth via vinodkv)
 
   OPTIMIZATIONS
 
@@ -1781,6 +1801,87 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3250. When AM restarts, client keeps reconnecting to the new AM 
     and prints a lots of logs. (vinodkv via mahadev)
+
+    MAPREDUCE-3254. Fixed streaming to set the job.jar by using the right
+    JobConf ctor. (acmurthy) 
+
+    MAPREDUCE-3264. mapreduce.job.user.name needs to be set automatically.
+    (acmurthy via mahadev)
+
+    MAPREDUCE-3175. Add authorization to admin web-pages such as /stacks, /jmx
+    etc. (Jonathan Eagles via acmurthy)
+
+    MAPREDUCE-3257. Added authorization checks for the protocol between
+    ResourceManager and ApplicationMaster. (vinodkv via acmurthy) 
+
+    MAPREDUCE-3259. Added java.library.path of NodeManager to
+    ContainerLocalizer in LinuxContainerExecutor. (Kihwal Lee via acmurthy) 
+
+    MAPREDUCE-3279. Fixed TestJobHistoryParsing which assumed user name to be
+    mapred all the time. (Siddharth Seth via acmurthy)
+
+    MAPREDUCE-3240. Fixed NodeManager to be able to forcefully cleanup its
+    containers (process-trees) irrespective of whether the container succeeded,
+    or killed. (Hitesh Shah via vinodkv)
+
+    MAPREDUCE-3281. Fixed a bug in TestLinuxContainerExecutorWithMocks. (vinodkv)
+
+    MAPREDUCE-3228. Fixed MR AM to timeout RPCs to bad NodeManagers. (vinodkv
+    via acmurthy)
+
+    MAPREDUCE-3284. Moved JobQueueClient to hadoop-mapreduce-client-core.
+    (acmurthy) 
+
+    MAPREDUCE-3282. bin/mapred job -list throws exception. (acmurthy via 
+    mahadev)
+
+    MAPREDUCE-3186. User jobs are getting hanged if the Resource manager
+    process goes down and comes up while job is getting executed. 
+    (Eric Payne via mahadev)
+
+    MAPREDUCE-3209. Jenkins reports 160 FindBugs warnings (mahadev)
+
+    MAPREDUCE-3258. Fixed AM & JobHistory web-ui to display counters properly.
+    (Siddharth Seth via acmurthy)
+
+    MAPREDUCE-3290. Fixed a NPE in ClientRMService. (acmurthy) 
+
+    MAPREDUCE-3185. RM Web UI does not sort the columns in some cases.
+    (Jonathan Eagles via mahadev)
+
+    MAPREDUCE-3292. In secure mode job submission fails with Provider 
+    org.apache.hadoop.mapreduce.security.token.JobTokenIndentifier$Renewer 
+    not found. (mahadev)
+
+    MAPREDUCE-3296. Fixed the remaining nine FindBugs warnings. (vinodkv)
+
+    MAPREDUCE-2775. Fixed ResourceManager and NodeManager to force a
+    decommissioned node to shutdown. (Devaraj K via vinodkv)
+
+    MAPREDUCE-3304. Fixed intermittent test failure due to a race in
+    TestRMContainerAllocator#testBlackListedNodes. (Ravi Prakash via acmurthy) 
+
+    MAPREDUCE-3306. Fixed a bug in NodeManager ApplicationImpl that was causing
+    NodeManager to crash. (vinodkv)
+
+    MAPREDUCE-3256. Added authorization checks for the protocol between
+    NodeManager and ApplicationMaster. (vinodkv via acmurthy) 
+
+    MAPREDUCE-3274. Fixed a race condition in MRAppMaster that was causing a
+    task-scheduling deadlock. (Robert Joseph Evans via vinodkv)
+
+    MAPREDUCE-3313. Fixed initialization of ClusterMetrics which was failing
+    TestResourceTrackerService sometimes. (Hitesh Shah via vinodkv)
+
+    MAPREDUCE-2766. Fixed NM to set secure permissions for files and directories
+    in distributed-cache. (Hitesh Shah via vinodkv)
+
+    MAPREDUCE-2696. Fixed NodeManager to cleanup logs in a thread when logs'
+    aggregation is not enabled. (Siddharth Seth via vinodkv)
+
+    MAPREDUCE-3262. Fixed Container's state-machine in NodeManager to handle
+    a couple of events in failure states correctly. (Hitesh Shah and Siddharth
+    Seth via vinodkv)
 
 Release 0.22.0 - Unreleased
 

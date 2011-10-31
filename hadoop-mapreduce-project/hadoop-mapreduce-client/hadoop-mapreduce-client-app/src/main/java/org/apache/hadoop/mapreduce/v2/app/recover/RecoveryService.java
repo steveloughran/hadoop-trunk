@@ -36,11 +36,11 @@ import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
-import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.AMInfo;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskAttemptInfo;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskInfo;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
+import org.apache.hadoop.mapreduce.v2.api.records.AMInfo;
 import org.apache.hadoop.mapreduce.v2.api.records.Phase;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptState;
@@ -66,6 +66,7 @@ import org.apache.hadoop.mapreduce.v2.app.rm.ContainerAllocatorEvent;
 import org.apache.hadoop.mapreduce.v2.app.taskclean.TaskCleaner;
 import org.apache.hadoop.mapreduce.v2.app.taskclean.TaskCleanupEvent;
 import org.apache.hadoop.mapreduce.v2.jobhistory.JobHistoryUtils;
+import org.apache.hadoop.mapreduce.v2.util.MRBuilderUtils;
 import org.apache.hadoop.yarn.Clock;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.Container;
@@ -80,6 +81,7 @@ import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.service.CompositeService;
 import org.apache.hadoop.yarn.service.Service;
 import org.apache.hadoop.yarn.util.BuilderUtils;
+import org.apache.hadoop.yarn.util.ConverterUtils;
 
 /*
  * Recovers the completed tasks from the previous life of Application Master.
@@ -157,13 +159,24 @@ public class RecoveryService extends CompositeService implements Recovery {
   public Set<TaskId> getCompletedTasks() {
     return completedTasks.keySet();
   }
-  
+
   @Override
   public List<AMInfo> getAMInfos() {
     if (jobInfo == null || jobInfo.getAMInfos() == null) {
       return new LinkedList<AMInfo>();
     }
-    return new LinkedList<AMInfo>(jobInfo.getAMInfos());
+    List<AMInfo> amInfos = new LinkedList<AMInfo>();
+    for (org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.AMInfo jhAmInfo : jobInfo
+        .getAMInfos()) {
+      AMInfo amInfo =
+          MRBuilderUtils.newAMInfo(jhAmInfo.getAppAttemptId(),
+              jhAmInfo.getStartTime(), jhAmInfo.getContainerId(),
+              jhAmInfo.getNodeManagerHost(), jhAmInfo.getNodeManagerPort(),
+              jhAmInfo.getNodeManagerHttpPort());
+
+      amInfos.add(amInfo);
+    }
+    return amInfos;
   }
 
   private void parse() throws IOException {
@@ -393,9 +406,8 @@ public class RecoveryService extends CompositeService implements Recovery {
         TaskAttemptInfo attemptInfo) {
       LOG.info("Sending assigned event to " + yarnAttemptID);
       ContainerId cId = attemptInfo.getContainerId();
-      String[] splits = attemptInfo.getHostname().split(":");
-      NodeId nodeId = BuilderUtils.newNodeId(splits[0], Integer
-          .parseInt(splits[1]));
+
+      NodeId nodeId = ConverterUtils.toNodeId(attemptInfo.getHostname());
       // Resource/Priority/ApplicationACLs are only needed while launching the
       // container on an NM, these are already completed tasks, so setting them
       // to null

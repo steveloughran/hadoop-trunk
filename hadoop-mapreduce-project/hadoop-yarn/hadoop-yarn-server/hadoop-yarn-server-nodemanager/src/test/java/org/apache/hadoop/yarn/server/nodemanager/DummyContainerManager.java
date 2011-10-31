@@ -24,10 +24,9 @@ import java.util.Collection;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.factories.RecordFactory;
-import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.server.security.ContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.ContainerManagerImpl;
@@ -48,16 +47,14 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.even
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ContainerLocalizationEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ContainerLocalizationRequestEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.LocalizationEvent;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.LogAggregationService;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.event.LogAggregatorEvent;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.LogHandler;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerEvent;
 import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
 
 public class DummyContainerManager extends ContainerManagerImpl {
 
   private static final Log LOG = LogFactory
       .getLog(DummyContainerManager.class);
-
-  private static final RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
   
   public DummyContainerManager(Context context, ContainerExecutor exec,
       DeletionService deletionContext, NodeStatusUpdater nodeStatusUpdater,
@@ -69,6 +66,7 @@ public class DummyContainerManager extends ContainerManagerImpl {
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   protected ResourceLocalizationService createResourceLocalizationService(ContainerExecutor exec,
       DeletionService deletionContext) {
     return new ResourceLocalizationService(super.dispatcher, exec, deletionContext) {
@@ -124,6 +122,7 @@ public class DummyContainerManager extends ContainerManagerImpl {
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   protected ContainersLauncher createContainersLauncher(Context context,
       ContainerExecutor exec) {
     return new ContainersLauncher(context, super.dispatcher, exec) {
@@ -148,21 +147,22 @@ public class DummyContainerManager extends ContainerManagerImpl {
   }
 
   @Override
-  protected LogAggregationService createLogAggregationService(Context context, 
-      DeletionService deletionService) {
-    return new LogAggregationService(context, deletionService) {
+  protected LogHandler createLogHandler(Configuration conf,
+      Context context, DeletionService deletionService) {
+    return new LogHandler() {
+      
       @Override
-      public void handle(LogAggregatorEvent event) {
+      public void handle(LogHandlerEvent event) {
         switch (event.getType()) {
-        case APPLICATION_STARTED:
-          break;
-        case CONTAINER_FINISHED:
-          break;
-        case APPLICATION_FINISHED:
-          break;
-        default:
-          // Ignore
-        }
+          case APPLICATION_STARTED:
+            break;
+          case CONTAINER_FINISHED:
+            break;
+          case APPLICATION_FINISHED:
+            break;
+          default:
+            // Ignore
+          }
       }
     };
   }

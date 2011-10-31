@@ -95,7 +95,8 @@ public class TestJobHistoryParsing {
     JobHistoryParser parser = new JobHistoryParser(in);
     JobInfo jobInfo = parser.parse();
 
-    Assert.assertEquals("Incorrect username ", "mapred", jobInfo.getUsername());
+    Assert.assertEquals("Incorrect username ", System.getProperty("user.name"),
+        jobInfo.getUsername());
     Assert.assertEquals("Incorrect jobName ", "test", jobInfo.getJobname());
     Assert.assertEquals("Incorrect queuename ", "default",
         jobInfo.getJobQueueName());
@@ -111,10 +112,11 @@ public class TestJobHistoryParsing {
 
     // Verify aminfo
     Assert.assertEquals(1, jobInfo.getAMInfos().size());
-    Assert.assertEquals("testhost", jobInfo.getAMInfos().get(0)
+    Assert.assertEquals(MRApp.NM_HOST, jobInfo.getAMInfos().get(0)
         .getNodeManagerHost());
     AMInfo amInfo = jobInfo.getAMInfos().get(0);
-    Assert.assertEquals(3333, amInfo.getNodeManagerHttpPort());
+    Assert.assertEquals(MRApp.NM_PORT, amInfo.getNodeManagerPort());
+    Assert.assertEquals(MRApp.NM_HTTP_PORT, amInfo.getNodeManagerHttpPort());
     Assert.assertEquals(1, amInfo.getAppAttemptId().getAttemptId());
     Assert.assertEquals(amInfo.getAppAttemptId(), amInfo.getContainerId()
         .getApplicationAttemptId());
@@ -182,7 +184,7 @@ public class TestJobHistoryParsing {
         Integer.parseInt(jobSummaryElements.get("numMaps")));
     Assert.assertEquals("Mismatch in num reduce slots", 1,
         Integer.parseInt(jobSummaryElements.get("numReduces")));
-    Assert.assertEquals("User does not match", "mapred",
+    Assert.assertEquals("User does not match", System.getProperty("user.name"),
         jobSummaryElements.get("user"));
     Assert.assertEquals("Queue does not match", "default",
         jobSummaryElements.get("queue"));

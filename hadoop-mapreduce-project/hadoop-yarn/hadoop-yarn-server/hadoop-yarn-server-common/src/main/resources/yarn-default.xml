@@ -280,15 +280,48 @@
   </property>
 
   <property>
+    <description>Whether to enable log aggregation</description>
+    <name>yarn.nodemanager.log-aggregation-enable</name>
+    <value>false</value>
+  </property>
+  
+  <property>
+    <description>Time in seconds to retain user logs. Only applicable if
+    log aggregation is disabled
+    </description>
+    <name>yarn.nodemanager.log.retain-seconds</name>
+    <value>10800</value>
+  </property>
+
+  <property>
     <description>Where to aggregate logs to.</description>
     <name>yarn.nodemanager.remote-app-log-dir</name>
     <value>/tmp/logs</value>
   </property>
+  <property>
+    <description>The remote log dir will be created at 
+      {yarn.nodemanager.remote-app-log-dir}/${user}/{thisParam}
+    </description>
+    <name>yarn.nodemanager.remote-app-log-dir-suffix</name>
+    <value>logs</value>
+  </property>
+
 
   <property>
-    <description>Amount of memory in GB that can be allocated for containers.</description>
-    <name>yarn.nodemanager.resource.memory-gb</name>
-    <value>8</value>
+    <description>Amount of physical memory, in MB, that can be allocated 
+    for containers.</description>
+    <name>yarn.nodemanager.resource.memory-mb</name>
+    <value>8192</value>
+  </property>
+
+  <property>
+    <description>Ratio between virtual memory to physical memory when
+    setting memory limits for containers. Container allocations are
+    expressed in terms of physical memory, and virtual memory usage
+    is allowed to exceed this allocation by this ratio.
+    </description>
+    <name>yarn.nodemanager.vmem-pmem-ratio</name>
+    <value>2.1</value>
   </property>
 
   <property>
@@ -306,12 +339,6 @@
   <property>
     <description>Class that calculates containers current resource utilization.</description>
     <name>yarn.nodemanager.container-monitor.resource-calculator.class</name>
-  </property>
-
-  <property>
-    <description>Amount of physical ram to reserve for other applications, -1 disables.</description>
-    <name>yarn.nodemanager.reserved.memory-mb</name>
-    <value>-1</value>
   </property>
 
   <property>
@@ -359,6 +386,18 @@
     <name>yarn.nodemanager.aux-services</name>
     <value></value>
     <!-- <value>mapreduce.shuffle</value> -->
+  </property>
+
+  <property>
+    <description>No. of ms to wait between sending a SIGTERM and SIGKILL to a container</description>
+    <name>yarn.nodemanager.sleep-delay-before-sigkill.ms</name>
+    <value>250</value>
+  </property>
+
+  <property>
+    <description>Max time to wait for a process to come up when trying to cleanup a container</description>
+    <name>yarn.nodemanager.process-kill-wait.ms</name>
+    <value>2000</value>
   </property>
 
   <!--Map Reduce configuration-->

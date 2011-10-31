@@ -137,6 +137,9 @@ public class YarnConfiguration extends Configuration {
     YARN_PREFIX + "admin.acl";
   public static final String DEFAULT_YARN_ADMIN_ACL = "*";
   
+  /** ACL used in case none is found. Allows nothing. */
+  public static final String DEFAULT_YARN_APP_ACL = " ";
+
   /** The address of the RM admin interface.*/
   public static final String RM_ADMIN_ADDRESS = 
     RM_PREFIX + "admin.address";
@@ -285,19 +288,54 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_LOCALIZER_FETCH_THREAD_COUNT = 
     NM_PREFIX + "localizer.fetch.thread-count";
   public static final int DEFAULT_NM_LOCALIZER_FETCH_THREAD_COUNT = 4;
-  
+
   /** Where to store container logs.*/
   public static final String NM_LOG_DIRS = NM_PREFIX + "log-dirs";
   public static final String DEFAULT_NM_LOG_DIRS = "/tmp/logs";
+
+  /** Whether to enable log aggregation */
+  public static final String NM_LOG_AGGREGATION_ENABLED = NM_PREFIX
+      + "log-aggregation-enable";
+  public static final boolean DEFAULT_NM_LOG_AGGREGATION_ENABLED = false;
   
+  /**
+   * Number of seconds to retain logs on the NodeManager. Only applicable if Log
+   * aggregation is disabled
+   */
+  public static final String NM_LOG_RETAIN_SECONDS = NM_PREFIX
+      + "log.retain-seconds";
+
+  /**
+   * Number of threads used in log cleanup. Only applicable if Log aggregation
+   * is disabled
+   */
+  public static final String NM_LOG_DELETION_THREADS_COUNT = 
+    NM_PREFIX +  "log.deletion-threads-count";
+  public static final int DEFAULT_NM_LOG_DELETE_THREAD_COUNT = 4;
+
   /** Where to aggregate logs to.*/
   public static final String NM_REMOTE_APP_LOG_DIR = 
     NM_PREFIX + "remote-app-log-dir";
   public static final String DEFAULT_NM_REMOTE_APP_LOG_DIR = "/tmp/logs";
-  
+
+  /**
+   * The remote log dir will be created at
+   * NM_REMOTE_APP_LOG_DIR/${user}/NM_REMOTE_APP_LOG_DIR_SUFFIX/${appId}
+   */
+  public static final String NM_REMOTE_APP_LOG_DIR_SUFFIX = 
+    NM_PREFIX + "remote-app-log-dir-suffix";
+  public static final String DEFAULT_NM_REMOTE_APP_LOG_DIR_SUFFIX="logs";
+
+  public static final String YARN_LOG_SERVER_URL =
+    YARN_PREFIX + "log.server.url";
+
   /** Amount of memory in GB that can be allocated for containers.*/
-  public static final String NM_VMEM_GB = NM_PREFIX + "resource.memory-gb";
-  public static final int DEFAULT_NM_VMEM_GB = 8;
+  public static final String NM_PMEM_MB = NM_PREFIX + "resource.memory-mb";
+  public static final int DEFAULT_NM_PMEM_MB = 8 * 1024;
+
+  public static final String NM_VMEM_PMEM_RATIO =
+    NM_PREFIX + "vmem-pmem-ratio";
+  public static final float DEFAULT_NM_VMEM_PMEM_RATIO = 2.1f;
   
   /** NM Webapp address.**/
   public static final String NM_WEBAPP_ADDRESS = NM_PREFIX + "webapp.address";
@@ -313,10 +351,6 @@ public class YarnConfiguration extends Configuration {
   /** Class that calculates containers current resource utilization.*/
   public static final String NM_CONTAINER_MON_RESOURCE_CALCULATOR =
     NM_PREFIX + "container-monitor.resource-calculator.class";
-  
-  /** Amount of physical ram to reserve for other applications, -1 disables.*/
-  public static final String NM_RESERVED_MEMORY_MB =
-    NM_PREFIX + "reserved.memory-mb";
   
   /** Frequency of running node health script.*/
   public static final String NM_HEALTH_CHECK_INTERVAL_MS = 
@@ -410,6 +444,20 @@ public class YarnConfiguration extends Configuration {
   public static final String 
   YARN_SECURITY_SERVICE_AUTHORIZATION_RESOURCE_LOCALIZER =
       "security.resourcelocalizer.protocol.acl";
+
+  /** No. of milliseconds to wait between sending a SIGTERM and SIGKILL
+   * to a running container */
+  public static final String NM_SLEEP_DELAY_BEFORE_SIGKILL_MS =
+      NM_PREFIX + "sleep-delay-before-sigkill.ms";
+  public static final long DEFAULT_NM_SLEEP_DELAY_BEFORE_SIGKILL_MS =
+      250;
+
+  /** Max time to wait for a process to come up when trying to cleanup
+   * container resources */
+  public static final String NM_PROCESS_KILL_WAIT_MS =
+      NM_PREFIX + "process-kill-wait.ms";
+  public static final long DEFAULT_NM_PROCESS_KILL_WAIT_MS =
+      2000;
 
   public YarnConfiguration() {
     super();

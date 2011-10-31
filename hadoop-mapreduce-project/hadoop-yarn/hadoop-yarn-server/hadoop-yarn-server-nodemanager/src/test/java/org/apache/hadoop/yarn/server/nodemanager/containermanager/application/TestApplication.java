@@ -20,6 +20,7 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
+import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.AuxServicesEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.AuxServicesEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
@@ -32,8 +33,8 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher.Conta
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ApplicationLocalizationEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.LocalizationEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.LocalizationEventType;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.event.LogAggregatorEvent;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.event.LogAggregatorEventType;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerEventType;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitorEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitorEventType;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
@@ -348,9 +349,10 @@ public class TestApplication {
     final EventHandler<ContainersMonitorEvent> monitorBus;
     final EventHandler<AuxServicesEvent> auxBus;
     final EventHandler<ContainerEvent> containerBus;
-    final EventHandler<LogAggregatorEvent> logAggregationBus;
+    final EventHandler<LogHandlerEvent> logAggregationBus;
     final String user;
     final List<Container> containers;
+    final Context context;
 
     final ApplicationId appId;
     final Application app;
@@ -371,13 +373,15 @@ public class TestApplication {
       dispatcher.register(ContainersMonitorEventType.class, monitorBus);
       dispatcher.register(AuxServicesEventType.class, auxBus);
       dispatcher.register(ContainerEventType.class, containerBus);
-      dispatcher.register(LogAggregatorEventType.class, logAggregationBus);
+      dispatcher.register(LogHandlerEventType.class, logAggregationBus);
 
+      context = mock(Context.class);
+      
       this.user = user;
       this.appId = BuilderUtils.newApplicationId(timestamp, id);
 
       app = new ApplicationImpl(dispatcher, new ApplicationACLsManager(
-          new Configuration()), this.user, appId, null);
+          new Configuration()), this.user, appId, null, context);
       containers = new ArrayList<Container>();
       for (int i = 0; i < numContainers; i++) {
         containers.add(createMockedContainer(this.appId, i));

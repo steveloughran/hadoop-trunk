@@ -42,7 +42,6 @@ import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.ContainerManager;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StopContainerRequest;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -57,6 +56,7 @@ import org.apache.hadoop.yarn.security.ApplicationTokenIdentifier;
 import org.apache.hadoop.yarn.security.ApplicationTokenSecretManager;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
 import org.apache.hadoop.yarn.security.client.ClientToAMSecretManager;
+import org.apache.hadoop.yarn.security.client.ClientTokenIdentifier;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
@@ -100,9 +100,7 @@ public class AMLauncher implements Runnable {
   private void connect() throws IOException {
     ContainerId masterContainerID = application.getMasterContainer().getId();
     
-    containerMgrProxy =
-        getContainerMgrProxy(
-            masterContainerID.getApplicationAttemptId().getApplicationId());
+    containerMgrProxy = getContainerMgrProxy(masterContainerID);
   }
   
   private void launch() throws IOException {
@@ -132,7 +130,7 @@ public class AMLauncher implements Runnable {
   }
 
   protected ContainerManager getContainerMgrProxy(
-      final ApplicationId applicationID) throws IOException {
+      final ContainerId containerId) {
 
     Container container = application.getMasterContainer();
 
@@ -140,8 +138,8 @@ public class AMLauncher implements Runnable {
 
     final YarnRPC rpc = YarnRPC.create(conf); // TODO: Don't create again and again.
 
-    UserGroupInformation currentUser =
-        UserGroupInformation.createRemoteUser("yarn"); // TODO
+    UserGroupInformation currentUser = UserGroupInformation
+        .createRemoteUser(containerId.toString());
     if (UserGroupInformation.isSecurityEnabled()) {
       ContainerToken containerToken = container.getContainerToken();
       Token<ContainerTokenIdentifier> token =
@@ -193,8 +191,13 @@ public class AMLauncher implements Runnable {
     // consumable by the AM.
     environment.put(ApplicationConstants.AM_CONTAINER_ID_ENV, container
         .getContainerId().toString());
-    environment.put(ApplicationConstants.NM_HTTP_ADDRESS_ENV, application
-        .getMasterContainer().getNodeHttpAddress());
+    environment.put(ApplicationConstants.NM_HOST_ENV, application
+        .getMasterContainer().getNodeId().getHost());
+    environment.put(ApplicationConstants.NM_PORT_ENV,
+        String.valueOf(application.getMasterContainer().getNodeId().getPort()));
+    String parts[] =
+        application.getMasterContainer().getNodeHttpAddress().split(":");
+    environment.put(ApplicationConstants.NM_HTTP_PORT_ENV, parts[1]);
     environment.put(
         ApplicationConstants.APP_SUBMIT_TIME_ENV,
         String.valueOf(rmContext.getRMApps()
@@ -214,7 +217,7 @@ public class AMLauncher implements Runnable {
       }
 
       ApplicationTokenIdentifier id = new ApplicationTokenIdentifier(
-          application.getAppAttemptId().getApplicationId());
+          application.getAppAttemptId());
       Token<ApplicationTokenIdentifier> token =
           new Token<ApplicationTokenIdentifier>(id,
               this.applicationTokenSecretManager);
@@ -240,7 +243,7 @@ public class AMLauncher implements Runnable {
       container.setContainerTokens(
           ByteBuffer.wrap(dob.getData(), 0, dob.getLength()));
 
-      ApplicationTokenIdentifier identifier = new ApplicationTokenIdentifier(
+      ClientTokenIdentifier identifier = new ClientTokenIdentifier(
           application.getAppAttemptId().getApplicationId());
       SecretKey clientSecretKey =
           this.clientToAMSecretManager.getMasterKey(identifier);
