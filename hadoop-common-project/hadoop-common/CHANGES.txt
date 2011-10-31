@@ -15,9 +15,6 @@ Trunk (unreleased changes)
 
     HADOOP-7635. RetryInvocationHandler should release underlying resources on
                  close (atm)
-    
-    HADOOP-7668. Add a NetUtils method that can tell if an InetAddress 
-                 belongs to local host. (suresh)
 
     HADOOP-7687 Make getProtocolSignature public  (sanjay)
 
@@ -35,9 +32,6 @@ Trunk (unreleased changes)
 
     HADOOP-7736. Remove duplicate Path#normalizePath call. (harsh)
 
-    HADOOP-7509. Improve exception message thrown when Authentication is 
-    required. (Ravi Prakash via suresh)
-
     HADOOP-7664. Remove warmings when overriding final parameter configuration
     if the override value is same as the final parameter value.
     (Ravi Prakash via suresh)
@@ -45,15 +39,18 @@ Trunk (unreleased changes)
     HADOOP-7737. normalize hadoop-mapreduce & hadoop-dist dist/tar build with 
     common/hdfs. (tucu)
 
-    HADOOP-7745. Fix wrong variable name in exception message introduced
-    in HADOOP-7509. (Ravi Prakash via suresh)
-
     HADOOP-7743. Add Maven profile to create a full source tarball. (tucu)
 
     HADOOP-7729. Send back valid HTTP response if user hits IPC port with
     HTTP GET. (todd)
 
     HADOOP-7758. Make GlobFilter class public. (tucu)
+
+    HADOOP-7728. Enable task memory management to be configurable in hadoop
+    config setup script. (ramya)
+
+    HADOOP-7424. Log an error if the topology script doesn't handle multiple args.
+    (Uma Maheswara Rao G via eli)
 
   BUGS
 
@@ -83,19 +80,17 @@ Trunk (unreleased changes)
     HADOOP-7695. RPC.stopProxy can throw unintended exception while logging
     error (atm)
 
-    HADOOP-7721. Add log before login in KerberosAuthenticationHandler. 
-    (jitendra)
-
-    MAPREDUCE-2764. Fix renewal of dfs delegation tokens. (Owen via jitendra)
-
     HADOOP-7769. TestJMXJsonServlet is failing. (tomwhite)
 
-    HADOOP-7766. The auth to local mappings are not being respected, with webhdfs 
-    and security enabled. (jitendra)
+    HADOOP-7770. ViewFS getFileChecksum throws FileNotFoundException for files in 
+    /tmp and /user. (Ravi Prakash via jitendra)
 
   OPTIMIZATIONS
 
     HADOOP-7761. Improve the performance of raw comparisons. (todd)
+
+    HADOOP-7773. Add support for protocol buffer based RPC engine.
+    (suresh)
 
 Release 0.23.0 - Unreleased
 
@@ -498,6 +493,22 @@ Release 0.23.0 - Unreleased
     HADOOP-7749. Add a NetUtils createSocketAddr call which provides more
     help in exception messages. (todd)
 
+    HADOOP-7762. Common side of MR-2736. (eli)
+
+    HADOOP-7668. Add a NetUtils method that can tell if an InetAddress 
+    belongs to local host. (suresh)
+
+    HADOOP-7509. Improve exception message thrown when Authentication is 
+    required. (Ravi Prakash via suresh)
+
+    HADOOP-7745. Fix wrong variable name in exception message introduced
+    in HADOOP-7509. (Ravi Prakash via suresh)
+
+    MAPREDUCE-2764. Fix renewal of dfs delegation tokens. (Owen via jitendra)
+
+    HADOOP-7360. Preserve relative paths that do not contain globs in FsShell.
+    (Daryn Sharp and Kihwal Lee via szetszwo)
+
   OPTIMIZATIONS
   
     HADOOP-7333. Performance improvement in PureJavaCrc32. (Eric Caspole
@@ -506,7 +517,17 @@ Release 0.23.0 - Unreleased
     HADOOP-7445. Implement bulk checksum verification using efficient native
     code. (todd)
 
+    HADOOP-7753. Support fadvise and sync_file_range in NativeIO. Add
+    ReadaheadPool infrastructure for use in HDFS and MR. (todd)
+
+    HADOOP-7446. Implement CRC32C native code using SSE4.2 instructions.
+    (Kihwal Lee and todd via todd)
+
+    HADOOP-7763. Add top-level navigation to APT docs. (tomwhite)
+
   BUG FIXES
+
+    HADOOP-7740. Fixed security audit logger configuration. (Arpit Gupta via Eric Yang)
 
     HADOOP-7630. hadoop-metrics2.properties should have a property *.period 
     set to a default value for metrics. (Eric Yang via mattf)
@@ -754,7 +775,15 @@ Release 0.23.0 - Unreleased
     Eagles via acmurthy) 
 
     HADOOP-7764. Allow HttpServer to set both ACL list and path spec filters. 
-    (Jonathan Eagles via acmurthy) 
+    (Jonathan Eagles via acmurthy)
+
+    HADOOP-7766. The auth to local mappings are not being respected, with webhdfs 
+    and security enabled. (jitendra)
+
+    HADOOP-7721. Add log before login in KerberosAuthenticationHandler. 
+    (jitendra)
+
+    HADOOP-7778. FindBugs warning in Token.getKind(). (tomwhite)
 
 Release 0.22.0 - Unreleased
 

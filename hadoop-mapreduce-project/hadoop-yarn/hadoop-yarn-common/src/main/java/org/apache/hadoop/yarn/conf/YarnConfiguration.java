@@ -137,6 +137,9 @@ public class YarnConfiguration extends Configuration {
     YARN_PREFIX + "admin.acl";
   public static final String DEFAULT_YARN_ADMIN_ACL = "*";
   
+  /** ACL used in case none is found. Allows nothing. */
+  public static final String DEFAULT_YARN_APP_ACL = " ";
+
   /** The address of the RM admin interface.*/
   public static final String RM_ADMIN_ADDRESS = 
     RM_PREFIX + "admin.address";
@@ -285,20 +288,51 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_LOCALIZER_FETCH_THREAD_COUNT = 
     NM_PREFIX + "localizer.fetch.thread-count";
   public static final int DEFAULT_NM_LOCALIZER_FETCH_THREAD_COUNT = 4;
-  
+
   /** Where to store container logs.*/
   public static final String NM_LOG_DIRS = NM_PREFIX + "log-dirs";
   public static final String DEFAULT_NM_LOG_DIRS = "/tmp/logs";
+
+  /** Whether to enable log aggregation */
+  public static final String NM_LOG_AGGREGATION_ENABLED = NM_PREFIX
+      + "log-aggregation-enable";
+  public static final boolean DEFAULT_NM_LOG_AGGREGATION_ENABLED = false;
   
+  /**
+   * Number of seconds to retain logs on the NodeManager. Only applicable if Log
+   * aggregation is disabled
+   */
+  public static final String NM_LOG_RETAIN_SECONDS = NM_PREFIX
+      + "log.retain-seconds";
+
+  /**
+   * Number of threads used in log cleanup. Only applicable if Log aggregation
+   * is disabled
+   */
+  public static final String NM_LOG_DELETION_THREADS_COUNT = 
+    NM_PREFIX +  "log.deletion-threads-count";
+  public static final int DEFAULT_NM_LOG_DELETE_THREAD_COUNT = 4;
+
   /** Where to aggregate logs to.*/
   public static final String NM_REMOTE_APP_LOG_DIR = 
     NM_PREFIX + "remote-app-log-dir";
   public static final String DEFAULT_NM_REMOTE_APP_LOG_DIR = "/tmp/logs";
-  
+
+  /**
+   * The remote log dir will be created at
+   * NM_REMOTE_APP_LOG_DIR/${user}/NM_REMOTE_APP_LOG_DIR_SUFFIX/${appId}
+   */
+  public static final String NM_REMOTE_APP_LOG_DIR_SUFFIX = 
+    NM_PREFIX + "remote-app-log-dir-suffix";
+  public static final String DEFAULT_NM_REMOTE_APP_LOG_DIR_SUFFIX="logs";
+
+  public static final String YARN_LOG_SERVER_URL =
+    YARN_PREFIX + "log.server.url";
+
   /** Amount of memory in GB that can be allocated for containers.*/
   public static final String NM_PMEM_MB = NM_PREFIX + "resource.memory-mb";
   public static final int DEFAULT_NM_PMEM_MB = 8 * 1024;
-  
+
   public static final String NM_VMEM_PMEM_RATIO =
     NM_PREFIX + "vmem-pmem-ratio";
   public static final float DEFAULT_NM_VMEM_PMEM_RATIO = 2.1f;

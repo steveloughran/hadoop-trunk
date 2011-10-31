@@ -54,8 +54,8 @@ public class MockNM {
     return nodeId;
   }
 
-  public String getHttpAddress() {
-    return nodeId.getHost() + ":" + String.valueOf(httpPort);
+  public int getHttpPort() {
+    return httpPort;
   }
 
   public void containerStatus(Container container) throws Exception {
@@ -63,7 +63,7 @@ public class MockNM {
         new HashMap<ApplicationId, List<ContainerStatus>>();
     conts.put(container.getId().getApplicationAttemptId().getApplicationId(), 
         Arrays.asList(new ContainerStatus[] { container.getContainerStatus() }));
-    nodeHeartbeat(conts, true);
+    nodeHeartbeat(conts, true,nodeId);
   }
 
   public NodeId registerNode() throws Exception {
@@ -83,11 +83,11 @@ public class MockNM {
   }
 
   public HeartbeatResponse nodeHeartbeat(boolean b) throws Exception {
-    return nodeHeartbeat(new HashMap<ApplicationId, List<ContainerStatus>>(), b);
+    return nodeHeartbeat(new HashMap<ApplicationId, List<ContainerStatus>>(), b,nodeId);
   }
 
   public HeartbeatResponse nodeHeartbeat(Map<ApplicationId, 
-      List<ContainerStatus>> conts, boolean isHealthy) throws Exception {
+      List<ContainerStatus>> conts, boolean isHealthy, NodeId nodeId) throws Exception {
     NodeHeartbeatRequest req = Records.newRecord(NodeHeartbeatRequest.class);
     NodeStatus status = Records.newRecord(NodeStatus.class);
     status.setNodeId(nodeId);

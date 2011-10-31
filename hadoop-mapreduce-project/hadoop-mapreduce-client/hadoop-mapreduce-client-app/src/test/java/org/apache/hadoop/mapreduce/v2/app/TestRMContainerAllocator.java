@@ -117,8 +117,8 @@ public class TestRMContainerAllocator {
     JobId jobId = MRBuilderUtils.newJobId(appAttemptId.getApplicationId(), 0);
     Job mockJob = mock(Job.class);
     when(mockJob.getReport()).thenReturn(
-        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING,
-            0, 0, 0, 0, 0, 0, "jobfile"));
+        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING, 0, 
+            0, 0, 0, 0, 0, 0, "jobfile", null));
     MyContainerAllocator allocator = new MyContainerAllocator(rm, conf,
         appAttemptId, mockJob);
 
@@ -194,8 +194,8 @@ public class TestRMContainerAllocator {
     JobId jobId = MRBuilderUtils.newJobId(appAttemptId.getApplicationId(), 0);
     Job mockJob = mock(Job.class);
     when(mockJob.getReport()).thenReturn(
-        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING,
-            0, 0, 0, 0, 0, 0, "jobfile"));
+        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING, 0,
+            0, 0, 0, 0, 0, 0, "jobfile", null));
     MyContainerAllocator allocator = new MyContainerAllocator(rm, conf,
         appAttemptId, mockJob);
 
@@ -260,8 +260,8 @@ public class TestRMContainerAllocator {
     JobId jobId = MRBuilderUtils.newJobId(appAttemptId.getApplicationId(), 0);
     Job mockJob = mock(Job.class);
     when(mockJob.getReport()).thenReturn(
-        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING,
-            0, 0, 0, 0, 0, 0, "jobfile"));
+        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING, 0,
+            0, 0, 0, 0, 0, 0, "jobfile", null));
     MyContainerAllocator allocator = new MyContainerAllocator(rm, conf,
         appAttemptId, mockJob);
 
@@ -374,8 +374,8 @@ public class TestRMContainerAllocator {
     @Override
     public JobReport getReport() {
       return MRBuilderUtils.newJobReport(this.jobId, "job", "user",
-          JobState.RUNNING, 0, 0, this.setupProgress, this.mapProgress,
-          this.reduceProgress, this.cleanupProgress, "jobfile");
+          JobState.RUNNING, 0, 0, 0, this.setupProgress, this.mapProgress,
+          this.reduceProgress, this.cleanupProgress, "jobfile", null);
     }
   }
 
@@ -510,8 +510,8 @@ public class TestRMContainerAllocator {
     JobId jobId = MRBuilderUtils.newJobId(appAttemptId.getApplicationId(), 0);
     Job mockJob = mock(Job.class);
     when(mockJob.getReport()).thenReturn(
-        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING,
-            0, 0, 0, 0, 0, 0, "jobfile"));
+        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING, 0,
+            0, 0, 0, 0, 0, 0, "jobfile", null));
     MyContainerAllocator allocator = new MyContainerAllocator(rm, conf,
         appAttemptId, mockJob);
 
@@ -567,6 +567,7 @@ public class TestRMContainerAllocator {
     Assert.assertEquals("No of assignments must be 0", 0, assigned.size());    
 
     nodeManager3.nodeHeartbeat(true); // Node heartbeat
+    dispatcher.await();
     assigned = allocator.schedule();    
     dispatcher.await();
         
