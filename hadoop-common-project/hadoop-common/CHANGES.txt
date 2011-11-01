@@ -92,7 +92,7 @@ Trunk (unreleased changes)
     HADOOP-7773. Add support for protocol buffer based RPC engine.
     (suresh)
 
-Release 0.23.0 - Unreleased
+Release 0.23.0 - 2011-11-01 
 
   INCOMPATIBLE CHANGES
 
@@ -509,6 +509,14 @@ Release 0.23.0 - Unreleased
     HADOOP-7360. Preserve relative paths that do not contain globs in FsShell.
     (Daryn Sharp and Kihwal Lee via szetszwo)
 
+    HADOOP-7771. FsShell -copyToLocal, -get, etc. commands throw NPE if the
+    destination directory does not exist.  (John George and Daryn Sharp
+    via szetszwo)
+
+    HADOOP-7782. Aggregate project javadocs. (tomwhite)
+
+    HADOOP-7789. Improvements to site navigation. (acmurthy) 
+
   OPTIMIZATIONS
   
     HADOOP-7333. Performance improvement in PureJavaCrc32. (Eric Caspole
@@ -524,6 +532,8 @@ Release 0.23.0 - Unreleased
     (Kihwal Lee and todd via todd)
 
     HADOOP-7763. Add top-level navigation to APT docs. (tomwhite)
+
+    HADOOP-7785. Add equals, hashcode, toString to DataChecksum (todd)
 
   BUG FIXES
 

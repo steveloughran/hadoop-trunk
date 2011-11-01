@@ -30,14 +30,6 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
-    MAPREDUCE-3241. [Rumen] Fix Rumen to ignore the AMStartedEvent. (amarrk)
-
-    MAPREDUCE-3166. [Rumen] Make Rumen use job history api instead of relying
-    on current history file name format. (Ravi Gummadi)
-
-    MAPREDUCE-3157. [Rumen] Fix TraceBuilder to handle 0.20 history file
-    names also. (Ravi Gummadi)
-
     MAPREDUCE-2950. [Gridmix] TestUserResolve fails in trunk. 
                     (Ravi Gummadi via amarrk)
 
@@ -48,15 +40,8 @@ Trunk (unreleased changes)
     findBugs, correct links to findBugs artifacts and no links to the
     artifacts when there are no warnings. (Tom White via vinodkv).
 
-    MAPREDUCE-3081. Fix vaidya startup script. (gkesavan via suhas).
-
     MAPREDUCE-3183. hadoop-assemblies/src/main/resources/assemblies/hadoop-mapreduce-dist.xml 
     missing license header. (Hitesh Shah via tucu).
-
-    MAPREDUCE-2764. Fix renewal of dfs delegation tokens. (Owen via jitendra)
-
-    MAPREDUCE-3192. Fix Javadoc warning in JobClient.java and Cluster.java.
-    (jitendra)
 
     MAPREDUCE-3003. Publish MR JARs to Maven snapshot repository. (tucu)
 
@@ -65,7 +50,7 @@ Trunk (unreleased changes)
     MAPREDUCE-3014. Rename and invert logic of '-cbuild' profile to 'native' and off 
     by default. (tucu)
 
-Release 0.23.0 - Unreleased
+Release 0.23.0 - 2011-11-01 
 
   INCOMPATIBLE CHANGES
 
@@ -451,6 +436,12 @@ Release 0.23.0 - Unreleased
 
     MAPREDUCE-3146. Added a MR specific command line to dump logs for a
     given TaskAttemptID. (Siddharth Seth via vinodkv)
+
+    MAPREDUCE-3275. Added documentation for AM WebApp Proxy. (Robert Evans via
+    acmurthy)
+
+    MAPREDUCE-3322. Added a better index.html and an brief overview of YARN
+    architecture. (acmurthy) 
 
   OPTIMIZATIONS
 
@@ -1882,6 +1873,41 @@ Release 0.23.0 - Unreleased
     MAPREDUCE-3262. Fixed Container's state-machine in NodeManager to handle
     a couple of events in failure states correctly. (Hitesh Shah and Siddharth
     Seth via vinodkv)
+
+    MAPREDUCE-3035. Fixed MR JobHistory to ensure rack information is present.
+    (chakravarthy via acmurthy)
+
+    MAPREDUCE-3321. Disabled a few MR tests for 0.23. (Hitesh Shah via
+    acmurthy) 
+
+    MAPREDUCE-3220. Fixed TestCombineOutputCollector. (Devaraj K via acmurthy) 
+
+    MAPREDUCE-3103. Implement Job ACLs for MRAppMaster. 
+    (mahadev)
+
+    MAPREDUCE-3241. [Rumen] Fix Rumen to ignore the AMStartedEvent. (amarrk)
+
+    MAPREDUCE-3166. [Rumen] Make Rumen use job history api instead of relying
+    on current history file name format. (Ravi Gummadi)
+
+    MAPREDUCE-3157. [Rumen] Fix TraceBuilder to handle 0.20 history file
+    names also. (Ravi Gummadi)
+
+    MAPREDUCE-3081. Fix vaidya startup script. (gkesavan via suhas).
+
+    MAPREDUCE-2764. Fix renewal of dfs delegation tokens. (Owen via jitendra)
+
+    MAPREDUCE-3192. Fix Javadoc warning in JobClient.java and Cluster.java.
+    (jitendra)
+
+    MAPREDUCE-3237. Move LocalJobRunner to hadoop-mapreduce-client-core.
+    (tomwhite via acmurthy) 
+
+    MAPREDUCE-3316. Rebooted link is not working properly. 
+    (Bhallamudi Venkata Siva Kamesh via mahadev)
+
+    MAPREDUCE-3317. Rumen TraceBuilder is emiting null as hostname.
+    (Ravi Gummadi via mahadev)
 
 Release 0.22.0 - Unreleased
 
