@@ -420,10 +420,9 @@ public class TestDistributedFileSystem {
       assertTrue("Not throwing the intended exception message", e.getMessage()
           .contains("File does not exist: /test/TestNonExistingFile"));
     }
-    
+
     try {
-      Path path = new Path(
-      "/test/TestExistingDir/");
+      Path path = new Path("/test/TestExistingDir/");
       hdfs.mkdirs(path);
       ((DistributedFileSystem) hdfs).getFileChecksum(path);
       fail("Expecting FileNotFoundException");

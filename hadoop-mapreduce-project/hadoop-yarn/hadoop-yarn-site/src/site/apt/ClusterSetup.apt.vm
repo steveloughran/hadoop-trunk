@@ -101,6 +101,8 @@ Hadoop MapReduce Next Generation - Cluster Setup
 *--------------------------------------+--------------------------------------+
 | NodeManager                          | YARN_NODEMANAGER_OPTS                |
 *--------------------------------------+--------------------------------------+
+| WebAppProxy                          | YARN_PROXYSERVER_OPTS                |
+*--------------------------------------+--------------------------------------+
 
     For example, To configure Namenode to use parallelGC, the following 
     statement should be added in hadoop-env.sh :
@@ -224,18 +226,13 @@ Hadoop MapReduce Next Generation - Cluster Setup
 | | <<<ResourceManager>>> Scheduler class. | |
 | | | <<<CapacityScheduler>>> (recommended) or <<<FifoScheduler>>> |
 *-------------------------+-------------------------+------------------------+
-| <<<yarn.nodemanager.remote-app-log-dir>>> | | |
-| | </logs> | |
-| | | HDFS directory where the application logs are moved on application |
-| | | completion. Need to set appropriate permissions. |
-*-------------------------+-------------------------+------------------------+
 | <<<yarn.resourcemanager.nodes.include-path>>> / | | | 
 | <<<yarn.resourcemanager.nodes.exclude-path>>> | | |  
 | | List of permitted/excluded NodeManagers. | |
 | | | If necessary, use these files to control the list of allowable | 
 | | | NodeManagers. |
 *-------------------------+-------------------------+------------------------+
-| 
+ 
         * Configurations for NodeManager:
 
 *-------------------------+-------------------------+------------------------+
@@ -262,6 +259,27 @@ Hadoop MapReduce Next Generation - Cluster Setup
 | | Comma-separated list of paths on the local filesystem where logs  | |
 | | are written. | |
 | | | Multiple paths help spread disk i/o. |
+*-------------------------+-------------------------+------------------------+
+| <<<yarn.nodemanager.log-aggregation-enable>>> | | |
+| | <false> | |
+| | | Configuration to enable or disable log aggregation |
+*-------------------------+-------------------------+------------------------+
+| <<<yarn.nodemanager.log.retain-seconds>>> | | |
+| | <10800> | |
+| | | Default time (in seconds) to retain log files on the NodeManager |
+| | | Only applicable if log-aggregation is disabled. |
+*-------------------------+-------------------------+------------------------+
+| <<<yarn.nodemanager.remote-app-log-dir>>> | | |
+| | </logs> | |
+| | | HDFS directory where the application logs are moved on application |
+| | | completion. Need to set appropriate permissions. |
+| | | Only applicable if log-aggregation is enabled. |
+*-------------------------+-------------------------+------------------------+
+| <<<yarn.nodemanager.remote-app-log-dir-suffix>>> | | |
+| | <logs> | |
+| | | Suffix appended to the remote log dir. Logs will be aggregated to  |
+| | | $\{yarn.nodemanager.remote-app-log-dir\}/$\{user\}/$\{thisParam\} |
+| | | Only applicable if log-aggregation is enabled. |
 *-------------------------+-------------------------+------------------------+
 | <<<yarn.nodemanager.aux-services>>> | | |
 | | mapreduce.shuffle  | |
@@ -434,8 +452,15 @@ Hadoop MapReduce Next Generation - Cluster Setup
     Run a script to start NodeManagers on all slaves:
 
 ----
-  $ $YARN_HOME/bin/hdfs start nodemanager --config $HADOOP_CONF_DIR  
+  $ $YARN_HOME/bin/yarn start nodemanager --config $HADOOP_CONF_DIR  
 ----    	  
+
+    Start a standalone WebAppProxy server.  If multiple servers
+    are used with load balancing it should be run on each of them:
+
+----
+  $ $YARN_HOME/bin/yarn start proxyserver --config $HADOOP_CONF_DIR  
+----
 
     Start the MapReduce JobHistory Server with the following command, run on the  
     designated server:
@@ -469,8 +494,16 @@ Hadoop MapReduce Next Generation - Cluster Setup
     Run a script to stop NodeManagers on all slaves:
 
 ----
-  $ $YARN_HOME/bin/hdfs stop nodemanager --config $HADOOP_CONF_DIR  
+  $ $YARN_HOME/bin/yarn stop nodemanager --config $HADOOP_CONF_DIR  
 ----    	  
+
+    Stop the WebAppProxy server. If multiple servers are used with load
+    balancing it should be run on each of them:
+
+----
+  $ $YARN_HOME/bin/yarn stop proxyserver --config $HADOOP_CONF_DIR  
+----
+
 
     Stop the MapReduce JobHistory Server with the following command, run on the  
     designated server:
@@ -486,7 +519,7 @@ Hadoop MapReduce Next Generation - Cluster Setup
   to run Hadoop in <<secure mode>> with strong, Kerberos-based
   authentication.
       
-  * <<<User Acccounts for Hadoop Daemons>>>
+  * <<<User Accounts for Hadoop Daemons>>>
       
   Ensure that HDFS and YARN daemons run as different Unix users, for e.g.
   <<<hdfs>>> and <<<yarn>>>. Also, ensure that the MapReduce JobHistory
@@ -735,6 +768,31 @@ KVNO Timestamp         Principal
 
     * <<<conf/yarn-site.xml>>>
     
+      * WebAppProxy
+
+      The <<<WebAppProxy>>> provides a proxy between the web applications
+      exported by an application and an end user.  If security is enabled
+      it will warn users before accessing a potentially unsafe web application.
+      Authentication and authorization using the proxy is handled just like
+      any other privileged web application.
+
+*-------------------------+-------------------------+------------------------+
+|| Parameter              || Value                  || Notes                 |
+*-------------------------+-------------------------+------------------------+
+| <<<yarn.web-proxy.address>>> | | |
+| | <<<WebAppProxy>>> host:port for proxy to AM web apps. | |
+| | | <host:port> if this is the same as <<<yarn.resourcemanager.webapp.address>>>|
+| | | or it is not defined then the <<<ResourceManager>>> will run the proxy|
+| | | otherwise a standalone proxy server will need to be launched.|
+*-------------------------+-------------------------+------------------------+
+| <<<yarn.web-proxy.keytab>>> | | |
+| | </etc/security/keytab/web-app.service.keytab> | |
+| | | Kerberos keytab file for the WebAppProxy. |
+*-------------------------+-------------------------+------------------------+
+| <<<yarn.web-proxy.principal>>> | wap/_HOST@REALM.TLD | |
+| | | Kerberos principal name for the WebAppProxy. |
+*-------------------------+-------------------------+------------------------+
+
       * LinuxContainerExecutor
       
       A <<<ContainerExecutor>>> used by YARN framework which define how any
@@ -952,7 +1010,15 @@ KVNO Timestamp         Principal
     Run a script to start NodeManagers on all slaves as <yarn>:
 
 ----
-[yarn]$ $YARN_HOME/bin/hdfs start nodemanager --config $HADOOP_CONF_DIR  
+[yarn]$ $YARN_HOME/bin/yarn start nodemanager --config $HADOOP_CONF_DIR  
+----    	  
+
+    Start a standalone WebAppProxy server. Run on the WebAppProxy 
+    server as <yarn>.  If multiple servers are used with load balancing
+    it should be run on each of them:
+
+----
+[yarn]$ $YARN_HOME/bin/yarn start proxyserver --config $HADOOP_CONF_DIR  
 ----    	  
 
     Start the MapReduce JobHistory Server with the following command, run on the  
@@ -987,12 +1053,20 @@ KVNO Timestamp         Principal
     Run a script to stop NodeManagers on all slaves as <yarn>:
 
 ----
-[yarn]$ $YARN_HOME/bin/hdfs stop nodemanager --config $HADOOP_CONF_DIR  
+[yarn]$ $YARN_HOME/bin/yarn stop nodemanager --config $HADOOP_CONF_DIR  
 ----    	  
+
+    Stop the WebAppProxy server. Run on the WebAppProxy  server as
+    <yarn>.  If multiple servers are used with load balancing it
+    should be run on each of them:
+
+----
+[yarn]$ $YARN_HOME/bin/yarn stop proxyserver --config $HADOOP_CONF_DIR  
+----
 
     Stop the MapReduce JobHistory Server with the following command, run on the  
     designated server as <mapred>:
-  
+
 ----
 [mapred]$ $YARN_HOME/bin/yarn stop historyserver --config $HADOOP_CONF_DIR  
 ----    	  

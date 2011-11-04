@@ -107,6 +107,7 @@ import org.apache.hadoop.yarn.api.records.ContainerToken;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
+import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.factories.RecordFactory;
@@ -158,6 +159,8 @@ public abstract class TaskAttemptImpl implements
   private long finishTime;
   private WrappedProgressSplitsBlock progressSplitBlock;
   private int shufflePort = -1;
+  private String trackerName;
+  private int httpPort;
 
   private static final CleanupContainerTransition CLEANUP_CONTAINER_TRANSITION =
     new CleanupContainerTransition();
@@ -423,9 +426,10 @@ public abstract class TaskAttemptImpl implements
     stateMachine;
 
   private ContainerId containerID;
-  private String nodeHostName;
+  private NodeId containerNodeId;
   private String containerMgrAddress;
   private String nodeHttpAddress;
+  private String nodeRackName;
   private WrappedJvmID jvmID;
   private ContainerToken containerToken;
   private Resource assignedCapability;
@@ -724,6 +728,19 @@ public abstract class TaskAttemptImpl implements
       readLock.unlock();
     }
   }
+  
+  /**
+   * If container Assigned then return the node's rackname, otherwise null.
+   */
+  @Override
+  public String getNodeRackName() {
+    this.readLock.lock();
+    try {
+      return this.nodeRackName;
+    } finally {
+      this.readLock.unlock();
+    }
+  }
 
   protected abstract org.apache.hadoop.mapred.Task createRemoteTask();
 
@@ -763,6 +780,12 @@ public abstract class TaskAttemptImpl implements
       result.setPhase(reportedStatus.phase);
       result.setStateString(reportedStatus.stateString);
       result.setCounters(getCounters());
+      result.setContainerId(this.getAssignedContainerID());
+      result.setNodeManagerHost(trackerName);
+      result.setNodeManagerHttpPort(httpPort);
+      if (this.containerNodeId != null) {
+        result.setNodeManagerPort(this.containerNodeId.getPort());
+      }
       return result;
     } finally {
       readLock.unlock();
@@ -1001,10 +1024,12 @@ public abstract class TaskAttemptImpl implements
       final TaskAttemptContainerAssignedEvent cEvent = 
         (TaskAttemptContainerAssignedEvent) event;
       taskAttempt.containerID = cEvent.getContainer().getId();
-      taskAttempt.nodeHostName = cEvent.getContainer().getNodeId().getHost();
-      taskAttempt.containerMgrAddress = cEvent.getContainer().getNodeId()
+      taskAttempt.containerNodeId = cEvent.getContainer().getNodeId();
+      taskAttempt.containerMgrAddress = taskAttempt.containerNodeId
           .toString();
       taskAttempt.nodeHttpAddress = cEvent.getContainer().getNodeHttpAddress();
+      taskAttempt.nodeRackName = RackResolver.resolve(
+          taskAttempt.containerNodeId.getHost()).getNetworkLocation();
       taskAttempt.containerToken = cEvent.getContainer().getContainerToken();
       taskAttempt.assignedCapability = cEvent.getContainer().getResource();
       // this is a _real_ Task (classic Hadoop mapred flavor):
@@ -1012,6 +1037,7 @@ public abstract class TaskAttemptImpl implements
       taskAttempt.jvmID = new WrappedJvmID(
           taskAttempt.remoteTask.getTaskID().getJobID(), 
           taskAttempt.remoteTask.isMapTask(), taskAttempt.containerID.getId());
+      taskAttempt.taskAttemptListener.registerPendingTask(taskAttempt.jvmID);
       
       //launch the container
       //create the container object to be launched for a given Task attempt
@@ -1106,12 +1132,14 @@ public abstract class TaskAttemptImpl implements
 
       // register it to TaskAttemptListener so that it start listening
       // for it
-      taskAttempt.taskAttemptListener.register(
+      taskAttempt.taskAttemptListener.registerLaunchedTask(
           taskAttempt.attemptId, taskAttempt.remoteTask, taskAttempt.jvmID);
       //TODO Resolve to host / IP in case of a local address.
       InetSocketAddress nodeHttpInetAddr =
           NetUtils.createSocketAddr(taskAttempt.nodeHttpAddress); // TODO:
                                                                   // Costly?
+      taskAttempt.trackerName = nodeHttpInetAddr.getHostName();
+      taskAttempt.httpPort = nodeHttpInetAddr.getPort();
       JobCounterUpdateEvent jce =
           new JobCounterUpdateEvent(taskAttempt.attemptId.getTaskId()
               .getJobId());
@@ -1242,8 +1270,10 @@ public abstract class TaskAttemptImpl implements
          TypeConverter.fromYarn(attemptId.getTaskId().getTaskType()),
          state.toString(),
          this.reportedStatus.mapFinishTime,
-         finishTime, this.containerMgrAddress == null ? "UNKNOWN" 
-             : this.containerMgrAddress,
+         finishTime,
+         this.containerNodeId == null ? "UNKNOWN"
+             : this.containerNodeId.getHost(),
+         this.nodeRackName == null ? "UNKNOWN" : this.nodeRackName,
          this.reportedStatus.stateString,
          TypeConverter.fromYarn(getCounters()),
          getProgressSplitBlock().burst());
@@ -1256,8 +1286,10 @@ public abstract class TaskAttemptImpl implements
          state.toString(),
          this.reportedStatus.shuffleFinishTime,
          this.reportedStatus.sortFinishTime,
-         finishTime, this.containerMgrAddress == null ? "UNKNOWN" 
-             : this.containerMgrAddress,
+         finishTime,
+         this.containerNodeId == null ? "UNKNOWN"
+                                         : this.containerNodeId.getHost(),
+         this.nodeRackName == null ? "UNKNOWN" : this.nodeRackName,
          this.reportedStatus.stateString,
          TypeConverter.fromYarn(getCounters()),
          getProgressSplitBlock().burst());
