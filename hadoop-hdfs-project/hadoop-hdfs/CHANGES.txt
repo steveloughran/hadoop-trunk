@@ -50,6 +50,11 @@ Trunk (unreleased changes)
 
     HDFS-2479 HDFS Client Data Types in Protocol Buffers (sanjay)
 
+    HDFS-2334. Add Closeable to JournalManager. (Ivan Kelly via jitendra)
+
+    HDFS-2477. Optimize computing the diff between a block report and the
+               namenode state. (Tomasz Nykiel via hairong)
+
   BUG FIXES
     HDFS-2287. TestParallelRead has a small off-by-one bug. (todd)
 
@@ -83,7 +88,39 @@ Trunk (unreleased changes)
 
     HDFS-2497 Fix TestBackupNode failure. (suresh)
 
-Release 0.23.0 - Unreleased
+    HDFS-2526. (Client)NamenodeProtocolTranslatorR23 do not need to keep a
+               reference to rpcProxyWithoutRetry (atm)
+
+Release 0.23.1 - UNRELEASED
+
+  INCOMPATIBLE CHANGES
+
+  NEW FEATURES
+
+  IMPROVEMENTS
+
+  OPTIMIZATIONS
+
+    HDFS-2130. Switch default checksum to CRC32C. (todd)
+
+    HDFS-2533. Remove needless synchronization on some FSDataSet methods.
+    (todd)
+
+    HDFS-2129. Simplify BlockReader to not inherit from FSInputChecker.
+    (todd)
+
+  BUG FIXES
+
+    HDFS-2416. distcp with a webhdfs uri on a secure cluster fails. (jitendra)
+
+    HDFS-2527. WebHdfs: remove the use of "Range" header in Open; use ugi
+    username if renewer parameter is null in GetDelegationToken; response OK
+    when setting replication for non-files; rename GETFILEBLOCKLOCATIONS to
+    GET_BLOCK_LOCATIONS and state that it is a private unstable API; replace
+    isDirectory and isSymlink with enum {FILE, DIRECTORY, SYMLINK} in
+    HdfsFileStatus JSON object.  (szetszwo)
+
+Release 0.23.0 - 2011-11-01 
 
   INCOMPATIBLE CHANGES
 
@@ -404,6 +441,9 @@ Release 0.23.0 - Unreleased
     (szetszwo)
 
     HDFS-2348. Support getContentSummary and getFileChecksum in webhdfs.
+    (szetszwo)
+
+    HDFS-2385. Support renew and cancel delegation tokens in webhdfs.
     (szetszwo)
 
   IMPROVEMENTS
@@ -828,11 +868,17 @@ Release 0.23.0 - Unreleased
     HDFS-2493. Remove reference to FSNamesystem in blockmanagement classes.
     (szetszwo)
 
-    HDFS-2509. Add a test for DistributedFileSystem.getFileChecksum(..) on
-    directories or non existing files.  (Uma Maheswara Rao G via szetszwo)
-
     HDFS-2436. Change FSNamesystem.setTimes(..) for allowing setting times on
     directories.  (Uma Maheswara Rao G via szetszwo)
+
+    HDFS-2512. Add textual error message to data transfer protocol responses
+    (todd)
+
+    HDFS-2521. Remove custom checksum headers from data transfer protocol
+    (todd)
+
+    HDFS-2308. NamenodeProtocol.endCheckpoint is vestigial and can be removed.
+    (eli)
 
   OPTIMIZATIONS
 
@@ -1226,6 +1272,9 @@ Release 0.23.0 - Unreleased
     setOwner with both owner and group empty; throw FileNotFoundException if
     getFileStatus on non-existing files; fix bugs in getBlockLocations; and
     changed getFileChecksum json response root to "FileChecksum".  (szetszwo)
+
+    HDFS-2065. Add null checks in DFSClient.getFileChecksum(..).  (Uma
+    Maheswara Rao G via szetszwo)
 
   BREAKDOWN OF HDFS-1073 SUBTASKS
 
@@ -1818,6 +1867,12 @@ Release 0.22.0 - Unreleased
 
     HDFS-2452. OutOfMemoryError in DataXceiverServer takes down the DataNode
     (Uma Maheswara Rao via cos)
+
+    HDFS-2285. BackupNode should reject requests to modify namespace.
+    (shv and Uma Maheswara Rao)
+
+    HDFS-2002. Incorrect computation of needed blocks in getTurnOffTip().
+    (Plamen Jeliazkov via shv)
 
 Release 0.21.1 - Unreleased
 

@@ -32,6 +32,6 @@ public enum ApplicationEventType {
   // Source: Container
   APPLICATION_CONTAINER_FINISHED,
 
-  // Source: Log Aggregation
-  APPLICATION_LOG_AGGREGATION_FINISHED
+  // Source: Log Handler
+  APPLICATION_LOG_HANDLING_FINISHED
 }
