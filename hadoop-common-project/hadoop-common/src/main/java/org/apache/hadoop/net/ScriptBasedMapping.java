@@ -46,8 +46,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public final class ScriptBasedMapping extends CachedDNSToSwitchMapping 
-    implements Configurable {
+public final class ScriptBasedMapping extends CachedDNSToSwitchMapping {
 
   /**
    * Minimum number of arguments: {@value}
@@ -124,7 +123,7 @@ public final class ScriptBasedMapping extends CachedDNSToSwitchMapping
    * by the superclass {@link CachedDNSToSwitchMapping}
    */
   private static final class RawScriptBasedMapping
-      extends AbstractDNSToSwitchMapping implements Configurable {
+      extends AbstractDNSToSwitchMapping {
     private String scriptName;
     private int maxArgs; //max hostnames per call of the script
     private static final Log LOG =
