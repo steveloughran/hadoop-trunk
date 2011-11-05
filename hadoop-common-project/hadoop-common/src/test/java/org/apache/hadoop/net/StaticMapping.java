@@ -112,7 +112,9 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
    */
   @Override
   public boolean isSingleSwitch() {
-    return nameToRackMap.isEmpty();
+    synchronized (nameToRackMap) {
+      return nameToRackMap.isEmpty();
+    }
   }
 
   /**
