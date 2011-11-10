@@ -10,6 +10,9 @@ Trunk (unreleased changes)
     (Plamen Jeliazkov via shv)
 
   IMPROVEMENTS
+    MAPREDUCE-2733. [Gridmix] Gridmix3 cpu emulation system tests. 
+                    (Vinay Thota via amarrk)
+
     MAPREDUCE-3008. Improvements to cumulative CPU emulation for short running 
                     tasks in Gridmix. (amarrk)
 
@@ -29,6 +32,8 @@ Trunk (unreleased changes)
     uri with no authority. (John George via jitendra)
 
   BUG FIXES
+    MAPREDUCE-3346. [Rumen] LoggedTaskAttempt#getHostName() returns null. 
+                    (amarrk)
 
     MAPREDUCE-2950. [Gridmix] TestUserResolve fails in trunk. 
                     (Ravi Gummadi via amarrk)
@@ -62,6 +67,9 @@ Release 0.23.1 - Unreleased
     HistoryServer and clients can use them without depending on the
     yarn-server-nodemanager module. (Siddharth Seth via vinodkv)
 
+    MAPREDUCE-3336. Replaced guice internal.Preconditions api usage with the
+    public Preconditions API. (Thomas Graves via vinodkv)
+
   OPTIMIZATIONS
 
   BUG FIXES
@@ -77,6 +85,22 @@ Release 0.23.1 - Unreleased
 
     MAPREDUCE-3217. Reenabled and fixed bugs in the failing ant test
     TestAuditLogger. (Devaraj K via vinodkv)
+
+    MAPREDUCE-3291. App fail to launch due to delegation token not 
+    found in cache (Robert Evans via mahadev)
+
+    MAPREDUCE-3344. o.a.h.mapreduce.Reducer since 0.21 blindly casts to
+    ReduceContext.ValueIterator. (Brock Noland via tomwhite)
+
+    MAPREDUCE-3342. Fixed JobHistoryServer to also show the job's queue
+    name. (Jonathan Eagles via vinodkv)
+
+    MAPREDUCE-3345. Fixed a race condition in ResourceManager that was causing
+    TestContainerManagerSecurity to fail sometimes. (Hitesh Shah via vinodkv)
+
+    MAPREDUCE-3333. Fixed bugs in ContainerLauncher of MR AppMaster due to
+    which per-container connections to NodeManager were lingering long enough
+    to hit the ulimits on number of processes. (vinodkv)
 
 Release 0.23.0 - 2011-11-01 
 

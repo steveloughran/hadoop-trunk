@@ -52,8 +52,13 @@ Trunk (unreleased changes)
 
     HDFS-2334. Add Closeable to JournalManager. (Ivan Kelly via jitendra)
 
+
+  OPTIMIZATIONS
     HDFS-2477. Optimize computing the diff between a block report and the
                namenode state. (Tomasz Nykiel via hairong)
+
+    HDFS-2495. Increase granularity of write operations in ReplicationMonitor
+    thus reducing contention for write lock. (Tomasz Nykiel via hairong)
 
   BUG FIXES
     HDFS-2287. TestParallelRead has a small off-by-one bug. (todd)
@@ -110,15 +115,6 @@ Release 0.23.1 - UNRELEASED
     (todd)
 
   BUG FIXES
-
-    HDFS-2416. distcp with a webhdfs uri on a secure cluster fails. (jitendra)
-
-    HDFS-2527. WebHdfs: remove the use of "Range" header in Open; use ugi
-    username if renewer parameter is null in GetDelegationToken; response OK
-    when setting replication for non-files; rename GETFILEBLOCKLOCATIONS to
-    GET_BLOCK_LOCATIONS and state that it is a private unstable API; replace
-    isDirectory and isSymlink with enum {FILE, DIRECTORY, SYMLINK} in
-    HdfsFileStatus JSON object.  (szetszwo)
 
 Release 0.23.0 - 2011-11-01 
 
@@ -1275,6 +1271,22 @@ Release 0.23.0 - 2011-11-01
 
     HDFS-2065. Add null checks in DFSClient.getFileChecksum(..).  (Uma
     Maheswara Rao G via szetszwo)
+
+    HDFS-2416. distcp with a webhdfs uri on a secure cluster fails. (jitendra)
+
+    HDFS-2527. WebHdfs: remove the use of "Range" header in Open; use ugi
+    username if renewer parameter is null in GetDelegationToken; response OK
+    when setting replication for non-files; rename GETFILEBLOCKLOCATIONS to
+    GET_BLOCK_LOCATIONS and state that it is a private unstable API; replace
+    isDirectory and isSymlink with enum {FILE, DIRECTORY, SYMLINK} in
+    HdfsFileStatus JSON object.  (szetszwo)
+
+    HDFS-2528. Webhdfs: set delegation kind to WEBHDFS and add a HDFS token
+    when http requests are redirected to datanode.  (szetszwo)
+
+    HDFS-2540. Webhdfs: change "Expect: 100-continue" to two-step write; change 
+    "HdfsFileStatus" and "localName" respectively to "FileStatus" and
+    "pathSuffix" in JSON response.  (szetszwo)
 
   BREAKDOWN OF HDFS-1073 SUBTASKS
 
