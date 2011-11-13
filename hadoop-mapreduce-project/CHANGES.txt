@@ -70,6 +70,12 @@ Release 0.23.1 - Unreleased
     MAPREDUCE-3336. Replaced guice internal.Preconditions api usage with the
     public Preconditions API. (Thomas Graves via vinodkv)
 
+    MAPREDUCE-3280. Removed the unnecessary job user-name configuration in
+    mapred-site.xml. (vinodkv)
+
+    MAPREDUCE-3370. Fixed MiniMRYarnCluster and related tests to not use
+    a hard-coded path for the mr-app jar. (Ahmed Radwan via vinodkv)
+
   OPTIMIZATIONS
 
   BUG FIXES
@@ -101,6 +107,12 @@ Release 0.23.1 - Unreleased
     MAPREDUCE-3333. Fixed bugs in ContainerLauncher of MR AppMaster due to
     which per-container connections to NodeManager were lingering long enough
     to hit the ulimits on number of processes. (vinodkv)
+
+    MAPREDUCE-3392. Fixed Cluster's getDelegationToken's API to return null
+    when there isn't a supported token. (John George via vinodkv)
+
+    MAPREDUCE-3379. Fixed LocalResourceTracker in NodeManager to remove deleted
+    cache entries correctly. (Siddharth Seth via vinodkv)
 
 Release 0.23.0 - 2011-11-01 
 
