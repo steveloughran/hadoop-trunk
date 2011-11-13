@@ -32,7 +32,8 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 
 /**
  * This class implements the {@link DNSToSwitchMapping} interface using a 
- * script configured via the {@link CommonConfigurationKeys#NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY}/
+ * script configured via the
+ * {@link CommonConfigurationKeys#NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY} option.
  * <p/>
  * It contains a static class {@link RawScriptBasedMapping} that performs
  * the work: reading the configuration parameters, executing any defined
