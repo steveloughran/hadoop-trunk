@@ -226,7 +226,7 @@ public final class ScriptBasedMapping extends CachedDNSToSwitchMapping {
           dir = new File(userDir);
         }
         ShellCommandExecutor s = new ShellCommandExecutor(
-            cmdList.toArray(new String[0]), dir);
+            cmdList.toArray(new String[cmdList.size()]), dir);
         try {
           s.execute();
           allOutput.append(s.getOutput()).append(" ");
