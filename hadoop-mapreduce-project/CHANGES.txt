@@ -10,6 +10,9 @@ Trunk (unreleased changes)
     (Plamen Jeliazkov via shv)
 
   IMPROVEMENTS
+    MAPREDUCE-3375. [Gridmix] Memory Emulation system tests. 
+                    (Vinay Thota via amarrk)
+
     MAPREDUCE-2733. [Gridmix] Gridmix3 cpu emulation system tests. 
                     (Vinay Thota via amarrk)
 
@@ -76,6 +79,21 @@ Release 0.23.1 - Unreleased
     MAPREDUCE-3370. Fixed MiniMRYarnCluster and related tests to not use
     a hard-coded path for the mr-app jar. (Ahmed Radwan via vinodkv)
 
+    MAPREDUCE-3325. Improvements to CapacityScheduler doc. (Thomas Graves 
+    via mahadev)
+
+    MAPREDUCE-3341. Enhance logging of initalized queue limit values.
+    (Anupam Seth via mahadev)
+
+    MAPREDUCE-3243. Invalid tracking URL for streaming jobs (Jonathan Eagles 
+    via mahadev)
+
+    MAPREDUCE-3331. Improvement to single node cluster setup documentation for 
+    0.23 (Anupam Seth via mahadev)
+
+    MAPREDUCE-3102. Changed NodeManager to fail fast when LinuxContainerExecutor
+    has wrong configuration or permissions. (Hitesh Shah via vinodkv)
+
   OPTIMIZATIONS
 
   BUG FIXES
@@ -113,6 +131,15 @@ Release 0.23.1 - Unreleased
 
     MAPREDUCE-3379. Fixed LocalResourceTracker in NodeManager to remove deleted
     cache entries correctly. (Siddharth Seth via vinodkv)
+
+    MAPREDUCE-3324. Not All HttpServer tools links (stacks,logs,config,metrics) are 
+    accessible through all UI servers (Jonathan Eagles via mahadev)
+
+    MAPREDUCE-3355. Fixed MR AM's ContainerLauncher to handle node-command
+    timeouts correctly. (vinodkv)
+
+    MAPREDUCE-3407. Fixed pom files to refer to the correct MR app-jar needed
+    by the integration tests. (Hitesh Shah via vinodkv)
 
 Release 0.23.0 - 2011-11-01 
 
