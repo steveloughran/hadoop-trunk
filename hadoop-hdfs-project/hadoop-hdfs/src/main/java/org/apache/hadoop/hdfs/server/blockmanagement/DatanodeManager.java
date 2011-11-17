@@ -945,4 +945,13 @@ public class DatanodeManager {
       }
     }
   }
+
+  /**
+   * Get the DNS to switch mapper; valid after initialization.
+   *
+   * @return the DNS to switch mapper
+   */
+  public DNSToSwitchMapping getDnsToSwitchMapping() {
+    return dnsToSwitchMapping;
+  }
 }
