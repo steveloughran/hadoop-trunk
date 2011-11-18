@@ -20,7 +20,6 @@ package org.apache.hadoop.net;
 
 import org.junit.Assert;
 import org.junit.Test;
-import sun.security.util.Cache;
 
 import java.util.List;
 
