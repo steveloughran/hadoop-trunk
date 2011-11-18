@@ -35,14 +35,13 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
  * script configured via the
  * {@link CommonConfigurationKeys#NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY} option.
  * <p/>
- * It contains a static class {@link RawScriptBasedMapping} that performs
+ * It contains a static class <code>RawScriptBasedMapping</code> that performs
  * the work: reading the configuration parameters, executing any defined
- * script, handling errors and such like. The public <code>ScriptBasedMapping</code>
- * class extends {@link #CachedDNSToSwitchMapping(DNSToSwitchMapping)} with a
- * <code>RawScriptBasedMapping</code> instance inside it. This allows
- * all the script results to be cached.
+ * script, handling errors and such like. The outer
+ * class extends {@link CachedDNSToSwitchMapping} to cache the delegated
+ * queries.
  * <p/>
- * This DNS mapper assumes that {@link #isSingleSwitch()} should return
+ * This DNS mapper's {@link #isSingleSwitch()} predicate returns
  * true if and only if a script is defined.
  */
 @InterfaceAudience.Public
