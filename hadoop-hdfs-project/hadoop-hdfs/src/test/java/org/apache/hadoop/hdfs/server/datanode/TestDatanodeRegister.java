@@ -18,20 +18,13 @@
 
 package org.apache.hadoop.hdfs.server.datanode;
 
-import java.io.File;
-import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.AbstractList;
-
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.server.common.IncorrectVersionException;
-import org.apache.hadoop.hdfs.server.datanode.DataNode.BPOfferService;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -49,7 +42,7 @@ public class TestDatanodeRegister {
     DataNode mockDN = mock(DataNode.class);
     Mockito.doReturn(true).when(mockDN).shouldRun();
     
-    BPOfferService bpos = new DataNode.BPOfferService(INVALID_ADDR, mockDN);
+    BPOfferService bpos = new BPOfferService(INVALID_ADDR, mockDN);
 
     NamespaceInfo fakeNSInfo = mock(NamespaceInfo.class);
     when(fakeNSInfo.getBuildVersion()).thenReturn("NSBuildVersion");
