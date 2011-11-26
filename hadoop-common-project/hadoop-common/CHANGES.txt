@@ -60,6 +60,8 @@ Trunk (unreleased changes)
     HADOOP-7688. Add servlet handler check in HttpServer.start().
     (Uma Maheswara Rao G via szetszwo)
 
+    HADOOP-7590. Mavenize streaming and MR examples. (tucu)
+
   BUGS
 
     HADOOP-7606. Upgrade Jackson to version 1.7.1 to match the version required
@@ -93,6 +95,9 @@ Trunk (unreleased changes)
     HADOOP-7770. ViewFS getFileChecksum throws FileNotFoundException for files in 
     /tmp and /user. (Ravi Prakash via jitendra)
 
+    HADOOP-7833. Fix findbugs warnings in protobuf generated code.
+    (John Lee via suresh)
+
   OPTIMIZATIONS
 
     HADOOP-7761. Improve the performance of raw comparisons. (todd)
@@ -110,12 +115,21 @@ Release 0.23.1 - Unreleased
 
     HADOOP-7801. HADOOP_PREFIX cannot be overriden. (Bruno Mahé via tomwhite)
 
+    HADOOP-7802. Hadoop scripts unconditionally source
+    "$bin"/../libexec/hadoop-config.sh. (Bruno Mahé via tomwhite)
+
   OPTIMIZATIONS
 
   BUG FIXES
    
    HADOOP-7811. TestUserGroupInformation#testGetServerSideGroups test fails in chroot.
    (Jonathan Eagles via mahadev)
+
+   HADOOP-7787. Make source tarball use conventional name.
+   (Bruno Mahé via tomwhite)
+
+   HADOOP-6614. RunJar should provide more diags when it can't create
+   a temp file. (Jonathan Hsieh via eli)
 
 Release 0.23.0 - 2011-11-01 
 
@@ -1082,6 +1096,12 @@ Release 0.22.0 - Unreleased
 
     HADOOP-7786. Remove HDFS-specific config keys defined in FsConfig. (eli)
 
+    HADOOP-7358. Improve log levels when exceptions caught in RPC handler
+    (Todd Lipcon via shv)
+
+    HADOOP-7861. changes2html.pl generates links to HADOOP, HDFS, and MAPREDUCE
+    jiras. (shv)
+
   OPTIMIZATIONS
 
     HADOOP-6884. Add LOG.isDebugEnabled() guard for each LOG.debug(..).
@@ -1349,6 +1369,8 @@ Release 0.22.0 - Unreleased
 
     HADOOP-7457. Remove out-of-date Chinese language documentation.
     (Jakob Homan via eli)
+
+    HADOOP-7783. Add more symlink tests that cover intermediate links. (eli)
 
 Release 0.21.1 - Unreleased
 

@@ -39,7 +39,9 @@ fi
 bin=`dirname "${BASH_SOURCE-$0}"`
 bin=`cd "$bin"; pwd`
 
-. "$bin"/yarn-config.sh
+DEFAULT_LIBEXEC_DIR="$bin"
+HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
+. $HADOOP_LIBEXEC_DIR/yarn-config.sh
 
 # get arguments
 startStop=$1
@@ -85,8 +87,8 @@ fi
 
 # some variables
 export YARN_LOGFILE=yarn-$YARN_IDENT_STRING-$command-$HOSTNAME.log
-export YARN_ROOT_LOGGER="INFO,DRFA"
-export YARN_JHS_LOGGER="INFO,JSA"
+export YARN_ROOT_LOGGER=${YARN_ROOT_LOGGER:-INFO,DRFA}
+export YARN_JHS_LOGGER=${YARN_JHS_LOGGER:-INFO,JSA}
 log=$YARN_LOG_DIR/yarn-$YARN_IDENT_STRING-$command-$HOSTNAME.out
 pid=$YARN_PID_DIR/yarn-$YARN_IDENT_STRING-$command.pid
 
