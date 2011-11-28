@@ -111,6 +111,14 @@ Release 0.23.1 - Unreleased
     MAPREDUCE-3411. Performance Upgrade for jQuery (Jonathan Eagles via 
     mahadev)
 
+    MAPREDUCE-3371. Review and improve the yarn-api javadocs. (Ravi Prakash
+    via mahadev)
+
+    MAPREDUCE-3238. Small cleanup in SchedulerApp. (Todd Lipcon via mahadev)
+
+    MAPREDUCE-3413. RM web ui applications not sorted in any order by default.
+    (Jonathan Eagles via mahadev)
+
   OPTIMIZATIONS
 
   BUG FIXES
