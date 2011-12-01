@@ -97,6 +97,11 @@ Trunk (unreleased changes)
     HADOOP-7833. Fix findbugs warnings in protobuf generated code.
     (John Lee via suresh)
 
+    HADOOP-7853. multiple javax security configurations cause conflicts. 
+    (daryn via tucu)
+
+    HDFS-2614. hadoop dist tarball is missing hdfs headers. (tucu)
+
   OPTIMIZATIONS
 
     HADOOP-7761. Improve the performance of raw comparisons. (todd)
@@ -126,6 +131,9 @@ Release 0.23.1 - Unreleased
     HADOOP-7424. Log an error if the topology script doesn't handle multiple args.
     (Uma Maheswara Rao G via eli)
 
+    HADOOP-7804. Enable hadoop config generator to set configurations to enable
+    short circuit read. (Arpit Gupta via jitendra)
+
   OPTIMIZATIONS
 
   BUG FIXES
@@ -140,6 +148,11 @@ Release 0.23.1 - Unreleased
    a temp file. (Jonathan Hsieh via eli)
 
    HADOOP-7859. TestViewFsHdfs.testgetFileLinkStatus is failing an assert. (eli)
+
+   HADOOP-7864. Building mvn site with Maven < 3.0.2 causes OOM errors.
+   (Andrew Bayer via eli)
+
+   HADOOP-7854. UGI getCurrentUser is not synchronized. (Daryn Sharp via jitendra)
 
 Release 0.23.0 - 2011-11-01 
 
