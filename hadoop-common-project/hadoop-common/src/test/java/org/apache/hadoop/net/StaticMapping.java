@@ -111,7 +111,7 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
    */
   @Override
   public boolean isSingleSwitch() {
-     return false;
+    return false;
   }
 
   /**
