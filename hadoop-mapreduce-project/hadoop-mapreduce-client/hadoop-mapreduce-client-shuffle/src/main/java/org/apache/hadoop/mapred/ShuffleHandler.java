@@ -264,8 +264,11 @@ public class ShuffleHandler extends AbstractService
   @Override
   public synchronized void stop() {
     accepted.close().awaitUninterruptibly(10, TimeUnit.SECONDS);
-    ServerBootstrap bootstrap = new ServerBootstrap(selector);
-    bootstrap.releaseExternalResources();
+    if (selector != null) {
+      ServerBootstrap bootstrap = new ServerBootstrap(selector);
+      bootstrap.releaseExternalResources();
+      selector = null;
+    }
     super.stop();
   }
 

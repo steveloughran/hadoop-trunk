@@ -171,35 +171,38 @@ public abstract class RMCommunicator extends AbstractService  {
   }
 
   protected void unregister() {
-    try {
-      FinalApplicationStatus finishState = FinalApplicationStatus.UNDEFINED;
-      if (job.getState() == JobState.SUCCEEDED) {
-        finishState = FinalApplicationStatus.SUCCEEDED;
-      } else if (job.getState() == JobState.KILLED) {
-        finishState = FinalApplicationStatus.KILLED;
-      } else if (job.getState() == JobState.FAILED
-          || job.getState() == JobState.ERROR) {
-        finishState = FinalApplicationStatus.FAILED;
+    if (job != null) {
+      try {
+        FinalApplicationStatus finishState = FinalApplicationStatus.UNDEFINED;
+        if (job.getState() == JobState.SUCCEEDED) {
+          finishState = FinalApplicationStatus.SUCCEEDED;
+        } else if (job.getState() == JobState.KILLED) {
+          finishState = FinalApplicationStatus.KILLED;
+        } else if (job.getState() == JobState.FAILED
+            || job.getState() == JobState.ERROR) {
+          finishState = FinalApplicationStatus.FAILED;
+        }
+        StringBuffer sb = new StringBuffer();
+        for (String s : job.getDiagnostics()) {
+          sb.append(s).append("\n");
+        }
+        LOG.info("Setting job diagnostics to " + sb.toString());
+  
+        String historyUrl = JobHistoryUtils.getHistoryUrl(getConfig(),
+            context.getApplicationID());
+        LOG.info("History url is " + historyUrl);
+  
+        FinishApplicationMasterRequest request =
+            recordFactory.newRecordInstance(FinishApplicationMasterRequest.class);
+        request.setAppAttemptId(this.applicationAttemptId);
+        request.setFinishApplicationStatus(finishState);
+        request.setDiagnostics(sb.toString());
+        request.setTrackingUrl(historyUrl);
+        scheduler.finishApplicationMaster(request);
+      } catch(Exception are) {
+        LOG.info("Exception while unregistering ", are);
       }
-      StringBuffer sb = new StringBuffer();
-      for (String s : job.getDiagnostics()) {
-        sb.append(s).append("\n");
-      }
-      LOG.info("Setting job diagnostics to " + sb.toString());
-
-      String historyUrl = JobHistoryUtils.getHistoryUrl(getConfig(),
-          context.getApplicationID());
-      LOG.info("History url is " + historyUrl);
-
-      FinishApplicationMasterRequest request =
-          recordFactory.newRecordInstance(FinishApplicationMasterRequest.class);
-      request.setAppAttemptId(this.applicationAttemptId);
-      request.setFinishApplicationStatus(finishState);
-      request.setDiagnostics(sb.toString());
-      request.setTrackingUrl(historyUrl);
-      scheduler.finishApplicationMaster(request);
-    } catch(Exception are) {
-      LOG.info("Exception while unregistering ", are);
+      job = null;
     }
   }
 
@@ -214,11 +217,14 @@ public abstract class RMCommunicator extends AbstractService  {
   @Override
   public void stop() {
     stopped = true;
-    allocatorThread.interrupt();
-    try {
-      allocatorThread.join();
-    } catch (InterruptedException ie) {
-      LOG.info("InterruptedException while stopping", ie);
+    if (allocatorThread != null) {
+      allocatorThread.interrupt();
+      try {
+        allocatorThread.join();
+      } catch (InterruptedException ie) {
+        LOG.info("InterruptedException while stopping", ie);
+      }
+      allocatorThread = null;
     }
     unregister();
     super.stop();

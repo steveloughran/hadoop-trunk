@@ -91,11 +91,14 @@ public class DeletionService extends AbstractService {
 
   @Override
   public void stop() {
-    sched.shutdown();
-    try {
-      sched.awaitTermination(10, SECONDS);
-    } catch (InterruptedException e) {
-      sched.shutdownNow();
+    if (sched != null) {
+      sched.shutdown();
+      try {
+        sched.awaitTermination(10, SECONDS);
+      } catch (InterruptedException e) {
+        sched.shutdownNow();
+      }
+      sched = null;
     }
     super.stop();
   }

@@ -236,7 +236,10 @@ public class NodeHealthScriptRunner extends AbstractService {
     if (!shouldRun(conf)) {
       return;
     }
-    nodeHealthScriptScheduler.cancel();
+    if (nodeHealthScriptScheduler != null) {
+      nodeHealthScriptScheduler.cancel();
+      nodeHealthScriptScheduler = null;
+    }
     if (shexec != null) {
       Process p = shexec.getProcess();
       if (p != null) {

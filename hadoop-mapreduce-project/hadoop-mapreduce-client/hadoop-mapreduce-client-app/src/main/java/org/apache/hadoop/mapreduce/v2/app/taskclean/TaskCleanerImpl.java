@@ -77,8 +77,14 @@ public class TaskCleanerImpl extends AbstractService implements TaskCleaner {
   }
 
   public void stop() {
-    eventHandlingThread.interrupt();
-    launcherPool.shutdown();
+    if (eventHandlingThread != null) {
+      eventHandlingThread.interrupt();
+      eventHandlingThread = null;
+    }
+    if (launcherPool != null) {
+      launcherPool.shutdown();
+      launcherPool = null;
+    }
     super.stop();
   }
 

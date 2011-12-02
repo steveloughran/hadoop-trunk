@@ -79,13 +79,19 @@ public class ApplicationMasterLauncher extends AbstractService implements
   
 
   public void stop() {
-    launcherHandlingThread.interrupt();
-    try {
-      launcherHandlingThread.join();
-    } catch (InterruptedException ie) {
-      LOG.info(launcherHandlingThread.getName() + " interrupted during join ", 
-          ie);    }
-    launcherPool.shutdown();
+    if (launcherHandlingThread != null) {
+      launcherHandlingThread.interrupt();
+      try {
+        launcherHandlingThread.join();
+      } catch (InterruptedException ie) {
+        LOG.info(launcherHandlingThread.getName() + " interrupted during join ",
+                 ie);
+      }
+      launcherHandlingThread = null;
+    }
+    if (launcherPool != null) {
+      launcherPool.shutdown();
+    }
     super.stop();
   }
 

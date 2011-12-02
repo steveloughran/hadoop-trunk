@@ -118,7 +118,10 @@ public class LocalContainerLauncher extends AbstractService implements
   }
 
   public void stop() {
-    eventHandlingThread.interrupt();
+    if (eventHandlingThread != null) {
+      eventHandlingThread.interrupt();
+      eventHandlingThread = null;
+    }
     super.stop();
   }
 
