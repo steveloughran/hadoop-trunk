@@ -47,13 +47,6 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
       "hadoop.configured.node.mapping";
 
   /**
-   * Flag to indicate whether or not the mapping is single switch or not:
-   * default is false, because the answer is cached by things (including
-   * the HFDS block manager), so adding racks does not get picked up.
-   */
-  private static boolean singleSwitch;
-
-  /**
    * Configure the mapping by extracting any mappings defined in the
    * {@link #KEY_HADOOP_CONFIGURED_NODE_MAPPING} field
    * @param conf new configuration
@@ -114,29 +107,17 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
   }
 
   /**
-   * This mapping single switch if the shared flag says so -default is false.
-   * @return the current switching status
+   * @return false
    */
   @Override
   public boolean isSingleSwitch() {
-     return singleSwitch;
+     return false;
   }
 
   /**
-   * Change the single switch flag. If this value has already been cached
-   * by a class that uses this topology data, setting the switch flag
-   * will have no effect.
-   * @param singleSwitch new value
-   */
-  public static void setSingleSwitch(boolean newSwitch) {
-    singleSwitch = newSwitch;
-  }
-
-  /**
-   * Clear the map and revert the switch status to the default
+   * Clear the map
    */
   public static void resetMap() {
-    StaticMapping.setSingleSwitch(false);
     synchronized (nameToRackMap) {
       nameToRackMap.clear();
     }

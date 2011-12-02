@@ -44,7 +44,8 @@ public class TestStaticMapping extends Assert {
   @Test
   public void testStaticIsSingleSwitch() throws Throwable {
     StaticMapping mapping = newInstance();
-    assertFalse("Empty maps should not be not single switch", mapping.isSingleSwitch());
+    assertFalse("Empty maps should not be not single switch",
+                mapping.isSingleSwitch());
   }
 
 
@@ -53,10 +54,8 @@ public class TestStaticMapping extends Assert {
     StaticMapping staticMapping = newInstance();
     CachedDNSToSwitchMapping mapping =
         new CachedDNSToSwitchMapping(staticMapping);
+    StaticMapping.addNodeToRack("n1", "r1");
     assertFalse("Expected multi switch", mapping.isSingleSwitch());
-    StaticMapping.setSingleSwitch(true);
-    assertTrue("Expected to be single switch",
-                mapping.isSingleSwitch());
   }
 
   @Test
@@ -96,7 +95,8 @@ public class TestStaticMapping extends Assert {
   public void testNullConfiguration() throws Throwable {
     StaticMapping mapping = newInstance();
     mapping.setConf(null);
-    assertFalse("Null maps are expected to be multi switch", mapping.isSingleSwitch());
+    assertFalse("Null maps are expected to be multi switch",
+                mapping.isSingleSwitch());
     assertFalse("Expected to be multi switch",
                AbstractDNSToSwitchMapping.isMappingSingleSwitch(mapping));
   }
