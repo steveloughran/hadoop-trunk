@@ -51,7 +51,7 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
    * default is false, because the answer is cached by things (including
    * the HFDS block manager), so adding racks does not get picked up.
    */
-  private boolean singleSwitch;
+  private static boolean singleSwitch;
 
   /**
    * Configure the mapping by extracting any mappings defined in the
@@ -114,7 +114,7 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
   }
 
   /**
-   * This mapping is only single switch if the map is empty
+   * This mapping single switch if the shared flag says so -default is false.
    * @return the current switching status
    */
   @Override
@@ -128,14 +128,15 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
    * will have no effect.
    * @param singleSwitch new value
    */
-  public void setSingleSwitch(boolean singleSwitch) {
-    this.singleSwitch = singleSwitch;
+  public static void setSingleSwitch(boolean newSwitch) {
+    singleSwitch = newSwitch;
   }
 
   /**
-   * Clear the map and revert to being a single switch
+   * Clear the map and revert the switch status to the default
    */
   public static void resetMap() {
+    StaticMapping.setSingleSwitch(false);
     synchronized (nameToRackMap) {
       nameToRackMap.clear();
     }
