@@ -35,7 +35,7 @@ Trunk (unreleased changes)
     uri with no authority. (John George via jitendra)
 
     MAPREDUCE-3169. Create a new MiniMRCluster equivalent which only provides 
-    client APIs cross MR1 and MR2. (Ahmed via tucu)
+    client APIs cross MR1 and MR2 (Ahmed via tucu)
 
     MAPREDUCE-3415. improve MiniMRYarnCluster & DistributedShell JAR resolution.
     (tucu)
@@ -129,6 +129,12 @@ Release 0.23.1 - Unreleased
     MAPREDUCE-3448. TestCombineOutputCollector javac unchecked warning on mocked
     generics (Jonathan Eagles via mahadev)
 
+    MAPREDUCE-3169 amendment. Deprecate MiniMRCluster. (Ahmed Radwan via
+    sseth)
+
+    MAPREDUCE-3369. Migrate MR1 tests to run on MR2 using the new interfaces
+    introduced in MAPREDUCE-3169. (Ahmed Radwan via tomwhite)
+
   OPTIMIZATIONS
 
   BUG FIXES
@@ -210,6 +216,9 @@ Release 0.23.1 - Unreleased
 
     MAPREDUCE-3452. fifoscheduler web ui page always shows 0% used for the queue.
     (Jonathan Eagles via mahadev)
+
+    MAPREDUCE-3443. JobClient and Job should function in the context of the
+    UGI which created them. (Mahadev Konar via sseth)
 
 Release 0.23.0 - 2011-11-01 
 
