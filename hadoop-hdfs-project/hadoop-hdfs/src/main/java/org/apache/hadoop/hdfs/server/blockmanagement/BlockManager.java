@@ -222,7 +222,7 @@ public class BlockManager {
     this.maxReplicationStreams = conf.getInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_MAX_STREAMS_KEY,
                                              DFSConfigKeys.DFS_NAMENODE_REPLICATION_MAX_STREAMS_DEFAULT);
     DNSToSwitchMapping dnsMap = datanodeManager.getDnsToSwitchMapping();
-    this.shouldCheckForEnoughRacks = AbstractDNSToSwitchMapping
+    this.shouldCheckForEnoughRacks = !AbstractDNSToSwitchMapping
         .isMappingSingleSwitch(dnsMap);
 
     this.replicationRecheckInterval = 
