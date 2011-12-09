@@ -50,17 +50,16 @@ public class JournalSet implements JournalManager {
    * 
    * If a Journal gets disabled due to an error writing to its
    * stream, then the stream will be aborted and set to null.
-   * 
-   * This should be used outside JournalSet only for testing.
    */
-  @VisibleForTesting
-  static class JournalAndStream {
+  static class JournalAndStream implements CheckableNameNodeResource {
     private final JournalManager journal;
     private boolean disabled = false;
     private EditLogOutputStream stream;
+    private boolean required = false;
     
-    public JournalAndStream(JournalManager manager) {
+    public JournalAndStream(JournalManager manager, boolean required) {
       this.journal = manager;
+      this.required = required;
     }
 
     public void startLogSegment(long txId) throws IOException {
@@ -132,9 +131,24 @@ public class JournalSet implements JournalManager {
     private void setDisabled(boolean disabled) {
       this.disabled = disabled;
     }
+    
+    @Override
+    public boolean isResourceAvailable() {
+      return !isDisabled();
+    }
+    
+    @Override
+    public boolean isRequired() {
+      return required;
+    }
   }
   
   private List<JournalAndStream> journals = Lists.newArrayList();
+  final int minimumRedundantJournals;
+  
+  JournalSet(int minimumRedundantResources) {
+    this.minimumRedundantJournals = minimumRedundantResources;
+  }
   
   @Override
   public EditLogOutputStream startLogSegment(final long txId) throws IOException {
@@ -232,16 +246,15 @@ public class JournalSet implements JournalManager {
   }
 
   /**
-   * Returns true if there are no journals or all are disabled.
-   * @return True if no journals or all are disabled.
+   * Returns true if there are no journals, all redundant journals are disabled,
+   * or any required journals are disabled.
+   * 
+   * @return True if there no journals, all redundant journals are disabled,
+   * or any required journals are disabled.
    */
   public boolean isEmpty() {
-    for (JournalAndStream jas : journals) {
-      if (!jas.isDisabled()) {
-        return false;
-      }
-    }
-    return true;
+    return !NameNodeResourcePolicy.areResourcesAvailable(journals,
+        minimumRedundantJournals);
   }
   
   /**
@@ -292,9 +305,11 @@ public class JournalSet implements JournalManager {
       }
     }
     disableAndReportErrorOnJournals(badJAS);
-    if (badJAS.size() >= journals.size()) {
-      LOG.error("Error: "+status+" failed for all journals");
-      throw new IOException(status+" failed on all the journals");
+    if (!NameNodeResourcePolicy.areResourcesAvailable(journals,
+        minimumRedundantJournals)) {
+      String message = status + " failed for too many journals";
+      LOG.error("Error: " + message);
+      throw new IOException(message);
     }
   }
   
@@ -309,7 +324,7 @@ public class JournalSet implements JournalManager {
     }
 
     @Override
-    void write(final FSEditLogOp op)
+    public void write(final FSEditLogOp op)
         throws IOException {
       mapJournalsAndReportErrors(new JournalClosure() {
         @Override
@@ -322,7 +337,7 @@ public class JournalSet implements JournalManager {
     }
 
     @Override
-    void writeRaw(final byte[] data, final int offset, final int length)
+    public void writeRaw(final byte[] data, final int offset, final int length)
         throws IOException {
       mapJournalsAndReportErrors(new JournalClosure() {
         @Override
@@ -335,7 +350,7 @@ public class JournalSet implements JournalManager {
     }
 
     @Override
-    void create() throws IOException {
+    public void create() throws IOException {
       mapJournalsAndReportErrors(new JournalClosure() {
         @Override
         public void apply(JournalAndStream jas) throws IOException {
@@ -367,7 +382,7 @@ public class JournalSet implements JournalManager {
     }
 
     @Override
-    void setReadyToFlush() throws IOException {
+    public void setReadyToFlush() throws IOException {
       mapJournalsAndReportErrors(new JournalClosure() {
         @Override
         public void apply(JournalAndStream jas) throws IOException {
@@ -450,8 +465,9 @@ public class JournalSet implements JournalManager {
     return jList;
   }
 
-  void add(JournalManager j) {
-    journals.add(new JournalAndStream(j));
+  void add(JournalManager j, boolean required) {
+    JournalAndStream jas = new JournalAndStream(j, required);
+    journals.add(jas);
   }
   
   void remove(JournalManager j) {
