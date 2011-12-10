@@ -74,6 +74,8 @@ Trunk (unreleased changes)
 
     HADOOP-7886. Add toString to FileStatus. (SreeHari via jghoman)
 
+    HADOOP-7899. Generate proto java files as part of the build. (tucu)
+
   BUGS
 
     HADOOP-7851. Configuration.getClasses() never returns the default value. 
@@ -131,6 +133,9 @@ Trunk (unreleased changes)
 
     HADOOP-7898. Fix javadoc warnings in AuthenticationToken.java.
     (suresh)
+
+    HADOOP-7902. skipping name rules setting (if already set) should be done 
+    on UGI initialization only. (tucu)
 
   OPTIMIZATIONS
 
