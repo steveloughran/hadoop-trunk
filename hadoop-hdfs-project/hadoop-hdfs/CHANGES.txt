@@ -27,6 +27,8 @@ Trunk (unreleased changes)
     HDFS-2178. Contributing Hoop to HDFS, replacement for HDFS proxy with 
     read/write capabilities. (tucu)
 
+    HDFS-2642. Protobuf translators for DatanodeProtocol. (jitendra)
+
   IMPROVEMENTS
 
     HADOOP-7524 Change RPC to allow multiple protocols including multuple 
@@ -90,6 +92,8 @@ Trunk (unreleased changes)
     (Ivan Kelly via jitendra)
 
     HDFS-2597 ClientNameNodeProtocol in Protocol Buffers (sanjay)
+
+    HDFS-2511. Add dev script to generate HDFS protobufs. (tucu)
 
   OPTIMIZATIONS
     HDFS-2477. Optimize computing the diff between a block report and the
