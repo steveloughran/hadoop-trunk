@@ -57,7 +57,7 @@ public abstract class AbstractService implements Service {
     new ArrayList<ServiceStateChangeListener>();
 
   /**
-   * Construct the service. 
+   * Construct the service.
    * @param name service name
    */
   public AbstractService(String name) {
@@ -179,18 +179,18 @@ public abstract class AbstractService implements Service {
   }
 
   /**
-   * Helper method for safely interrupting threads during shutdown. 
+   * Helper method for safely interrupting threads during shutdown.
    * If the target is non null, it will be interrupted. The return
    * value will always be null. This permits a use such as
    * <pre>
    *   workerThread = interruptThread(workerThread);
    * </pre>
-   * Such a line will interrupt the worker thread if it is not null, 
+   * Such a line will interrupt the worker thread if it is not null,
    * and guarantee that the field will be null afterwards.
    * @param target target thread -this may be null
    * @return null, always
    */
-  protected final Thread interruptThread(Thread target) {
+  protected static Thread interruptThread(Thread target) {
     if (target != null) {
       target.interrupt();
     }
@@ -198,11 +198,11 @@ public abstract class AbstractService implements Service {
   }
 
   /**
-   * Stop an IPC server if not null.
+   * Helper method to safely stop an IPC server if not null.
    * @param target the target server
    * @return null, always
    */
-  protected final Server stopIPCServer(Server target) {
+  protected static Server stopIPCServer(Server target) {
     if (target != null) {
       target.stop();
     }
@@ -221,7 +221,7 @@ public abstract class AbstractService implements Service {
   }
 
   /**
-   * Stop a service; if it is null do nothing. 
+   * Stop a service; if it is null do nothing.
    * Exceptions are caught and logged
    * (but not Throwables). This operation is intended to be used in cleanup
    * operations

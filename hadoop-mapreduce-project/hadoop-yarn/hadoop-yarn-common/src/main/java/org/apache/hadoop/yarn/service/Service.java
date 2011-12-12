@@ -31,18 +31,20 @@ public interface Service {
   public enum STATE {
     /** Constructed but not initialized */
     NOTINITED,
-    
+
     /** Initialized but not started or stopped */
     INITED,
+
     /** started and not stopped */
     STARTED,
+
     /** stopped. No further state transitions are permitted */
     STOPPED
   }
 
   /**
    * Initialize the service.
-   * 
+   *
    * The transition must be from {@link STATE#NOTINITED} to {@link STATE#INITED}
    * unless the operation failed and an exception was raised.
    * @param config the configuration of the service
@@ -89,7 +91,8 @@ public interface Service {
    * Get the configuration of this service. 
    * This is normally not a clone and may be manipulated, though there are no
    * guarantees as to what the consequences of such actions may be
-   * @return the current configuration, unless a specific implentation chooses otherwise.
+   * @return the current configuration, unless a specific implentation chooses
+   * otherwise.
    */
   Configuration getConfig();
 
