@@ -88,7 +88,7 @@ public interface Service {
   String getName();
 
   /**
-   * Get the configuration of this service. 
+   * Get the configuration of this service.
    * This is normally not a clone and may be manipulated, though there are no
    * guarantees as to what the consequences of such actions may be
    * @return the current configuration, unless a specific implentation chooses

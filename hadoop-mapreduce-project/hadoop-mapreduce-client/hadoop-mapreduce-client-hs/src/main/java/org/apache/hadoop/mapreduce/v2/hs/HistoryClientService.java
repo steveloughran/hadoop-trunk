@@ -147,9 +147,7 @@ public class HistoryClientService extends AbstractService {
   @Override
   public void stop() {
     server = stopIPCServer(server);
-    if (webApp != null) {
-      webApp.stop();
-    }
+    webApp = stopWebApp(webApp);
     super.stop();
   }
 

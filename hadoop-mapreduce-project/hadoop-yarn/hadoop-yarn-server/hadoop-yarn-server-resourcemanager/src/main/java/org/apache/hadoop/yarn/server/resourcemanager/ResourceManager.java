@@ -456,9 +456,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
   @Override
   public void stop() {
-    if (webApp != null) {
-      webApp.stop();
-    }
+    webApp = stopWebApp(webApp);
 
     /*synchronized(shutdown) {
       shutdown.set(true);

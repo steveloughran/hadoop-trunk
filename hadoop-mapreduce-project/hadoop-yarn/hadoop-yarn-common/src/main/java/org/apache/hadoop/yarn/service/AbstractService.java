@@ -141,9 +141,9 @@ public abstract class AbstractService implements Service {
   }
 
   /**
-   * Verify that that a service is in a given state. 
+   * Verify that that a service is in a given state.
    * @param currentState the desired state
-   * @throws IllegalStateException if the service state is different from 
+   * @throws IllegalStateException if the service state is different from
    * the desired state
    */
   private void ensureCurrentState(STATE currentState) {
@@ -155,7 +155,7 @@ public abstract class AbstractService implements Service {
 
   /**
    * Change to a new state and notify all listeners.
-   * This is a private method that is only invoked from synchronized methods, 
+   * This is a private method that is only invoked from synchronized methods,
    * which avoid having to clone the listener list. It does imply that
    * the state change listener methods should be short lived, as they
    * will delay the state transition.
@@ -209,7 +209,7 @@ public abstract class AbstractService implements Service {
     }
     return null;
   }
-  
+
   /**
    * Helper method to safely stop a webapp if not null.
    * @param target the target server
