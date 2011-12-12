@@ -22,7 +22,7 @@ import java.net.InetSocketAddress;
 import java.util.Arrays;
 
 import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.protocolR23Compatible.JournalProtocolTranslatorR23;
+import org.apache.hadoop.hdfs.protocolPB.JournalProtocolTranslatorPB;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.protocol.JournalProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
@@ -57,7 +57,7 @@ class EditLogBackupOutputStream extends EditLogOutputStream {
       NetUtils.createSocketAddr(bnRegistration.getAddress());
     try {
       this.backupNode =
-          new JournalProtocolTranslatorR23(bnAddress, new HdfsConfiguration());
+          new JournalProtocolTranslatorPB(bnAddress, new HdfsConfiguration());
     } catch(IOException e) {
       Storage.LOG.error("Error connecting to: " + bnAddress, e);
       throw e;
@@ -67,12 +67,12 @@ class EditLogBackupOutputStream extends EditLogOutputStream {
   }
   
   @Override // EditLogOutputStream
-  void write(FSEditLogOp op) throws IOException {
+  public void write(FSEditLogOp op) throws IOException {
     doubleBuf.writeOp(op);
  }
 
   @Override
-  void writeRaw(byte[] bytes, int offset, int length) throws IOException {
+  public void writeRaw(byte[] bytes, int offset, int length) throws IOException {
     throw new IOException("Not supported");
   }
 
@@ -80,7 +80,7 @@ class EditLogBackupOutputStream extends EditLogOutputStream {
    * There is no persistent storage. Just clear the buffers.
    */
   @Override // EditLogOutputStream
-  void create() throws IOException {
+  public void create() throws IOException {
     assert doubleBuf.isFlushed() : "previous data is not flushed yet";
     this.doubleBuf = new EditsDoubleBuffer(DEFAULT_BUFFER_SIZE);
   }
@@ -106,7 +106,7 @@ class EditLogBackupOutputStream extends EditLogOutputStream {
   }
 
   @Override // EditLogOutputStream
-  void setReadyToFlush() throws IOException {
+  public void setReadyToFlush() throws IOException {
     doubleBuf.setReadyToFlush();
   }
 
