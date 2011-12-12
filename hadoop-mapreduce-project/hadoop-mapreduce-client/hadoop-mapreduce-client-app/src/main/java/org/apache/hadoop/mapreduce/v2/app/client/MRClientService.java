@@ -165,13 +165,8 @@ public class MRClientService extends AbstractService
   }
 
   public void stop() {
-    if (server != null) {
-      server.stop();
-      server = null;
-    }
-    if (webApp != null) {
-      webApp.stop();
-    }
+    server = stopIPCServer(server);
+    webApp = stopWebApp(webApp);
     super.stop();
   }
 

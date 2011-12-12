@@ -25,6 +25,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.yarn.webapp.WebApp;
 
 public abstract class AbstractService implements Service {
 
@@ -203,6 +204,18 @@ public abstract class AbstractService implements Service {
    * @return null, always
    */
   protected static Server stopIPCServer(Server target) {
+    if (target != null) {
+      target.stop();
+    }
+    return null;
+  }
+  
+  /**
+   * Helper method to safely stop a webapp if not null.
+   * @param target the target server
+   * @return null, always
+   */
+  protected static WebApp stopWebApp(WebApp target) {
     if (target != null) {
       target.stop();
     }
