@@ -36,7 +36,7 @@ public abstract class AbstractService implements Service {
   private STATE state = STATE.NOTINITED;
 
   /**
-   * Service name
+   * Service name.
    */
   private final String name;
   /**
@@ -198,19 +198,19 @@ public abstract class AbstractService implements Service {
   }
 
   /**
-   * Stop an IPC server if not null
+   * Stop an IPC server if not null.
    * @param target the target server
    * @return null, always
    */
   protected final Server stopIPCServer(Server target) {
-    if (target!=null) {
+    if (target != null) {
       target.stop();
     }
     return null;
   }
 
   /**
-  * Stop a service; if it is null do nothing
+  * Stop a service; if it is null do nothing.
   *
   * @param service a service
   */
@@ -221,7 +221,8 @@ public abstract class AbstractService implements Service {
   }
 
   /**
-   * Stop a service; if it is null do nothing. Exceptions are caught and logged
+   * Stop a service; if it is null do nothing. 
+   * Exceptions are caught and logged
    * (but not Throwables). This operation is intended to be used in cleanup
    * operations
    *
@@ -234,7 +235,7 @@ public abstract class AbstractService implements Service {
       } catch (Exception e) {
         LOG.warn("When stopping the service " + service.getName()
                      + " : " + e,
-                 e);
+                     e);
       }
     }
   }

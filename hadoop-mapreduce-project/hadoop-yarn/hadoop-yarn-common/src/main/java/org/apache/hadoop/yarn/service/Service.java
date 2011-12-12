@@ -68,7 +68,7 @@ public interface Service {
   void stop();
 
   /**
-   * Register an instance of the service state change events
+   * Register an instance of the service state change events.
    * @param listener a new listener
    */
   void register(ServiceStateChangeListener listener);
@@ -80,7 +80,7 @@ public interface Service {
   void unregister(ServiceStateChangeListener listener);
 
   /**
-   * Get the name of this service
+   * Get the name of this service.
    * @return the service name
    */
   String getName();
