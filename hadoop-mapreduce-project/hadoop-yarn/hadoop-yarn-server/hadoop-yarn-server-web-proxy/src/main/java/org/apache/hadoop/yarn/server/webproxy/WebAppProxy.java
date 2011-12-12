@@ -104,6 +104,8 @@ public class WebAppProxy extends AbstractService {
       } catch (Exception e) {
         LOG.fatal("Error stopping proxy web server", e);
         throw new YarnException("Error stopping proxy web server",e);
+      } finally {
+        proxyServer = null;
       }
     }
     super.stop();

@@ -167,12 +167,10 @@ public class ContainerLauncherImpl extends AbstractService implements
   }
 
   public void stop() {
-    if (eventHandlingThread != null) {
-      eventHandlingThread.interrupt();
-      eventHandlingThread = null;
-    }
+    eventHandlingThread = interruptThread(eventHandlingThread);
     if (launcherPool != null) {
       launcherPool.shutdownNow();
+      launcherPool = null;
     }
     super.stop();
   }

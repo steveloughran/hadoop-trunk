@@ -159,6 +159,7 @@ public class LocalDirsHandlerService extends AbstractService {
   public void stop() {
     if (dirsHandlerScheduler != null) {
       dirsHandlerScheduler.cancel();
+      dirsHandlerScheduler = null;
     }
     super.stop();
   }

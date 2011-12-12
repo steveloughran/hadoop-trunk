@@ -430,9 +430,7 @@ public class ClientRMService extends AbstractService implements
   
   @Override
   public void stop() {
-    if (this.server != null) {
-        this.server.stop();
-    }
+    server = stopIPCServer(server);
     super.stop();
   }
   

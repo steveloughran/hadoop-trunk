@@ -75,6 +75,7 @@ public class WebServer extends AbstractService {
   public synchronized void stop() {
     if (this.webApp != null) {
       this.webApp.stop();
+      this.webApp = null;
     }
     super.stop();
   }

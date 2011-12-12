@@ -268,9 +268,7 @@ public class ResourceLocalizationService extends CompositeService
 
   @Override
   public void stop() {
-    if (server != null) {
-      server.stop();
-    }
+    server = stopIPCServer(server);
     cacheCleanup.shutdown();
     super.stop();
   }

@@ -128,9 +128,7 @@ public class AdminService extends AbstractService implements RMAdminProtocol {
 
   @Override
   public void stop() {
-    if (this.server != null) {
-      this.server.stop();
-    }
+    server = stopIPCServer(server);
     super.stop();
   }
 

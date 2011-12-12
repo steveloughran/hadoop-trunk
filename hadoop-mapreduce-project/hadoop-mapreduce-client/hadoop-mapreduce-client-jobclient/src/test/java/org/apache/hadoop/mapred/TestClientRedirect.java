@@ -386,7 +386,7 @@ public class TestClientRedirect {
     }
 
     public void stop() {
-      server.stop();
+      server = stopIPCServer(server);
       super.stop();
       amRunning = false;
     }

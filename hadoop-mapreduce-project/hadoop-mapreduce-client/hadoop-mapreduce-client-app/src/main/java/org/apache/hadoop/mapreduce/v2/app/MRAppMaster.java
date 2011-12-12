@@ -641,10 +641,8 @@ public class MRAppMaster extends CompositeService {
 
     @Override
     public synchronized void stop() {
-      if (containerAllocator != null) {
-        ((Service) this.containerAllocator).stop();
-        containerAllocator = null;
-      }
+      stopService((Service) this.containerAllocator);
+      this.containerAllocator = null;
       super.stop();
     }
 
@@ -688,7 +686,8 @@ public class MRAppMaster extends CompositeService {
 
     @Override
     public synchronized void stop() {
-      ((Service)this.containerLauncher).stop();
+      stopService((Service)this.containerLauncher);
+      this.containerLauncher = null;
       super.stop();
     }
   }

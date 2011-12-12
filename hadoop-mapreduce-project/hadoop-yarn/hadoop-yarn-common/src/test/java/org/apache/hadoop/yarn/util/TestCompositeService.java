@@ -226,11 +226,6 @@ public class TestCompositeService {
       this.throwExceptionOnStop = throwExceptionOnStop;
     }
 
-    @Override
-    public String toString() {
-      return "Service " + getName();
-    }
-
   }
 
   public static class ServiceManager extends CompositeService {

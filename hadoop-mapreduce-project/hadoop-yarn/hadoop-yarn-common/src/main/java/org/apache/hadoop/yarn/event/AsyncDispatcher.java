@@ -105,6 +105,7 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
       } catch (InterruptedException ie) {
         LOG.debug("Interrupted Exception while stopping", ie);
       }
+      eventHandlingThread = null;
     }
 
     // stop all the components

@@ -266,9 +266,7 @@ public class ContainerManagerImpl extends CompositeService implements
     if (auxiliaryServices.getServiceState() == STARTED) {
       auxiliaryServices.unregister(this);
     }
-    if (server != null) {
-      server.stop();
-    }
+    server = stopIPCServer(server);
     super.stop();
   }
 

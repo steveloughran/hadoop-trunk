@@ -124,9 +124,8 @@ public class MiniMRYarnCluster extends MiniYARNCluster {
 
     @Override
     public synchronized void stop() {
-      if (historyServer != null) {
-        historyServer.stop();
-      }
+      stopService(historyServer);
+      historyServer = null;
       super.stop();
     }
   }

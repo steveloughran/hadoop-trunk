@@ -140,9 +140,7 @@ public class ResourceTrackerService extends AbstractService implements
 
   @Override
   public synchronized void stop() {
-    if (this.server != null) {
-      this.server.stop();
-    }
+    server = stopIPCServer(server);
     super.stop();
   }
 

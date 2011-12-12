@@ -206,9 +206,7 @@ public class DefaultSpeculator extends AbstractService implements
   @Override
   public void stop() {
     // this could be called before background thread is established
-    if (speculationBackgroundThread != null) {
-      speculationBackgroundThread.interrupt();
-    }
+    speculationBackgroundThread = interruptThread(speculationBackgroundThread);
     super.stop();
   }
 

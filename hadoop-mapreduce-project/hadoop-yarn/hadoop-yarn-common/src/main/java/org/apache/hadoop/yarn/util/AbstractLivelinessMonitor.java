@@ -60,9 +60,7 @@ public abstract class AbstractLivelinessMonitor<O> extends AbstractService {
   @Override
   public void stop() {
     stopped = true;
-    if (checkerThread != null) {
-      checkerThread.interrupt();
-    }
+    checkerThread = interruptThread(checkerThread);
     super.stop();
   }
 

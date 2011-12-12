@@ -162,7 +162,7 @@ public class MRAppBenchmark {
 
       @Override
       public void stop() {
-        thread.interrupt();
+        thread = interruptThread(thread);
         super.stop();
       }
     }

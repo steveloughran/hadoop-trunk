@@ -79,9 +79,7 @@ public class TaskHeartbeatHandler extends AbstractService {
   @Override
   public void stop() {
     stopped = true;
-    if (lostTaskCheckerThread != null) {
-      lostTaskCheckerThread.interrupt();
-    }
+    lostTaskCheckerThread = interruptThread(lostTaskCheckerThread);
     super.stop();
   }
 
