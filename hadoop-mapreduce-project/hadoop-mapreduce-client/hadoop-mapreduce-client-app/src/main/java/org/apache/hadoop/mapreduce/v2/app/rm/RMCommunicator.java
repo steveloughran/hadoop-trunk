@@ -187,11 +187,11 @@ public abstract class RMCommunicator extends AbstractService  {
           sb.append(s).append("\n");
         }
         LOG.info("Setting job diagnostics to " + sb.toString());
-  
+
         String historyUrl = JobHistoryUtils.getHistoryUrl(getConfig(),
             context.getApplicationID());
         LOG.info("History url is " + historyUrl);
-  
+
         FinishApplicationMasterRequest request =
             recordFactory.newRecordInstance(FinishApplicationMasterRequest.class);
         request.setAppAttemptId(this.applicationAttemptId);
