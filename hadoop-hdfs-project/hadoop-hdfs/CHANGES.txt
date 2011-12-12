@@ -29,6 +29,9 @@ Trunk (unreleased changes)
 
     HDFS-2642. Protobuf translators for DatanodeProtocol. (jitendra)
 
+    HDFS-2647. Used protobuf based RPC for InterDatanodeProtocol, 
+    ClientDatanodeProtocol, JournalProtocol, NamenodeProtocol. (suresh)
+
   IMPROVEMENTS
 
     HADOOP-7524 Change RPC to allow multiple protocols including multuple 
@@ -94,6 +97,8 @@ Trunk (unreleased changes)
     HDFS-2597 ClientNameNodeProtocol in Protocol Buffers (sanjay)
 
     HDFS-2511. Add dev script to generate HDFS protobufs. (tucu)
+
+    HDFS-2651 ClientNameNodeProtocol Translators for Protocol Buffers (sanjay)
 
   OPTIMIZATIONS
     HDFS-2477. Optimize computing the diff between a block report and the
@@ -1489,7 +1494,19 @@ Release 0.23.0 - 2011-11-01
     HDFS-2445. Ensure failed tests exit with proper error code. (Jonathan 
     Eagles via acmurthy)
 
-Release 0.22.0 - Unreleased
+Release 0.22.1 - Unreleased
+
+  INCOMPATIBLE CHANGES
+
+  NEW FEATURES
+
+  IMPROVEMENTS
+
+  OPTIMIZATIONS
+
+  BUG FIXES
+
+Release 0.22.0 - 2011-11-29
 
   INCOMPATIBLE CHANGES
 
