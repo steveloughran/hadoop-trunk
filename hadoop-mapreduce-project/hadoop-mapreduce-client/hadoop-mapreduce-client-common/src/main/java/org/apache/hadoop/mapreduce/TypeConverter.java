@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobPriority;
 import org.apache.hadoop.mapred.TaskCompletionEvent;
@@ -45,14 +44,15 @@ import org.apache.hadoop.mapreduce.v2.util.MRApps;
 import org.apache.hadoop.yarn.YarnException;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
-import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.QueueACL;
 import org.apache.hadoop.yarn.api.records.QueueState;
 import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
+import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 
+@SuppressWarnings("deprecation")
 public class TypeConverter {
 
   private static RecordFactory recordFactory;
@@ -288,7 +288,7 @@ public class TypeConverter {
             .getMapProgress(), jobreport.getReduceProgress(), jobreport
             .getCleanupProgress(), fromYarn(jobreport.getJobState()),
         jobPriority, jobreport.getUser(), jobreport.getJobName(), jobreport
-            .getJobFile(), trackingUrl);
+            .getJobFile(), trackingUrl, jobreport.isUber());
     jobStatus.setFailureInfo(jobreport.getDiagnostics());
     return jobStatus;
   }
@@ -421,7 +421,7 @@ public class TypeConverter {
           TypeConverter.fromYarn(application.getYarnApplicationState()),
           org.apache.hadoop.mapreduce.JobPriority.NORMAL,
           application.getUser(), application.getName(),
-          application.getQueue(), jobFile, trackingUrl
+          application.getQueue(), jobFile, trackingUrl, false
       );
     jobStatus.setSchedulingInfo(trackingUrl); // Set AM tracking url
     jobStatus.setStartTime(application.getStartTime());
@@ -450,9 +450,19 @@ public class TypeConverter {
 
   public static QueueInfo fromYarn(org.apache.hadoop.yarn.api.records.QueueInfo
       queueInfo, Configuration conf) {
-    return new QueueInfo(queueInfo.getQueueName(),queueInfo.toString(),
-        fromYarn(queueInfo.getQueueState()), TypeConverter.fromYarnApps(
-        queueInfo.getApplications(), conf));
+    QueueInfo toReturn = new QueueInfo(queueInfo.getQueueName(), "Capacity: " +
+      queueInfo.getCapacity() * 100 + ", MaximumCapacity: " +
+      (queueInfo.getMaximumCapacity() < 0 ? "UNDEFINED" :
+        queueInfo.getMaximumCapacity()) + ", CurrentCapacity: " +
+      queueInfo.getCurrentCapacity() * 100, fromYarn(queueInfo.getQueueState()),
+      TypeConverter.fromYarnApps(queueInfo.getApplications(), conf));
+    List<QueueInfo> childQueues = new ArrayList<QueueInfo>();
+    for(org.apache.hadoop.yarn.api.records.QueueInfo childQueue :
+      queueInfo.getChildQueues()) {
+      childQueues.add(fromYarn(childQueue, conf));
+    }
+    toReturn.setQueueChildren(childQueues);
+    return toReturn;
   }
 
   public static QueueInfo[] fromYarnQueueInfo(

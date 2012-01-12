@@ -43,14 +43,14 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.UpgradeAction;
+import org.apache.hadoop.hdfs.protocolPB.RefreshAuthorizationPolicyProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdfs.protocolPB.RefreshUserMappingsProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdfs.server.common.UpgradeStatusReport;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.RefreshUserMappingsProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -131,8 +131,9 @@ public class DFSAdmin extends FsShell {
       "\t\ton the number of names in the directory tree\n" +
       "\t\tFor each directory, attempt to set the quota. An error will be reported if\n" +
       "\t\t1. N is not a positive integer, or\n" +
-      "\t\t2. user is not an administrator, or\n" +
-      "\t\t3. the directory does not exist or is a file, or\n";
+      "\t\t2. User is not an administrator, or\n" +
+      "\t\t3. The directory does not exist or is a file.\n" +
+      "\t\tNote: A quota of 1 would force the directory to remain empty.\n";
 
     private final long quota; // the quota to be set
     
@@ -790,13 +791,9 @@ public class DFSAdmin extends FsShell {
         conf.get(DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY, ""));
 
     // Create the client
-    RefreshAuthorizationPolicyProtocol refreshProtocol = 
-      (RefreshAuthorizationPolicyProtocol) 
-      RPC.getProxy(RefreshAuthorizationPolicyProtocol.class, 
-                   RefreshAuthorizationPolicyProtocol.versionID, 
-                   NameNode.getAddress(conf), getUGI(), conf,
-                   NetUtils.getSocketFactory(conf, 
-                                             RefreshAuthorizationPolicyProtocol.class));
+    RefreshAuthorizationPolicyProtocolClientSideTranslatorPB refreshProtocol = 
+        new RefreshAuthorizationPolicyProtocolClientSideTranslatorPB(
+        NameNode.getAddress(conf), getUGI(), conf);
     
     // Refresh the authorization policy in-effect
     refreshProtocol.refreshServiceAcl();
@@ -820,13 +817,9 @@ public class DFSAdmin extends FsShell {
         conf.get(DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY, ""));
  
     // Create the client
-    RefreshUserMappingsProtocol refreshProtocol = 
-      (RefreshUserMappingsProtocol) 
-      RPC.getProxy(RefreshUserMappingsProtocol.class, 
-          RefreshUserMappingsProtocol.versionID, 
-          NameNode.getAddress(conf), getUGI(), conf,
-          NetUtils.getSocketFactory(conf, 
-              RefreshUserMappingsProtocol.class));
+    RefreshUserMappingsProtocolClientSideTranslatorPB refreshProtocol = 
+        new RefreshUserMappingsProtocolClientSideTranslatorPB(
+        NameNode.getAddress(conf), getUGI(), conf);
 
     // Refresh the user-to-groups mappings
     refreshProtocol.refreshUserToGroupsMappings();
@@ -851,13 +844,9 @@ public class DFSAdmin extends FsShell {
         conf.get(DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY, ""));
 
     // Create the client
-    RefreshUserMappingsProtocol refreshProtocol = 
-      (RefreshUserMappingsProtocol) 
-      RPC.getProxy(RefreshUserMappingsProtocol.class, 
-          RefreshUserMappingsProtocol.versionID, 
-          NameNode.getAddress(conf), getUGI(), conf,
-          NetUtils.getSocketFactory(conf, 
-              RefreshUserMappingsProtocol.class));
+    RefreshUserMappingsProtocolClientSideTranslatorPB refreshProtocol = 
+        new RefreshUserMappingsProtocolClientSideTranslatorPB(
+        NameNode.getAddress(conf), getUGI(), conf);
 
     // Refresh the user-to-groups mappings
     refreshProtocol.refreshSuperUserGroupsConfiguration();
@@ -929,6 +918,7 @@ public class DFSAdmin extends FsShell {
                   + " [-setBalancerBandwidth <bandwidth in bytes per second>]");
     } else {
       System.err.println("Usage: java DFSAdmin");
+      System.err.println("Note: Administrative commands can only be run as the HDFS superuser.");
       System.err.println("           [-report]");
       System.err.println("           [-safemode enter | leave | get | wait]");
       System.err.println("           [-saveNamespace]");

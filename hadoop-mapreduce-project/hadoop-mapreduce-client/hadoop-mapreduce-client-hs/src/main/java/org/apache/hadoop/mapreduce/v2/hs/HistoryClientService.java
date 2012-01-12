@@ -27,18 +27,21 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.apache.hadoop.ipc.Server;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.mapreduce.JobACL;
+import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.v2.api.MRClientProtocol;
+import org.apache.hadoop.mapreduce.v2.api.MRDelegationTokenIdentifier;
 import org.apache.hadoop.mapreduce.v2.api.protocolrecords.FailTaskAttemptRequest;
 import org.apache.hadoop.mapreduce.v2.api.protocolrecords.FailTaskAttemptResponse;
 import org.apache.hadoop.mapreduce.v2.api.protocolrecords.GetCountersRequest;
 import org.apache.hadoop.mapreduce.v2.api.protocolrecords.GetCountersResponse;
+import org.apache.hadoop.mapreduce.v2.api.protocolrecords.GetDelegationTokenRequest;
+import org.apache.hadoop.mapreduce.v2.api.protocolrecords.GetDelegationTokenResponse;
 import org.apache.hadoop.mapreduce.v2.api.protocolrecords.GetDiagnosticsRequest;
 import org.apache.hadoop.mapreduce.v2.api.protocolrecords.GetDiagnosticsResponse;
 import org.apache.hadoop.mapreduce.v2.api.protocolrecords.GetJobReportRequest;
@@ -68,35 +71,42 @@ import org.apache.hadoop.mapreduce.v2.hs.webapp.HsWebApp;
 import org.apache.hadoop.mapreduce.v2.jobhistory.JHAdminConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.YarnException;
+import org.apache.hadoop.yarn.api.records.DelegationToken;
 import org.apache.hadoop.yarn.exceptions.YarnRemoteException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.service.AbstractService;
+import org.apache.hadoop.yarn.util.BuilderUtils;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.WebApps;
 
 /**
- * This module is responsible for talking to the 
+ * This module is responsible for talking to the
  * JobClient (user facing).
  *
  */
 public class HistoryClientService extends AbstractService {
 
   private static final Log LOG = LogFactory.getLog(HistoryClientService.class);
-  
+
   private MRClientProtocol protocolHandler;
   private Server server;
   private WebApp webApp;
   private InetSocketAddress bindAddress;
   private HistoryContext history;
-
-  public HistoryClientService(HistoryContext history) {
+  private JHSDelegationTokenSecretManager jhsDTSecretManager;
+  
+  public HistoryClientService(HistoryContext history,
+      JHSDelegationTokenSecretManager jhsDTSecretManager) {
     super("HistoryClientService");
     this.history = history;
     this.protocolHandler = new MRClientProtocolHandler();
+    this.jhsDTSecretManager = jhsDTSecretManager;
   }
 
   public void start() {
@@ -110,30 +120,31 @@ public class HistoryClientService extends AbstractService {
       JHAdminConfig.DEFAULT_MR_HISTORY_ADDRESS);
     InetAddress hostNameResolved = null;
     try {
-      hostNameResolved = InetAddress.getLocalHost(); //address.getAddress().getLocalHost();
+      hostNameResolved = InetAddress.getLocalHost(); 
+      //address.getAddress().getLocalHost();
     } catch (UnknownHostException e) {
       throw new YarnException(e);
     }
 
     server =
         rpc.getServer(MRClientProtocol.class, protocolHandler, address,
-            conf, null,
-            conf.getInt(JHAdminConfig.MR_HISTORY_CLIENT_THREAD_COUNT, 
+            conf, jhsDTSecretManager,
+            conf.getInt(JHAdminConfig.MR_HISTORY_CLIENT_THREAD_COUNT,
                 JHAdminConfig.DEFAULT_MR_HISTORY_CLIENT_THREAD_COUNT));
-    
+
     // Enable service authorization?
     if (conf.getBoolean(
-        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, 
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
       server.refreshServiceAcl(conf, new MRAMPolicyProvider());
     }
-    
+
     server.start();
     this.bindAddress =
         NetUtils.createSocketAddr(hostNameResolved.getHostAddress()
             + ":" + server.getPort());
     LOG.info("Instantiated MRClientService at " + this.bindAddress);
-    
+
     super.start();
   }
 
@@ -141,7 +152,7 @@ public class HistoryClientService extends AbstractService {
     webApp = new HsWebApp(history);
     String bindAddress = conf.get(JHAdminConfig.MR_HISTORY_WEBAPP_ADDRESS,
         JHAdminConfig.DEFAULT_MR_HISTORY_WEBAPP_ADDRESS);
-    WebApps.$for("jobhistory", this).with(conf).at(bindAddress).start(webApp); 
+    WebApps.$for("jobhistory", HistoryClientService.class, this, "ws").with(conf).at(bindAddress).start(webApp);
   }
 
   @Override
@@ -158,7 +169,7 @@ public class HistoryClientService extends AbstractService {
   private class MRClientProtocolHandler implements MRClientProtocol {
 
     private RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
-    
+
     private Job verifyAndGetJob(final JobId jobID) throws YarnRemoteException {
       UserGroupInformation loginUgi = null;
       Job job = null;
@@ -191,10 +202,10 @@ public class HistoryClientService extends AbstractService {
       JobId jobId = request.getJobId();
       Job job = verifyAndGetJob(jobId);
       GetCountersResponse response = recordFactory.newRecordInstance(GetCountersResponse.class);
-      response.setCounters(job.getCounters());
+      response.setCounters(TypeConverter.toYarn(job.getAllCounters()));
       return response;
     }
-    
+
     @Override
     public GetJobReportResponse getJobReport(GetJobReportRequest request) throws YarnRemoteException {
       JobId jobId = request.getJobId();
@@ -227,23 +238,23 @@ public class HistoryClientService extends AbstractService {
       JobId jobId = request.getJobId();
       int fromEventId = request.getFromEventId();
       int maxEvents = request.getMaxEvents();
-      
+
       Job job = verifyAndGetJob(jobId);
       GetTaskAttemptCompletionEventsResponse response = recordFactory.newRecordInstance(GetTaskAttemptCompletionEventsResponse.class);
       response.addAllCompletionEvents(Arrays.asList(job.getTaskAttemptCompletionEvents(fromEventId, maxEvents)));
       return response;
     }
-      
+
     @Override
     public KillJobResponse killJob(KillJobRequest request) throws YarnRemoteException {
       throw RPCUtil.getRemoteException("Invalid operation on completed job");
     }
-    
+
     @Override
     public KillTaskResponse killTask(KillTaskRequest request) throws YarnRemoteException {
       throw RPCUtil.getRemoteException("Invalid operation on completed job");
     }
-    
+
     @Override
     public KillTaskAttemptResponse killTaskAttempt(KillTaskAttemptRequest request) throws YarnRemoteException {
       throw RPCUtil.getRemoteException("Invalid operation on completed job");
@@ -252,15 +263,15 @@ public class HistoryClientService extends AbstractService {
     @Override
     public GetDiagnosticsResponse getDiagnostics(GetDiagnosticsRequest request) throws YarnRemoteException {
       TaskAttemptId taskAttemptId = request.getTaskAttemptId();
-    
+
       Job job = verifyAndGetJob(taskAttemptId.getTaskId().getJobId());
-      
+
       GetDiagnosticsResponse response = recordFactory.newRecordInstance(GetDiagnosticsResponse.class);
       response.addAllDiagnostics(job.getTask(taskAttemptId.getTaskId()).getAttempt(taskAttemptId).getDiagnostics());
       return response;
     }
 
-    @Override 
+    @Override
     public FailTaskAttemptResponse failTaskAttempt(FailTaskAttemptRequest request) throws YarnRemoteException {
       throw RPCUtil.getRemoteException("Invalid operation on completed job");
     }
@@ -269,7 +280,7 @@ public class HistoryClientService extends AbstractService {
     public GetTaskReportsResponse getTaskReports(GetTaskReportsRequest request) throws YarnRemoteException {
       JobId jobId = request.getJobId();
       TaskType taskType = request.getTaskType();
-      
+
       GetTaskReportsResponse response = recordFactory.newRecordInstance(GetTaskReportsResponse.class);
       Job job = verifyAndGetJob(jobId);
       Collection<Task> tasks = job.getTasks(taskType).values();
@@ -277,6 +288,38 @@ public class HistoryClientService extends AbstractService {
         response.addTaskReport(task.getReport());
       }
       return response;
+    }
+    
+    @Override
+    public GetDelegationTokenResponse getDelegationToken(
+        GetDelegationTokenRequest request) throws YarnRemoteException {
+
+      try {
+      // Verify that the connection is kerberos authenticated
+      AuthenticationMethod authMethod = UserGroupInformation
+        .getRealAuthenticationMethod(UserGroupInformation.getCurrentUser());
+      if (UserGroupInformation.isSecurityEnabled()
+          && (authMethod != AuthenticationMethod.KERBEROS)) {
+       throw new IOException(
+          "Delegation Token can be issued only with kerberos authentication");
+      }
+
+      GetDelegationTokenResponse response = recordFactory.newRecordInstance(
+          GetDelegationTokenResponse.class);
+      MRDelegationTokenIdentifier tokenIdentifier =
+          new MRDelegationTokenIdentifier();
+      Token<MRDelegationTokenIdentifier> realJHSToken =
+          new Token<MRDelegationTokenIdentifier>(tokenIdentifier,
+              jhsDTSecretManager);
+      DelegationToken mrDToken = BuilderUtils.newDelegationToken(
+        realJHSToken.getIdentifier(), realJHSToken.getKind().toString(),
+        realJHSToken.getPassword(), bindAddress.getAddress().getHostAddress()
+            + ":" + bindAddress.getPort());
+      response.setDelegationToken(mrDToken);
+      return response;
+      } catch (IOException i) {
+        throw RPCUtil.getRemoteException(i);
+      }
     }
 
     private void checkAccess(Job job, JobACL jobOperation)

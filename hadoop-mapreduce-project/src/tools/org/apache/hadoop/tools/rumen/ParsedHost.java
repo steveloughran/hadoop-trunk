@@ -22,7 +22,9 @@ import java.util.List;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
-class ParsedHost {
+import org.apache.hadoop.tools.rumen.datatypes.NodeName;
+
+public class ParsedHost {
   private final String rackName;
   private final String nodeName;
 
@@ -69,11 +71,17 @@ class ParsedHost {
     return new ParsedHost(matcher.group(1), matcher.group(2));
   }
 
+  private String process(String name) {
+    return name == null 
+           ? null 
+           : name.startsWith("/") ? name.substring(1) : name;
+  }
+  
   public ParsedHost(LoggedLocation loc) {
-    List<String> coordinates = loc.getLayers();
+    List<NodeName> coordinates = loc.getLayers();
 
-    rackName = coordinates.get(0);
-    nodeName = coordinates.get(1);
+    rackName = process(coordinates.get(0).getRackName());
+    nodeName = process(coordinates.get(1).getHostName());
   }
 
   LoggedLocation makeLoggedLocation() {
@@ -89,18 +97,18 @@ class ParsedHost {
     return result;
   }
   
-  String getNodeName() {
+  public String getNodeName() {
     return nodeName;
   }
   
-  String getRackName() {
+  public String getRackName() {
     return rackName;
   }
 
   // expects the broadest name first
   ParsedHost(String rackName, String nodeName) {
-    this.rackName = rackName;
-    this.nodeName = nodeName;
+    this.rackName = process(rackName);
+    this.nodeName = process(nodeName);
   }
 
   @Override

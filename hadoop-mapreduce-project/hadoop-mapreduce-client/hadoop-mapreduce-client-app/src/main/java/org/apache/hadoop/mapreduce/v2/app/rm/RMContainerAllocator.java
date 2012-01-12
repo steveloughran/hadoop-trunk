@@ -30,17 +30,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.JobCounter;
-import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.MRJobConfig;
-import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryEvent;
 import org.apache.hadoop.mapreduce.jobhistory.NormalizedResourceEvent;
-import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskType;
 import org.apache.hadoop.mapreduce.v2.app.AppContext;
@@ -68,7 +68,7 @@ import org.apache.hadoop.yarn.util.RackResolver;
 public class RMContainerAllocator extends RMContainerRequestor
     implements ContainerAllocator {
 
-  private static final Log LOG = LogFactory.getLog(RMContainerAllocator.class);
+  static final Log LOG = LogFactory.getLog(RMContainerAllocator.class);
   
   public static final 
   float DEFAULT_COMPLETED_MAPS_PERCENT_FOR_REDUCE_SLOWSTART = 0.05f;
@@ -76,7 +76,10 @@ public class RMContainerAllocator extends RMContainerRequestor
   private static final Priority PRIORITY_FAST_FAIL_MAP;
   private static final Priority PRIORITY_REDUCE;
   private static final Priority PRIORITY_MAP;
-  
+
+  private Thread eventHandlingThread;
+  private volatile boolean stopEventHandling;
+
   static {
     PRIORITY_FAST_FAIL_MAP = RecordFactoryProvider.getRecordFactory(null).newRecordInstance(Priority.class);
     PRIORITY_FAST_FAIL_MAP.setPriority(5);
@@ -122,8 +125,6 @@ public class RMContainerAllocator extends RMContainerRequestor
   private boolean recalculateReduceSchedule = false;
   private int mapResourceReqt;//memory
   private int reduceResourceReqt;//memory
-  private int completedMaps = 0;
-  private int completedReduces = 0;
   
   private boolean reduceStarted = false;
   private float maxReduceRampupLimit = 0;
@@ -131,7 +132,10 @@ public class RMContainerAllocator extends RMContainerRequestor
   private float reduceSlowStart = 0;
   private long retryInterval;
   private long retrystartTime;
-  
+
+  BlockingQueue<ContainerAllocatorEvent> eventQueue
+    = new LinkedBlockingQueue<ContainerAllocatorEvent>();
+
   public RMContainerAllocator(ClientService clientService, AppContext context) {
     super(clientService, context);
   }
@@ -157,6 +161,40 @@ public class RMContainerAllocator extends RMContainerRequestor
   }
 
   @Override
+  public void start() {
+    this.eventHandlingThread = new Thread() {
+      @SuppressWarnings("unchecked")
+      @Override
+      public void run() {
+
+        ContainerAllocatorEvent event;
+
+        while (!stopEventHandling && !Thread.currentThread().isInterrupted()) {
+          try {
+            event = RMContainerAllocator.this.eventQueue.take();
+          } catch (InterruptedException e) {
+            LOG.error("Returning, interrupted : " + e);
+            return;
+          }
+
+          try {
+            handleEvent(event);
+          } catch (Throwable t) {
+            LOG.error("Error in handling event type " + event.getType()
+                + " to the ContainreAllocator", t);
+            // Kill the AM
+            eventHandler.handle(new JobEvent(getJob().getID(),
+              JobEventType.INTERNAL_ERROR));
+            return;
+          }
+        }
+      }
+    };
+    this.eventHandlingThread.start();
+    super.start();
+  }
+
+  @Override
   protected synchronized void heartbeat() throws Exception {
     LOG.info("Before Scheduling: " + getStat());
     List<Container> allocatedContainers = getResources();
@@ -169,20 +207,53 @@ public class RMContainerAllocator extends RMContainerRequestor
     
     if (recalculateReduceSchedule) {
       preemptReducesIfNeeded();
-      scheduleReduces();
+      scheduleReduces(
+          getJob().getTotalMaps(), getJob().getCompletedMaps(),
+          scheduledRequests.maps.size(), scheduledRequests.reduces.size(), 
+          assignedRequests.maps.size(), assignedRequests.reduces.size(),
+          mapResourceReqt, reduceResourceReqt,
+          pendingReduces.size(), 
+          maxReduceRampupLimit, reduceSlowStart);
       recalculateReduceSchedule = false;
     }
   }
 
   @Override
   public void stop() {
+    this.stopEventHandling = true;
+    eventHandlingThread.interrupt();
     super.stop();
     LOG.info("Final Stats: " + getStat());
   }
 
-  @SuppressWarnings("unchecked")
+  public boolean getIsReduceStarted() {
+    return reduceStarted;
+  }
+  
+  public void setIsReduceStarted(boolean reduceStarted) {
+    this.reduceStarted = reduceStarted; 
+  }
+
   @Override
-  public synchronized void handle(ContainerAllocatorEvent event) {
+  public void handle(ContainerAllocatorEvent event) {
+    int qSize = eventQueue.size();
+    if (qSize != 0 && qSize % 1000 == 0) {
+      LOG.info("Size of event-queue in RMContainerAllocator is " + qSize);
+    }
+    int remCapacity = eventQueue.remainingCapacity();
+    if (remCapacity < 1000) {
+      LOG.warn("Very low remaining capacity in the event-queue "
+          + "of RMContainerAllocator: " + remCapacity);
+    }
+    try {
+      eventQueue.put(event);
+    } catch (InterruptedException e) {
+      throw new YarnException(e);
+    }
+  }
+
+  @SuppressWarnings({ "unchecked" })
+  protected synchronized void handleEvent(ContainerAllocatorEvent event) {
     LOG.info("Processing the event " + event.toString());
     recalculateReduceSchedule = true;
     if (event.getType() == ContainerAllocator.EventType.CONTAINER_REQ) {
@@ -193,9 +264,7 @@ public class RMContainerAllocator extends RMContainerRequestor
           int minSlotMemSize = getMinContainerCapability().getMemory();
           mapResourceReqt = (int) Math.ceil((float) mapResourceReqt/minSlotMemSize)
               * minSlotMemSize;
-          JobID id = TypeConverter.fromYarn(applicationId);
-          JobId jobId = TypeConverter.toYarn(id);
-          eventHandler.handle(new JobHistoryEvent(jobId, 
+          eventHandler.handle(new JobHistoryEvent(getJob().getID(), 
               new NormalizedResourceEvent(org.apache.hadoop.mapreduce.TaskType.MAP,
               mapResourceReqt)));
           LOG.info("mapResourceReqt:"+mapResourceReqt);
@@ -219,9 +288,7 @@ public class RMContainerAllocator extends RMContainerRequestor
           //round off on slotsize
           reduceResourceReqt = (int) Math.ceil((float) 
               reduceResourceReqt/minSlotMemSize) * minSlotMemSize;
-          JobID id = TypeConverter.fromYarn(applicationId);
-          JobId jobId = TypeConverter.toYarn(id);
-          eventHandler.handle(new JobHistoryEvent(jobId, 
+          eventHandler.handle(new JobHistoryEvent(getJob().getID(), 
               new NormalizedResourceEvent(
                   org.apache.hadoop.mapreduce.TaskType.REDUCE,
               reduceResourceReqt)));
@@ -319,10 +386,17 @@ public class RMContainerAllocator extends RMContainerRequestor
       }
     }
   }
-
-  private void scheduleReduces() {
+  
+  @Private
+  public void scheduleReduces(
+      int totalMaps, int completedMaps,
+      int scheduledMaps, int scheduledReduces,
+      int assignedMaps, int assignedReduces,
+      int mapResourceReqt, int reduceResourceReqt,
+      int numPendingReduces,
+      float maxReduceRampupLimit, float reduceSlowStart) {
     
-    if (pendingReduces.size() == 0) {
+    if (numPendingReduces == 0) {
       return;
     }
     
@@ -330,29 +404,25 @@ public class RMContainerAllocator extends RMContainerRequestor
     
     //if all maps are assigned, then ramp up all reduces irrespective of the 
     //headroom
-    if (scheduledRequests.maps.size() == 0 && pendingReduces.size() > 0) {
-      LOG.info("All maps assigned. Ramping up all remaining reduces:" + pendingReduces.size());
-      for (ContainerRequest req : pendingReduces) {
-        scheduledRequests.addReduce(req);
-      }
-      pendingReduces.clear();
+    if (scheduledMaps == 0 && numPendingReduces > 0) {
+      LOG.info("All maps assigned. " +
+      		"Ramping up all remaining reduces:" + numPendingReduces);
+      scheduleAllReduces();
       return;
     }
     
-    
-    int totalMaps = assignedRequests.maps.size() + completedMaps + scheduledRequests.maps.size();
-    
     //check for slow start
-    if (!reduceStarted) {//not set yet
+    if (!getIsReduceStarted()) {//not set yet
       int completedMapsForReduceSlowstart = (int)Math.ceil(reduceSlowStart * 
                       totalMaps);
       if(completedMaps < completedMapsForReduceSlowstart) {
         LOG.info("Reduce slow start threshold not met. " +
-              "completedMapsForReduceSlowstart " + completedMapsForReduceSlowstart);
+              "completedMapsForReduceSlowstart " + 
+            completedMapsForReduceSlowstart);
         return;
       } else {
         LOG.info("Reduce slow start threshold reached. Scheduling reduces.");
-        reduceStarted = true;
+        setIsReduceStarted(true);
       }
     }
     
@@ -363,20 +433,21 @@ public class RMContainerAllocator extends RMContainerRequestor
       completedMapPercent = 1;
     }
     
-    int netScheduledMapMem = scheduledRequests.maps.size() * mapResourceReqt
-        + assignedRequests.maps.size() * mapResourceReqt;
+    int netScheduledMapMem = 
+        (scheduledMaps + assignedMaps) * mapResourceReqt;
 
-    int netScheduledReduceMem = scheduledRequests.reduces.size()
-        * reduceResourceReqt + assignedRequests.reduces.size()
-        * reduceResourceReqt;
+    int netScheduledReduceMem = 
+        (scheduledReduces + assignedReduces) * reduceResourceReqt;
 
     int finalMapMemLimit = 0;
     int finalReduceMemLimit = 0;
     
     // ramp up the reduces based on completed map percentage
     int totalMemLimit = getMemLimit();
-    int idealReduceMemLimit = Math.min((int)(completedMapPercent * totalMemLimit),
-        (int) (maxReduceRampupLimit * totalMemLimit));
+    int idealReduceMemLimit = 
+        Math.min(
+            (int)(completedMapPercent * totalMemLimit),
+            (int) (maxReduceRampupLimit * totalMemLimit));
     int idealMapMemLimit = totalMemLimit - idealReduceMemLimit;
 
     // check if there aren't enough maps scheduled, give the free map capacity
@@ -397,29 +468,46 @@ public class RMContainerAllocator extends RMContainerRequestor
         " netScheduledMapMem:" + netScheduledMapMem +
         " netScheduledReduceMem:" + netScheduledReduceMem);
     
-    int rampUp = (finalReduceMemLimit - netScheduledReduceMem)
-        / reduceResourceReqt;
+    int rampUp = 
+        (finalReduceMemLimit - netScheduledReduceMem) / reduceResourceReqt;
     
     if (rampUp > 0) {
-      rampUp = Math.min(rampUp, pendingReduces.size());
+      rampUp = Math.min(rampUp, numPendingReduces);
       LOG.info("Ramping up " + rampUp);
-      //more reduce to be scheduled
-      for (int i = 0; i < rampUp; i++) {
-        ContainerRequest request = pendingReduces.removeFirst();
-        scheduledRequests.addReduce(request);
-      }
+      rampUpReduces(rampUp);
     } else if (rampUp < 0){
       int rampDown = -1 * rampUp;
-      rampDown = Math.min(rampDown, scheduledRequests.reduces.size());
+      rampDown = Math.min(rampDown, scheduledReduces);
       LOG.info("Ramping down " + rampDown);
-      //remove from the scheduled and move back to pending
-      for (int i = 0; i < rampDown; i++) {
-        ContainerRequest request = scheduledRequests.removeReduce();
-        pendingReduces.add(request);
-      }
+      rampDownReduces(rampDown);
     }
   }
 
+  private void scheduleAllReduces() {
+    for (ContainerRequest req : pendingReduces) {
+      scheduledRequests.addReduce(req);
+    }
+    pendingReduces.clear();
+  }
+  
+  @Private
+  public void rampUpReduces(int rampUp) {
+    //more reduce to be scheduled
+    for (int i = 0; i < rampUp; i++) {
+      ContainerRequest request = pendingReduces.removeFirst();
+      scheduledRequests.addReduce(request);
+    }
+  }
+  
+  @Private
+  public void rampDownReduces(int rampDown) {
+    //remove from the scheduled and move back to pending
+    for (int i = 0; i < rampDown; i++) {
+      ContainerRequest request = scheduledRequests.removeReduce();
+      pendingReduces.add(request);
+    }
+  }
+  
   /**
    * Synchronized to avoid findbugs warnings
    */
@@ -429,8 +517,8 @@ public class RMContainerAllocator extends RMContainerRequestor
         " ScheduledReduces:" + scheduledRequests.reduces.size() +
         " AssignedMaps:" + assignedRequests.maps.size() + 
         " AssignedReduces:" + assignedRequests.reduces.size() +
-        " completedMaps:" + completedMaps +
-        " completedReduces:" + completedReduces +
+        " completedMaps:" + getJob().getCompletedMaps() + 
+        " completedReduces:" + getJob().getCompletedReduces() +
         " containersAllocated:" + containersAllocated +
         " containersReleased:" + containersReleased +
         " hostLocalAssigned:" + hostLocalAssigned + 
@@ -479,12 +567,16 @@ public class RMContainerAllocator extends RMContainerRequestor
       //something changed
       recalculateReduceSchedule = true;
     }
-    
-    List<Container> allocatedContainers = new ArrayList<Container>();
-    for (Container cont : newContainers) {
-        allocatedContainers.add(cont);
+
+    if (LOG.isDebugEnabled()) {
+      for (Container cont : newContainers) {
         LOG.debug("Received new Container :" + cont);
+      }
     }
+
+    //Called on each allocation. Will know about newly blacklisted/added hosts.
+    computeIgnoreBlacklisting();
+    
     for (ContainerStatus cont : finishedContainers) {
       LOG.info("Received completed container " + cont);
       TaskAttemptId attemptID = assignedRequests.get(cont.getContainerId());
@@ -493,11 +585,7 @@ public class RMContainerAllocator extends RMContainerRequestor
             + cont.getContainerId());
       } else {
         assignedRequests.remove(attemptID);
-        if (attemptID.getTaskId().getTaskType().equals(TaskType.MAP)) {
-          completedMaps++;
-        } else {
-          completedReduces++;
-        }
+        
         // send the container completed event to Task attempt
         eventHandler.handle(new TaskAttemptEvent(attemptID,
             TaskAttemptEventType.TA_CONTAINER_COMPLETED));
@@ -510,7 +598,8 @@ public class RMContainerAllocator extends RMContainerRequestor
     return newContainers;
   }
 
-  private int getMemLimit() {
+  @Private
+  public int getMemLimit() {
     int headRoom = getAvailableResources() != null ? getAvailableResources().getMemory() : 0;
     return headRoom + assignedRequests.maps.size() * mapResourceReqt + 
        assignedRequests.reduces.size() * reduceResourceReqt;

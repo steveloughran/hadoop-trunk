@@ -159,6 +159,7 @@ implements ResourceScheduler, CapacitySchedulerContext {
     return maximumAllocation;
   }
 
+  @Override
   public synchronized int getNumClusterNodes() {
     return numNodeManagers;
   }
@@ -200,11 +201,8 @@ implements ResourceScheduler, CapacitySchedulerContext {
   }
 
   @Private
-  public static final String ROOT = "root";
-
-  @Private
   public static final String ROOT_QUEUE = 
-    CapacitySchedulerConfiguration.PREFIX + ROOT;
+    CapacitySchedulerConfiguration.PREFIX + CapacitySchedulerConfiguration.ROOT;
 
   static class QueueHook {
     public CSQueue hook(CSQueue queue) {
@@ -217,7 +215,7 @@ implements ResourceScheduler, CapacitySchedulerContext {
   private void initializeQueues(CapacitySchedulerConfiguration conf)
     throws IOException {
     root = 
-        parseQueue(this, conf, null, ROOT, queues, queues, 
+        parseQueue(this, conf, null, CapacitySchedulerConfiguration.ROOT, queues, queues, 
             queueComparator, applicationComparator, noop);
     LOG.info("Initialized root queue " + root);
   }
@@ -228,7 +226,7 @@ implements ResourceScheduler, CapacitySchedulerContext {
     // Parse new queues
     Map<String, CSQueue> newQueues = new HashMap<String, CSQueue>();
     CSQueue newRoot = 
-        parseQueue(this, conf, null, ROOT, newQueues, queues, 
+        parseQueue(this, conf, null, CapacitySchedulerConfiguration.ROOT, newQueues, queues, 
             queueComparator, applicationComparator, noop);
     
     // Ensure all existing queues are still present

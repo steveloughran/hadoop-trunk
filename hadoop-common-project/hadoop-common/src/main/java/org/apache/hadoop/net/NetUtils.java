@@ -37,6 +37,7 @@ import java.nio.channels.SocketChannel;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.net.SocketFactory;
 
@@ -45,9 +46,9 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.VersionedProtocol;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
@@ -178,43 +179,111 @@ public class NetUtils {
       throw new IllegalArgumentException("Target address cannot be null." +
           helpText);
     }
-    int colonIndex = target.indexOf(':');
-    if (colonIndex < 0 && defaultPort == -1) {
-      throw new RuntimeException("Not a host:port pair: " + target +
-          helpText);
-    }
-    String hostname;
-    int port = -1;
-    if (!target.contains("/")) {
-      if (colonIndex == -1) {
-        hostname = target;
-      } else {
-        // must be the old style <host>:<port>
-        hostname = target.substring(0, colonIndex);
-        String portStr = target.substring(colonIndex + 1);
-        try {
-          port = Integer.parseInt(portStr);
-        } catch (NumberFormatException nfe) {
-          throw new IllegalArgumentException(
-              "Can't parse port '" + portStr + "'"
-              + helpText);
-        }
-      }
-    } else {
-      // a new uri
-      URI addr = new Path(target).toUri();
-      hostname = addr.getHost();
-      port = addr.getPort();
+    boolean hasScheme = target.contains("://");    
+    URI uri = null;
+    try {
+      uri = hasScheme ? URI.create(target) : URI.create("dummyscheme://"+target);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "Does not contain a valid host:port authority: " + target + helpText
+      );
     }
 
+    String host = uri.getHost();
+    int port = uri.getPort();
     if (port == -1) {
       port = defaultPort;
     }
-  
-    if (getStaticResolution(hostname) != null) {
-      hostname = getStaticResolution(hostname);
+    String path = uri.getPath();
+    
+    if ((host == null) || (port < 0) ||
+        (!hasScheme && path != null && !path.isEmpty()))
+    {
+      throw new IllegalArgumentException(
+          "Does not contain a valid host:port authority: " + target + helpText
+      );
     }
-    return new InetSocketAddress(hostname, port);
+    return createSocketAddrForHost(host, port);
+  }
+
+  /**
+   * Create a socket address with the given host and port.  The hostname
+   * might be replaced with another host that was set via
+   * {@link #addStaticResolution(String, String)}.  The value of
+   * hadoop.security.token.service.use_ip will determine whether the
+   * standard java host resolver is used, or if the fully qualified resolver
+   * is used.
+   * @param host the hostname or IP use to instantiate the object
+   * @param port the port number
+   * @return InetSocketAddress
+   */
+  public static InetSocketAddress createSocketAddrForHost(String host, int port) {
+    String staticHost = getStaticResolution(host);
+    String resolveHost = (staticHost != null) ? staticHost : host;
+    
+    InetSocketAddress addr;
+    try {
+      InetAddress iaddr = SecurityUtil.getByName(resolveHost);
+      // if there is a static entry for the host, make the returned
+      // address look like the original given host
+      if (staticHost != null) {
+        iaddr = InetAddress.getByAddress(host, iaddr.getAddress());
+      }
+      addr = new InetSocketAddress(iaddr, port);
+    } catch (UnknownHostException e) {
+      addr = InetSocketAddress.createUnresolved(host, port);
+    }
+    return addr;
+  }
+  
+  /**
+   * Resolve the uri's hostname and add the default port if not in the uri
+   * @param uri to resolve
+   * @param defaultPort if none is given
+   * @return URI
+   */
+  public static URI getCanonicalUri(URI uri, int defaultPort) {
+    // skip if there is no authority, ie. "file" scheme or relative uri
+    String host = uri.getHost();
+    if (host == null) {
+      return uri;
+    }
+    String fqHost = canonicalizeHost(host);
+    int port = uri.getPort();
+    // short out if already canonical with a port
+    if (host.equals(fqHost) && port != -1) {
+      return uri;
+    }
+    // reconstruct the uri with the canonical host and port
+    try {
+      uri = new URI(uri.getScheme(), uri.getUserInfo(),
+          fqHost, (port == -1) ? defaultPort : port,
+          uri.getPath(), uri.getQuery(), uri.getFragment());
+    } catch (URISyntaxException e) {
+      throw new IllegalArgumentException(e);
+    }
+    return uri;
+  }  
+
+  // cache the canonicalized hostnames;  the cache currently isn't expired,
+  // but the canonicals will only change if the host's resolver configuration
+  // changes
+  private static final ConcurrentHashMap<String, String> canonicalizedHostCache =
+      new ConcurrentHashMap<String, String>();
+
+  private static String canonicalizeHost(String host) {
+    // check if the host has already been canonicalized
+    String fqHost = canonicalizedHostCache.get(host);
+    if (fqHost == null) {
+      try {
+        fqHost = SecurityUtil.getByName(host).getHostName();
+        // slight race condition, but won't hurt 
+        canonicalizedHostCache.put(host, fqHost);
+      } catch (UnknownHostException e) {
+        fqHost = host;
+      }
+    }
+    return fqHost;
   }
 
   /**
@@ -279,8 +348,8 @@ public class NetUtils {
    */
   public static InetSocketAddress getConnectAddress(Server server) {
     InetSocketAddress addr = server.getListenerAddress();
-    if (addr.getAddress().getHostAddress().equals("0.0.0.0")) {
-      addr = new InetSocketAddress("127.0.0.1", addr.getPort());
+    if (addr.getAddress().isAnyLocalAddress()) {
+      addr = createSocketAddrForHost("127.0.0.1", addr.getPort());
     }
     return addr;
   }
