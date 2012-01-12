@@ -17,31 +17,41 @@
  */
 package org.apache.hadoop.fs;
 
-import java.io.*;
+import static org.apache.hadoop.fs.FileContextTestHelper.getAbsoluteTestRootDir;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+
+import java.io.IOException;
 import java.net.URI;
 
+import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileContext;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import static org.apache.hadoop.fs.FileContextTestHelper.*;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
+import org.apache.hadoop.hdfs.web.WebHdfsTestUtil;
 import org.apache.hadoop.ipc.RemoteException;
-import static org.junit.Assert.*;
-import org.junit.Test;
-import org.junit.BeforeClass;
+import org.apache.log4j.Level;
 import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 /**
  * Test symbolic links using FileContext and Hdfs.
  */
 public class TestFcHdfsSymlink extends FileContextSymlinkBaseTest {
 
+  {
+    ((Log4JLogger)NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
+  }
+
   private static MiniDFSCluster cluster;
+  private static WebHdfsFileSystem webhdfs;
+
   
   protected String getScheme() {
     return "hdfs";
@@ -70,10 +80,11 @@ public class TestFcHdfsSymlink extends FileContextSymlinkBaseTest {
   @BeforeClass
   public static void testSetUp() throws Exception {
     Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY, true);
+    conf.setBoolean(DFSConfigKeys.DFS_WEBHDFS_ENABLED_KEY, true);
     conf.set(FsPermission.UMASK_LABEL, "000");
     cluster = new MiniDFSCluster.Builder(conf).build();
     fc = FileContext.getFileContext(cluster.getURI(0));
+    webhdfs = WebHdfsTestUtil.getWebHdfsFileSystem(conf);
   }
   
   @AfterClass
@@ -250,8 +261,21 @@ public class TestFcHdfsSymlink extends FileContextSymlinkBaseTest {
     Path link = new Path(testBaseDir1(), "symlinkToFile");
     createAndWriteFile(file);
     fc.createSymlink(file, link, false);
-    FileStatus stat_file = fc.getFileStatus(file);
-    FileStatus stat_link = fc.getFileStatus(link);
-    assertEquals(stat_link.getOwner(), stat_file.getOwner());
+    FileStatus statFile = fc.getFileStatus(file);
+    FileStatus statLink = fc.getFileStatus(link);
+    assertEquals(statLink.getOwner(), statFile.getOwner());
+  }
+
+  @Test
+  /** Test WebHdfsFileSystem.craeteSymlink(..). */  
+  public void testWebHDFS() throws IOException {
+    Path file = new Path(testBaseDir1(), "file");
+    Path link = new Path(testBaseDir1(), "linkToFile");
+    createAndWriteFile(file);
+    webhdfs.createSymlink(file, link, false);
+    fc.setReplication(link, (short)2);
+    assertEquals(0, fc.getFileLinkStatus(link).getReplication());
+    assertEquals(2, fc.getFileStatus(link).getReplication());      
+    assertEquals(2, fc.getFileStatus(file).getReplication());
   }
 }

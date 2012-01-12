@@ -644,12 +644,12 @@ public class HttpServer implements FilterContainer {
         while (true) {
           try {
             port = webServer.getConnectors()[0].getLocalPort();
-            LOG.info("Port returned by webServer.getConnectors()[0]." +
+            LOG.debug("Port returned by webServer.getConnectors()[0]." +
             		"getLocalPort() before open() is "+ port + 
             		". Opening the listener on " + oriPort);
             listener.open();
             port = listener.getLocalPort();
-            LOG.info("listener.getLocalPort() returned " + listener.getLocalPort() + 
+            LOG.debug("listener.getLocalPort() returned " + listener.getLocalPort() + 
                   " webServer.getConnectors()[0].getLocalPort() returned " +
                   webServer.getConnectors()[0].getLocalPort());
             //Workaround to handle the problem reported in HADOOP-4744
@@ -705,6 +705,14 @@ public class HttpServer implements FilterContainer {
             throw ex;
           }
           listener.setPort((oriPort += 1));
+        }
+      }
+      // Make sure there is no handler failures.
+      Handler[] handlers = webServer.getHandlers();
+      for (int i = 0; i < handlers.length; i++) {
+        if (handlers[i].isFailed()) {
+          throw new IOException(
+              "Problem in starting http server. Server handlers failed");
         }
       }
     } catch (IOException e) {

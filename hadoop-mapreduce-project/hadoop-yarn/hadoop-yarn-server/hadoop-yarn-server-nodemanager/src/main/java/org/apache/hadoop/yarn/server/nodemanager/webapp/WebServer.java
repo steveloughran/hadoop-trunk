@@ -26,11 +26,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.YarnException;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
+import org.apache.hadoop.yarn.server.nodemanager.LocalDirsHandlerService;
 import org.apache.hadoop.yarn.server.nodemanager.ResourceView;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.service.AbstractService;
+import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.WebApps;
+import org.apache.hadoop.yarn.webapp.YarnWebParams;
 
 public class WebServer extends AbstractService {
 
@@ -41,10 +44,11 @@ public class WebServer extends AbstractService {
   private WebApp webApp;
 
   public WebServer(Context nmContext, ResourceView resourceView,
-      ApplicationACLsManager aclsManager) {
+      ApplicationACLsManager aclsManager,
+      LocalDirsHandlerService dirsHandler) {
     super(WebServer.class.getName());
     this.nmContext = nmContext;
-    this.nmWebApp = new NMWebApp(resourceView, aclsManager);
+    this.nmWebApp = new NMWebApp(resourceView, aclsManager, dirsHandler);
   }
 
   @Override
@@ -58,8 +62,9 @@ public class WebServer extends AbstractService {
         YarnConfiguration.DEFAULT_NM_WEBAPP_ADDRESS);
     LOG.info("Instantiating NMWebApp at " + bindAddress);
     try {
-      this.webApp = WebApps.$for("node", Context.class, this.nmContext).at(
-          bindAddress).with(getConfig()).start(this.nmWebApp);
+      this.webApp =
+          WebApps.$for("node", Context.class, this.nmContext, "ws")
+              .at(bindAddress).with(getConfig()).start(this.nmWebApp);
     } catch (Exception e) {
       String msg = "NMWebapps failed to start.";
       LOG.error(msg, e);
@@ -76,21 +81,28 @@ public class WebServer extends AbstractService {
     super.stop();
   }
 
-  public static class NMWebApp extends WebApp implements NMWebParams {
+  public static class NMWebApp extends WebApp implements YarnWebParams {
 
     private final ResourceView resourceView;
     private final ApplicationACLsManager aclsManager;
+    private final LocalDirsHandlerService dirsHandler;
 
     public NMWebApp(ResourceView resourceView,
-        ApplicationACLsManager aclsManager) {
+        ApplicationACLsManager aclsManager,
+        LocalDirsHandlerService dirsHandler) {
       this.resourceView = resourceView;
       this.aclsManager = aclsManager;
+      this.dirsHandler = dirsHandler;
     }
 
     @Override
     public void setup() {
+      bind(NMWebServices.class);
+      bind(GenericExceptionHandler.class);
+      bind(JAXBContextResolver.class);
       bind(ResourceView.class).toInstance(this.resourceView);
       bind(ApplicationACLsManager.class).toInstance(this.aclsManager);
+      bind(LocalDirsHandlerService.class).toInstance(dirsHandler);
       route("/", NMController.class, "info");
       route("/node", NMController.class, "node");
       route("/allApplications", NMController.class, "allApplications");

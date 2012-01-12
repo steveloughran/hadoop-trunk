@@ -18,17 +18,16 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.webapp;
 
-import static org.apache.hadoop.yarn.util.StringHelper.ujoin;
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.ACCORDION;
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.initID;
 
 import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
+import org.apache.hadoop.yarn.server.nodemanager.webapp.dao.ContainerInfo;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.webapp.SubView;
+import org.apache.hadoop.yarn.webapp.YarnWebParams;
 import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
 import org.apache.hadoop.yarn.webapp.hamlet.Hamlet.DIV;
 import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
@@ -36,7 +35,7 @@ import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 
 import com.google.inject.Inject;
 
-public class ContainerPage extends NMView implements NMWebParams {
+public class ContainerPage extends NMView implements YarnWebParams {
 
   @Override
   protected void preHead(Page.HTML<_> html) {
@@ -50,7 +49,7 @@ public class ContainerPage extends NMView implements NMWebParams {
     return ContainerBlock.class;
   }
 
-  public static class ContainerBlock extends HtmlBlock implements NMWebParams {
+  public static class ContainerBlock extends HtmlBlock implements YarnWebParams {
 
     private final Context nmContext;
 
@@ -76,21 +75,16 @@ public class ContainerPage extends NMView implements NMWebParams {
                 + "please go back to the previous page and retry.")._();
         return;
       }
-      ContainerStatus containerData = container.cloneAndGetContainerStatus();
-      int exitCode = containerData.getExitStatus();
-      String exiStatus = 
-          (exitCode == YarnConfiguration.INVALID_CONTAINER_EXIT_STATUS) ? 
-              "N/A" : String.valueOf(exitCode);
+      ContainerInfo info = new ContainerInfo(this.nmContext, container);
+
       info("Container information")
-        ._("ContainerID", $(CONTAINER_ID))
-        ._("ContainerState", container.getContainerState())
-        ._("ExitStatus", exiStatus)
-        ._("Diagnostics", containerData.getDiagnostics())
-        ._("User", container.getUser())
-        ._("TotalMemoryNeeded",
-            container.getLaunchContext().getResource().getMemory())
-        ._("logs", ujoin("containerlogs", $(CONTAINER_ID), container.getUser()),
-            "Link to logs");
+        ._("ContainerID", info.getId())
+        ._("ContainerState", info.getState())
+        ._("ExitStatus", info.getExitStatus())
+        ._("Diagnostics", info.getDiagnostics())
+        ._("User", info.getUser())
+        ._("TotalMemoryNeeded", info.getMemoryNeeded())
+        ._("logs", info.getShortLogLink(), "Link to logs");
       html._(InfoBlock.class);
     }
   }

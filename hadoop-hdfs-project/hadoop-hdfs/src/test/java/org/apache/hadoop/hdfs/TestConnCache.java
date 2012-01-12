@@ -20,23 +20,20 @@ package org.apache.hadoop.hdfs;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.io.IOException;
-import java.util.List;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.RemoteBlockReader;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSInputStream;
 import org.apache.hadoop.hdfs.SocketCache;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 
 import org.apache.hadoop.security.token.Token;
 import org.junit.Test;
@@ -76,20 +73,20 @@ public class TestConnCache {
    * It verifies that all invocation to DFSInputStream.getBlockReader()
    * use the same socket.
    */
-  private class MockGetBlockReader implements Answer<RemoteBlockReader> {
-    public RemoteBlockReader reader = null;
+  private class MockGetBlockReader implements Answer<RemoteBlockReader2> {
+    public RemoteBlockReader2 reader = null;
     private Socket sock = null;
 
-    public RemoteBlockReader answer(InvocationOnMock invocation) throws Throwable {
-      RemoteBlockReader prevReader = reader;
-      reader = (RemoteBlockReader) invocation.callRealMethod();
+    public RemoteBlockReader2 answer(InvocationOnMock invocation) throws Throwable {
+      RemoteBlockReader2 prevReader = reader;
+      reader = (RemoteBlockReader2) invocation.callRealMethod();
       if (sock == null) {
         sock = reader.dnSock;
-      } else if (prevReader != null && prevReader.hasSentStatusCode()) {
-        // Can't reuse socket if the previous BlockReader didn't read till EOS.
+      } else if (prevReader != null) {
         assertSame("DFSInputStream should use the same socket",
                    sock, reader.dnSock);
-      } return reader;
+      }
+      return reader;
     }
   }
 
@@ -213,6 +210,7 @@ public class TestConnCache {
     MockGetBlockReader answer = new MockGetBlockReader();
     Mockito.doAnswer(answer).when(in).getBlockReader(
                            (InetSocketAddress) Matchers.anyObject(),
+                           (DatanodeInfo) Matchers.anyObject(),
                            Matchers.anyString(),
                            (ExtendedBlock) Matchers.anyObject(),
                            (Token<BlockTokenIdentifier>) Matchers.anyObject(),

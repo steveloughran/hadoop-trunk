@@ -63,13 +63,15 @@ import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.logaggregation.AggregatedLogFormat;
+import org.apache.hadoop.yarn.logaggregation.ContainerLogsRetentionPolicy;
+import org.apache.hadoop.yarn.logaggregation.AggregatedLogFormat.LogKey;
+import org.apache.hadoop.yarn.logaggregation.AggregatedLogFormat.LogReader;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrCompletedAppsEvent;
 import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.BaseContainerManagerTest;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEventType;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.AggregatedLogFormat.LogKey;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.AggregatedLogFormat.LogReader;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppFinishedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppStartedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerContainerFinishedEvent;
@@ -120,7 +122,8 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     dispatcher.register(ApplicationEventType.class, appEventHandler);
     
     LogAggregationService logAggregationService =
-        new LogAggregationService(dispatcher, this.context, this.delSrvc);
+        new LogAggregationService(dispatcher, this.context, this.delSrvc,
+                                  super.dirsHandler);
     logAggregationService.init(this.conf);
     logAggregationService.start();
 
@@ -187,7 +190,8 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     dispatcher.register(ApplicationEventType.class, appEventHandler);
     
     LogAggregationService logAggregationService =
-        new LogAggregationService(dispatcher, this.context, this.delSrvc);
+        new LogAggregationService(dispatcher, this.context, this.delSrvc,
+                                  super.dirsHandler);
     logAggregationService.init(this.conf);
     logAggregationService.start();
 
@@ -235,7 +239,8 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     dispatcher.register(ApplicationEventType.class, appEventHandler);
     
     LogAggregationService logAggregationService =
-        new LogAggregationService(dispatcher, this.context, this.delSrvc);
+        new LogAggregationService(dispatcher, this.context, this.delSrvc,
+                                  super.dirsHandler);
     logAggregationService.init(this.conf);
     logAggregationService.start();
 

@@ -156,6 +156,7 @@ public class MRAppMaster extends CompositeService {
   private OutputCommitter committer;
   private JobEventDispatcher jobEventDispatcher;
   private boolean inRecovery = false;
+  private SpeculatorEventDispatcher speculatorEventDispatcher;
 
   private Job job;
   private Credentials fsTokens = new Credentials(); // Filled during init
@@ -217,8 +218,7 @@ public class MRAppMaster extends CompositeService {
         && appAttemptID.getAttemptId() > 1) {
       LOG.info("Recovery is enabled. "
           + "Will try to recover from previous life on best effort basis.");
-      recoveryServ = new RecoveryService(appAttemptID, clock, 
-          committer);
+      recoveryServ = createRecoveryService(context);
       addIfService(recoveryServ);
       dispatcher = recoveryServ.getDispatcher();
       clock = recoveryServ.getClock();
@@ -228,7 +228,7 @@ public class MRAppMaster extends CompositeService {
           + recoveryEnabled + " recoverySupportedByCommitter: "
           + recoverySupportedByCommitter + " ApplicationAttemptID: "
           + appAttemptID.getAttemptId());
-      dispatcher = new AsyncDispatcher();
+      dispatcher = createDispatcher();
       addIfService(dispatcher);
     }
 
@@ -266,8 +266,9 @@ public class MRAppMaster extends CompositeService {
       addIfService(speculator);
     }
 
+    speculatorEventDispatcher = new SpeculatorEventDispatcher(conf);
     dispatcher.register(Speculator.EventType.class,
-        new SpeculatorEventDispatcher(conf));
+        speculatorEventDispatcher);
 
     // service to allocate containers from RM (if non-uber) or to fake it (uber)
     containerAllocator = createContainerAllocator(clientService, context);
@@ -289,6 +290,10 @@ public class MRAppMaster extends CompositeService {
 
     super.init(conf);
   } // end of init()
+
+  protected Dispatcher createDispatcher() {
+    return new AsyncDispatcher();
+  }
 
   private OutputCommitter createOutputCommitter(Configuration conf) {
     OutputCommitter committer = null;
@@ -374,6 +379,18 @@ public class MRAppMaster extends CompositeService {
       // this is the only job, so shut down the Appmaster
       // note in a workflow scenario, this may lead to creation of a new
       // job (FIXME?)
+      if (getConfig().get(MRJobConfig.MR_JOB_END_NOTIFICATION_URL) != null) {
+        try {
+          LOG.info("Job end notification started for jobID : "
+              + job.getReport().getJobId());
+          JobEndNotifier notifier = new JobEndNotifier();
+          notifier.setConf(getConfig());
+          notifier.notify(job.getReport());
+        } catch (InterruptedException ie) {
+          LOG.warn("Job end notification interrupted for jobID : "
+              + job.getReport().getJobId(), ie);
+        }
+      }
 
       // TODO:currently just wait for some time so clients can know the
       // final states. Will be removed once RM come on.
@@ -387,29 +404,19 @@ public class MRAppMaster extends CompositeService {
         // This will also send the final report to the ResourceManager
         LOG.info("Calling stop for all the services");
         stop();
-        
+
         // Send job-end notification
-        try {
-          LOG.info("Job end notification started for jobID : "
-            + job.getReport().getJobId());
-          JobEndNotifier notifier = new JobEndNotifier();
-          notifier.setConf(getConfig());
-          notifier.notify(job.getReport());
-        } catch (InterruptedException ie) {
-          LOG.warn("Job end notification interrupted for jobID : "
-            + job.getReport().getJobId(), ie );
-        }
       } catch (Throwable t) {
         LOG.warn("Graceful stop failed ", t);
       }
-      
+
       // Cleanup staging directory
       try {
         cleanupStagingDir();
       } catch(IOException io) {
         LOG.warn("Failed to delete staging dir");
       }
-      
+
       //Bring the process down by force.
       //Not needed after HADOOP-7140
       LOG.info("Exiting MR AppMaster..GoodBye!");
@@ -423,6 +430,15 @@ public class MRAppMaster extends CompositeService {
    */
   protected EventHandler<JobFinishEvent> createJobFinishEventHandler() {
     return new JobFinishEventHandler();
+  }
+
+  /**
+   * Create the recovery service.
+   * @return an instance of the recovery service.
+   */
+  protected Recovery createRecoveryService(AppContext appContext) {
+    return new RecoveryService(appContext.getApplicationAttemptId(),
+        appContext.getClock(), getCommitter());
   }
 
   /** Create and initialize (but don't start) a single job. */
@@ -782,10 +798,6 @@ public class MRAppMaster extends CompositeService {
     // job-init to be done completely here.
     jobEventDispatcher.handle(initJobEvent);
 
-    // send init to speculator. This won't yest start as dispatcher isn't
-    // started yet.
-    dispatcher.getEventHandler().handle(
-        new SpeculatorEvent(job.getID(), clock.getTime()));
 
     // JobImpl's InitTransition is done (call above is synchronous), so the
     // "uber-decision" (MR-1220) has been made.  Query job and switch to
@@ -793,9 +805,15 @@ public class MRAppMaster extends CompositeService {
     // and container-launcher services/event-handlers).
 
     if (job.isUber()) {
+      speculatorEventDispatcher.disableSpeculation();
       LOG.info("MRAppMaster uberizing job " + job.getID()
-               + " in local container (\"uber-AM\").");
+               + " in local container (\"uber-AM\") on node "
+               + nmHost + ":" + nmPort + ".");
     } else {
+      // send init to speculator only for non-uber jobs. 
+      // This won't yet start as dispatcher isn't started yet.
+      dispatcher.getEventHandler().handle(
+          new SpeculatorEvent(job.getID(), clock.getTime()));
       LOG.info("MRAppMaster launching normal, non-uberized, multi-container "
                + "job " + job.getID() + ".");
     }
@@ -857,17 +875,24 @@ public class MRAppMaster extends CompositeService {
   private class SpeculatorEventDispatcher implements
       EventHandler<SpeculatorEvent> {
     private final Configuration conf;
+    private volatile boolean disabled;
     public SpeculatorEventDispatcher(Configuration config) {
       this.conf = config;
     }
     @Override
     public void handle(SpeculatorEvent event) {
-      if (conf.getBoolean(MRJobConfig.MAP_SPECULATIVE, false)
-          || conf.getBoolean(MRJobConfig.REDUCE_SPECULATIVE, false)) {
+      if (!disabled && 
+          (conf.getBoolean(MRJobConfig.MAP_SPECULATIVE, false)
+          || conf.getBoolean(MRJobConfig.REDUCE_SPECULATIVE, false))) {
         // Speculator IS enabled, direct the event to there.
         speculator.handle(event);
       }
     }
+
+    public void disableSpeculation() {
+      disabled = true;
+    }
+
   }
 
   private static void validateInputParam(String value, String param)

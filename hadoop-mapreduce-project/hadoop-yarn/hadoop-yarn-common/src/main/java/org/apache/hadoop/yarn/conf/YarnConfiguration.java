@@ -91,12 +91,7 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_CLIENT_THREAD_COUNT =
     RM_PREFIX + "client.thread-count";
   public static final int DEFAULT_RM_CLIENT_THREAD_COUNT = 10;
-  
-  /** The expiry interval for application master reporting.*/
-  public static final String RM_AM_EXPIRY_INTERVAL_MS = 
-    RM_PREFIX  + "am.liveness-monitor.expiry-interval-ms";
-  public static final int DEFAULT_RM_AM_EXPIRY_INTERVAL_MS = 600000;
-  
+
   /** The Kerberos principal for the resource manager.*/
   public static final String RM_PRINCIPAL =
     RM_PREFIX + "principal";
@@ -126,7 +121,17 @@ public class YarnConfiguration extends Configuration {
   public static final int DEFAULT_RM_RESOURCE_TRACKER_PORT = 8025;
   public static final String DEFAULT_RM_RESOURCE_TRACKER_ADDRESS =
     "0.0.0.0:" + DEFAULT_RM_RESOURCE_TRACKER_PORT;
-  
+
+  /** The expiry interval for application master reporting.*/
+  public static final String RM_AM_EXPIRY_INTERVAL_MS = 
+    YARN_PREFIX  + "am.liveness-monitor.expiry-interval-ms";
+  public static final int DEFAULT_RM_AM_EXPIRY_INTERVAL_MS = 600000;
+
+  /** How long to wait until a node manager is considered dead.*/
+  public static final String RM_NM_EXPIRY_INTERVAL_MS = 
+    YARN_PREFIX + "nm.liveness-monitor.expiry-interval-ms";
+  public static final int DEFAULT_RM_NM_EXPIRY_INTERVAL_MS = 600000;
+
   /** Are acls enabled.*/
   public static final String YARN_ACL_ENABLE = 
     YARN_PREFIX + "acl.enable";
@@ -160,12 +165,7 @@ public class YarnConfiguration extends Configuration {
   /** The keytab for the resource manager.*/
   public static final String RM_KEYTAB = 
     RM_PREFIX + "keytab";
-  
-  /** How long to wait until a node manager is considered dead.*/
-  public static final String RM_NM_EXPIRY_INTERVAL_MS = 
-    RM_PREFIX + "nm.liveness-monitor.expiry-interval-ms";
-  public static final int DEFAULT_RM_NM_EXPIRY_INTERVAL_MS = 600000;
-  
+
   /** How long to wait until a container is considered dead.*/
   public static final String RM_CONTAINER_ALLOC_EXPIRY_INTERVAL_MS = 
     RM_PREFIX + "rm.container-allocation.expiry-interval-ms";
@@ -189,10 +189,26 @@ public class YarnConfiguration extends Configuration {
   /** The class to use as the resource scheduler.*/
   public static final String RM_SCHEDULER = 
     RM_PREFIX + "scheduler.class";
+ 
+
+  //Delegation token related keys
+  public static final String  DELEGATION_KEY_UPDATE_INTERVAL_KEY = 
+    RM_PREFIX + "delegation.key.update-interval";
+  public static final long    DELEGATION_KEY_UPDATE_INTERVAL_DEFAULT = 
+    24*60*60*1000; // 1 day
+  public static final String  DELEGATION_TOKEN_RENEW_INTERVAL_KEY = 
+    RM_PREFIX + "delegation.token.renew-interval";
+  public static final long    DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT = 
+    24*60*60*1000;  // 1 day
+  public static final String  DELEGATION_TOKEN_MAX_LIFETIME_KEY = 
+     RM_PREFIX + "delegation.token.max-lifetime";
+  public static final long    DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT = 
+    7*24*60*60*1000; // 7 days
+  
   
   /** The class to use as the persistent store.*/
   public static final String RM_STORE = RM_PREFIX + "store.class";
-  
+ 
   /** The address of the zookeeper instance to use with ZK store.*/
   public static final String RM_ZK_STORE_ADDRESS = 
     RM_PREFIX + "zookeeper-store.address";
@@ -293,10 +309,16 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_LOG_DIRS = NM_PREFIX + "log-dirs";
   public static final String DEFAULT_NM_LOG_DIRS = "/tmp/logs";
 
+  /** Interval at which the delayed token removal thread runs */
+  public static final String RM_DELAYED_DELEGATION_TOKEN_REMOVAL_INTERVAL_MS =
+      RM_PREFIX + "delayed.delegation-token.removal-interval-ms";
+  public static final long DEFAULT_RM_DELAYED_DELEGATION_TOKEN_REMOVAL_INTERVAL_MS =
+      30000l;
+
   /** Whether to enable log aggregation */
-  public static final String NM_LOG_AGGREGATION_ENABLED = NM_PREFIX
+  public static final String LOG_AGGREGATION_ENABLED = YARN_PREFIX
       + "log-aggregation-enable";
-  public static final boolean DEFAULT_NM_LOG_AGGREGATION_ENABLED = false;
+  public static final boolean DEFAULT_LOG_AGGREGATION_ENABLED = false;
   
   /**
    * Number of seconds to retain logs on the NodeManager. Only applicable if Log
@@ -351,13 +373,39 @@ public class YarnConfiguration extends Configuration {
   /** Class that calculates containers current resource utilization.*/
   public static final String NM_CONTAINER_MON_RESOURCE_CALCULATOR =
     NM_PREFIX + "container-monitor.resource-calculator.class";
-  
+
+  /**
+   * Enable/Disable disks' health checker. Default is true.
+   * An expert level configuration property.
+   */
+  public static final String NM_DISK_HEALTH_CHECK_ENABLE =
+    NM_PREFIX + "disk-health-checker.enable";
+  /** Frequency of running disks' health checker.*/
+  public static final String NM_DISK_HEALTH_CHECK_INTERVAL_MS =
+    NM_PREFIX + "disk-health-checker.interval-ms";
+  /** By default, disks' health is checked every 2 minutes. */
+  public static final long DEFAULT_NM_DISK_HEALTH_CHECK_INTERVAL_MS =
+    2 * 60 * 1000;
+
+  /**
+   * The minimum fraction of number of disks to be healthy for the nodemanager
+   * to launch new containers. This applies to nm-local-dirs and nm-log-dirs.
+   */
+  public static final String NM_MIN_HEALTHY_DISKS_FRACTION =
+    NM_PREFIX + "disk-health-checker.min-healthy-disks";
+  /**
+   * By default, at least 5% of disks are to be healthy to say that the node
+   * is healthy in terms of disks.
+   */
+  public static final float DEFAULT_NM_MIN_HEALTHY_DISKS_FRACTION
+    = 0.25F;
+
   /** Frequency of running node health script.*/
   public static final String NM_HEALTH_CHECK_INTERVAL_MS = 
     NM_PREFIX + "health-checker.interval-ms";
   public static final long DEFAULT_NM_HEALTH_CHECK_INTERVAL_MS = 10 * 60 * 1000;
-  
-  /** Script time out period.*/
+
+  /** Health check script time out period.*/  
   public static final String NM_HEALTH_CHECK_SCRIPT_TIMEOUT_MS = 
     NM_PREFIX + "health-checker.script.timeout-ms";
   public static final long DEFAULT_NM_HEALTH_CHECK_SCRIPT_TIMEOUT_MS = 
@@ -405,6 +453,7 @@ public class YarnConfiguration extends Configuration {
 
   public static final int INVALID_CONTAINER_EXIT_STATUS = -1000;
   public static final int ABORTED_CONTAINER_EXIT_STATUS = -100;
+  public static final int DISKS_FAILED = -101;
 
   ////////////////////////////////
   // Web Proxy Configs

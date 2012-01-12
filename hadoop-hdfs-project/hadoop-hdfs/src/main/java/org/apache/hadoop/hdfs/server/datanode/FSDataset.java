@@ -52,6 +52,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
+import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
@@ -459,7 +460,7 @@ public class FSDataset implements FSDatasetInterface {
         long metaFileLen = metaFile.length();
         int crcHeaderLen = DataChecksum.getChecksumHeaderSize();
         if (!blockFile.exists() || blockFileLen == 0 ||
-            !metaFile.exists() || metaFileLen < (long)crcHeaderLen) {
+            !metaFile.exists() || metaFileLen < crcHeaderLen) {
           return 0;
         }
         checksumIn = new DataInputStream(
@@ -578,7 +579,7 @@ public class FSDataset implements FSDatasetInterface {
      * reserved capacity.
      * @return the unreserved number of bytes left in this filesystem. May be zero.
      */
-    long getCapacity() throws IOException {
+    long getCapacity() {
       long remaining = usage.getCapacity() - reserved;
       return remaining > 0 ? remaining : 0;
     }
@@ -818,7 +819,7 @@ public class FSDataset implements FSDatasetInterface {
       return dfsUsed;
     }
 
-    private long getCapacity() throws IOException {
+    private long getCapacity() {
       long capacity = 0L;
       for (FSVolume vol : volumes) {
         capacity += vol.getCapacity();
@@ -1258,7 +1259,7 @@ public class FSDataset implements FSDatasetInterface {
   /**
    * Get File name for a given block.
    */
-  public synchronized File getBlockFile(String bpid, Block b)
+  public File getBlockFile(String bpid, Block b)
       throws IOException {
     File f = validateBlockFile(bpid, b);
     if(f == null) {
@@ -1271,16 +1272,44 @@ public class FSDataset implements FSDatasetInterface {
   }
   
   @Override // FSDatasetInterface
-  public synchronized InputStream getBlockInputStream(ExtendedBlock b)
+  public InputStream getBlockInputStream(ExtendedBlock b)
       throws IOException {
-    return new FileInputStream(getBlockFile(b));
+    File f = getBlockFileNoExistsCheck(b);
+    try {
+      return new FileInputStream(f);
+    } catch (FileNotFoundException fnfe) {
+      throw new IOException("Block " + b + " is not valid. " +
+          "Expected block file at " + f + " does not exist.");
+    }
+  }
+  
+  /**
+   * Return the File associated with a block, without first
+   * checking that it exists. This should be used when the
+   * next operation is going to open the file for read anyway,
+   * and thus the exists check is redundant.
+   */
+  private File getBlockFileNoExistsCheck(ExtendedBlock b)
+      throws IOException {
+    File f = getFile(b.getBlockPoolId(), b.getLocalBlock());
+    if (f == null) {
+      throw new IOException("Block " + b + " is not valid");
+    }
+    return f;
   }
 
   @Override // FSDatasetInterface
-  public synchronized InputStream getBlockInputStream(ExtendedBlock b,
+  public InputStream getBlockInputStream(ExtendedBlock b,
       long seekOffset) throws IOException {
-    File blockFile = getBlockFile(b);
-    RandomAccessFile blockInFile = new RandomAccessFile(blockFile, "r");
+    File blockFile = getBlockFileNoExistsCheck(b);
+    RandomAccessFile blockInFile;
+    try {
+      blockInFile = new RandomAccessFile(blockFile, "r");
+    } catch (FileNotFoundException fnfe) {
+      throw new IOException("Block " + b + " is not valid. " +
+          "Expected block file at " + blockFile + " does not exist.");
+    }
+
     if (seekOffset > 0) {
       blockInFile.seek(seekOffset);
     }
@@ -1639,7 +1668,7 @@ public class FSDataset implements FSDatasetInterface {
     }
     if (!oldmeta.renameTo(newmeta)) {
       replicaInfo.setGenerationStamp(oldGS); // restore old GS
-      throw new IOException("Block " + (Block)replicaInfo + " reopen failed. " +
+      throw new IOException("Block " + replicaInfo + " reopen failed. " +
                             " Unable to move meta file  " + oldmeta +
                             " to " + newmeta);
     }
@@ -1990,7 +2019,7 @@ public class FSDataset implements FSDatasetInterface {
   /**
    * Find the file corresponding to the block and return it if it exists.
    */
-  File validateBlockFile(String bpid, Block b) throws IOException {
+  File validateBlockFile(String bpid, Block b) {
     //Should we check for metadata file too?
     File f = getFile(bpid, b);
     
@@ -2299,7 +2328,7 @@ public class FSDataset implements FSDatasetInterface {
         if (datanode.blockScanner != null) {
           datanode.blockScanner.addBlock(new ExtendedBlock(bpid, diskBlockInfo));
         }
-        DataNode.LOG.warn("Added missing block to memory " + (Block)diskBlockInfo);
+        DataNode.LOG.warn("Added missing block to memory " + diskBlockInfo);
         return;
       }
       /*
@@ -2572,7 +2601,7 @@ public class FSDataset implements FSDatasetInterface {
    * get list of all bpids
    * @return list of bpids
    */
-  public String [] getBPIdlist() throws IOException {
+  public String [] getBPIdlist() {
     return volumeMap.getBlockPoolList();
   }
   
@@ -2629,5 +2658,15 @@ public class FSDataset implements FSDatasetInterface {
     for (FSVolume volume : volumes.volumes) {
       volume.deleteBPDirectories(bpid, force);
     }
+  }
+  
+  @Override // FSDatasetInterface
+  public BlockLocalPathInfo getBlockLocalPathInfo(ExtendedBlock block)
+      throws IOException {
+    File datafile = getBlockFile(block);
+    File metafile = getMetaFile(datafile, block.getGenerationStamp());
+    BlockLocalPathInfo info = new BlockLocalPathInfo(block,
+        datafile.getAbsolutePath(), metafile.getAbsolutePath());
+    return info;
   }
 }

@@ -1,4 +1,27 @@
 <?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<!--
+   Licensed to the Apache Software Foundation (ASF) under one or more
+   contributor license agreements.  See the NOTICE file distributed with
+   this work for additional information regarding copyright ownership.
+   The ASF licenses this file to You under the Apache License, Version 2.0
+   (the "License"); you may not use this file except in compliance with
+   the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+
+<!-- Do not modify this file directly.  Instead, copy entries that you -->
+<!-- wish to modify from this file into yarn-site.xml and change them -->
+<!-- there.  If yarn-site.xml does not already exist, create it.      -->
+
 <configuration>
   
   <!-- IPC Configs -->
@@ -49,14 +72,13 @@
 
   <property>
     <description>The expiry interval for application master reporting.</description>
-    <name>yarn.resourcemanager.am.liveness-monitor.expiry-interval-ms</name>
+    <name>yarn.am.liveness-monitor.expiry-interval-ms</name>
     <value>600000</value>
   </property>
 
   <property>
     <description>The Kerberos principal for the resource manager.</description>
     <name>yarn.resourcemanager.principal</name>
-    <value>rm/sightbusy-lx@LOCALHOST</value>
   </property>
 
   <property>
@@ -132,7 +154,7 @@
 
   <property>
     <description>How long to wait until a node manager is considered dead.</description>
-    <name>yarn.resourcemanager.nm.liveness-monitor.expiry-interval-ms</name>
+    <name>yarn.nm.liveness-monitor.expiry-interval-ms</name>
     <value>600000</value>
   </property>
 
@@ -185,6 +207,12 @@
     <description>The maximum number of completed applications RM keeps. </description>
     <name>yarn.resourcemanager.max-completed-applications</name>
     <value>10000</value>
+  </property>
+
+  <property>
+    <description>Interval at which the delayed token removal thread runs</description>
+    <name>yarn.resourcemanager.delayed.delegation-token.removal-interval-ms</name>
+    <value>30000</value>
   </property>
 
   <!-- Node Manager Configs -->
@@ -281,7 +309,7 @@
 
   <property>
     <description>Whether to enable log aggregation</description>
-    <name>yarn.nodemanager.log-aggregation-enable</name>
+    <name>yarn.log-aggregation-enable</name>
     <value>false</value>
   </property>
   
@@ -366,6 +394,22 @@
   </property>
 
   <property>
+    <description>Frequency of running disk health checker code.</description>
+    <name>yarn.nodemanager.disk-health-checker.interval-ms</name>
+    <value>120000</value>
+  </property>
+
+  <property>
+    <description>The minimum fraction of number of disks to be healthy for the
+    nodemanager to launch new containers. This correspond to both
+    yarn-nodemanager.local-dirs and yarn.nodemanager.log-dirs. i.e. If there
+    are less number of healthy local-dirs (or log-dirs) available, then
+    new containers will not be launched on this node.</description>
+    <name>yarn.nodemanager.disk-health-checker.min-healthy-disks</name>
+    <value>0.25</value>
+  </property>
+
+  <property>
     <description>The path to the Linux container executor.</description>
     <name>yarn.nodemanager.linux-container-executor.path</name>
   </property>
@@ -379,7 +423,7 @@
   <property>
     <description>The kerberos principal for the node manager.</description>
     <name>yarn.nodemanager.principal</name>
-    <value>nm/sightbusy-lx@LOCALHOST</value>
+    <value></value>
   </property>
 
   <property>

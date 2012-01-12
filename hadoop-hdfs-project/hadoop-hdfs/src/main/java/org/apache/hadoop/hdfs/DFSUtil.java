@@ -30,6 +30,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -50,10 +51,16 @@ import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
+import org.apache.hadoop.hdfs.protocolPB.ClientDatanodeProtocolTranslatorPB;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.RpcPayloadHeader.RpcKind;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.security.UserGroupInformation;
+
+import com.google.protobuf.BlockingService;
 
 @InterfaceAudience.Private
 public class DFSUtil {
@@ -63,10 +70,22 @@ public class DFSUtil {
       return new Random();
     }
   };
+  
+  private static final ThreadLocal<SecureRandom> SECURE_RANDOM = new ThreadLocal<SecureRandom>() {
+    @Override
+    protected SecureRandom initialValue() {
+      return new SecureRandom();
+    }
+  };
 
-  /** @return a pseudorandom number generator. */
+  /** @return a pseudo random number generator. */
   public static Random getRandom() {
     return RANDOM.get();
+  }
+  
+  /** @return a pseudo secure random number generator. */
+  public static SecureRandom getSecureRandom() {
+    return SECURE_RANDOM.get();
   }
 
   /**
@@ -572,12 +591,12 @@ public class DFSUtil {
   
   /** Return used as percentage of capacity */
   public static float getPercentUsed(long used, long capacity) {
-    return capacity <= 0 ? 100 : ((float)used * 100.0f)/(float)capacity; 
+    return capacity <= 0 ? 100 : (used * 100.0f)/capacity; 
   }
   
   /** Return remaining as percentage of capacity */
   public static float getPercentRemaining(long remaining, long capacity) {
-    return capacity <= 0 ? 0 : ((float)remaining * 100.0f)/(float)capacity; 
+    return capacity <= 0 ? 0 : (remaining * 100.0f)/capacity; 
   }
 
   /**
@@ -621,29 +640,35 @@ public class DFSUtil {
       Configuration conf, UserGroupInformation ugi) throws IOException {
     /** 
      * Currently we have simply burnt-in support for a SINGLE
-     * protocol - protocolR23Compatible. This will be replaced
+     * protocol - protocolPB. This will be replaced
      * by a way to pick the right protocol based on the 
      * version of the target server.  
      */
-    return new org.apache.hadoop.hdfs.protocolR23Compatible.
-        ClientNamenodeProtocolTranslatorR23(nameNodeAddr, conf, ugi);
+    return new org.apache.hadoop.hdfs.protocolPB.
+        ClientNamenodeProtocolTranslatorPB(nameNodeAddr, conf, ugi);
   }
 
   /** Create a {@link ClientDatanodeProtocol} proxy */
   public static ClientDatanodeProtocol createClientDatanodeProtocolProxy(
       DatanodeID datanodeid, Configuration conf, int socketTimeout,
       LocatedBlock locatedBlock) throws IOException {
-    return new org.apache.hadoop.hdfs.protocolR23Compatible.
-        ClientDatanodeProtocolTranslatorR23(datanodeid, conf, socketTimeout,
+    return new ClientDatanodeProtocolTranslatorPB(datanodeid, conf, socketTimeout,
              locatedBlock);
+  }
+  
+  /** Create {@link ClientDatanodeProtocol} proxy using kerberos ticket */
+  static ClientDatanodeProtocol createClientDatanodeProtocolProxy(
+      DatanodeID datanodeid, Configuration conf, int socketTimeout)
+      throws IOException {
+    return new ClientDatanodeProtocolTranslatorPB(
+        datanodeid, conf, socketTimeout);
   }
   
   /** Create a {@link ClientDatanodeProtocol} proxy */
   public static ClientDatanodeProtocol createClientDatanodeProtocolProxy(
       InetSocketAddress addr, UserGroupInformation ticket, Configuration conf,
       SocketFactory factory) throws IOException {
-    return new org.apache.hadoop.hdfs.protocolR23Compatible.
-        ClientDatanodeProtocolTranslatorR23(addr, ticket, conf, factory);
+    return new ClientDatanodeProtocolTranslatorPB(addr, ticket, conf, factory);
   }
   
   /**
@@ -727,5 +752,19 @@ public class DFSUtil {
     } catch (URISyntaxException ue) {
       throw new IllegalArgumentException(ue);
     }
+  }
+  
+  /**
+   * Add protobuf based protocol to the {@link org.apache.hadoop.ipc.RPC.Server}
+   * @param conf configuration
+   * @param protocol Protocol interface
+   * @param service service that implements the protocol
+   * @param server RPC server to which the protocol & implementation is added to
+   * @throws IOException
+   */
+  public static void addPBProtocol(Configuration conf, Class<?> protocol,
+      BlockingService service, RPC.Server server) throws IOException {
+    RPC.setProtocolEngine(conf, protocol, ProtobufRpcEngine.class);
+    server.addProtocol(RpcKind.RPC_PROTOCOL_BUFFER, protocol, service);
   }
 }

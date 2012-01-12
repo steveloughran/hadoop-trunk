@@ -24,11 +24,13 @@ import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.mapred.LocalContainerLauncher;
 import org.apache.hadoop.mapred.ShuffleHandler;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.v2.hs.JobHistoryServer;
 import org.apache.hadoop.mapreduce.v2.jobhistory.JHAdminConfig;
+import org.apache.hadoop.util.JarFinder;
 import org.apache.hadoop.yarn.YarnException;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.MiniYARNCluster;
@@ -43,15 +45,7 @@ import org.apache.hadoop.yarn.service.Service;
  */
 public class MiniMRYarnCluster extends MiniYARNCluster {
 
-  public static final String HADOOP_MAPREDUCE_CLIENT_APP_JAR_NAME =
-  "hadoop-mapreduce-client-app-0.24.0-SNAPSHOT.jar";
-  
-  public static final String YARN_MAPREDUCE_APP_JAR_PATH =
-  "$YARN_HOME/modules/" + HADOOP_MAPREDUCE_CLIENT_APP_JAR_NAME;
-
-  public static final String APPJAR =
-    "../hadoop-mapreduce-client-app/target/"
-        + HADOOP_MAPREDUCE_CLIENT_APP_JAR_NAME;
+  public static final String APPJAR = JarFinder.getJar(LocalContainerLauncher.class);
 
   private static final Log LOG = LogFactory.getLog(MiniMRYarnCluster.class);
   private JobHistoryServer historyServer;
@@ -60,9 +54,9 @@ public class MiniMRYarnCluster extends MiniYARNCluster {
   public MiniMRYarnCluster(String testName) {
     this(testName, 1);
   }
-  
+
   public MiniMRYarnCluster(String testName, int noOfNMs) {
-    super(testName, noOfNMs);
+    super(testName, noOfNMs, 4, 4);
     //TODO: add the history server
     historyServerWrapper = new JobHistoryServerWrapper();
     addService(historyServerWrapper);
@@ -71,7 +65,6 @@ public class MiniMRYarnCluster extends MiniYARNCluster {
   @Override
   public void init(Configuration conf) {
     conf.set(MRConfig.FRAMEWORK_NAME, MRConfig.YARN_FRAMEWORK_NAME);
-    conf.set(MRJobConfig.USER_NAME, System.getProperty("user.name"));
     conf.set(MRJobConfig.MR_AM_STAGING_DIR, new File(getTestWorkDir(),
         "apps_staging_dir/${user.name}/").getAbsolutePath());
     conf.set(MRConfig.MASTER_ADDRESS, "test"); // The default is local because of
@@ -94,9 +87,9 @@ public class MiniMRYarnCluster extends MiniYARNCluster {
     conf.setBoolean(MRJobConfig.JOB_UBERTASK_ENABLE, false);
 
     // Set config for JH Server
-    conf.set(JHAdminConfig.MR_HISTORY_ADDRESS, 
+    conf.set(JHAdminConfig.MR_HISTORY_ADDRESS,
         JHAdminConfig.DEFAULT_MR_HISTORY_ADDRESS);
-    
+
     super.init(conf);
   }
 

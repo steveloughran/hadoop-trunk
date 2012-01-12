@@ -23,6 +23,7 @@ import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.util.JarFinder;
 import org.apache.hadoop.yarn.server.MiniYARNCluster;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -36,13 +37,14 @@ public class TestDistributedShell {
   protected static MiniYARNCluster yarnCluster = null;
   protected static Configuration conf = new Configuration();
 
-  protected static String APPMASTER_JAR = "../hadoop-yarn-applications-distributedshell/target/hadoop-yarn-applications-distributedshell-0.24.0-SNAPSHOT.jar";
+  protected static String APPMASTER_JAR = JarFinder.getJar(ApplicationMaster.class);
 
   @BeforeClass
   public static void setup() throws InterruptedException, IOException {
     LOG.info("Starting up YARN cluster");
     if (yarnCluster == null) {
-      yarnCluster = new MiniYARNCluster(TestDistributedShell.class.getName());
+      yarnCluster = new MiniYARNCluster(TestDistributedShell.class.getName(),
+          1, 1, 1);
       yarnCluster.init(conf);
       yarnCluster.start();
     }

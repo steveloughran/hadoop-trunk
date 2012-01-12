@@ -146,10 +146,10 @@ public class LeafQueue implements CSQueue {
       (float)cs.getConfiguration().getCapacity(getQueuePath()) / 100;
     float absoluteCapacity = parent.getAbsoluteCapacity() * capacity;
 
-    float maximumCapacity = cs.getConfiguration().getMaximumCapacity(getQueuePath());
+    float maximumCapacity = (float)cs.getConfiguration().getMaximumCapacity(getQueuePath()) / 100;
     float absoluteMaxCapacity = 
-      (maximumCapacity == CapacitySchedulerConfiguration.UNDEFINED) ? 
-          Float.MAX_VALUE : (parent.getAbsoluteCapacity() * maximumCapacity) / 100;
+      (Math.round(maximumCapacity * 100) == CapacitySchedulerConfiguration.UNDEFINED) ? 
+          Float.MAX_VALUE : (parent.getAbsoluteCapacity() * maximumCapacity);
 
     int userLimit = cs.getConfiguration().getUserLimit(getQueuePath());
     float userLimitFactor = 
@@ -211,16 +211,19 @@ public class LeafQueue implements CSQueue {
   
   private synchronized void setupQueueConfigs(
       float capacity, float absoluteCapacity, 
-      float maxCapacity, float absoluteMaxCapacity,
+      float maximumCapacity, float absoluteMaxCapacity,
       int userLimit, float userLimitFactor,
       int maxApplications, int maxApplicationsPerUser,
       int maxActiveApplications, int maxActiveApplicationsPerUser,
       QueueState state, Map<QueueACL, AccessControlList> acls)
   {
+    // Sanity check
+    CSQueueUtils.checkMaxCapacity(getQueueName(), capacity, maximumCapacity);
+
     this.capacity = capacity; 
     this.absoluteCapacity = parent.getAbsoluteCapacity() * capacity;
 
-    this.maximumCapacity = maxCapacity;
+    this.maximumCapacity = maximumCapacity;
     this.absoluteMaxCapacity = absoluteMaxCapacity;
 
     this.userLimit = userLimit;
@@ -236,25 +239,54 @@ public class LeafQueue implements CSQueue {
 
     this.acls = acls;
 
-    this.queueInfo.setCapacity(capacity);
-    this.queueInfo.setMaximumCapacity(maximumCapacity);
-    this.queueInfo.setQueueState(state);
+    this.queueInfo.setCapacity(this.capacity);
+    this.queueInfo.setMaximumCapacity(this.maximumCapacity);
+    this.queueInfo.setQueueState(this.state);
 
     StringBuilder aclsString = new StringBuilder();
     for (Map.Entry<QueueACL, AccessControlList> e : acls.entrySet()) {
       aclsString.append(e.getKey() + ":" + e.getValue().getAclString());
     }
 
-    LOG.info("Initializing " + queueName +
-        ", capacity=" + capacity + 
-        ", asboluteCapacity=" + absoluteCapacity + 
-        ", maxCapacity=" + maxCapacity +
-        ", asboluteMaxCapacity=" + absoluteMaxCapacity +
-        ", userLimit=" + userLimit + ", userLimitFactor=" + userLimitFactor + 
-        ", maxApplications=" + maxApplications + 
-        ", maxApplicationsPerUser=" + maxApplicationsPerUser + 
-        ", state=" + state +
-        ", acls=" + aclsString);
+    LOG.info("Initializing " + queueName + "\n" +
+        "capacity = " + capacity +
+        " [= (float) configuredCapacity / 100 ]" + "\n" + 
+        "asboluteCapacity = " + absoluteCapacity +
+        " [= parentAbsoluteCapacity * capacity ]" + "\n" +
+        "maxCapacity = " + maximumCapacity +
+        " [= configuredMaxCapacity ]" + "\n" +
+        "absoluteMaxCapacity = " + absoluteMaxCapacity +
+        " [= Float.MAX_VALUE if maximumCapacity undefined, " +
+        "(parentAbsoluteCapacity * maximumCapacity) / 100 otherwise ]" + "\n" +
+        "userLimit = " + userLimit +
+        " [= configuredUserLimit ]" + "\n" +
+        "userLimitFactor = " + userLimitFactor +
+        " [= configuredUserLimitFactor ]" + "\n" +
+        "maxApplications = " + maxApplications +
+        " [= (int)(configuredMaximumSystemApplications * absoluteCapacity) ]" + "\n" +
+        "maxApplicationsPerUser = " + maxApplicationsPerUser +
+        " [= (int)(maxApplications * (userLimit / 100.0f) * userLimitFactor) ]" + "\n" +
+        "maxActiveApplications = " + maxActiveApplications +
+        " [= max(" + 
+        "(int)((clusterResourceMemory / (float)DEFAULT_AM_RESOURCE) *" + 
+        "maxAMResourcePercent * absoluteCapacity)," + 
+        "1) ]" + "\n" +
+        "maxActiveApplicationsPerUser = " + maxActiveApplicationsPerUser +
+        " [= (int)(maxActiveApplications * (userLimit / 100.0f) * userLimitFactor) ]" + "\n" +
+        "utilization = " + utilization +
+        " [= usedResourcesMemory / queueLimit ]" + "\n" +
+        "usedCapacity = " + usedCapacity +
+        " [= usedResourcesMemory / (clusterResourceMemory * capacity) ]" + "\n" +
+        "maxAMResourcePercent = " + maxAMResourcePercent +
+        " [= configuredMaximumAMResourcePercent ]" + "\n" +
+        "minimumAllocationFactor = " + minimumAllocationFactor +
+        " [= (float)(maximumAllocationMemory - minimumAllocationMemory) / maximumAllocationMemory ]" + "\n" +
+        "numContainers = " + numContainers +
+        " [= currentNumContainers ]" + "\n" +
+        "state = " + state +
+        " [= configuredState ]" + "\n" +
+        "acls = " + aclsString +
+        " [= configuredAcls ]" + "\n");
   }
   
   @Override
@@ -365,9 +397,12 @@ public class LeafQueue implements CSQueue {
    * @param maximumCapacity new max capacity
    */
   synchronized void setMaxCapacity(float maximumCapacity) {
+    // Sanity check
+    CSQueueUtils.checkMaxCapacity(getQueueName(), capacity, maximumCapacity);
+    
     this.maximumCapacity = maximumCapacity;
     this.absoluteMaxCapacity = 
-      (maximumCapacity == CapacitySchedulerConfiguration.UNDEFINED) ? 
+      (Math.round(maximumCapacity * 100) == CapacitySchedulerConfiguration.UNDEFINED) ? 
           Float.MAX_VALUE : 
           (parent.getAbsoluteCapacity() * maximumCapacity);
   }
@@ -457,11 +492,8 @@ public class LeafQueue implements CSQueue {
     QueueUserACLInfo userAclInfo = 
       recordFactory.newRecordInstance(QueueUserACLInfo.class);
     List<QueueACL> operations = new ArrayList<QueueACL>();
-    for (Map.Entry<QueueACL, AccessControlList> e : acls.entrySet()) {
-      QueueACL operation = e.getKey();
-      AccessControlList acl = e.getValue();
-
-      if (acl.isUserAllowed(user)) {
+    for (QueueACL operation : QueueACL.values()) {
+      if (hasAccess(operation, user)) {
         operations.add(operation);
       }
     }
@@ -794,13 +826,13 @@ public class LeafQueue implements CSQueue {
     float potentialNewCapacity = 
       (float)(usedResources.getMemory() + required.getMemory()) / 
         clusterResource.getMemory();
+    LOG.info(getQueueName() + 
+        " usedResources: " + usedResources.getMemory() + 
+        " currentCapacity " + ((float)usedResources.getMemory())/clusterResource.getMemory() + 
+        " required " + required.getMemory() +
+        " potentialNewCapacity: " + potentialNewCapacity + " ( " +
+        " max-capacity: " + absoluteMaxCapacity + ")");
     if (potentialNewCapacity > absoluteMaxCapacity) {
-      LOG.info(getQueueName() + 
-          " usedResources: " + usedResources.getMemory() + 
-          " currentCapacity " + ((float)usedResources.getMemory())/clusterResource.getMemory() + 
-          " required " + required.getMemory() +
-          " potentialNewCapacity: " + potentialNewCapacity + " ( " +
-          " > max-capacity (" + absoluteMaxCapacity + ")");
       return false;
     }
     return true;

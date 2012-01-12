@@ -25,8 +25,12 @@ import java.io.DataOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.Socket;
+import java.net.SocketException;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -78,6 +82,7 @@ import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpBlockChecksumResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
+import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.UpgradeStatusReport;
@@ -98,7 +103,9 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
+import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Progressable;
+import org.apache.hadoop.hdfs.security.token.block.InvalidBlockTokenException;
 
 /********************************************************
  * DFSClient can connect to a Hadoop Filesystem and 
@@ -139,6 +146,7 @@ public class DFSClient implements java.io.Closeable {
     final int maxBlockAcquireFailures;
     final int confTime;
     final int ioBufferSize;
+    final int checksumType;
     final int bytesPerChecksum;
     final int writePacketSize;
     final int socketTimeout;
@@ -153,6 +161,7 @@ public class DFSClient implements java.io.Closeable {
     final short defaultReplication;
     final String taskId;
     final FsPermission uMask;
+    final boolean useLegacyBlockReader;
 
     Conf(Configuration conf) {
       maxBlockAcquireFailures = conf.getInt(
@@ -163,6 +172,7 @@ public class DFSClient implements java.io.Closeable {
       ioBufferSize = conf.getInt(
           CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY,
           CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT);
+      checksumType = getChecksumType(conf);
       bytesPerChecksum = conf.getInt(DFS_BYTES_PER_CHECKSUM_KEY,
           DFS_BYTES_PER_CHECKSUM_DEFAULT);
       socketTimeout = conf.getInt(DFS_CLIENT_SOCKET_TIMEOUT_KEY,
@@ -170,7 +180,7 @@ public class DFSClient implements java.io.Closeable {
       /** dfs.write.packet.size is an internal config variable */
       writePacketSize = conf.getInt(DFS_CLIENT_WRITE_PACKET_SIZE_KEY,
           DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT);
-      defaultBlockSize = conf.getLong(DFS_BLOCK_SIZE_KEY,
+      defaultBlockSize = conf.getLongBytes(DFS_BLOCK_SIZE_KEY,
           DFS_BLOCK_SIZE_DEFAULT);
       defaultReplication = (short) conf.getInt(
           DFS_REPLICATION_KEY, DFS_REPLICATION_DEFAULT);
@@ -189,6 +199,29 @@ public class DFSClient implements java.io.Closeable {
           .getInt(DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_KEY,
               DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_DEFAULT);
       uMask = FsPermission.getUMask(conf);
+      useLegacyBlockReader = conf.getBoolean(
+          DFS_CLIENT_USE_LEGACY_BLOCKREADER,
+          DFS_CLIENT_USE_LEGACY_BLOCKREADER_DEFAULT);
+    }
+
+    private int getChecksumType(Configuration conf) {
+      String checksum = conf.get(DFSConfigKeys.DFS_CHECKSUM_TYPE_KEY,
+          DFSConfigKeys.DFS_CHECKSUM_TYPE_DEFAULT);
+      if ("CRC32".equals(checksum)) {
+        return DataChecksum.CHECKSUM_CRC32;
+      } else if ("CRC32C".equals(checksum)) {
+        return DataChecksum.CHECKSUM_CRC32C;
+      } else if ("NULL".equals(checksum)) {
+        return DataChecksum.CHECKSUM_NULL;
+      } else {
+        LOG.warn("Bad checksum type: " + checksum + ". Using default.");
+        return DataChecksum.CHECKSUM_CRC32C;
+      }
+    }
+
+    private DataChecksum createChecksum() {
+      return DataChecksum.newDataChecksum(
+          checksumType, bytesPerChecksum);
     }
   }
  
@@ -203,7 +236,8 @@ public class DFSClient implements java.io.Closeable {
    */
   private final Map<String, DFSOutputStream> filesBeingWritten
       = new HashMap<String, DFSOutputStream>();
-        
+  private boolean shortCircuitLocalReads;
+  
   /**
    * Same as this(NameNode.getAddress(conf), conf);
    * @see #DFSClient(InetSocketAddress, Configuration)
@@ -265,6 +299,13 @@ public class DFSClient implements java.io.Closeable {
       throw new IllegalArgumentException(
           "Expecting exactly one of nameNodeAddr and rpcNamenode being null: "
           + "nameNodeAddr=" + nameNodeAddr + ", rpcNamenode=" + rpcNamenode);
+    }
+    // read directly from the block file if configured.
+    this.shortCircuitLocalReads = conf.getBoolean(
+        DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY,
+        DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_DEFAULT);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Short circuit read is " + shortCircuitLocalReads);
     }
   }
 
@@ -472,6 +513,81 @@ public class DFSClient implements java.io.Closeable {
     }
   }
 
+  /**
+   * Get {@link BlockReader} for short circuited local reads.
+   */
+  static BlockReader getLocalBlockReader(Configuration conf,
+      String src, ExtendedBlock blk, Token<BlockTokenIdentifier> accessToken,
+      DatanodeInfo chosenNode, int socketTimeout, long offsetIntoBlock)
+      throws InvalidToken, IOException {
+    try {
+      return BlockReaderLocal.newBlockReader(conf, src, blk, accessToken,
+          chosenNode, socketTimeout, offsetIntoBlock, blk.getNumBytes()
+              - offsetIntoBlock);
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(InvalidToken.class,
+          AccessControlException.class);
+    }
+  }
+  
+  private static Map<String, Boolean> localAddrMap = Collections
+      .synchronizedMap(new HashMap<String, Boolean>());
+  
+  private static boolean isLocalAddress(InetSocketAddress targetAddr) {
+    InetAddress addr = targetAddr.getAddress();
+    Boolean cached = localAddrMap.get(addr.getHostAddress());
+    if (cached != null && cached) {
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Address " + targetAddr + " is local");
+      }
+      return true;
+    }
+
+    // Check if the address is any local or loop back
+    boolean local = addr.isAnyLocalAddress() || addr.isLoopbackAddress();
+
+    // Check if the address is defined on any interface
+    if (!local) {
+      try {
+        local = NetworkInterface.getByInetAddress(addr) != null;
+      } catch (SocketException e) {
+        local = false;
+      }
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Address " + targetAddr + " is local");
+    }
+    localAddrMap.put(addr.getHostAddress(), local);
+    return local;
+  }
+  
+  /**
+   * Should the block access token be refetched on an exception
+   * 
+   * @param ex Exception received
+   * @param targetAddr Target datanode address from where exception was received
+   * @return true if block access token has expired or invalid and it should be
+   *         refetched
+   */
+  private static boolean tokenRefetchNeeded(IOException ex,
+      InetSocketAddress targetAddr) {
+    /*
+     * Get a new access token and retry. Retry is needed in 2 cases. 1) When
+     * both NN and DN re-started while DFSClient holding a cached access token.
+     * 2) In the case that NN fails to update its access key at pre-set interval
+     * (by a wide margin) and subsequently restarts. In this case, DN
+     * re-registers itself with NN and receives a new access key, but DN will
+     * delete the old access key from its memory since it's considered expired
+     * based on the estimated expiration date.
+     */
+    if (ex instanceof InvalidBlockTokenException || ex instanceof InvalidToken) {
+      LOG.info("Access token was invalid when connecting to " + targetAddr
+          + " : " + ex);
+      return true;
+    }
+    return false;
+  }
+  
   /**
    * Cancel a delegation token
    * @param token the token to cancel
@@ -773,7 +889,7 @@ public class DFSClient implements java.io.Closeable {
     }
     final DFSOutputStream result = new DFSOutputStream(this, src, masked, flag,
         createParent, replication, blockSize, progress, buffersize,
-        dfsClientConf.bytesPerChecksum);
+        dfsClientConf.createChecksum());
     leaserenewer.put(src, result, this);
     return result;
   }
@@ -817,9 +933,12 @@ public class DFSClient implements java.io.Closeable {
     CreateFlag.validate(flag);
     DFSOutputStream result = primitiveAppend(src, flag, buffersize, progress);
     if (result == null) {
+      DataChecksum checksum = DataChecksum.newDataChecksum(
+          dfsClientConf.checksumType,
+          bytesPerChecksum);
       result = new DFSOutputStream(this, src, absPermission,
           flag, createParent, replication, blockSize, progress, buffersize,
-          bytesPerChecksum);
+          checksum);
     }
     leaserenewer.put(src, result, this);
     return result;
@@ -877,7 +996,7 @@ public class DFSClient implements java.io.Closeable {
                                      UnresolvedPathException.class);
     }
     return new DFSOutputStream(this, src, buffersize, progress,
-        lastBlock, stat, dfsClientConf.bytesPerChecksum);
+        lastBlock, stat, dfsClientConf.createChecksum());
   }
   
   /**
@@ -1351,7 +1470,8 @@ public class DFSClient implements java.io.Closeable {
    * 
    * @see ClientProtocol#restoreFailedStorage(String arg)
    */
-  boolean restoreFailedStorage(String arg) throws AccessControlException {
+  boolean restoreFailedStorage(String arg)
+      throws AccessControlException, IOException{
     return namenode.restoreFailedStorage(arg);
   }
 
@@ -1560,13 +1680,20 @@ public class DFSClient implements java.io.Closeable {
     synchronized List<LocatedBlock> getAllBlocks() throws IOException {
       return ((DFSInputStream)in).getAllBlocks();
     }
-
+    
     /**
      * @return The visible length of the file.
      */
     public long getVisibleLength() throws IOException {
       return ((DFSInputStream)in).getFileLength();
     }
+  }
+  
+  boolean shouldTryShortCircuitRead(InetSocketAddress targetAddr) {
+    if (shortCircuitLocalReads && isLocalAddress(targetAddr)) {
+      return true;
+    }
+    return false;
   }
 
   void reportChecksumFailure(String file, ExtendedBlock blk, DatanodeInfo dn) {
@@ -1585,9 +1712,13 @@ public class DFSClient implements java.io.Closeable {
     }
   }
 
-  /** {@inheritDoc} */
+  @Override
   public String toString() {
     return getClass().getSimpleName() + "[clientName=" + clientName
         + ", ugi=" + ugi + "]"; 
+  }
+
+  void disableShortCircuit() {
+    shortCircuitLocalReads = false;
   }
 }

@@ -31,7 +31,6 @@ import java.util.Random;
 
 import junit.framework.TestCase;
 
-import org.apache.commons.digester.SetRootRule;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -74,7 +73,7 @@ public class TestDataTransferProtocol extends TestCase {
                     "org.apache.hadoop.hdfs.TestDataTransferProtocol");
 
   private static final DataChecksum DEFAULT_CHECKSUM =
-    DataChecksum.newDataChecksum(DataChecksum.CHECKSUM_CRC32, 512);
+    DataChecksum.newDataChecksum(DataChecksum.CHECKSUM_CRC32C, 512);
   
   DatanodeID datanode;
   InetSocketAddress dnAddr;
@@ -209,7 +208,7 @@ public class TestDataTransferProtocol extends TestCase {
   @Test public void testOpWrite() throws IOException {
     int numDataNodes = 1;
     Configuration conf = new HdfsConfiguration();
-    conf.setBoolean("dfs.support.append", true);
+    conf.setBoolean(DFSConfigKeys.DFS_SUPPORT_APPEND_KEY, true);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
     try {
       cluster.waitActive();

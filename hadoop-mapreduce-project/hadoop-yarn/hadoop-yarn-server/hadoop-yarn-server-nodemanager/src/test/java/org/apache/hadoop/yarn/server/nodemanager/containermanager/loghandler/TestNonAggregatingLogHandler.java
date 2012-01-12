@@ -1,3 +1,20 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler;
 
 import static org.mockito.Matchers.any;
@@ -18,10 +35,11 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
+import org.apache.hadoop.yarn.logaggregation.ContainerLogsRetentionPolicy;
 import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
+import org.apache.hadoop.yarn.server.nodemanager.LocalDirsHandlerService;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEventType;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.ContainerLogsRetentionPolicy;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppFinishedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppStartedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerContainerFinishedEvent;
@@ -50,12 +68,15 @@ public class TestNonAggregatingLogHandler {
             + localLogDirs[1].getAbsolutePath();
 
     conf.set(YarnConfiguration.NM_LOG_DIRS, localLogDirsString);
-    conf.setBoolean(YarnConfiguration.NM_LOG_AGGREGATION_ENABLED, false);
+    conf.setBoolean(YarnConfiguration.LOG_AGGREGATION_ENABLED, false);
     conf.setLong(YarnConfiguration.NM_LOG_RETAIN_SECONDS, 0l);
 
     DrainDispatcher dispatcher = createDispatcher(conf);
     EventHandler<ApplicationEvent> appEventHandler = mock(EventHandler.class);
     dispatcher.register(ApplicationEventType.class, appEventHandler);
+
+    LocalDirsHandlerService dirsHandler = new LocalDirsHandlerService();
+    dirsHandler.init(conf);
 
     ApplicationId appId1 = BuilderUtils.newApplicationId(1234, 1);
     ApplicationAttemptId appAttemptId1 =
@@ -63,7 +84,7 @@ public class TestNonAggregatingLogHandler {
     ContainerId container11 = BuilderUtils.newContainerId(appAttemptId1, 1);
 
     NonAggregatingLogHandler logHandler =
-        new NonAggregatingLogHandler(dispatcher, delService);
+        new NonAggregatingLogHandler(dispatcher, delService, dirsHandler);
     logHandler.init(conf);
     logHandler.start();
 
@@ -121,7 +142,7 @@ public class TestNonAggregatingLogHandler {
             + localLogDirs[1].getAbsolutePath();
 
     conf.set(YarnConfiguration.NM_LOG_DIRS, localLogDirsString);
-    conf.setBoolean(YarnConfiguration.NM_LOG_AGGREGATION_ENABLED, false);
+    conf.setBoolean(YarnConfiguration.LOG_AGGREGATION_ENABLED, false);
 
     conf.setLong(YarnConfiguration.NM_LOG_RETAIN_SECONDS, 10800l);
 
@@ -129,13 +150,17 @@ public class TestNonAggregatingLogHandler {
     EventHandler<ApplicationEvent> appEventHandler = mock(EventHandler.class);
     dispatcher.register(ApplicationEventType.class, appEventHandler);
 
+    LocalDirsHandlerService dirsHandler = new LocalDirsHandlerService();
+    dirsHandler.init(conf);
+
     ApplicationId appId1 = BuilderUtils.newApplicationId(1234, 1);
     ApplicationAttemptId appAttemptId1 =
         BuilderUtils.newApplicationAttemptId(appId1, 1);
     ContainerId container11 = BuilderUtils.newContainerId(appAttemptId1, 1);
 
     NonAggregatingLogHandler logHandler =
-        new NonAggregatingLogHandlerWithMockExecutor(dispatcher, delService);
+        new NonAggregatingLogHandlerWithMockExecutor(dispatcher, delService,
+                                                     dirsHandler);
     logHandler.init(conf);
     logHandler.start();
 
@@ -165,8 +190,8 @@ public class TestNonAggregatingLogHandler {
     private ScheduledThreadPoolExecutor mockSched;
 
     public NonAggregatingLogHandlerWithMockExecutor(Dispatcher dispatcher,
-        DeletionService delService) {
-      super(dispatcher, delService);
+        DeletionService delService, LocalDirsHandlerService dirsHandler) {
+      super(dispatcher, delService, dirsHandler);
     }
 
     @Override

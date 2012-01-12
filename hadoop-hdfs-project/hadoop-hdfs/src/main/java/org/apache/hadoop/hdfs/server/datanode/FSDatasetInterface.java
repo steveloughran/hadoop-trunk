@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.datanode;
 
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,8 +32,10 @@ import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
+import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 
 /**
@@ -158,14 +161,22 @@ public interface FSDatasetInterface extends FSDatasetMBean {
      static class BlockWriteStreams {
       OutputStream dataOut;
       OutputStream checksumOut;
-      BlockWriteStreams(OutputStream dOut, OutputStream cOut) {
+      DataChecksum checksum;
+      
+      BlockWriteStreams(OutputStream dOut, OutputStream cOut,
+          DataChecksum checksum) {
         dataOut = dOut;
         checksumOut = cOut;
+        this.checksum = checksum;
       }
       
       void close() throws IOException {
         IOUtils.closeStream(dataOut);
         IOUtils.closeStream(checksumOut);
+      }
+      
+      DataChecksum getChecksum() {
+        return checksum;
       }
     }
 
@@ -182,7 +193,7 @@ public interface FSDatasetInterface extends FSDatasetMBean {
       this.checksumIn = checksumIn;
     }
 
-    /** {@inheritDoc} */
+    @Override
     public void close() {
       IOUtils.closeStream(dataIn);
       IOUtils.closeStream(checksumIn);
@@ -393,4 +404,9 @@ public interface FSDatasetInterface extends FSDatasetMBean {
    * @throws IOException
    */
   public void deleteBlockPool(String bpid, boolean force) throws IOException;
+  
+  /**
+   * Get {@link BlockLocalPathInfo} for the given block.
+   **/
+  public BlockLocalPathInfo getBlockLocalPathInfo(ExtendedBlock b) throws IOException;
 }

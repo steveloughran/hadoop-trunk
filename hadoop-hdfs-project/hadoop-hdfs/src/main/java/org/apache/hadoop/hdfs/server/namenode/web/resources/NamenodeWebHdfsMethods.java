@@ -42,14 +42,13 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.ResponseBuilder;
-import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.StreamingOutput;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
@@ -67,14 +66,17 @@ import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.hdfs.web.resources.AccessTimeParam;
 import org.apache.hadoop.hdfs.web.resources.BlockSizeParam;
 import org.apache.hadoop.hdfs.web.resources.BufferSizeParam;
+import org.apache.hadoop.hdfs.web.resources.CreateParentParam;
 import org.apache.hadoop.hdfs.web.resources.DelegationParam;
 import org.apache.hadoop.hdfs.web.resources.DeleteOpParam;
 import org.apache.hadoop.hdfs.web.resources.DestinationParam;
+import org.apache.hadoop.hdfs.web.resources.DoAsParam;
 import org.apache.hadoop.hdfs.web.resources.GetOpParam;
 import org.apache.hadoop.hdfs.web.resources.GroupParam;
 import org.apache.hadoop.hdfs.web.resources.HttpOpParam;
 import org.apache.hadoop.hdfs.web.resources.LengthParam;
 import org.apache.hadoop.hdfs.web.resources.ModificationTimeParam;
+import org.apache.hadoop.hdfs.web.resources.NamenodeRpcAddressParam;
 import org.apache.hadoop.hdfs.web.resources.OffsetParam;
 import org.apache.hadoop.hdfs.web.resources.OverwriteParam;
 import org.apache.hadoop.hdfs.web.resources.OwnerParam;
@@ -86,6 +88,7 @@ import org.apache.hadoop.hdfs.web.resources.RecursiveParam;
 import org.apache.hadoop.hdfs.web.resources.RenameOptionSetParam;
 import org.apache.hadoop.hdfs.web.resources.RenewerParam;
 import org.apache.hadoop.hdfs.web.resources.ReplicationParam;
+import org.apache.hadoop.hdfs.web.resources.TokenArgumentParam;
 import org.apache.hadoop.hdfs.web.resources.UriFsPathParam;
 import org.apache.hadoop.hdfs.web.resources.UserParam;
 import org.apache.hadoop.net.NodeBase;
@@ -104,7 +107,7 @@ public class NamenodeWebHdfsMethods {
   public static final Log LOG = LogFactory.getLog(NamenodeWebHdfsMethods.class);
 
   private static final UriFsPathParam ROOT = new UriFsPathParam("");
-
+  
   private static final ThreadLocal<String> REMOTE_ADDRESS = new ThreadLocal<String>(); 
 
   /** @return the remote client address. */
@@ -116,9 +119,24 @@ public class NamenodeWebHdfsMethods {
   private @Context HttpServletRequest request;
   private @Context HttpServletResponse response;
 
+  private void init(final UserGroupInformation ugi,
+      final DelegationParam delegation,
+      final UserParam username, final DoAsParam doAsUser,
+      final UriFsPathParam path, final HttpOpParam<?> op,
+      final Param<?, ?>... parameters) throws IOException {
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("HTTP " + op.getValue().getType() + ": " + op + ", " + path
+          + ", ugi=" + ugi + ", " + username + ", " + doAsUser
+          + Param.toSortedString(", ", parameters));
+    }
+
+    //clear content type
+    response.setContentType(null);
+  }
+
   private static DatanodeInfo chooseDatanode(final NameNode namenode,
-      final String path, final HttpOpParam.Op op, final long openOffset
-      ) throws IOException {
+      final String path, final HttpOpParam.Op op, final long openOffset,
+      Configuration conf) throws IOException {
     if (op == GetOpParam.Op.OPEN
         || op == GetOpParam.Op.GETFILECHECKSUM
         || op == PostOpParam.Op.APPEND) {
@@ -138,7 +156,7 @@ public class NamenodeWebHdfsMethods {
         final LocatedBlocks locations = np.getBlockLocations(path, offset, 1);
         final int count = locations.locatedBlockCount();
         if (count > 0) {
-          return JspHelper.bestNode(locations.get(0));
+          return JspHelper.bestNode(locations.get(0), conf);
         }
       }
     } 
@@ -152,24 +170,25 @@ public class NamenodeWebHdfsMethods {
       final NameNode namenode, final UserGroupInformation ugi,
       final String renewer) throws IOException {
     final Credentials c = DelegationTokenSecretManager.createCredentials(
-        namenode, ugi,
-        renewer != null? renewer: request.getUserPrincipal().getName());
+        namenode, ugi, renewer != null? renewer: ugi.getShortUserName());
     final Token<? extends TokenIdentifier> t = c.getAllTokens().iterator().next();
     t.setKind(WebHdfsFileSystem.TOKEN_KIND);
-    SecurityUtil.setTokenService(t, namenode.getNameNodeAddress());
+    SecurityUtil.setTokenService(t, namenode.getHttpAddress());
     return t;
   }
 
   private URI redirectURI(final NameNode namenode,
       final UserGroupInformation ugi, final DelegationParam delegation,
+      final UserParam username, final DoAsParam doAsUser,
       final String path, final HttpOpParam.Op op, final long openOffset,
       final Param<?, ?>... parameters) throws URISyntaxException, IOException {
-    final DatanodeInfo dn = chooseDatanode(namenode, path, op, openOffset);
+    final Configuration conf = (Configuration)context.getAttribute(JspHelper.CURRENT_CONF);
+    final DatanodeInfo dn = chooseDatanode(namenode, path, op, openOffset, conf);
 
     final String delegationQuery;
     if (!UserGroupInformation.isSecurityEnabled()) {
       //security disabled
-      delegationQuery = "";
+      delegationQuery = Param.toSortedString("&", doAsUser, username);
     } else if (delegation.getValue() != null) {
       //client has provided a token
       delegationQuery = "&" + delegation;
@@ -179,8 +198,8 @@ public class NamenodeWebHdfsMethods {
           namenode, ugi, request.getUserPrincipal().getName());
       delegationQuery = "&" + new DelegationParam(t.encodeToUrlString());
     }
-    final String query = op.toQueryString()
-        + '&' + new UserParam(ugi) + delegationQuery
+    final String query = op.toQueryString() + delegationQuery
+        + "&" + new NamenodeRpcAddressParam(namenode)
         + Param.toSortedString("&", parameters);
     final String uripath = WebHdfsFileSystem.PATH_PREFIX + path;
 
@@ -201,6 +220,10 @@ public class NamenodeWebHdfsMethods {
       @Context final UserGroupInformation ugi,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
+      @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
+          final UserParam username,
+      @QueryParam(DoAsParam.NAME) @DefaultValue(DoAsParam.DEFAULT)
+          final DoAsParam doAsUser,
       @QueryParam(PutOpParam.NAME) @DefaultValue(PutOpParam.DEFAULT)
           final PutOpParam op,
       @QueryParam(DestinationParam.NAME) @DefaultValue(DestinationParam.DEFAULT)
@@ -224,11 +247,16 @@ public class NamenodeWebHdfsMethods {
       @QueryParam(AccessTimeParam.NAME) @DefaultValue(AccessTimeParam.DEFAULT)
           final AccessTimeParam accessTime,
       @QueryParam(RenameOptionSetParam.NAME) @DefaultValue(RenameOptionSetParam.DEFAULT)
-          final RenameOptionSetParam renameOptions
+          final RenameOptionSetParam renameOptions,
+      @QueryParam(CreateParentParam.NAME) @DefaultValue(CreateParentParam.DEFAULT)
+          final CreateParentParam createParent,
+      @QueryParam(TokenArgumentParam.NAME) @DefaultValue(TokenArgumentParam.DEFAULT)
+          final TokenArgumentParam delegationTokenArgument
       ) throws IOException, InterruptedException {
-    return put(ugi, delegation, ROOT, op, destination, owner, group,
-        permission, overwrite, bufferSize, replication, blockSize,
-        modificationTime, accessTime, renameOptions);
+    return put(ugi, delegation, username, doAsUser, ROOT, op, destination,
+        owner, group, permission, overwrite, bufferSize, replication,
+        blockSize, modificationTime, accessTime, renameOptions, createParent,
+        delegationTokenArgument);
   }
 
   /** Handle HTTP PUT request. */
@@ -240,6 +268,10 @@ public class NamenodeWebHdfsMethods {
       @Context final UserGroupInformation ugi,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
+      @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
+          final UserParam username,
+      @QueryParam(DoAsParam.NAME) @DefaultValue(DoAsParam.DEFAULT)
+          final DoAsParam doAsUser,
       @PathParam(UriFsPathParam.NAME) final UriFsPathParam path,
       @QueryParam(PutOpParam.NAME) @DefaultValue(PutOpParam.DEFAULT)
           final PutOpParam op,
@@ -264,18 +296,16 @@ public class NamenodeWebHdfsMethods {
       @QueryParam(AccessTimeParam.NAME) @DefaultValue(AccessTimeParam.DEFAULT)
           final AccessTimeParam accessTime,
       @QueryParam(RenameOptionSetParam.NAME) @DefaultValue(RenameOptionSetParam.DEFAULT)
-          final RenameOptionSetParam renameOptions
+          final RenameOptionSetParam renameOptions,
+      @QueryParam(CreateParentParam.NAME) @DefaultValue(CreateParentParam.DEFAULT)
+          final CreateParentParam createParent,
+      @QueryParam(TokenArgumentParam.NAME) @DefaultValue(TokenArgumentParam.DEFAULT)
+          final TokenArgumentParam delegationTokenArgument
       ) throws IOException, InterruptedException {
 
-    if (LOG.isTraceEnabled()) {
-      LOG.trace(op + ": " + path + ", ugi=" + ugi
-          + Param.toSortedString(", ", destination, owner, group, permission,
-              overwrite, bufferSize, replication, blockSize,
-              modificationTime, accessTime, renameOptions));
-    }
-
-    //clear content type
-    response.setContentType(null);
+    init(ugi, delegation, username, doAsUser, path, op, destination, owner,
+        group, permission, overwrite, bufferSize, replication, blockSize,
+        modificationTime, accessTime, renameOptions, delegationTokenArgument);
 
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override
@@ -291,8 +321,8 @@ public class NamenodeWebHdfsMethods {
     switch(op.getValue()) {
     case CREATE:
     {
-      final URI uri = redirectURI(namenode, ugi, delegation, fullpath,
-          op.getValue(), -1L,
+      final URI uri = redirectURI(namenode, ugi, delegation, username, doAsUser,
+          fullpath, op.getValue(), -1L,
           permission, overwrite, bufferSize, replication, blockSize);
       return Response.temporaryRedirect(uri).build();
     } 
@@ -301,6 +331,12 @@ public class NamenodeWebHdfsMethods {
       final boolean b = np.mkdirs(fullpath, permission.getFsPermission(), true);
       final String js = JsonUtil.toJsonString("boolean", b);
       return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
+    }
+    case CREATESYMLINK:
+    {
+      np.createSymlink(destination.getValue(), fullpath,
+          PermissionParam.getDefaultFsPermission(), createParent.getValue());
+      return Response.ok().type(MediaType.APPLICATION_JSON).build();
     }
     case RENAME:
     {
@@ -319,8 +355,7 @@ public class NamenodeWebHdfsMethods {
     {
       final boolean b = np.setReplication(fullpath, replication.getValue(conf));
       final String js = JsonUtil.toJsonString("boolean", b);
-      final ResponseBuilder r = b? Response.ok(): Response.status(Status.FORBIDDEN);
-      return r.entity(js).type(MediaType.APPLICATION_JSON).build();
+      return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
     }
     case SETOWNER:
     {
@@ -344,7 +379,7 @@ public class NamenodeWebHdfsMethods {
     case RENEWDELEGATIONTOKEN:
     {
       final Token<DelegationTokenIdentifier> token = new Token<DelegationTokenIdentifier>();
-      token.decodeFromUrlString(delegation.getValue());
+      token.decodeFromUrlString(delegationTokenArgument.getValue());
       final long expiryTime = np.renewDelegationToken(token);
       final String js = JsonUtil.toJsonString("long", expiryTime);
       return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
@@ -352,7 +387,7 @@ public class NamenodeWebHdfsMethods {
     case CANCELDELEGATIONTOKEN:
     {
       final Token<DelegationTokenIdentifier> token = new Token<DelegationTokenIdentifier>();
-      token.decodeFromUrlString(delegation.getValue());
+      token.decodeFromUrlString(delegationTokenArgument.getValue());
       np.cancelDelegationToken(token);
       return Response.ok().type(MediaType.APPLICATION_JSON).build();
     }
@@ -376,12 +411,16 @@ public class NamenodeWebHdfsMethods {
       @Context final UserGroupInformation ugi,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
+      @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
+          final UserParam username,
+      @QueryParam(DoAsParam.NAME) @DefaultValue(DoAsParam.DEFAULT)
+          final DoAsParam doAsUser,
       @QueryParam(PostOpParam.NAME) @DefaultValue(PostOpParam.DEFAULT)
           final PostOpParam op,
       @QueryParam(BufferSizeParam.NAME) @DefaultValue(BufferSizeParam.DEFAULT)
           final BufferSizeParam bufferSize
       ) throws IOException, InterruptedException {
-    return post(ugi, delegation, ROOT, op, bufferSize);
+    return post(ugi, delegation, username, doAsUser, ROOT, op, bufferSize);
   }
 
   /** Handle HTTP POST request. */
@@ -393,6 +432,10 @@ public class NamenodeWebHdfsMethods {
       @Context final UserGroupInformation ugi,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
+      @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
+          final UserParam username,
+      @QueryParam(DoAsParam.NAME) @DefaultValue(DoAsParam.DEFAULT)
+          final DoAsParam doAsUser,
       @PathParam(UriFsPathParam.NAME) final UriFsPathParam path,
       @QueryParam(PostOpParam.NAME) @DefaultValue(PostOpParam.DEFAULT)
           final PostOpParam op,
@@ -400,13 +443,7 @@ public class NamenodeWebHdfsMethods {
           final BufferSizeParam bufferSize
       ) throws IOException, InterruptedException {
 
-    if (LOG.isTraceEnabled()) {
-      LOG.trace(op + ": " + path + ", ugi=" + ugi
-          + Param.toSortedString(", ", bufferSize));
-    }
-
-    //clear content type
-    response.setContentType(null);
+    init(ugi, delegation, username, doAsUser, path, op, bufferSize);
 
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override
@@ -420,8 +457,8 @@ public class NamenodeWebHdfsMethods {
     switch(op.getValue()) {
     case APPEND:
     {
-      final URI uri = redirectURI(namenode, ugi, delegation, fullpath,
-          op.getValue(), -1L, bufferSize);
+      final URI uri = redirectURI(namenode, ugi, delegation, username, doAsUser,
+          fullpath, op.getValue(), -1L, bufferSize);
       return Response.temporaryRedirect(uri).build();
     }
     default:
@@ -443,6 +480,10 @@ public class NamenodeWebHdfsMethods {
       @Context final UserGroupInformation ugi,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
+      @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
+          final UserParam username,
+      @QueryParam(DoAsParam.NAME) @DefaultValue(DoAsParam.DEFAULT)
+          final DoAsParam doAsUser,
       @QueryParam(GetOpParam.NAME) @DefaultValue(GetOpParam.DEFAULT)
           final GetOpParam op,
       @QueryParam(OffsetParam.NAME) @DefaultValue(OffsetParam.DEFAULT)
@@ -454,7 +495,8 @@ public class NamenodeWebHdfsMethods {
       @QueryParam(BufferSizeParam.NAME) @DefaultValue(BufferSizeParam.DEFAULT)
           final BufferSizeParam bufferSize
       ) throws IOException, URISyntaxException, InterruptedException {
-    return get(ugi, delegation, ROOT, op, offset, length, renewer, bufferSize);
+    return get(ugi, delegation, username, doAsUser, ROOT, op,
+        offset, length, renewer, bufferSize);
   }
 
   /** Handle HTTP GET request. */
@@ -465,6 +507,10 @@ public class NamenodeWebHdfsMethods {
       @Context final UserGroupInformation ugi,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
+      @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
+          final UserParam username,
+      @QueryParam(DoAsParam.NAME) @DefaultValue(DoAsParam.DEFAULT)
+          final DoAsParam doAsUser,
       @PathParam(UriFsPathParam.NAME) final UriFsPathParam path,
       @QueryParam(GetOpParam.NAME) @DefaultValue(GetOpParam.DEFAULT)
           final GetOpParam op,
@@ -478,13 +524,8 @@ public class NamenodeWebHdfsMethods {
           final BufferSizeParam bufferSize
       ) throws IOException, InterruptedException {
 
-    if (LOG.isTraceEnabled()) {
-      LOG.trace(op + ": " + path + ", ugi=" + ugi
-          + Param.toSortedString(", ", offset, length, renewer, bufferSize));
-    }
-
-    //clear content type
-    response.setContentType(null);
+    init(ugi, delegation, username, doAsUser, path, op,
+        offset, length, renewer, bufferSize);
 
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override
@@ -499,11 +540,11 @@ public class NamenodeWebHdfsMethods {
     switch(op.getValue()) {
     case OPEN:
     {
-      final URI uri = redirectURI(namenode, ugi, delegation, fullpath,
-          op.getValue(), offset.getValue(), offset, length, bufferSize);
+      final URI uri = redirectURI(namenode, ugi, delegation, username, doAsUser,
+          fullpath, op.getValue(), offset.getValue(), offset, length, bufferSize);
       return Response.temporaryRedirect(uri).build();
     }
-    case GETFILEBLOCKLOCATIONS:
+    case GET_BLOCK_LOCATIONS:
     {
       final long offsetValue = offset.getValue();
       final Long lengthValue = length.getValue();
@@ -535,15 +576,37 @@ public class NamenodeWebHdfsMethods {
     }
     case GETFILECHECKSUM:
     {
-      final URI uri = redirectURI(namenode, ugi, delegation, fullpath,
-          op.getValue(), -1L);
+      final URI uri = redirectURI(namenode, ugi, delegation, username, doAsUser,
+          fullpath, op.getValue(), -1L);
       return Response.temporaryRedirect(uri).build();
     }
     case GETDELEGATIONTOKEN:
     {
+      if (delegation.getValue() != null) {
+        throw new IllegalArgumentException(delegation.getName()
+            + " parameter is not null.");
+      }
       final Token<? extends TokenIdentifier> token = generateDelegationToken(
           namenode, ugi, renewer.getValue());
       final String js = JsonUtil.toJsonString(token);
+      return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
+    }
+    case GETDELEGATIONTOKENS:
+    {
+      if (delegation.getValue() != null) {
+        throw new IllegalArgumentException(delegation.getName()
+            + " parameter is not null.");
+      }
+      final Token<? extends TokenIdentifier>[] tokens = new Token<?>[1];
+      tokens[0] = generateDelegationToken(namenode, ugi, renewer.getValue());
+      final String js = JsonUtil.toJsonString(tokens);
+      return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
+    }
+    case GETHOMEDIRECTORY:
+    {
+      final String js = JsonUtil.toJsonString(
+          org.apache.hadoop.fs.Path.class.getSimpleName(),
+          WebHdfsFileSystem.getHomeDirectoryString(ugi));
       return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
     }
     default:
@@ -575,8 +638,8 @@ public class NamenodeWebHdfsMethods {
       @Override
       public void write(final OutputStream outstream) throws IOException {
         final PrintStream out = new PrintStream(outstream);
-        out.println("{\"" + HdfsFileStatus.class.getSimpleName() + "es\":{\""
-            + HdfsFileStatus.class.getSimpleName() + "\":[");
+        out.println("{\"" + FileStatus.class.getSimpleName() + "es\":{\""
+            + FileStatus.class.getSimpleName() + "\":[");
 
         final HdfsFileStatus[] partial = first.getPartialListing();
         if (partial.length > 0) {
@@ -607,12 +670,18 @@ public class NamenodeWebHdfsMethods {
   @Produces(MediaType.APPLICATION_JSON)
   public Response deleteRoot(
       @Context final UserGroupInformation ugi,
+      @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
+          final DelegationParam delegation,
+      @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
+          final UserParam username,
+      @QueryParam(DoAsParam.NAME) @DefaultValue(DoAsParam.DEFAULT)
+          final DoAsParam doAsUser,
       @QueryParam(DeleteOpParam.NAME) @DefaultValue(DeleteOpParam.DEFAULT)
           final DeleteOpParam op,
       @QueryParam(RecursiveParam.NAME) @DefaultValue(RecursiveParam.DEFAULT)
           final RecursiveParam recursive
       ) throws IOException, InterruptedException {
-    return delete(ugi, ROOT, op, recursive);
+    return delete(ugi, delegation, username, doAsUser, ROOT, op, recursive);
   }
 
   /** Handle HTTP DELETE request. */
@@ -621,6 +690,12 @@ public class NamenodeWebHdfsMethods {
   @Produces(MediaType.APPLICATION_JSON)
   public Response delete(
       @Context final UserGroupInformation ugi,
+      @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
+          final DelegationParam delegation,
+      @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
+          final UserParam username,
+      @QueryParam(DoAsParam.NAME) @DefaultValue(DoAsParam.DEFAULT)
+          final DoAsParam doAsUser,
       @PathParam(UriFsPathParam.NAME) final UriFsPathParam path,
       @QueryParam(DeleteOpParam.NAME) @DefaultValue(DeleteOpParam.DEFAULT)
           final DeleteOpParam op,
@@ -628,13 +703,7 @@ public class NamenodeWebHdfsMethods {
           final RecursiveParam recursive
       ) throws IOException, InterruptedException {
 
-    if (LOG.isTraceEnabled()) {
-      LOG.trace(op + ": " + path + ", ugi=" + ugi
-          + Param.toSortedString(", ", recursive));
-    }
-
-    //clear content type
-    response.setContentType(null);
+    init(ugi, delegation, username, doAsUser, path, op, recursive);
 
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
       @Override

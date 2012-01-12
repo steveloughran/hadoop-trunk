@@ -273,6 +273,8 @@ public class RMAppAttemptImpl implements RMAppAttempt {
     this.readLock = lock.readLock();
     this.writeLock = lock.writeLock();
 
+    this.proxiedTrackingUrl = generateProxyUriWithoutScheme();
+    
     this.stateMachine = stateMachineFactory.make(this);
   }
 
@@ -358,11 +360,16 @@ public class RMAppAttemptImpl implements RMAppAttempt {
     }    
   }
   
+  private String generateProxyUriWithoutScheme() {
+    return generateProxyUriWithoutScheme(null);
+  }
+  
   private String generateProxyUriWithoutScheme(
       final String trackingUriWithoutScheme) {
     this.readLock.lock();
     try {
-      URI trackingUri = ProxyUriUtils.getUriFromAMUrl(trackingUriWithoutScheme);
+      URI trackingUri = trackingUriWithoutScheme == null ? null : 
+        ProxyUriUtils.getUriFromAMUrl(trackingUriWithoutScheme);
       URI proxyUri = ProxyUriUtils.getUriFromAMUrl(proxy);
       URI result = ProxyUriUtils.getProxyUri(trackingUri, proxyUri, 
           applicationAttemptId.getApplicationId());
@@ -595,8 +602,13 @@ public class RMAppAttemptImpl implements RMAppAttempt {
           AM_CONTAINER_PRIORITY, "*", appAttempt.submissionContext
               .getAMContainerSpec().getResource(), 1);
 
-      appAttempt.scheduler.allocate(appAttempt.applicationAttemptId,
-          Collections.singletonList(request), EMPTY_CONTAINER_RELEASE_LIST);
+      Allocation amContainerAllocation = 
+          appAttempt.scheduler.allocate(appAttempt.applicationAttemptId,
+              Collections.singletonList(request), EMPTY_CONTAINER_RELEASE_LIST);
+      if (amContainerAllocation != null
+          && amContainerAllocation.getContainers() != null) {
+        assert(amContainerAllocation.getContainers().size() == 0);
+      }
     }
   }
 

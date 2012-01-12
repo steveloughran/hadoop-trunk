@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.security.PrivilegedExceptionAction;
 
@@ -52,7 +51,9 @@ public class FileDataServlet extends DfsServlet {
     String scheme = request.getScheme();
     final LocatedBlocks blks = nnproxy.getBlockLocations(
         status.getFullPath(new Path(path)).toUri().getPath(), 0, 1);
-    final DatanodeID host = pickSrcDatanode(blks, status);
+    final Configuration conf = NameNodeHttpServer.getConfFromContext(
+        getServletContext());
+    final DatanodeID host = pickSrcDatanode(blks, status, conf);
     final String hostname;
     if (host instanceof DatanodeInfo) {
       hostname = ((DatanodeInfo)host).getHostName();
@@ -83,16 +84,17 @@ public class FileDataServlet extends DfsServlet {
   /** Select a datanode to service this request.
    * Currently, this looks at no more than the first five blocks of a file,
    * selecting a datanode randomly from the most represented.
+   * @param conf 
    */
-  private DatanodeID pickSrcDatanode(LocatedBlocks blks, HdfsFileStatus i)
-      throws IOException {
+  private DatanodeID pickSrcDatanode(LocatedBlocks blks, HdfsFileStatus i,
+      Configuration conf) throws IOException {
     if (i.getLen() == 0 || blks.getLocatedBlocks().size() <= 0) {
       // pick a random datanode
       NameNode nn = NameNodeHttpServer.getNameNodeFromContext(
           getServletContext());
       return NamenodeJspHelper.getRandomDatanode(nn);
     }
-    return JspHelper.bestNode(blks);
+    return JspHelper.bestNode(blks, conf);
   }
 
   /**

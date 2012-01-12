@@ -94,6 +94,9 @@
         <include>${project.artifactId}-${project.version}-sources.jar</include>
         <include>${project.artifactId}-${project.version}-test-sources.jar</include>
       </includes>
+      <excludes>
+        <exclude>hadoop-tools-dist-*.jar</exclude>
+      </excludes>
     </fileSet>
     <fileSet>
       <directory>${basedir}/dev-support/jdiff</directory>
@@ -106,6 +109,13 @@
     <fileSet>
       <directory>${project.build.directory}/site</directory>
       <outputDirectory>/share/doc/hadoop/${hadoop.component}</outputDirectory>
+    </fileSet>
+    <fileSet>
+      <directory>${basedir}/src/main/native</directory>
+      <includes>
+        <include>*.h</include>
+      </includes>
+      <outputDirectory>/include</outputDirectory>
     </fileSet>
   </fileSets>
   <dependencySets>

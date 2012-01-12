@@ -1,6 +1,23 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.mapreduce.v2.app.job.impl;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -12,7 +29,6 @@ import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Task;
@@ -43,11 +59,12 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+@SuppressWarnings({ "rawtypes", "deprecation" })
 public class TestTaskImpl {
 
   private static final Log LOG = LogFactory.getLog(TestTaskImpl.class);    
   
-  private Configuration conf;
+  private JobConf conf;
   private TaskAttemptListener taskAttemptListener;
   private OutputCommitter committer;
   private Token<JobTokenIdentifier> jobToken;
@@ -74,9 +91,8 @@ public class TestTaskImpl {
         
     private int taskAttemptCounter = 0;
 
-    @SuppressWarnings("rawtypes")
     public MockTaskImpl(JobId jobId, int partition,
-        EventHandler eventHandler, Path remoteJobConfFile, Configuration conf,
+        EventHandler eventHandler, Path remoteJobConfFile, JobConf conf,
         TaskAttemptListener taskAttemptListener, OutputCommitter committer,
         Token<JobTokenIdentifier> jobToken,
         Collection<Token<? extends TokenIdentifier>> fsTokens, Clock clock,
@@ -115,10 +131,9 @@ public class TestTaskImpl {
     private TaskAttemptState state = TaskAttemptState.NEW;
     private TaskAttemptId attemptId;
 
-    @SuppressWarnings("rawtypes")
     public MockTaskAttemptImpl(TaskId taskId, int id, EventHandler eventHandler,
         TaskAttemptListener taskAttemptListener, Path jobFile, int partition,
-        Configuration conf, OutputCommitter committer,
+        JobConf conf, OutputCommitter committer,
         Token<JobTokenIdentifier> jobToken,
         Collection<Token<? extends TokenIdentifier>> fsTokens, Clock clock) {
       super(taskId, id, eventHandler, taskAttemptListener, jobFile, partition, conf,
@@ -158,7 +173,6 @@ public class TestTaskImpl {
   private class MockTask extends Task {
 
     @Override
-    @SuppressWarnings("deprecation") 
     public void run(JobConf job, TaskUmbilicalProtocol umbilical)
         throws IOException, ClassNotFoundException, InterruptedException {
       return;
@@ -178,7 +192,7 @@ public class TestTaskImpl {
     
     ++startCount;
     
-    conf = new Configuration();
+    conf = new JobConf();
     taskAttemptListener = mock(TaskAttemptListener.class);
     committer = mock(OutputCommitter.class);
     jobToken = (Token<JobTokenIdentifier>) mock(Token.class);

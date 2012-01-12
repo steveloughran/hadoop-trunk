@@ -3,32 +3,40 @@ Hadoop Change Log
 Trunk (unreleased changes)
 
   INCOMPATIBLE CHANGES
-   
+    HADOOP-7920. Remove Avro Rpc. (suresh)
+
+  NEW FEATURES
+    HADOOP-7773. Add support for protocol buffer based RPC engine.
+    (suresh)
+
+    HADOOP-7875. Add helper class to unwrap protobuf ServiceException.
+    (suresh)
+
   IMPROVEMENTS
 
     HADOOP-7595. Upgrade dependency to Avro 1.5.3. (Alejandro Abdelnur via atm)
 
     HADOOP-7524. Change RPC to allow multiple protocols including multuple
-                 versions of the same protocol (sanjay Radia)
+    versions of the same protocol (sanjay Radia)
 
     HADOOP-7607. Simplify the RPC proxy cleanup process. (atm)
 
     HADOOP-7635. RetryInvocationHandler should release underlying resources on
-                 close (atm)
+    close (atm)
 
     HADOOP-7687 Make getProtocolSignature public  (sanjay)
 
     HADOOP-7693. Enhance AvroRpcEngine to support the new #addProtocol
-                 interface introduced in HADOOP-7524.  (cutting)
+    interface introduced in HADOOP-7524.  (cutting)
 
     HADOOP-7716. RPC protocol registration on SS does not log the protocol name
-                 (only the class which may be different) (sanjay)
+    (only the class which may be different) (sanjay)
 
     HADOOP-7717. Move handling of concurrent client fail-overs to
-                 RetryInvocationHandler (atm)
+    RetryInvocationHandler (atm)
 
     HADOOP-6490. Use StringUtils over String#replace in Path#normalizePath.
-                 (Uma Maheswara Rao G via harsh)
+    (Uma Maheswara Rao G via harsh)
 
     HADOOP-7736. Remove duplicate Path#normalizePath call. (harsh)
 
@@ -36,23 +44,49 @@ Trunk (unreleased changes)
     if the override value is same as the final parameter value.
     (Ravi Prakash via suresh)
 
-    HADOOP-7737. normalize hadoop-mapreduce & hadoop-dist dist/tar build with 
-    common/hdfs. (tucu)
-
-    HADOOP-7743. Add Maven profile to create a full source tarball. (tucu)
-
     HADOOP-7729. Send back valid HTTP response if user hits IPC port with
     HTTP GET. (todd)
-
-    HADOOP-7758. Make GlobFilter class public. (tucu)
 
     HADOOP-7728. Enable task memory management to be configurable in hadoop
     config setup script. (ramya)
 
-    HADOOP-7424. Log an error if the topology script doesn't handle multiple args.
-    (Uma Maheswara Rao G via eli)
+    HADOOP-7792. Add verifyToken method to AbstractDelegationTokenSecretManager.
+    (jitendra)
+
+    HADOOP-7776 Make the Ipc-Header in a RPC-Payload an explicit header (sanjay)
+
+    HADOOP-7688. Add servlet handler check in HttpServer.start().
+    (Uma Maheswara Rao G via szetszwo)
+
+    HADOOP-7862. Move the support for multiple protocols to lower layer so 
+    that Writable, PB and Avro can all use it (Sanjay)
+
+    HADOOP-7876. Provided access to encoded key in DelegationKey for
+    use in protobuf based RPCs. (suresh)
+
+    HADOOP-7886. Add toString to FileStatus. (SreeHari via jghoman)
+
+    HADOOP-7899. Generate proto java files as part of the build. (tucu)
+
+    HADOOP-7574. Improve FSShell -stat, add user/group elements.
+    (XieXianshan via harsh)
+
+    HADOOP-7919. Remove the unused hadoop.logfile.* properties from the 
+    core-default.xml file. (harsh)
+
+    HADOOP-7808. Port HADOOP-7510 - Add configurable option to use original 
+    hostname in token instead of IP to allow server IP change. 
+    (Daryn Sharp via suresh)
+ 
+    HADOOP-7957. Classes deriving GetGroupsBase should be able to override 
+    proxy creation. (jitendra)
+
+    HADOOP-4515. Configuration#getBoolean must not be case sensitive. (Sho Shimauchi via harsh)
 
   BUGS
+
+    HADOOP-7851. Configuration.getClasses() never returns the default value. 
+                 (Uma Maheswara Rao G via amarrk)
 
     HADOOP-7606. Upgrade Jackson to version 1.7.1 to match the version required
     by Jersey (Alejandro Abdelnur via atm)
@@ -85,12 +119,155 @@ Trunk (unreleased changes)
     HADOOP-7770. ViewFS getFileChecksum throws FileNotFoundException for files in 
     /tmp and /user. (Ravi Prakash via jitendra)
 
+    HADOOP-7833. Fix findbugs warnings in protobuf generated code.
+    (John Lee via suresh)
+
+    HADOOP-7888. TestFailoverProxy fails intermittently on trunk. (Jason Lowe
+    via atm)
+
+    HADOOP-7897. ProtobufRpcEngine client side exception mechanism is not
+    consistent with WritableRpcEngine. (suresh)
+
+    HADOOP-7913 Fix bug in ProtoBufRpcEngine  (sanjay)
+
+    HADOOP-7892. IPC logs too verbose after "RpcKind" introduction (todd)
+
+    HADOOP-7931. o.a.h.ipc.WritableRpcEngine should have a way to force
+                 initialization (atm)
+
   OPTIMIZATIONS
 
     HADOOP-7761. Improve the performance of raw comparisons. (todd)
 
-    HADOOP-7773. Add support for protocol buffer based RPC engine.
-    (suresh)
+Release 0.23.1 - Unreleased
+
+  INCOMPATIBLE CHANGES
+
+  NEW FEATURES
+
+    HADOOP-7777 Implement a base class for DNSToSwitchMapping implementations 
+    that can offer extra topology information. (stevel)
+
+    HADOOP-7657. Add support for LZ4 compression. (Binglin Chang via todd)
+
+    HADOOP-7910. Add Configuration.getLongBytes to handle human readable byte size values. (Sho Shimauchi via harsh)
+
+
+  IMPROVEMENTS
+
+    HADOOP-7801. HADOOP_PREFIX cannot be overriden. (Bruno Mahé via tomwhite)
+
+    HADOOP-7802. Hadoop scripts unconditionally source
+    "$bin"/../libexec/hadoop-config.sh. (Bruno Mahé via tomwhite)
+
+    HADOOP-7858. Drop some info logging to DEBUG level in IPC,
+    metrics, and HTTP. (todd via eli)
+
+    HADOOP-7424. Log an error if the topology script doesn't handle multiple args.
+    (Uma Maheswara Rao G via eli)
+
+    HADOOP-7804. Enable hadoop config generator to set configurations to enable
+    short circuit read. (Arpit Gupta via jitendra)
+
+    HADOOP-7877. Update balancer CLI usage documentation to include the new
+    -policy option.  (szetszwo)
+
+    HADOOP-6840. Support non-recursive create() in FileSystem and 
+    SequenceFile.Writer. (jitendra and eli via eli)
+
+    HADOOP-6886. LocalFileSystem Needs createNonRecursive API.
+    (Nicolas Spiegelberg and eli via eli)
+
+    HADOOP-7912. test-patch should run eclipse:eclipse to verify that it does
+    not break again. (Robert Joseph Evans via tomwhite)
+
+    HADOOP-7890. Redirect hadoop script's deprecation message to stderr.
+    (Koji Knoguchi via mahadev)
+
+    HADOOP-7504. Add the missing Ganglia31 opts to hadoop-metrics.properties as a comment. (harsh)
+
+    HADOOP-7933. Add a getDelegationTokens api to FileSystem which checks
+    for known tokens in the passed Credentials object. (sseth)
+
+    HADOOP-7737. normalize hadoop-mapreduce & hadoop-dist dist/tar build with 
+    common/hdfs. (tucu)
+
+    HADOOP-7743. Add Maven profile to create a full source tarball. (tucu)
+
+    HADOOP-7758. Make GlobFilter class public. (tucu)
+
+    HADOOP-7590. Mavenize streaming and MR examples. (tucu)
+
+    HADOOP-7934. Normalize dependencies versions across all modules. (tucu)
+
+    HADOOP-7348. Change 'addnl' in getmerge util to be a flag '-nl' instead.
+    (XieXianshan via harsh)
+
+  OPTIMIZATIONS
+
+  BUG FIXES
+   
+   HADOOP-7811. TestUserGroupInformation#testGetServerSideGroups test fails in chroot.
+   (Jonathan Eagles via mahadev)
+
+   HADOOP-7787. Make source tarball use conventional name.
+   (Bruno Mahé via tomwhite)
+
+   HADOOP-6614. RunJar should provide more diags when it can't create
+   a temp file. (Jonathan Hsieh via eli)
+
+   HADOOP-7859. TestViewFsHdfs.testgetFileLinkStatus is failing an assert. (eli)
+
+   HADOOP-7864. Building mvn site with Maven < 3.0.2 causes OOM errors.
+   (Andrew Bayer via eli)
+
+   HADOOP-7854. UGI getCurrentUser is not synchronized. (Daryn Sharp via jitendra)
+
+   HADOOP-7870. fix SequenceFile#createWriter with boolean
+   createParent arg to respect createParent. (Jon Hsieh via eli)
+
+   HADOOP-7898. Fix javadoc warnings in AuthenticationToken.java. (suresh)
+
+   HADOOP-7878  Regression: HADOOP-7777 switch changes break HDFS tests when the
+   isSingleSwitch() predicate is used. (stevel)
+
+   HADOOP-7914. Remove the duplicated declaration of hadoop-hdfs test-jar in
+   hadoop-project/pom.xml.  (szetszwo)
+
+   HADOOP-7837. no NullAppender in the log4j config. (eli)
+
+   HADOOP-7948. Shell scripts created by hadoop-dist/pom.xml to build tar do not 
+   properly propagate failure. (cim_michajlomatijkiw via tucu)
+
+   HADOOP-7949. Updated maxIdleTime default in the code to match
+   core-default.xml (eli)
+
+   HADOOP-7853. multiple javax security configurations cause conflicts. 
+   (daryn via tucu)
+
+   HDFS-2614. hadoop dist tarball is missing hdfs headers. (tucu)
+
+   HADOOP-7874. native libs should be under lib/native/ dir. (tucu)
+
+   HADOOP-7887. KerberosAuthenticatorHandler is not setting
+   KerberosName name rules from configuration. (tucu)
+
+   HADOOP-7902. skipping name rules setting (if already set) should be done 
+   on UGI initialization only. (tucu)
+
+   HADOOP-7810. move hadoop archive to core from tools. (tucu)
+
+   HADOOP_7917. compilation of protobuf files fails in windows/cygwin. (tucu)
+
+   HADOOP-7907. hadoop-tools JARs are not part of the distro. (tucu)
+
+   HADOOP-7936. There's a Hoop README in the root dir of the tarball. (tucu)
+
+   HADOOP-7963. Fix ViewFS to catch a null canonical service-name and pass
+   tests TestViewFileSystem* (Siddharth Seth via vinodkv)
+
+   HADOOP-7964. Deadlock in NetUtils and SecurityUtil class initialization.
+   (Daryn Sharp via suresh)
 
 Release 0.23.0 - 2011-11-01 
 
@@ -795,7 +972,28 @@ Release 0.23.0 - 2011-11-01
 
     HADOOP-7778. FindBugs warning in Token.getKind(). (tomwhite)
 
-Release 0.22.0 - Unreleased
+    HADOOP-7798. Add support gpg signatures for maven release artifacts.
+    (cutting via acmurthy) 
+
+    HADOOP-7797. Fix top-level pom.xml to refer to correct staging maven
+    repository. (omalley via acmurthy) 
+
+Release 0.22.1 - Unreleased
+
+  INCOMPATIBLE CHANGES
+
+  NEW FEATURES
+
+  IMPROVEMENTS
+
+  OPTIMIZATIONS
+
+  BUG FIXES
+
+    HADOOP-7937. Forward port SequenceFile#syncFs and friends from Hadoop 1.x.
+    (tomwhite)
+
+Release 0.22.0 - 2011-11-29
 
   INCOMPATIBLE CHANGES
 
@@ -1048,6 +1246,14 @@ Release 0.22.0 - Unreleased
     a hyphen. (Brock Noland via todd)
 
     HADOOP-7772. javadoc the topology classes (stevel)
+
+    HADOOP-7786. Remove HDFS-specific config keys defined in FsConfig. (eli)
+
+    HADOOP-7358. Improve log levels when exceptions caught in RPC handler
+    (Todd Lipcon via shv)
+
+    HADOOP-7861. changes2html.pl generates links to HADOOP, HDFS, and MAPREDUCE
+    jiras. (shv)
 
   OPTIMIZATIONS
 
@@ -1316,6 +1522,8 @@ Release 0.22.0 - Unreleased
 
     HADOOP-7457. Remove out-of-date Chinese language documentation.
     (Jakob Homan via eli)
+
+    HADOOP-7783. Add more symlink tests that cover intermediate links. (eli)
 
 Release 0.21.1 - Unreleased
 

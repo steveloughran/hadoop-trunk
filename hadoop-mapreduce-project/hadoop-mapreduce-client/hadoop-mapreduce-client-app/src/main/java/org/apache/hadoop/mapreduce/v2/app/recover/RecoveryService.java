@@ -76,8 +76,6 @@ import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.Event;
 import org.apache.hadoop.yarn.event.EventHandler;
-import org.apache.hadoop.yarn.factories.RecordFactory;
-import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.service.CompositeService;
 import org.apache.hadoop.yarn.service.Service;
 import org.apache.hadoop.yarn.util.BuilderUtils;
@@ -94,10 +92,7 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
 
 //TODO:
 //task cleanup for all non completed tasks
-
 public class RecoveryService extends CompositeService implements Recovery {
-
-  private static final RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
 
   private static final Log LOG = LogFactory.getLog(RecoveryService.class);
 
@@ -120,7 +115,7 @@ public class RecoveryService extends CompositeService implements Recovery {
     super("RecoveringDispatcher");
     this.applicationAttemptId = applicationAttemptId;
     this.committer = committer;
-    this.dispatcher = new RecoveryDispatcher();
+    this.dispatcher = createRecoveryDispatcher();
     this.clock = new ControlledClock(clock);
       addService((Service) dispatcher);
   }
@@ -209,17 +204,32 @@ public class RecoveryService extends CompositeService implements Recovery {
     LOG.info("Read completed tasks from history "
         + completedTasks.size());
   }
+  
+  protected Dispatcher createRecoveryDispatcher() {
+    return new RecoveryDispatcher();
+  }
+  
+  protected Dispatcher createRecoveryDispatcher(boolean exitOnException) {
+    return new RecoveryDispatcher(exitOnException);
+  }
 
+  @SuppressWarnings("rawtypes")
   class RecoveryDispatcher extends AsyncDispatcher {
     private final EventHandler actualHandler;
     private final EventHandler handler;
 
-    RecoveryDispatcher() {
+    RecoveryDispatcher(boolean exitOnException) {
+      super(exitOnException);
       actualHandler = super.getEventHandler();
       handler = new InterceptingEventHandler(actualHandler);
     }
 
+    RecoveryDispatcher() {
+      this(false);
+    }
+
     @Override
+    @SuppressWarnings("unchecked")
     public void dispatch(Event event) {
       if (recoveryMode) {
         if (event.getType() == TaskAttemptEventType.TA_CONTAINER_LAUNCHED) {
@@ -267,6 +277,10 @@ public class RecoveryService extends CompositeService implements Recovery {
           }
         }
       }
+      realDispatch(event);
+    }
+    
+    public void realDispatch(Event event) {
       super.dispatch(event);
     }
 
@@ -281,6 +295,7 @@ public class RecoveryService extends CompositeService implements Recovery {
     return taskInfo.getAllTaskAttempts().get(TypeConverter.fromYarn(id));
   }
 
+  @SuppressWarnings({"rawtypes", "unchecked"})
   private class InterceptingEventHandler implements EventHandler {
     EventHandler actualHandler;
 
@@ -395,8 +410,7 @@ public class RecoveryService extends CompositeService implements Recovery {
       if (cntrs == null) {
         taskAttemptStatus.counters = null;
       } else {
-        taskAttemptStatus.counters = TypeConverter.toYarn(attemptInfo
-            .getCounters());
+        taskAttemptStatus.counters = cntrs;
       }
       actualHandler.handle(new TaskAttemptStatusUpdateEvent(
           taskAttemptStatus.id, taskAttemptStatus));
@@ -407,7 +421,9 @@ public class RecoveryService extends CompositeService implements Recovery {
       LOG.info("Sending assigned event to " + yarnAttemptID);
       ContainerId cId = attemptInfo.getContainerId();
 
-      NodeId nodeId = ConverterUtils.toNodeId(attemptInfo.getHostname());
+      NodeId nodeId =
+          ConverterUtils.toNodeId(attemptInfo.getHostname() + ":"
+              + attemptInfo.getPort());
       // Resource/Priority/ApplicationACLs are only needed while launching the
       // container on an NM, these are already completed tasks, so setting them
       // to null

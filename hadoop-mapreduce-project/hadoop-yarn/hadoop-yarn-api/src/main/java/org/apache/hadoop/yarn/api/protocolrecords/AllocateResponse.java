@@ -34,7 +34,7 @@ import org.apache.hadoop.yarn.api.records.Container;
  *   <ul>
  *     <li>Response ID to track duplicate responses.</li>
  *     <li>
- *       A reboot flag to let the <code>ApplicationMaster</code> that its 
+ *       A reboot flag to let the <code>ApplicationMaster</code> know that its 
  *       horribly out of sync and needs to reboot.</li>
  *     <li>A list of newly allocated {@link Container}.</li>
  *     <li>A list of completed {@link Container}.</li>
@@ -61,4 +61,17 @@ public interface AllocateResponse {
   @Private
   @Unstable
   public abstract void setAMResponse(AMResponse amResponse);
+  
+  
+  /**
+   * Get the number of hosts available on the cluster.
+   * @return the available host count.
+   */
+  @Public
+  @Stable
+  public int getNumClusterNodes();
+  
+  @Private
+  @Unstable
+  public void setNumClusterNodes(int numNodes);
 }

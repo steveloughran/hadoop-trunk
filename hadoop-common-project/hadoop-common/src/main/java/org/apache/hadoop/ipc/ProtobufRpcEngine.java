@@ -37,6 +37,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.ipc.RPC.RpcInvoker;
+import org.apache.hadoop.ipc.RpcPayloadHeader.RpcKind;
 import org.apache.hadoop.ipc.protobuf.HadoopRpcProtos.HadoopRpcExceptionProto;
 import org.apache.hadoop.ipc.protobuf.HadoopRpcProtos.HadoopRpcRequestProto;
 import org.apache.hadoop.ipc.protobuf.HadoopRpcProtos.HadoopRpcResponseProto;
@@ -59,6 +61,12 @@ import com.google.protobuf.ServiceException;
 @InterfaceStability.Evolving
 public class ProtobufRpcEngine implements RpcEngine {
   private static final Log LOG = LogFactory.getLog(ProtobufRpcEngine.class);
+  
+  static { // Register the rpcRequest deserializer for WritableRpcEngine 
+    org.apache.hadoop.ipc.Server.registerProtocolEngine(
+        RpcKind.RPC_PROTOCOL_BUFFER, RpcRequestWritable.class,
+        new Server.ProtoBufRpcInvoker());
+  }
 
   private static final ClientCache CLIENTS = new ClientCache();
 
@@ -74,10 +82,13 @@ public class ProtobufRpcEngine implements RpcEngine {
   }
 
   private static class Invoker implements InvocationHandler, Closeable {
-    private Map<String, Message> returnTypes = new ConcurrentHashMap<String, Message>();
+    private final Map<String, Message> returnTypes = 
+        new ConcurrentHashMap<String, Message>();
     private boolean isClosed = false;
-    private Client.ConnectionId remoteId;
-    private Client client;
+    private final Client.ConnectionId remoteId;
+    private final Client client;
+    private final long clientProtocolVersion;
+    private final String protocolName;
 
     public Invoker(Class<?> protocol, InetSocketAddress addr,
         UserGroupInformation ticket, Configuration conf, SocketFactory factory,
@@ -86,6 +97,8 @@ public class ProtobufRpcEngine implements RpcEngine {
           ticket, rpcTimeout, conf);
       this.client = CLIENTS.getClient(conf, factory,
           RpcResponseWritable.class);
+      this.clientProtocolVersion = RPC.getProtocolVersion(protocol);
+      this.protocolName = RPC.getProtocolName(protocol);
     }
 
     private HadoopRpcRequestProto constructRpcRequest(Method method,
@@ -107,6 +120,19 @@ public class ProtobufRpcEngine implements RpcEngine {
 
       Message param = (Message) params[1];
       builder.setRequest(param.toByteString());
+      // For protobuf, {@code protocol} used when creating client side proxy is
+      // the interface extending BlockingInterface, which has the annotations 
+      // such as ProtocolName etc.
+      //
+      // Using Method.getDeclaringClass(), as in WritableEngine to get at
+      // the protocol interface will return BlockingInterface, from where 
+      // the annotation ProtocolName and Version cannot be
+      // obtained.
+      //
+      // Hence we simply use the protocol class used to create the proxy.
+      // For PB this may limit the use of mixins on client side.
+      builder.setDeclaringClassProtocolName(protocolName);
+      builder.setClientProtocolVersion(clientProtocolVersion);
       rpcRequest = builder.build();
       return rpcRequest;
     }
@@ -118,9 +144,10 @@ public class ProtobufRpcEngine implements RpcEngine {
      * 
      * ServiceException has the following causes:
      * <ol>
-     * <li>Exceptions encountered in this methods are thrown as
-     * RpcClientException, wrapped in RemoteException</li>
-     * <li>Remote exceptions are thrown wrapped in RemoteException</li>
+     * <li>Exceptions encountered on the client side in this method are 
+     * set as cause in ServiceException as is.</li>
+     * <li>Exceptions from the server are wrapped in RemoteException and are
+     * set as cause in ServiceException</li>
      * </ol>
      * 
      * Note that the client calling protobuf RPC methods, must handle
@@ -139,11 +166,10 @@ public class ProtobufRpcEngine implements RpcEngine {
       HadoopRpcRequestProto rpcRequest = constructRpcRequest(method, args);
       RpcResponseWritable val = null;
       try {
-        val = (RpcResponseWritable) client.call(
+        val = (RpcResponseWritable) client.call(RpcKind.RPC_PROTOCOL_BUFFER,
             new RpcRequestWritable(rpcRequest), remoteId);
-      } catch (Exception e) {
-        RpcClientException ce = new RpcClientException("Client exception", e);
-        throw new ServiceException(getRemoteException(ce));
+      } catch (Throwable e) {
+        throw new ServiceException(e);
       }
 
       HadoopRpcResponseProto response = val.message;
@@ -171,9 +197,8 @@ public class ProtobufRpcEngine implements RpcEngine {
       try {
         returnMessage = prototype.newBuilderForType()
             .mergeFrom(response.getResponse()).build();
-      } catch (InvalidProtocolBufferException e) {
-        RpcClientException ce = new RpcClientException("Client exception", e);
-        throw new ServiceException(getRemoteException(ce));
+      } catch (Throwable e) {
+        throw new ServiceException(e);
       }
       return returnMessage;
     }
@@ -271,104 +296,44 @@ public class ProtobufRpcEngine implements RpcEngine {
         RpcResponseWritable.class);
   }
   
+ 
 
   @Override
-  public RPC.Server getServer(Class<?> protocol, Object instance,
+  public RPC.Server getServer(Class<?> protocol, Object protocolImpl,
       String bindAddress, int port, int numHandlers, int numReaders,
       int queueSizePerHandler, boolean verbose, Configuration conf,
       SecretManager<? extends TokenIdentifier> secretManager)
       throws IOException {
-    return new Server(instance, conf, bindAddress, port, numHandlers,
-        numReaders, queueSizePerHandler, verbose, secretManager);
+    return new Server(protocol, protocolImpl, conf, bindAddress, port,
+        numHandlers, numReaders, queueSizePerHandler, verbose, secretManager);
   }
   
-  private static RemoteException getRemoteException(Exception e) {
-    return new RemoteException(e.getClass().getName(),
-        StringUtils.stringifyException(e));
-  }
-
   public static class Server extends RPC.Server {
-    private BlockingService service;
-    private boolean verbose;
-
-    private static String classNameBase(String className) {
-      String[] names = className.split("\\.", -1);
-      if (names == null || names.length == 0) {
-        return className;
-      }
-      return names[names.length - 1];
-    }
-
     /**
      * Construct an RPC server.
      * 
-     * @param instance the instance whose methods will be called
+     * @param protocolClass the class of protocol
+     * @param protocolImpl the protocolImpl whose methods will be called
      * @param conf the configuration to use
      * @param bindAddress the address to bind on to listen for connection
      * @param port the port to listen for connections on
      * @param numHandlers the number of method handler threads to run
      * @param verbose whether each call should be logged
      */
-    public Server(Object instance, Configuration conf, String bindAddress,
-        int port, int numHandlers, int numReaders, int queueSizePerHandler,
-        boolean verbose, SecretManager<? extends TokenIdentifier> secretManager)
+    public Server(Class<?> protocolClass, Object protocolImpl,
+        Configuration conf, String bindAddress, int port, int numHandlers,
+        int numReaders, int queueSizePerHandler, boolean verbose,
+        SecretManager<? extends TokenIdentifier> secretManager)
         throws IOException {
-      super(bindAddress, port, RpcRequestWritable.class, numHandlers,
-          numReaders, queueSizePerHandler, conf, classNameBase(instance
+      super(bindAddress, port, null, numHandlers,
+          numReaders, queueSizePerHandler, conf, classNameBase(protocolImpl
               .getClass().getName()), secretManager);
-      this.service = (BlockingService) instance;
-      this.verbose = verbose;
+      this.verbose = verbose;  
+      registerProtocolAndImpl(RpcKind.RPC_PROTOCOL_BUFFER, protocolClass,
+          protocolImpl);
     }
 
-    /**
-     * This is a server side method, which is invoked over RPC. On success
-     * the return response has protobuf response payload. On failure, the
-     * exception name and the stack trace are return in the resposne. See {@link HadoopRpcResponseProto}
-     * 
-     * In this method there three types of exceptions possible and they are
-     * returned in response as follows.
-     * <ol>
-     * <li> Exceptions encountered in this method that are returned as {@link RpcServerException} </li>
-     * <li> Exceptions thrown by the service is wrapped in ServiceException. In that
-     * this method returns in response the exception thrown by the service.</li>
-     * <li> Other exceptions thrown by the service. They are returned as
-     * it is.</li>
-     * </ol>
-     */
-    @Override
-    public Writable call(String protocol, Writable writableRequest,
-        long receiveTime) throws IOException {
-      RpcRequestWritable request = (RpcRequestWritable) writableRequest;
-      HadoopRpcRequestProto rpcRequest = request.message;
-      String methodName = rpcRequest.getMethodName();
-      if (verbose)
-        LOG.info("Call: protocol=" + protocol + ", method=" + methodName);
-      MethodDescriptor methodDescriptor = service.getDescriptorForType()
-          .findMethodByName(methodName);
-      if (methodDescriptor == null) {
-        String msg = "Unknown method " + methodName + " called on " + protocol
-            + " protocol.";
-        LOG.warn(msg);
-        return handleException(new RpcServerException(msg));
-      }
-      Message prototype = service.getRequestPrototype(methodDescriptor);
-      Message param = prototype.newBuilderForType()
-          .mergeFrom(rpcRequest.getRequest()).build();
-      Message result;
-      try {
-        result = service.callBlockingMethod(methodDescriptor, null, param);
-      } catch (ServiceException e) {
-        Throwable cause = e.getCause();
-        return handleException(cause != null ? cause : e);
-      } catch (Exception e) {
-        return handleException(e);
-      }
-
-      HadoopRpcResponseProto response = constructProtoSpecificRpcSuccessResponse(result);
-      return new RpcResponseWritable(response);
-    }
-
-    private RpcResponseWritable handleException(Throwable e) {
+    private static RpcResponseWritable handleException(Throwable e) {
       HadoopRpcExceptionProto exception = HadoopRpcExceptionProto.newBuilder()
           .setExceptionName(e.getClass().getName())
           .setStackTrace(StringUtils.stringifyException(e)).build();
@@ -377,13 +342,89 @@ public class ProtobufRpcEngine implements RpcEngine {
       return new RpcResponseWritable(response);
     }
 
-    private HadoopRpcResponseProto constructProtoSpecificRpcSuccessResponse(
+    private static HadoopRpcResponseProto constructProtoSpecificRpcSuccessResponse(
         Message message) {
       HadoopRpcResponseProto res = HadoopRpcResponseProto.newBuilder()
           .setResponse(message.toByteString())
           .setStatus(ResponseStatus.SUCCESS)
           .build();
       return res;
+    }
+    
+    /**
+     * Protobuf invoker for {@link RpcInvoker}
+     */
+    static class ProtoBufRpcInvoker implements RpcInvoker {
+
+      @Override 
+      /**
+       * This is a server side method, which is invoked over RPC. On success
+       * the return response has protobuf response payload. On failure, the
+       * exception name and the stack trace are return in the resposne.
+       * See {@link HadoopRpcResponseProto}
+       * 
+       * In this method there three types of exceptions possible and they are
+       * returned in response as follows.
+       * <ol>
+       * <li> Exceptions encountered in this method that are returned 
+       * as {@link RpcServerException} </li>
+       * <li> Exceptions thrown by the service is wrapped in ServiceException. 
+       * In that this method returns in response the exception thrown by the 
+       * service.</li>
+       * <li> Other exceptions thrown by the service. They are returned as
+       * it is.</li>
+       * </ol>
+       */
+      public Writable call(RPC.Server server, String protocol,
+          Writable writableRequest, long receiveTime) throws IOException {
+        RpcRequestWritable request = (RpcRequestWritable) writableRequest;
+        HadoopRpcRequestProto rpcRequest = request.message;
+        String methodName = rpcRequest.getMethodName();
+        String protoName = rpcRequest.getDeclaringClassProtocolName();
+        long clientVersion = rpcRequest.getClientProtocolVersion();
+        if (server.verbose)
+          LOG.info("Call: protocol=" + protocol + ", method=" + methodName);
+        
+        ProtoNameVer pv = new ProtoNameVer(protoName, clientVersion);
+        ProtoClassProtoImpl protocolImpl = 
+            server.getProtocolImplMap(RpcKind.RPC_PROTOCOL_BUFFER).get(pv);
+        if (protocolImpl == null) { // no match for Protocol AND Version
+          VerProtocolImpl highest = 
+              server.getHighestSupportedProtocol(RpcKind.RPC_PROTOCOL_BUFFER, 
+                  protoName);
+          if (highest == null) {
+            throw new IOException("Unknown protocol: " + protoName);
+          }
+          // protocol supported but not the version that client wants
+          throw new RPC.VersionMismatch(protoName, clientVersion,
+              highest.version);
+        }
+        
+        BlockingService service = (BlockingService) protocolImpl.protocolImpl;
+        MethodDescriptor methodDescriptor = service.getDescriptorForType()
+            .findMethodByName(methodName);
+        if (methodDescriptor == null) {
+          String msg = "Unknown method " + methodName + " called on " + protocol
+              + " protocol.";
+          LOG.warn(msg);
+          return handleException(new RpcServerException(msg));
+        }
+        Message prototype = service.getRequestPrototype(methodDescriptor);
+        Message param = prototype.newBuilderForType()
+            .mergeFrom(rpcRequest.getRequest()).build();
+        Message result;
+        try {
+          result = service.callBlockingMethod(methodDescriptor, null, param);
+        } catch (ServiceException e) {
+          Throwable cause = e.getCause();
+          return handleException(cause != null ? cause : e);
+        } catch (Exception e) {
+          return handleException(e);
+        }
+  
+        HadoopRpcResponseProto response = constructProtoSpecificRpcSuccessResponse(result);
+        return new RpcResponseWritable(response);
+      }
     }
   }
 }

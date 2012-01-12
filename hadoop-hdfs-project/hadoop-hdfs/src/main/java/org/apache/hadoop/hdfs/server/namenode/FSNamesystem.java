@@ -33,6 +33,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_REQUIRED_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_MAX_OBJECTS_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_MAX_OBJECTS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY;
@@ -306,7 +307,20 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
    * @throws IOException if loading fails
    */
   public static FSNamesystem loadFromDisk(Configuration conf) throws IOException {
-    FSImage fsImage = new FSImage(conf);
+    Collection<URI> namespaceDirs = FSNamesystem.getNamespaceDirs(conf);
+    Collection<URI> namespaceEditsDirs = 
+      FSNamesystem.getNamespaceEditsDirs(conf);
+
+    if (namespaceDirs.size() == 1) {
+      LOG.warn("Only one " + DFS_NAMENODE_NAME_DIR_KEY
+          + " directory configured , beware data loss!");
+    }
+    if (namespaceEditsDirs.size() == 1) {
+      LOG.warn("Only one " + DFS_NAMENODE_EDITS_DIR_KEY
+          + " directory configured , beware data loss!");
+    }
+
+    FSImage fsImage = new FSImage(conf, namespaceDirs, namespaceEditsDirs);
     FSNamesystem namesystem = new FSNamesystem(conf, fsImage);
 
     long loadStart = now();
@@ -417,6 +431,21 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
   public static Collection<URI> getNamespaceDirs(Configuration conf) {
     return getStorageDirs(conf, DFS_NAMENODE_NAME_DIR_KEY);
   }
+  
+  public static Collection<URI> getNamespaceEditsDirs(Configuration conf) {
+    Collection<URI> editsDirs = getStorageDirs(conf, DFS_NAMENODE_EDITS_DIR_KEY);
+    if (editsDirs.isEmpty()) {
+      // If this is the case, no edit dirs have been explicitly configured.
+      // Image dirs are to be used for edits too.
+      return getNamespaceDirs(conf);
+    } else {
+      return editsDirs;
+    }
+  }
+  
+  public static Collection<URI> getRequiredNamespaceEditsDirs(Configuration conf) {
+    return getStorageDirs(conf, DFS_NAMENODE_EDITS_DIR_REQUIRED_KEY);
+  }
 
   private static Collection<URI> getStorageDirs(Configuration conf,
                                                 String propertyName) {
@@ -446,10 +475,6 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
       dirNames = Collections.singletonList("file:///tmp/hadoop/dfs/name");
     }
     return Util.stringCollectionAsURIs(dirNames);
-  }
-
-  public static Collection<URI> getNamespaceEditsDirs(Configuration conf) {
-    return getStorageDirs(conf, DFS_NAMENODE_EDITS_DIR_KEY);
   }
 
   @Override
@@ -503,7 +528,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
         fsOwner.getShortUserName(), supergroup, new FsPermission(filePermission));
     
     this.serverDefaults = new FsServerDefaults(
-        conf.getLong(DFS_BLOCK_SIZE_KEY, DFS_BLOCK_SIZE_DEFAULT),
+        conf.getLongBytes(DFS_BLOCK_SIZE_KEY, DFS_BLOCK_SIZE_DEFAULT),
         conf.getInt(DFS_BYTES_PER_CHECKSUM_KEY, DFS_BYTES_PER_CHECKSUM_DEFAULT),
         conf.getInt(DFS_CLIENT_WRITE_PACKET_SIZE_KEY, DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT),
         (short) conf.getInt(DFS_REPLICATION_KEY, DFS_REPLICATION_DEFAULT),
@@ -1421,7 +1446,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     try {
       lb = startFileInternal(src, null, holder, clientMachine, 
                         EnumSet.of(CreateFlag.APPEND), 
-                        false, blockManager.maxReplication, (long)0);
+                        false, blockManager.maxReplication, 0);
     } finally {
       writeUnlock();
     }
@@ -1504,7 +1529,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
       fileLength = pendingFile.computeContentSummary().getLength();
       blockSize = pendingFile.getPreferredBlockSize();
       clientNode = pendingFile.getClientNode();
-      replication = (int)pendingFile.getReplication();
+      replication = pendingFile.getReplication();
     } finally {
       writeUnlock();
     }
@@ -2003,10 +2028,12 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     }
   }
 
-  /** Get the file info for a specific file.
+  /**
+   * Get the file info for a specific file.
+   *
    * @param src The string representation of the path to the file
    * @param resolveLink whether to throw UnresolvedLinkException 
-   *        if src refers to a symlinks
+   *        if src refers to a symlink
    *
    * @throws AccessControlException if access is denied
    * @throws UnresolvedLinkException if a symlink is encountered.
@@ -2214,6 +2241,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     // If the penultimate block is not COMPLETE, then it must be COMMITTED.
     if(nrCompleteBlocks < nrBlocks - 2 ||
        nrCompleteBlocks == nrBlocks - 2 &&
+         curBlock != null &&
          curBlock.getBlockUCState() != BlockUCState.COMMITTED) {
       final String message = "DIR* NameSystem.internalReleaseLease: "
         + "attempt to release a create lock on "
@@ -2299,7 +2327,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
   }
   
   Lease reassignLeaseInternal(Lease lease, String src, String newHolder,
-      INodeFileUnderConstruction pendingFile) throws IOException {
+      INodeFileUnderConstruction pendingFile) {
     assert hasWriteLock();
     pendingFile.setClientName(newHolder);
     return leaseManager.reassignLease(lease, src, newHolder);
@@ -2402,7 +2430,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
                 newtargets[i]);
           }
         }
-        if (closeFile) {
+        if ((closeFile) && (descriptors != null)) {
           // the file is getting closed. Insert block locations into blockManager.
           // Otherwise fsck will report these blocks as MISSING, especially if the
           // blocksReceived from Datanodes take a long time to arrive.
@@ -3088,7 +3116,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
       this.blockTotal = total;
       this.blockThreshold = (int) (blockTotal * threshold);
       this.blockReplQueueThreshold = 
-        (int) (((double) blockTotal) * replQueueThreshold);
+        (int) (blockTotal * replQueueThreshold);
       checkMode();
     }
       
@@ -3098,7 +3126,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
      * @param replication current replication 
      */
     private synchronized void incrementSafeBlockCount(short replication) {
-      if ((int)replication == safeReplication)
+      if (replication == safeReplication)
         this.blockSafe++;
       checkMode();
     }
@@ -3230,6 +3258,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     /**
      * Checks consistency of the class state.
      * This is costly and currently called only in assert.
+     * @throws IOException 
      */
     private boolean isConsistent() throws IOException {
       if (blockTotal == -1 && blockSafe == -1) {
@@ -3493,15 +3522,15 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
 
   void endCheckpoint(NamenodeRegistration registration,
                             CheckpointSignature sig) throws IOException {
-    writeLock();
+    readLock();
     try {
       if (isInSafeMode()) {
         throw new SafeModeException("Checkpoint not ended", safeMode);
       }
       LOG.info("End checkpoint for " + registration.getAddress());
-      getFSImage().endCheckpoint(sig, registration.getRole());
+      getFSImage().endCheckpoint(sig);
     } finally {
-      writeUnlock();
+      readUnlock();
     }
   }
 
@@ -3997,7 +4026,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
    * @throws IOException
    */
   Collection<CorruptFileBlockInfo> listCorruptFileBlocks(String path,
-      String startBlockAfter) throws IOException {
+	String[] cookieTab) throws IOException {
 
     readLock();
     try {
@@ -4006,23 +4035,27 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
                               "replication queues have not been initialized.");
       }
       checkSuperuserPrivilege();
-      long startBlockId = 0;
       // print a limited # of corrupt files per call
       int count = 0;
       ArrayList<CorruptFileBlockInfo> corruptFiles = new ArrayList<CorruptFileBlockInfo>();
-      
-      if (startBlockAfter != null) {
-        startBlockId = Block.filename2id(startBlockAfter);
-      }
 
       final Iterator<Block> blkIterator = blockManager.getCorruptReplicaBlockIterator();
+
+      if (cookieTab == null) {
+        cookieTab = new String[] { null };
+      }
+      int skip = getIntCookie(cookieTab[0]);
+      for (int i = 0; i < skip && blkIterator.hasNext(); i++) {
+        blkIterator.next();
+      }
+
       while (blkIterator.hasNext()) {
         Block blk = blkIterator.next();
         INode inode = blockManager.getINode(blk);
+        skip++;
         if (inode != null && blockManager.countNodes(blk).liveReplicas() == 0) {
           String src = FSDirectory.getFullPathName(inode);
-          if (((startBlockAfter == null) || (blk.getBlockId() > startBlockId))
-              && (src.startsWith(path))) {
+          if (src.startsWith(path)){
             corruptFiles.add(new CorruptFileBlockInfo(src, blk));
             count++;
             if (count >= DEFAULT_MAX_CORRUPT_FILEBLOCKS_RETURNED)
@@ -4030,13 +4063,32 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
           }
         }
       }
+      cookieTab[0] = String.valueOf(skip);
       LOG.info("list corrupt file blocks returned: " + count);
       return corruptFiles;
     } finally {
       readUnlock();
     }
   }
-  
+
+  /**
+   * Convert string cookie to integer.
+   */
+  private static int getIntCookie(String cookie){
+    int c;
+    if(cookie == null){
+      c = 0;
+    } else {
+      try{
+        c = Integer.parseInt(cookie);
+      }catch (NumberFormatException e) {
+        c = 0;
+      }
+    }
+    c = Math.max(0, c);
+    return c;
+  }
+
   /**
    * Create delegation token secret manager
    */
@@ -4420,5 +4472,16 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
   /** @return the block manager. */
   public BlockManager getBlockManager() {
     return blockManager;
+  }
+  
+  /**
+   * Verifies that the given identifier and password are valid and match.
+   * @param identifier Token identifier.
+   * @param password Password in the token.
+   * @throws InvalidToken
+   */
+  public synchronized void verifyToken(DelegationTokenIdentifier identifier,
+      byte[] password) throws InvalidToken {
+    getDelegationTokenSecretManager().verifyToken(identifier, password);
   }
 }

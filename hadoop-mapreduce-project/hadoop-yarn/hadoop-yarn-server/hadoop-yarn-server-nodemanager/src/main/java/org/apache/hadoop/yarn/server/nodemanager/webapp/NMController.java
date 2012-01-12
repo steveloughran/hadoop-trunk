@@ -28,10 +28,11 @@ import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.Application;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.webapp.Controller;
+import org.apache.hadoop.yarn.webapp.YarnWebParams;
 
 import com.google.inject.Inject;
 
-public class NMController extends Controller implements NMWebParams {
+public class NMController extends Controller implements YarnWebParams {
 
   private Context nmContext;
   private Configuration nmConf;
@@ -87,8 +88,8 @@ public class NMController extends Controller implements NMWebParams {
         containerId.getApplicationAttemptId().getApplicationId();
     Application app = nmContext.getApplications().get(appId);
     if (app == null
-        && nmConf.getBoolean(YarnConfiguration.NM_LOG_AGGREGATION_ENABLED,
-            YarnConfiguration.DEFAULT_NM_LOG_AGGREGATION_ENABLED)) {
+        && nmConf.getBoolean(YarnConfiguration.LOG_AGGREGATION_ENABLED,
+            YarnConfiguration.DEFAULT_LOG_AGGREGATION_ENABLED)) {
       String logServerUrl = nmConf.get(YarnConfiguration.YARN_LOG_SERVER_URL);
       String redirectUrl = null;
       if (logServerUrl == null || logServerUrl.isEmpty()) {

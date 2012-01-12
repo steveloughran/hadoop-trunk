@@ -41,7 +41,7 @@ $ mvn clean install assembly:assembly -Pnative
 * Setting up the environment.
 
   Assuming you have installed hadoop-common/hadoop-hdfs and exported
-  <<$HADOOP_COMMON_HOME>>/<<$HADOOP_COMMON_HOME>>, untar hadoop mapreduce 
+  <<$HADOOP_COMMON_HOME>>/<<$HADOOP_HDFS_HOME>>, untar hadoop mapreduce 
   tarball and set environment variable <<$HADOOP_MAPRED_HOME>> to the 
   untarred directory. Set <<$YARN_HOME>> the same as <<$HADOOP_MAPRED_HOME>>. 
  
@@ -79,15 +79,15 @@ $ mvn clean install assembly:assembly -Pnative
 Add the following configs to your <<<yarn-site.xml>>>
 
 +---+
- <property>
+  <property>
     <name>yarn.resourcemanager.resource-tracker.address</name>
     <value>host:port</value>
     <description>host is the hostname of the resource manager and 
     port is the port on which the NodeManagers contact the Resource Manager.
     </description>
- </property>
+  </property>
 
- <property>
+  <property>
     <name>yarn.resourcemanager.scheduler.address</name>
     <value>host:port</value>
     <description>host is the hostname of the resourcemanager and port is the port
@@ -145,20 +145,32 @@ Add the following configs to your <<<yarn-site.xml>>>
   </property>
 +---+
 
-* Create Symlinks.
+* Setting up <<<capacity-scheduler.xml>>>
 
-  You will have to create the following symlinks:
+   Make sure you populate the root queues in <<<capacity-scheduler.xml>>>.
 
 +---+
-$ cd $HADOOP_COMMON_HOME/share/hadoop/common/lib/
-$ ln -s $HADOOP_MAPRED_HOME/modules/hadoop-mapreduce-client-app-*-SNAPSHOT.jar .
-$ ln -s $HADOOP_MAPRED_HOME/modules/hadoop-mapreduce-client-jobclient-*-SNAPSHOT.jar .
-$ ln -s $HADOOP_MAPRED_HOME/modules/hadoop-mapreduce-client-common-*-SNAPSHOT.jar .
-$ ln -s $HADOOP_MAPRED_HOME/modules/hadoop-mapreduce-client-shuffle-*-SNAPSHOT.jar .
-$ ln -s $HADOOP_MAPRED_HOME/modules/hadoop-mapreduce-client-core-*-SNAPSHOT.jar .
-$ ln -s $HADOOP_MAPRED_HOME/modules/hadoop-yarn-common-*-SNAPSHOT.jar .
-$ ln -s $HADOOP_MAPRED_HOME/modules/hadoop-yarn-api-*-SNAPSHOT.jar .
+  <property>
+    <name>yarn.scheduler.capacity.root.queues</name>
+    <value>unfunded,default</value>
+  </property>
+  
+  <property>
+    <name>yarn.scheduler.capacity.root.capacity</name>
+    <value>100</value>
+  </property>
+  
+  <property>
+    <name>yarn.scheduler.capacity.root.unfunded.capacity</name>
+    <value>50</value>
+  </property>
+  
+  <property>
+    <name>yarn.scheduler.capacity.root.default.capacity</name>
+    <value>50</value>
+  </property>
 +---+
+
 * Running daemons.
 
   Assuming that the environment variables <<$HADOOP_COMMON_HOME>>, <<$HADOOP_HDFS_HOME>>, <<$HADOO_MAPRED_HOME>>,
@@ -169,8 +181,8 @@ $ ln -s $HADOOP_MAPRED_HOME/modules/hadoop-yarn-api-*-SNAPSHOT.jar .
   
 +---+
 $ cd $HADOOP_MAPRED_HOME
-$ bin/yarn-daemon.sh start resourcemanager
-$ bin/yarn-daemon.sh start nodemanager
+$ sbin/yarn-daemon.sh start resourcemanager
+$ sbin/yarn-daemon.sh start nodemanager
 +---+
 
   You should be up and running. You can run randomwriter as:

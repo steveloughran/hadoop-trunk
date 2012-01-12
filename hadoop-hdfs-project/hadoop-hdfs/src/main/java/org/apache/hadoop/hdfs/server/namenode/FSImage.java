@@ -738,7 +738,7 @@ public class FSImage implements Closeable {
    * FSImageSaver assumes that it was launched from a thread that holds
    * FSNamesystem lock and waits for the execution of FSImageSaver thread
    * to finish.
-   * This way we are guraranteed that the namespace is not being updated
+   * This way we are guaranteed that the namespace is not being updated
    * while multiple instances of FSImageSaver are traversing it
    * and writing it out.
    */
@@ -998,18 +998,12 @@ public class FSImage implements Closeable {
   /**
    * End checkpoint.
    * <p>
-   * Rename uploaded checkpoint to the new image;
-   * purge old edits file;
-   * rename edits.new to edits;
-   * redirect edit log streams to the new edits;
-   * update checkpoint time if the remote node is a checkpoint only node.
+   * Validate the current storage info with the given signature.
    * 
-   * @param sig
-   * @param remoteNNRole
-   * @throws IOException
+   * @param sig to validate the current storage info against
+   * @throws IOException if the checkpoint fields are inconsistent
    */
-  void endCheckpoint(CheckpointSignature sig,
-                     NamenodeRole remoteNNRole) throws IOException {
+  void endCheckpoint(CheckpointSignature sig) throws IOException {
     sig.validateStorageInfo(this);
   }
 

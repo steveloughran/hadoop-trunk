@@ -737,6 +737,27 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     return Long.parseLong(valueString);
   }
 
+  /**
+   * Get the value of the <code>name</code> property as a <code>long</code> or
+   * human readable format. If no such property exists, the provided default
+   * value is returned, or if the specified value is not a valid
+   * <code>long</code> or human readable format, then an error is thrown. You
+   * can use the following suffix (case insensitive): k(kilo), m(mega), g(giga),
+   * t(tera), p(peta), e(exa)
+   *
+   * @param name property name.
+   * @param defaultValue default value.
+   * @throws NumberFormatException when the value is invalid
+   * @return property value as a <code>long</code>,
+   *         or <code>defaultValue</code>.
+   */
+  public long getLongBytes(String name, long defaultValue) {
+    String valueString = getTrimmed(name);
+    if (valueString == null)
+      return defaultValue;
+    return StringUtils.TraditionalBinaryPrefix.string2long(valueString);
+  }
+
   private String getHexDigits(String value) {
     boolean negative = false;
     String str = value;
@@ -805,6 +826,12 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    */
   public boolean getBoolean(String name, boolean defaultValue) {
     String valueString = getTrimmed(name);
+    if (null == valueString || "".equals(valueString)) {
+      return defaultValue;
+    }
+
+    valueString = valueString.toLowerCase();
+
     if ("true".equals(valueString))
       return true;
     else if ("false".equals(valueString))
@@ -1145,9 +1172,11 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    *         or <code>defaultValue</code>. 
    */
   public Class<?>[] getClasses(String name, Class<?> ... defaultValue) {
-    String[] classnames = getTrimmedStrings(name);
-    if (classnames == null)
+    String valueString = getRaw(name);
+    if (null == valueString) {
       return defaultValue;
+    }
+    String[] classnames = getTrimmedStrings(name);
     try {
       Class<?>[] classes = new Class<?>[classnames.length];
       for(int i = 0; i < classnames.length; i++) {

@@ -18,12 +18,15 @@
 
 package org.apache.hadoop.yarn.api.records;
 
+import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.ClientRMProtocol;
 
 /**
- * <p><code>ApplicationSubmissionContext</code> represents the all of the 
+ * <p><code>ApplicationSubmissionContext</code> represents all of the
  * information needed by the <code>ResourceManager</code> to launch 
  * the <code>ApplicationMaster</code> for an application.</p>
  * 
@@ -148,4 +151,21 @@ public interface ApplicationSubmissionContext {
   @Public
   @Stable
   public void setAMContainerSpec(ContainerLaunchContext amContainer);
+
+  /**
+   * @return true if tokens should be canceled when the app completes.
+   */
+  @LimitedPrivate("mapreduce")
+  @Unstable
+  public boolean getCancelTokensWhenComplete();
+  
+  /**
+   * Set to false if tokens should not be canceled when the app finished else
+   * false.  WARNING: this is not recommended unless you want your single job
+   * tokens to be reused by others jobs.
+   * @param cancel true if tokens should be canceled when the app finishes. 
+   */
+  @LimitedPrivate("mapreduce")
+  @Unstable
+  public void setCancelTokensWhenComplete(boolean cancel);
 }

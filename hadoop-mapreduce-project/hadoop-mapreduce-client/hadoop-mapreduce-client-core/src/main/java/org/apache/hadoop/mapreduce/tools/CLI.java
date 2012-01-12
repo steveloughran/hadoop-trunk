@@ -20,6 +20,9 @@ package org.apache.hadoop.mapreduce.tools;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Arrays;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -46,7 +49,7 @@ import org.apache.hadoop.mapreduce.v2.LogParams;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.LogDumper;
+import org.apache.hadoop.yarn.logaggregation.LogDumper;
 
 /**
  * Interprets the map reduce cli options 
@@ -55,7 +58,11 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation
 @InterfaceStability.Stable
 public class CLI extends Configured implements Tool {
   private static final Log LOG = LogFactory.getLog(CLI.class);
-  private Cluster cluster;
+  protected Cluster cluster;
+  private final Set<String> taskTypes = new HashSet<String>(
+              Arrays.asList("map", "reduce", "setup", "cleanup"));
+  private final Set<String> taskStates = new HashSet<String>(
+              Arrays.asList("pending", "running", "completed", "failed", "killed"));
 
   public CLI() {
   }
@@ -545,9 +552,21 @@ public class CLI extends Configured implements Tool {
    * @param type the type of the task (map/reduce/setup/cleanup)
    * @param state the state of the task 
    * (pending/running/completed/failed/killed)
+   * @throws IOException when there is an error communicating with the master
+   * @throws InterruptedException
+   * @throws IllegalArgumentException if an invalid type/state is passed
    */
   protected void displayTasks(Job job, String type, String state) 
   throws IOException, InterruptedException {
+    if (!taskTypes.contains(type)) {
+      throw new IllegalArgumentException("Invalid type: " + type + 
+          ". Valid types for task are: map, reduce, setup, cleanup.");
+    }
+    if (!taskStates.contains(state)) {
+      throw new java.lang.IllegalArgumentException("Invalid state: " + state + 
+          ". Valid states for task are: pending, running, completed, failed, killed.");
+    }
+
     TaskReport[] reports = job.getTaskReports(TaskType.valueOf(type));
     for (TaskReport report : reports) {
       TIPStatus status = report.getCurrentStatus();

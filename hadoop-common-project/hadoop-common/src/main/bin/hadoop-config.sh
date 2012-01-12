@@ -27,7 +27,9 @@ this="$common_bin/$script"
 
 # the root of the Hadoop installation
 # See HADOOP-6255 for directory structure layout
-export HADOOP_PREFIX=`dirname "$this"`/..
+HADOOP_DEFAULT_PREFIX=`dirname "$this"`/..
+HADOOP_PREFIX=${HADOOP_PREFIX:-$HADOOP_DEFAULT_PREFIX}
+export HADOOP_PREFIX
 
 #check to see if the conf dir is given as an optional argument
 if [ $# -gt 1 ]
@@ -184,27 +186,14 @@ fi
 # setup 'java.library.path' for native-hadoop code if necessary
 
 if [ -d "${HADOOP_PREFIX}/build/native" -o -d "${HADOOP_PREFIX}/lib/native" ]; then
-  JAVA_PLATFORM=`CLASSPATH=${CLASSPATH} ${JAVA} -Xmx32m ${HADOOP_JAVA_PLATFORM_OPTS} org.apache.hadoop.util.PlatformName | sed -e "s/ /_/g"`
-  
-  if [ -d "$HADOOP_PREFIX/build/native" ]; then
-    if [ "x$JAVA_LIBRARY_PATH" != "x" ]; then
-        JAVA_LIBRARY_PATH=${JAVA_LIBRARY_PATH}:${HADOOP_PREFIX}/build/native/${JAVA_PLATFORM}/lib
-    else
-        JAVA_LIBRARY_PATH=${HADOOP_PREFIX}/build/native/${JAVA_PLATFORM}/lib
-    fi
-  fi
-  
+    
   if [ -d "${HADOOP_PREFIX}/lib/native" ]; then
     if [ "x$JAVA_LIBRARY_PATH" != "x" ]; then
-      JAVA_LIBRARY_PATH=${JAVA_LIBRARY_PATH}:${HADOOP_PREFIX}/lib/native/${JAVA_PLATFORM}
+      JAVA_LIBRARY_PATH=${JAVA_LIBRARY_PATH}:${HADOOP_PREFIX}/lib/native
     else
-      JAVA_LIBRARY_PATH=${HADOOP_PREFIX}/lib/native/${JAVA_PLATFORM}
+      JAVA_LIBRARY_PATH=${HADOOP_PREFIX}/lib/native
     fi
   fi
-fi
-
-if [ -e "${HADOOP_PREFIX}/lib/libhadoop.a" ]; then
-  JAVA_LIBRARY_PATH=${HADOOP_PREFIX}/lib
 fi
 
 # cygwin path translation
@@ -241,6 +230,23 @@ if [ -d "$HADOOP_HDFS_HOME/share/hadoop/hdfs/lib" ]; then
 fi
 
 CLASSPATH=${CLASSPATH}:$HADOOP_HDFS_HOME/share/hadoop/hdfs'/*'
+
+# put yarn in classpath if present
+if [ "$YARN_HOME" = "" ]; then
+  if [ -d "${HADOOP_PREFIX}/share/hadoop/mapreduce" ]; then
+    YARN_HOME=$HADOOP_PREFIX
+  fi
+fi
+
+if [ -d "$YARN_HOME/share/hadoop/mapreduce/webapps" ]; then
+  CLASSPATH=${CLASSPATH}:$YARN_HOME/share/hadoop/mapreduce
+fi
+
+if [ -d "$YARN_HOME/share/hadoop/mapreduce/lib" ]; then
+  CLASSPATH=${CLASSPATH}:$YARN_HOME/share/hadoop/mapreduce/lib'/*'
+fi
+
+CLASSPATH=${CLASSPATH}:$YARN_HOME/share/hadoop/mapreduce'/*'
 
 # cygwin path translation
 if $cygwin; then

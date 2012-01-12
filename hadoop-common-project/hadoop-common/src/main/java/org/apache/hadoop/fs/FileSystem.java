@@ -47,6 +47,8 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.MultipleIOException;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -186,6 +188,15 @@ public abstract class FileSystem extends Configured implements Closeable {
   public abstract URI getUri();
   
   /**
+   * Resolve the uri's hostname and add the default port if not in the uri
+   * @return URI
+   * @see NetUtils#getCanonicalUri(URI, int)
+   */
+  protected URI getCanonicalUri() {
+    return NetUtils.getCanonicalUri(getUri(), getDefaultPort());
+  }
+  
+  /**
    * Get the default port for this file system.
    * @return the default port or 0 if there isn't one
    */
@@ -194,8 +205,13 @@ public abstract class FileSystem extends Configured implements Closeable {
   }
 
   /**
-   * Get a canonical name for this file system.
-   * @return a URI string that uniquely identifies this file system
+   * Get a canonical service name for this file system.  The token cache is
+   * the only user of this value, and uses it to lookup this filesystem's
+   * service tokens.  The token cache will not attempt to acquire tokens if the
+   * service is null.
+   * @return a service string that uniquely identifies this file system, null
+   *         if the filesystem does not implement tokens
+   * @see SecurityUtil#buildDTServiceName(URI, int) 
    */
   public String getCanonicalServiceName() {
     return SecurityUtil.buildDTServiceName(getUri(), getDefaultPort());
@@ -393,6 +409,40 @@ public abstract class FileSystem extends Configured implements Closeable {
   public List<Token<?>> getDelegationTokens(String renewer) throws IOException {
     return new ArrayList<Token<?>>(0);
   }
+  
+  /**
+   * @see #getDelegationTokens(String)
+   * This is similar to getDelegationTokens, with the added restriction that if
+   * a token is already present in the passed Credentials object - that token
+   * is returned instead of a new delegation token. 
+   * 
+   * If the token is found to be cached in the Credentials object, this API does
+   * not verify the token validity or the passed in renewer. 
+   * 
+   * 
+   * @param renewer the account name that is allowed to renew the token.
+   * @param credentials a Credentials object containing already knowing 
+   *   delegationTokens.
+   * @return a list of delegation tokens.
+   * @throws IOException
+   */
+  @InterfaceAudience.LimitedPrivate({ "HDFS", "MapReduce" })
+  public List<Token<?>> getDelegationTokens(String renewer,
+      Credentials credentials) throws IOException {
+    List<Token<?>> allTokens = getDelegationTokens(renewer);
+    List<Token<?>> newTokens = new ArrayList<Token<?>>();
+    if (allTokens != null) {
+      for (Token<?> token : allTokens) {
+        Token<?> knownToken = credentials.getToken(token.getService());
+        if (knownToken == null) {
+          newTokens.add(token);
+        } else {
+          newTokens.add(knownToken);
+        }
+      }
+    }
+    return newTokens;
+  }
 
   /** create a file with the provided permission
    * The permission of the file is set to be the provided permission as in
@@ -452,32 +502,31 @@ public abstract class FileSystem extends Configured implements Closeable {
    */
   protected void checkPath(Path path) {
     URI uri = path.toUri();
-    if (uri.getScheme() == null)                // fs is relative 
-      return;
-    String thisScheme = this.getUri().getScheme();
     String thatScheme = uri.getScheme();
-    String thisAuthority = this.getUri().getAuthority();
-    String thatAuthority = uri.getAuthority();
+    if (thatScheme == null)                // fs is relative
+      return;
+    URI thisUri = getCanonicalUri();
+    String thisScheme = thisUri.getScheme();
     //authority and scheme are not case sensitive
     if (thisScheme.equalsIgnoreCase(thatScheme)) {// schemes match
-      if (thisAuthority == thatAuthority ||       // & authorities match
-          (thisAuthority != null && 
-           thisAuthority.equalsIgnoreCase(thatAuthority)))
-        return;
-
+      String thisAuthority = thisUri.getAuthority();
+      String thatAuthority = uri.getAuthority();
       if (thatAuthority == null &&                // path's authority is null
           thisAuthority != null) {                // fs has an authority
-        URI defaultUri = getDefaultUri(getConf()); // & is the conf default 
-        if (thisScheme.equalsIgnoreCase(defaultUri.getScheme()) &&
-            thisAuthority.equalsIgnoreCase(defaultUri.getAuthority()))
-          return;
-        try {                                     // or the default fs's uri
-          defaultUri = get(getConf()).getUri();
-        } catch (IOException e) {
-          throw new RuntimeException(e);
+        URI defaultUri = getDefaultUri(getConf());
+        if (thisScheme.equalsIgnoreCase(defaultUri.getScheme())) {
+          uri = defaultUri; // schemes match, so use this uri instead
+        } else {
+          uri = null; // can't determine auth of the path
         }
-        if (thisScheme.equalsIgnoreCase(defaultUri.getScheme()) &&
-            thisAuthority.equalsIgnoreCase(defaultUri.getAuthority()))
+      }
+      if (uri != null) {
+        // canonicalize uri before comparing with this fs
+        uri = NetUtils.getCanonicalUri(uri, getDefaultPort());
+        thatAuthority = uri.getAuthority();
+        if (thisAuthority == thatAuthority ||       // authorities match
+            (thisAuthority != null &&
+             thisAuthority.equalsIgnoreCase(thatAuthority)))
           return;
       }
     }
@@ -829,6 +878,53 @@ public abstract class FileSystem extends Configured implements Closeable {
     }
   }
 
+  /**
+   * Opens an FSDataOutputStream at the indicated Path with write-progress
+   * reporting. Same as create(), except fails if parent directory doesn't
+   * already exist.
+   * @param f the file name to open
+   * @param overwrite if a file with this name already exists, then if true,
+   * the file will be overwritten, and if false an error will be thrown.
+   * @param bufferSize the size of the buffer to be used.
+   * @param replication required block replication for the file.
+   * @param blockSize
+   * @param progress
+   * @throws IOException
+   * @see #setPermission(Path, FsPermission)
+   * @deprecated API only for 0.20-append
+   */
+  @Deprecated
+  public FSDataOutputStream createNonRecursive(Path f,
+      boolean overwrite,
+      int bufferSize, short replication, long blockSize,
+      Progressable progress) throws IOException {
+    return this.createNonRecursive(f, FsPermission.getDefault(),
+        overwrite, bufferSize, replication, blockSize, progress);
+  }
+
+  /**
+   * Opens an FSDataOutputStream at the indicated Path with write-progress
+   * reporting. Same as create(), except fails if parent directory doesn't
+   * already exist.
+   * @param f the file name to open
+   * @param permission
+   * @param overwrite if a file with this name already exists, then if true,
+   * the file will be overwritten, and if false an error will be thrown.
+   * @param bufferSize the size of the buffer to be used.
+   * @param replication required block replication for the file.
+   * @param blockSize
+   * @param progress
+   * @throws IOException
+   * @see #setPermission(Path, FsPermission)
+   * @deprecated API only for 0.20-append
+   */
+   @Deprecated
+   public FSDataOutputStream createNonRecursive(Path f, FsPermission permission,
+       boolean overwrite, int bufferSize, short replication, long blockSize,
+       Progressable progress) throws IOException {
+     throw new IOException("createNonRecursive unsupported for this filesystem "
+         + this.getClass());
+   }
 
   /**
    * Creates the given Path as a brand-new zero-length file.  If

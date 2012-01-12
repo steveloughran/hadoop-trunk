@@ -40,6 +40,7 @@ import org.apache.hadoop.ipc.ProtocolProxy;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RpcEngine;
 import org.apache.hadoop.ipc.ClientCache;
+import org.apache.hadoop.ipc.RpcPayloadHeader.RpcKind;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -155,6 +156,7 @@ public class ProtoOverHadoopRpcEngine implements RpcEngine {
       return actualReturnMessage;
     }
 
+    @Override
     public void close() throws IOException {
       if (!isClosed) {
         isClosed = true;
@@ -308,8 +310,8 @@ public class ProtoOverHadoopRpcEngine implements RpcEngine {
     }
 
     @Override
-    public Writable call(String protocol, Writable writableRequest,
-        long receiveTime) throws IOException {
+    public Writable call(RpcKind rpcKind, String protocol, 
+        Writable writableRequest, long receiveTime) throws IOException {
       ProtoSpecificRequestWritable request = (ProtoSpecificRequestWritable) writableRequest;
       ProtoSpecificRpcRequest rpcRequest = request.message;
       String methodName = rpcRequest.getMethodName();

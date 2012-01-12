@@ -22,22 +22,23 @@ import java.net.URI;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
+import java.lang.reflect.Constructor;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.*;
 import org.apache.hadoop.hdfs.server.namenode.JournalSet.JournalAndStream;
-import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeDirType;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.RemoteEditLogManifest;
@@ -76,7 +77,7 @@ public class FSEditLog  {
   private State state = State.UNINITIALIZED;
   
   //initialize
-  final private JournalSet journalSet;
+  private JournalSet journalSet;
   private EditLogOutputStream editLogStream = null;
 
   // a monotonically increasing counter that represents transactionIds.
@@ -109,6 +110,9 @@ public class FSEditLog  {
   private NameNodeMetrics metrics;
 
   private NNStorage storage;
+  private Configuration conf;
+  
+  private Collection<URI> editsDirs;
 
   private static class TransactionId {
     public long txid;
@@ -125,19 +129,22 @@ public class FSEditLog  {
     }
   };
 
-  final private Collection<URI> editsDirs;
-
   /**
    * Construct FSEditLog with default configuration, taking editDirs from NNStorage
+   * 
    * @param storage Storage object used by namenode
    */
   @VisibleForTesting
-  FSEditLog(NNStorage storage) {
-    this(new Configuration(), storage, Collections.<URI>emptyList());
+  FSEditLog(NNStorage storage) throws IOException {
+    Configuration conf = new Configuration();
+    // Make sure the edits dirs are set in the provided configuration object.
+    conf.set(DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_KEY,
+        StringUtils.join(storage.getEditsDirectories(), ","));
+    init(conf, storage, FSNamesystem.getNamespaceEditsDirs(conf));
   }
 
   /**
-   * Constructor for FSEditLog. Add underlying journals are constructed, but 
+   * Constructor for FSEditLog. Underlying journals are constructed, but 
    * no streams are opened until open() is called.
    * 
    * @param conf The namenode configuration
@@ -145,31 +152,35 @@ public class FSEditLog  {
    * @param editsDirs List of journals to use
    */
   FSEditLog(Configuration conf, NNStorage storage, Collection<URI> editsDirs) {
+    init(conf, storage, editsDirs);
+  }
+  
+  private void init(Configuration conf, NNStorage storage, Collection<URI> editsDirs) {
     isSyncRunning = false;
+    this.conf = conf;
     this.storage = storage;
     metrics = NameNode.getNameNodeMetrics();
     lastPrintTime = now();
+     
+    // If this list is empty, an error will be thrown on first use
+    // of the editlog, as no journals will exist
+    this.editsDirs = Lists.newArrayList(editsDirs);
     
-    if (editsDirs.isEmpty()) { 
-      // if this is the case, no edit dirs have been explictly configured
-      // image dirs are to be used for edits too
-      try {
-        editsDirs = Lists.newArrayList(storage.getEditsDirectories());
-      } catch (IOException ioe) {
-        // cannot get list from storage, so the empty editsDirs 
-        // will be assigned. an error will be thrown on first use
-        // of the editlog, as no journals will exist
-      }
-      this.editsDirs = editsDirs;
-    } else {
-      this.editsDirs = Lists.newArrayList(editsDirs);
-    }
+    int minimumRedundantJournals = conf.getInt(
+        DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_MINIMUM_KEY,
+        DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_MINIMUM_DEFAULT);
 
-    this.journalSet = new JournalSet();
+    journalSet = new JournalSet(minimumRedundantJournals);
     for (URI u : this.editsDirs) {
-      StorageDirectory sd = storage.getStorageDirectory(u);
-      if (sd != null) {
-        journalSet.add(new FileJournalManager(sd));
+      boolean required = FSNamesystem.getRequiredNamespaceEditsDirs(conf)
+          .contains(u);
+      if (u.getScheme().equals(NNStorage.LOCAL_URI_SCHEME)) {
+        StorageDirectory sd = storage.getStorageDirectory(u);
+        if (sd != null) {
+          journalSet.add(new FileJournalManager(sd), required);
+        }
+      } else {
+        journalSet.add(createJournal(u), required);
       }
     }
  
@@ -207,7 +218,7 @@ public class FSEditLog  {
    */
   synchronized void close() {
     if (state == State.CLOSED) {
-      LOG.warn("Closing log when already closed", new Exception());
+      LOG.debug("Closing log when already closed");
       return;
     }
     if (state == State.IN_SEGMENT) {
@@ -435,7 +446,7 @@ public class FSEditLog  {
             }
             editLogStream.setReadyToFlush();
           } catch (IOException e) {
-            LOG.fatal("Could not sync any journal to persistent storage. "
+            LOG.fatal("Could not sync enough journals to persistent storage. "
                 + "Unsynced transactions: " + (txid - synctxid),
                 new Exception());
             runtime.exit(1);
@@ -457,7 +468,7 @@ public class FSEditLog  {
         }
       } catch (IOException ex) {
         synchronized (this) {
-          LOG.fatal("Could not sync any journal to persistent storage. "
+          LOG.fatal("Could not sync enough journals to persistent storage. "
               + "Unsynced transactions: " + (txid - synctxid), new Exception());
           runtime.exit(1);
         }
@@ -910,7 +921,7 @@ public class FSEditLog  {
     
     LOG.info("Registering new backup node: " + bnReg);
     BackupJournalManager bjm = new BackupJournalManager(bnReg, nnReg);
-    journalSet.add(bjm);
+    journalSet.add(bjm, true);
   }
   
   synchronized void releaseBackupStream(NamenodeRegistration registration)
@@ -993,6 +1004,55 @@ public class FSEditLog  {
   static void closeAllStreams(Iterable<EditLogInputStream> streams) {
     for (EditLogInputStream s : streams) {
       IOUtils.closeStream(s);
+    }
+  }
+
+  /**
+   * Retrieve the implementation class for a Journal scheme.
+   * @param conf The configuration to retrieve the information from
+   * @param uriScheme The uri scheme to look up.
+   * @return the class of the journal implementation
+   * @throws IllegalArgumentException if no class is configured for uri
+   */
+  static Class<? extends JournalManager> getJournalClass(Configuration conf,
+                               String uriScheme) {
+    String key
+      = DFSConfigKeys.DFS_NAMENODE_EDITS_PLUGIN_PREFIX + "." + uriScheme;
+    Class <? extends JournalManager> clazz = null;
+    try {
+      clazz = conf.getClass(key, null, JournalManager.class);
+    } catch (RuntimeException re) {
+      throw new IllegalArgumentException(
+          "Invalid class specified for " + uriScheme, re);
+    }
+      
+    if (clazz == null) {
+      LOG.warn("No class configured for " +uriScheme
+               + ", " + key + " is empty");
+      throw new IllegalArgumentException(
+          "No class configured for " + uriScheme);
+    }
+    return clazz;
+  }
+
+  /**
+   * Construct a custom journal manager.
+   * The class to construct is taken from the configuration.
+   * @param uri Uri to construct
+   * @return The constructed journal manager
+   * @throws IllegalArgumentException if no class is configured for uri
+   */
+  private JournalManager createJournal(URI uri) {
+    Class<? extends JournalManager> clazz
+      = getJournalClass(conf, uri.getScheme());
+
+    try {
+      Constructor<? extends JournalManager> cons
+        = clazz.getConstructor(Configuration.class, URI.class);
+      return cons.newInstance(conf, uri);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Unable to construct journal, "
+                                         + uri, e);
     }
   }
 }

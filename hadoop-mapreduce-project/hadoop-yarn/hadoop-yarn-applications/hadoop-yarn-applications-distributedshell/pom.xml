@@ -33,37 +33,36 @@
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-yarn-api</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-yarn-common</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-yarn-server-nodemanager</artifactId>
       <scope>test</scope>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
       <scope>test</scope>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-yarn-server-common</artifactId>
       <scope>test</scope>
-      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-mapreduce-client-core</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-yarn-server-tests</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
-      <version>${project.version}</version>
     </dependency>
   </dependencies>
 
@@ -76,7 +75,7 @@
             <goals>
               <goal>jar</goal>
             </goals>
-            <!-- strictly speaking, the unit test is really a regression test. It 
+            <!-- strictly speaking, the unit test is really a regression test. It
                  needs the main jar to be available to be able to run. -->
             <phase>test-compile</phase>
           </execution>
@@ -98,6 +97,15 @@
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <environmentVariables>
+            <JAVA_HOME>${java.home}</JAVA_HOME>
+          </environmentVariables>
+       </configuration>
       </plugin>
     </plugins>
   </build>

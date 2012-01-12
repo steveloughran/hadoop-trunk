@@ -19,8 +19,6 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 
 import javax.net.SocketFactory;
@@ -82,7 +80,7 @@ public class FileChecksumServlets {
           dtParam + addrParam);
     }
 
-    /** {@inheritDoc} */
+    @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response
         ) throws ServletException, IOException {
       final ServletContext context = getServletContext();
@@ -106,7 +104,7 @@ public class FileChecksumServlets {
     /** For java.io.Serializable */
     private static final long serialVersionUID = 1L;
     
-    /** {@inheritDoc} */
+    @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response
         ) throws ServletException, IOException {
       final PrintWriter out = response.getWriter();

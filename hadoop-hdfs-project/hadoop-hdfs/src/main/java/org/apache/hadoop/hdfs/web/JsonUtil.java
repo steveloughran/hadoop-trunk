@@ -28,6 +28,7 @@ import java.util.TreeMap;
 
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtil;
@@ -96,6 +97,59 @@ public class JsonUtil {
     return (Token<BlockTokenIdentifier>)toToken(m);
   }
 
+  /** Convert a Token[] to a JSON array. */
+  private static Object[] toJsonArray(final Token<? extends TokenIdentifier>[] array
+      ) throws IOException {
+    if (array == null) {
+      return null;
+    } else if (array.length == 0) {
+      return EMPTY_OBJECT_ARRAY;
+    } else {
+      final Object[] a = new Object[array.length];
+      for(int i = 0; i < array.length; i++) {
+        a[i] = toJsonMap(array[i]);
+      }
+      return a;
+    }
+  }
+
+  /** Convert a token object to a JSON string. */
+  public static String toJsonString(final Token<? extends TokenIdentifier>[] tokens
+      ) throws IOException {
+    if (tokens == null) {
+      return null;
+    }
+
+    final Map<String, Object> m = new TreeMap<String, Object>();
+    m.put(Token.class.getSimpleName(), toJsonArray(tokens));
+    return toJsonString(Token.class.getSimpleName() + "s", m);
+  }
+
+  /** Convert an Object[] to a List<Token<?>>.  */
+  private static List<Token<?>> toTokenList(final Object[] objects) throws IOException {
+    if (objects == null) {
+      return null;
+    } else if (objects.length == 0) {
+      return Collections.emptyList();
+    } else {
+      final List<Token<?>> list = new ArrayList<Token<?>>(objects.length);
+      for(int i = 0; i < objects.length; i++) {
+        list.add(toToken((Map<?, ?>)objects[i]));
+      }
+      return list;
+    }
+  }
+
+  /** Convert a JSON map to a List<Token<?>>. */
+  public static List<Token<?>> toTokenList(final Map<?, ?> json) throws IOException {
+    if (json == null) {
+      return null;
+    }
+
+    final Map<?, ?> m = (Map<?, ?>)json.get(Token.class.getSimpleName() + "s");
+    return toTokenList((Object[])m.get(Token.class.getSimpleName()));
+  }
+
   /** Convert an exception object to a Json string. */
   public static String toJsonString(final Exception e) {
     final Map<String, Object> m = new TreeMap<String, Object>();
@@ -134,6 +188,14 @@ public class JsonUtil {
     return new FsPermission(Short.parseShort(s, 8));
   }
 
+  static enum PathType {
+    FILE, DIRECTORY, SYMLINK;
+    
+    static PathType valueOf(HdfsFileStatus status) {
+      return status.isDir()? DIRECTORY: status.isSymlink()? SYMLINK: FILE;
+    }
+  }
+
   /** Convert a HdfsFileStatus object to a Json string. */
   public static String toJsonString(final HdfsFileStatus status,
       boolean includeType) {
@@ -141,14 +203,13 @@ public class JsonUtil {
       return null;
     }
     final Map<String, Object> m = new TreeMap<String, Object>();
-    m.put("localName", status.getLocalName());
-    m.put("isDir", status.isDir());
-    m.put("isSymlink", status.isSymlink());
+    m.put("pathSuffix", status.getLocalName());
+    m.put("type", PathType.valueOf(status));
     if (status.isSymlink()) {
       m.put("symlink", status.getSymlink());
     }
 
-    m.put("len", status.getLen());
+    m.put("length", status.getLen());
     m.put("owner", status.getOwner());
     m.put("group", status.getGroup());
     m.put("permission", toString(status.getPermission()));
@@ -156,8 +217,7 @@ public class JsonUtil {
     m.put("modificationTime", status.getModificationTime());
     m.put("blockSize", status.getBlockSize());
     m.put("replication", status.getReplication());
-    return includeType ? toJsonString(HdfsFileStatus.class, m) : 
-      JSON.toString(m);
+    return includeType ? toJsonString(FileStatus.class, m): JSON.toString(m);
   }
 
   /** Convert a Json map to a HdfsFileStatus object. */
@@ -167,14 +227,13 @@ public class JsonUtil {
     }
 
     final Map<?, ?> m = includesType ? 
-        (Map<?, ?>)json.get(HdfsFileStatus.class.getSimpleName()) : json;
-    final String localName = (String) m.get("localName");
-    final boolean isDir = (Boolean) m.get("isDir");
-    final boolean isSymlink = (Boolean) m.get("isSymlink");
-    final byte[] symlink = isSymlink?
-        DFSUtil.string2Bytes((String)m.get("symlink")): null;
+        (Map<?, ?>)json.get(FileStatus.class.getSimpleName()) : json;
+    final String localName = (String) m.get("pathSuffix");
+    final PathType type = PathType.valueOf((String) m.get("type"));
+    final byte[] symlink = type != PathType.SYMLINK? null
+        : DFSUtil.string2Bytes((String)m.get("symlink"));
 
-    final long len = (Long) m.get("len");
+    final long len = (Long) m.get("length");
     final String owner = (String) m.get("owner");
     final String group = (String) m.get("group");
     final FsPermission permission = toFsPermission((String) m.get("permission"));
@@ -182,8 +241,8 @@ public class JsonUtil {
     final long mTime = (Long) m.get("modificationTime");
     final long blockSize = (Long) m.get("blockSize");
     final short replication = (short) (long) (Long) m.get("replication");
-    return new HdfsFileStatus(len, isDir, replication, blockSize, mTime, aTime,
-        permission, owner, group,
+    return new HdfsFileStatus(len, type == PathType.DIRECTORY, replication,
+        blockSize, mTime, aTime, permission, owner, group,
         symlink, DFSUtil.string2Bytes(localName));
   }
 

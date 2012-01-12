@@ -1,8 +1,26 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,7 +45,7 @@ public class TestApplicationLimits {
   LeafQueue queue;
   
   @Before
-  public void setUp() {
+  public void setUp() throws IOException {
     CapacitySchedulerConfiguration csConf = 
         new CapacitySchedulerConfiguration();
     setupQueueConfiguration(csConf);
@@ -70,13 +88,13 @@ public class TestApplicationLimits {
   private void setupQueueConfiguration(CapacitySchedulerConfiguration conf) {
     
     // Define top-level queues
-    conf.setQueues(CapacityScheduler.ROOT, new String[] {A, B});
-    conf.setCapacity(CapacityScheduler.ROOT, 100);
+    conf.setQueues(CapacitySchedulerConfiguration.ROOT, new String[] {A, B});
+    conf.setCapacity(CapacitySchedulerConfiguration.ROOT, 100);
     
-    final String Q_A = CapacityScheduler.ROOT + "." + A;
+    final String Q_A = CapacitySchedulerConfiguration.ROOT + "." + A;
     conf.setCapacity(Q_A, 10);
     
-    final String Q_B = CapacityScheduler.ROOT + "." + B;
+    final String Q_B = CapacitySchedulerConfiguration.ROOT + "." + B;
     conf.setCapacity(Q_B, 90);
     
     LOG.info("Setup top-level queues a and b");
@@ -234,7 +252,7 @@ public class TestApplicationLimits {
   public void testHeadroom() throws Exception {
     CapacitySchedulerConfiguration csConf = 
         new CapacitySchedulerConfiguration();
-    csConf.setUserLimit(CapacityScheduler.ROOT + "." + A, 25);
+    csConf.setUserLimit(CapacitySchedulerConfiguration.ROOT + "." + A, 25);
     setupQueueConfiguration(csConf);
     
     CapacitySchedulerContext csContext = mock(CapacitySchedulerContext.class);

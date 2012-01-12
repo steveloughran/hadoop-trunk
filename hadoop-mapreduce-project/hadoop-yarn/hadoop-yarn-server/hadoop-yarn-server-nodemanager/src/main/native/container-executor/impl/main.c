@@ -39,11 +39,15 @@
 
 void display_usage(FILE *stream) {
   fprintf(stream,
+          "Usage: container-executor --checksetup\n");
+  fprintf(stream,
       "Usage: container-executor user command command-args\n");
   fprintf(stream, "Commands:\n");
-  fprintf(stream, "   initialize container: %2d appid tokens cmd app...\n",
-	  INITIALIZE_CONTAINER);
-  fprintf(stream, "   launch container:    %2d appid containerid workdir container-script tokens\n",
+  fprintf(stream, "   initialize container: %2d appid tokens " \
+   "nm-local-dirs nm-log-dirs cmd app...\n", INITIALIZE_CONTAINER);
+  fprintf(stream,
+      "   launch container:    %2d appid containerid workdir "\
+      "container-script tokens pidfile nm-local-dirs nm-log-dirs\n",
 	  LAUNCH_CONTAINER);
   fprintf(stream, "   signal container:    %2d container-pid signal\n",
 	  SIGNAL_CONTAINER);
@@ -52,14 +56,31 @@ void display_usage(FILE *stream) {
 }
 
 int main(int argc, char **argv) {
-  //Minimum number of arguments required to run the container-executor
+  int invalid_args = 0; 
+  int do_check_setup = 0;
+  
+  LOGFILE = stdout;
+  ERRORFILE = stderr;
+
+  // Minimum number of arguments required to run 
+  // the std. container-executor commands is 4
+  // 4 args not needed for checksetup option
   if (argc < 4) {
+    invalid_args = 1;
+    if (argc == 2) {
+      const char *arg1 = argv[1];
+      if (strcmp("--checksetup", arg1) == 0) {
+        invalid_args = 0;
+        do_check_setup = 1;        
+      }      
+    }
+  }
+  
+  if (invalid_args != 0) {
     display_usage(stdout);
     return INVALID_ARGUMENT_NUMBER;
   }
 
-  LOGFILE = stdout;
-  ERRORFILE = stderr;
   int command;
   const char * app_id = NULL;
   const char * container_id = NULL;
@@ -76,6 +97,7 @@ int main(int argc, char **argv) {
 
   char *orig_conf_file = STRINGIFY(HADOOP_CONF_DIR) "/" CONF_FILENAME;
   char *conf_file = realpath(orig_conf_file, NULL);
+  char *local_dirs, *log_dirs;
 
   if (conf_file == NULL) {
     fprintf(ERRORFILE, "Configuration file %s not found.\n", orig_conf_file);
@@ -111,11 +133,19 @@ int main(int argc, char **argv) {
     return INVALID_CONTAINER_EXEC_PERMISSIONS;
   }
 
+  if (do_check_setup != 0) {
+    // basic setup checks done
+    // verified configs available and valid
+    // verified executor permissions
+    return 0;
+  }
+
   //checks done for user name
   if (argv[optind] == NULL) {
     fprintf(ERRORFILE, "Invalid user name.\n");
     return INVALID_USER_NAME;
   }
+
   int ret = set_user(argv[optind]);
   if (ret != 0) {
     return ret;
@@ -130,20 +160,23 @@ int main(int argc, char **argv) {
 
   switch (command) {
   case INITIALIZE_CONTAINER:
-    if (argc < 6) {
-      fprintf(ERRORFILE, "Too few arguments (%d vs 6) for initialize container\n",
+    if (argc < 8) {
+      fprintf(ERRORFILE, "Too few arguments (%d vs 8) for initialize container\n",
 	      argc);
       fflush(ERRORFILE);
       return INVALID_ARGUMENT_NUMBER;
     }
     app_id = argv[optind++];
     cred_file = argv[optind++];
+    local_dirs = argv[optind++];// good local dirs as a comma separated list
+    log_dirs = argv[optind++];// good log dirs as a comma separated list
     exit_code = initialize_app(user_detail->pw_name, app_id, cred_file,
-                               argv + optind);
+                               extract_values(local_dirs),
+                               extract_values(log_dirs), argv + optind);
     break;
   case LAUNCH_CONTAINER:
-    if (argc < 9) {
-      fprintf(ERRORFILE, "Too few arguments (%d vs 8) for launch container\n",
+    if (argc != 11) {
+      fprintf(ERRORFILE, "Too few arguments (%d vs 11) for launch container\n",
 	      argc);
       fflush(ERRORFILE);
       return INVALID_ARGUMENT_NUMBER;
@@ -154,13 +187,17 @@ int main(int argc, char **argv) {
     script_file = argv[optind++];
     cred_file = argv[optind++];
     pid_file = argv[optind++];
-    exit_code = launch_container_as_user(user_detail->pw_name, app_id, container_id,
-                                 current_dir, script_file, cred_file, pid_file);
+    local_dirs = argv[optind++];// good local dirs as a comma separated list
+    log_dirs = argv[optind++];// good log dirs as a comma separated list
+    exit_code = launch_container_as_user(user_detail->pw_name, app_id,
+                    container_id, current_dir, script_file, cred_file,
+                    pid_file, extract_values(local_dirs),
+                    extract_values(log_dirs));
     break;
   case SIGNAL_CONTAINER:
-    if (argc < 5) {
-      fprintf(ERRORFILE, "Too few arguments (%d vs 5) for signal container\n",
-	      argc);
+    if (argc != 5) {
+      fprintf(ERRORFILE, "Wrong number of arguments (%d vs 5) for " \
+          "signal container\n", argc);
       fflush(ERRORFILE);
       return INVALID_ARGUMENT_NUMBER;
     } else {

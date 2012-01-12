@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,7 +35,6 @@ import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.yarn.Lock;
@@ -145,8 +143,9 @@ public class FifoScheduler implements ResourceScheduler {
         boolean includeChildQueues, boolean recursive) {
       QueueInfo queueInfo = recordFactory.newRecordInstance(QueueInfo.class);
       queueInfo.setQueueName(DEFAULT_QUEUE.getQueueName());
-      queueInfo.setCapacity(100.0f);
-      queueInfo.setMaximumCapacity(100.0f);
+      queueInfo.setCapacity(1.0f);
+      queueInfo.setCurrentCapacity((float)usedResource.getMemory() / clusterResource.getMemory());
+      queueInfo.setMaximumCapacity(1.0f);
       queueInfo.setChildQueues(new ArrayList<QueueInfo>());
       queueInfo.setQueueState(QueueState.RUNNING);
       return queueInfo;
@@ -178,6 +177,11 @@ public class FifoScheduler implements ResourceScheduler {
     return minimumAllocation;
   }
 
+  @Override
+  public int getNumClusterNodes() {
+    return nodes.size();
+  }
+  
   @Override
   public Resource getMaximumResourceCapability() {
     return maximumAllocation;
@@ -236,28 +240,30 @@ public class FifoScheduler implements ResourceScheduler {
           RMContainerEventType.RELEASED);
     }
 
-    if (!ask.isEmpty()) {
-      LOG.debug("allocate: pre-update" +
-          " applicationId=" + applicationAttemptId + 
-          " application=" + application);
-      application.showRequests();
+    synchronized (application) {
+      if (!ask.isEmpty()) {
+        LOG.debug("allocate: pre-update" +
+            " applicationId=" + applicationAttemptId + 
+            " application=" + application);
+        application.showRequests();
 
-      // Update application requests
-      application.updateResourceRequests(ask);
+        // Update application requests
+        application.updateResourceRequests(ask);
 
-      LOG.debug("allocate: post-update" +
-          " applicationId=" + applicationAttemptId + 
-          " application=" + application);
-      application.showRequests();
+        LOG.debug("allocate: post-update" +
+            " applicationId=" + applicationAttemptId + 
+            " application=" + application);
+        application.showRequests();
 
-      LOG.debug("allocate:" +
-          " applicationId=" + applicationAttemptId + 
-          " #ask=" + ask.size());
+        LOG.debug("allocate:" +
+            " applicationId=" + applicationAttemptId + 
+            " #ask=" + ask.size());
+      }
+
+      return new Allocation(
+          application.pullNewlyAllocatedContainers(), 
+          application.getHeadroom());
     }
-
-    return new Allocation(
-        application.pullNewlyAllocatedContainers(), 
-        application.getHeadroom());
   }
 
   private SchedulerApp getApplication(

@@ -26,10 +26,7 @@ import java.io.EOFException;
 import java.io.DataInputStream;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.common.Storage;
-import org.apache.hadoop.hdfs.server.namenode.FSEditLogLoader.EditLogValidation;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-
 import com.google.common.annotations.VisibleForTesting;
 
 /**
@@ -130,7 +127,7 @@ class EditLogFileInputStream extends EditLogInputStream {
   }
 
   @Override
-  long length() throws IOException {
+  public long length() throws IOException {
     // file size + size of both buffers
     return file.length();
   }

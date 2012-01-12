@@ -45,18 +45,25 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
 
   private Thread eventHandlingThread;
   protected final Map<Class<? extends Enum>, EventHandler> eventDispatchers;
+  private boolean exitOnDispatchException;
 
   public AsyncDispatcher() {
     this(new HashMap<Class<? extends Enum>, EventHandler>(),
-         new LinkedBlockingQueue<Event>());
+         new LinkedBlockingQueue<Event>(), true);
+  }
+  
+  public AsyncDispatcher(boolean exitOnException) {
+    this(new HashMap<Class<? extends Enum>, EventHandler>(),
+         new LinkedBlockingQueue<Event>(), exitOnException);
   }
 
   AsyncDispatcher(
       Map<Class<? extends Enum>, EventHandler> eventDispatchers,
-      BlockingQueue<Event> eventQueue) {
+      BlockingQueue<Event> eventQueue, boolean exitOnException) {
     super("Dispatcher");
     this.eventQueue = eventQueue;
     this.eventDispatchers = eventDispatchers;
+    this.exitOnDispatchException = exitOnException;
   }
 
   Runnable createThread() {
@@ -68,7 +75,7 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
           try {
             event = eventQueue.take();
           } catch(InterruptedException ie) {
-            LOG.info("AsyncDispatcher thread interrupted", ie);
+            LOG.warn("AsyncDispatcher thread interrupted", ie);
             return;
           }
           if (event != null) {
@@ -107,8 +114,10 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
   @SuppressWarnings("unchecked")
   protected void dispatch(Event event) {
     //all events go thru this loop
-    LOG.debug("Dispatching the event " + event.getClass().getName() + "."
-        + event.toString());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Dispatching the event " + event.getClass().getName() + "."
+          + event.toString());
+    }
 
     Class<? extends Enum> type = event.getType().getDeclaringClass();
 
@@ -118,16 +127,17 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
     catch (Throwable t) {
       //TODO Maybe log the state of the queue
       LOG.fatal("Error in dispatcher thread. Exiting..", t);
-      System.exit(-1);
+      if (exitOnDispatchException) {
+        System.exit(-1);
+      }
     }
   }
 
+  @SuppressWarnings("unchecked")
   @Override
-  @SuppressWarnings("rawtypes")
   public void register(Class<? extends Enum> eventType,
       EventHandler handler) {
     /* check to see if we have a listener registered */
-    @SuppressWarnings("unchecked")
     EventHandler<Event> registeredHandler = (EventHandler<Event>)
     eventDispatchers.get(eventType);
     LOG.info("Registering " + eventType + " for " + handler.getClass());
@@ -161,7 +171,7 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
       }
       int remCapacity = eventQueue.remainingCapacity();
       if (remCapacity < 1000) {
-        LOG.info("Very low remaining capacity in the event-queue: "
+        LOG.warn("Very low remaining capacity in the event-queue: "
             + remCapacity);
       }
       try {
@@ -177,7 +187,6 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
    * are interested in the event.
    * @param <T> the type of event these multiple handlers are interested in.
    */
-  @SuppressWarnings("rawtypes")
   static class MultiListenerHandler implements EventHandler<Event> {
     List<EventHandler<Event>> listofHandlers;
 

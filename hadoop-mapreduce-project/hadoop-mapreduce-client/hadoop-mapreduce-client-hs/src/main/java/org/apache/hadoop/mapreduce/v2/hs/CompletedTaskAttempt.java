@@ -21,9 +21,9 @@ package org.apache.hadoop.mapreduce.v2.hs;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskAttemptInfo;
-import org.apache.hadoop.mapreduce.v2.api.records.Counters;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptReport;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptState;
@@ -46,8 +46,9 @@ public class CompletedTaskAttempt implements TaskAttempt {
   CompletedTaskAttempt(TaskId taskId, TaskAttemptInfo attemptInfo) {
     this.attemptInfo = attemptInfo;
     this.attemptId = TypeConverter.toYarn(attemptInfo.getAttemptId());
-    if (attemptInfo.getCounters() != null)
-      this.counters = TypeConverter.toYarn(attemptInfo.getCounters());
+    if (attemptInfo.getCounters() != null) {
+      this.counters = attemptInfo.getCounters();
+    }
     if (attemptInfo.getTaskStatus() != null) {
       this.state = TaskAttemptState.valueOf(attemptInfo.getTaskStatus());
     } else {
@@ -61,7 +62,6 @@ public class CompletedTaskAttempt implements TaskAttempt {
     }
     
     report = RecordFactoryProvider.getRecordFactory(null).newRecordInstance(TaskAttemptReport.class);
-    report.setCounters(counters);
     
     report.setTaskAttemptId(attemptId);
     report.setTaskAttemptState(state);
@@ -78,14 +78,13 @@ public class CompletedTaskAttempt implements TaskAttempt {
     }
 //    report.setPhase(attemptInfo.get); //TODO
     report.setStateString(attemptInfo.getState());
-    report.setCounters(getCounters());
+    report.setCounters(TypeConverter.toYarn(getCounters()));
     report.setContainerId(attemptInfo.getContainerId());
-    String []hostSplits = attemptInfo.getHostname().split(":");
-    if (hostSplits.length != 2) {
+    if (attemptInfo.getHostname() == null) {
       report.setNodeManagerHost("UNKNOWN");
     } else {
-      report.setNodeManagerHost(hostSplits[0]);
-      report.setNodeManagerPort(Integer.parseInt(hostSplits[1]));
+      report.setNodeManagerHost(attemptInfo.getHostname());
+      report.setNodeManagerPort(attemptInfo.getPort());
     }
     report.setNodeManagerHttpPort(attemptInfo.getHttpPort());
   }
@@ -97,7 +96,7 @@ public class CompletedTaskAttempt implements TaskAttempt {
 
   @Override
   public String getAssignedContainerMgrAddress() {
-    return attemptInfo.getHostname();
+    return attemptInfo.getHostname() + ":" + attemptInfo.getPort();
   }
 
   @Override

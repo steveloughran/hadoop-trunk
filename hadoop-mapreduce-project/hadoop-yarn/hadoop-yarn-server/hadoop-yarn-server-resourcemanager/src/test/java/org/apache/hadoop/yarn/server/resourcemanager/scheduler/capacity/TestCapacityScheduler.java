@@ -197,13 +197,13 @@ public class TestCapacityScheduler {
   private void setupQueueConfiguration(CapacitySchedulerConfiguration conf) {
     
     // Define top-level queues
-    conf.setQueues(CapacityScheduler.ROOT, new String[] {"a", "b"});
-    conf.setCapacity(CapacityScheduler.ROOT, 100);
+    conf.setQueues(CapacitySchedulerConfiguration.ROOT, new String[] {"a", "b"});
+    conf.setCapacity(CapacitySchedulerConfiguration.ROOT, 100);
     
-    final String A = CapacityScheduler.ROOT + ".a";
+    final String A = CapacitySchedulerConfiguration.ROOT + ".a";
     conf.setCapacity(A, 10);
     
-    final String B = CapacityScheduler.ROOT + ".b";
+    final String B = CapacitySchedulerConfiguration.ROOT + ".b";
     conf.setCapacity(B, 90);
     
     // Define 2nd-level queues
@@ -238,6 +238,23 @@ public class TestCapacityScheduler {
       org.apache.hadoop.yarn.server.resourcemanager.NodeManager node) {
     Assert.assertEquals(expected, node.getUsed().getMemory());
     node.checkResourceUsage();
+  }
+
+  /** Test that parseQueue throws an exception when two leaf queues have the
+   *  same name
+ * @throws IOException
+   */
+  @Test(expected=IOException.class)
+  public void testParseQueue() throws IOException {
+    CapacityScheduler cs = new CapacityScheduler();
+
+    CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
+    setupQueueConfiguration(conf);
+    conf.setQueues(CapacitySchedulerConfiguration.ROOT + ".a.a1", new String[] {"b1"} );
+    conf.setCapacity(CapacitySchedulerConfiguration.ROOT + ".a.a1.b1", 100);
+    conf.setUserLimitFactor(CapacitySchedulerConfiguration.ROOT + ".a.a1.b1", 100.0f);
+
+    cs.reinitialize(conf, null, null);
   }
 
 }

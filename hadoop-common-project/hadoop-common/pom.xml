@@ -240,11 +240,6 @@
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.avro</groupId>
-      <artifactId>avro-ipc</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
       <groupId>net.sf.kosmosfs</groupId>
       <artifactId>kfs</artifactId>
       <scope>compile</scope>
@@ -264,6 +259,11 @@
       <artifactId>hadoop-auth</artifactId>
       <scope>compile</scope>
     </dependency>
+    <dependency>
+      <groupId>com.googlecode.json-simple</groupId>
+      <artifactId>json-simple</artifactId>
+      <scope>compile</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -277,7 +277,6 @@
             <phase>generate-test-sources</phase>
             <goals>
               <goal>schema</goal>
-              <goal>protocol</goal>
             </goals>
           </execution>
         </executions>
@@ -289,6 +288,76 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
         <executions>
+          <execution>
+            <id>compile-proto</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target>
+                <echo file="target/compile-proto.sh">
+                    PROTO_DIR=src/main/proto
+                    JAVA_DIR=target/generated-sources/java
+                    which cygpath 2> /dev/null
+                    if [ $? = 1 ]; then
+                      IS_WIN=false
+                    else
+                      IS_WIN=true
+                      WIN_PROTO_DIR=`cygpath --windows $PROTO_DIR`
+                      WIN_JAVA_DIR=`cygpath --windows $JAVA_DIR`
+                    fi
+                    mkdir -p $JAVA_DIR 2> /dev/null
+                    for PROTO_FILE in `ls $PROTO_DIR/*.proto 2> /dev/null`
+                    do
+                        if [ "$IS_WIN" = "true" ]; then
+                          protoc -I$WIN_PROTO_DIR --java_out=$WIN_JAVA_DIR $PROTO_FILE
+                        else
+                          protoc -I$PROTO_DIR --java_out=$JAVA_DIR $PROTO_FILE
+                        fi
+                    done
+                </echo>
+                <exec executable="sh" dir="${basedir}" failonerror="true">
+                  <arg line="target/compile-proto.sh"/>
+                </exec>
+              </target>
+            </configuration>
+          </execution>
+          <execution>
+            <id>compile-test-proto</id>
+            <phase>generate-test-sources</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target>
+                <echo file="target/compile-test-proto.sh">
+                    PROTO_DIR=src/test/proto
+                    JAVA_DIR=target/generated-test-sources/java
+                    which cygpath 2> /dev/null
+                    if [ $? = 1 ]; then
+                      IS_WIN=false
+                    else
+                      IS_WIN=true
+                      WIN_PROTO_DIR=`cygpath --windows $PROTO_DIR`
+                      WIN_JAVA_DIR=`cygpath --windows $JAVA_DIR`
+                    fi
+                    mkdir -p $JAVA_DIR 2> /dev/null
+                    for PROTO_FILE in `ls $PROTO_DIR/*.proto 2> /dev/null`
+                    do
+                        if [ "$IS_WIN" = "true" ]; then
+                          protoc -I$WIN_PROTO_DIR --java_out=$WIN_JAVA_DIR $PROTO_FILE
+                        else
+                          protoc -I$PROTO_DIR --java_out=$JAVA_DIR $PROTO_FILE
+                        fi
+                    done
+                </echo>
+                <exec executable="sh" dir="${basedir}" failonerror="true">
+                  <arg line="target/compile-test-proto.sh"/>
+                </exec>
+              </target>
+            </configuration>
+          </execution>
           <execution>
             <id>save-version</id>
             <phase>generate-sources</phase>
@@ -467,6 +536,8 @@
                     <javahClassName>org.apache.hadoop.security.JniBasedUnixGroupsNetgroupMapping</javahClassName>
                     <javahClassName>org.apache.hadoop.io.compress.snappy.SnappyCompressor</javahClassName>
                     <javahClassName>org.apache.hadoop.io.compress.snappy.SnappyDecompressor</javahClassName>
+                    <javahClassName>org.apache.hadoop.io.compress.lz4.Lz4Compressor</javahClassName>
+                    <javahClassName>org.apache.hadoop.io.compress.lz4.Lz4Decompressor</javahClassName>
                     <javahClassName>org.apache.hadoop.util.NativeCrc32</javahClassName>
                   </javahClassNames>
                   <javahOutputDirectory>${project.build.directory}/native/javah</javahOutputDirectory>

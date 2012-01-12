@@ -31,7 +31,9 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -45,12 +47,10 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.Credentials;
-import org.apache.hadoop.security.SecurityInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.yarn.api.records.LocalResource;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRemoteException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
@@ -61,7 +61,6 @@ import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalResour
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerHeartbeatResponse;
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerStatus;
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.ResourceStatusType;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.security.LocalizerSecurityInfo;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.security.LocalizerTokenIdentifier;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.security.LocalizerTokenSecretManager;
 import org.apache.hadoop.yarn.util.ConverterUtils;
@@ -166,7 +165,8 @@ public class ContainerLocalizer {
     ExecutorService exec = null;
     try {
       exec = createDownloadThreadPool();
-      localizeFiles(nodeManager, exec, ugi);
+      CompletionService<Path> ecs = createCompletionService(exec);
+      localizeFiles(nodeManager, ecs, ugi);
       return 0;
     } catch (Throwable e) {
       // Print traces to stdout so that they can be logged by the NM address
@@ -185,17 +185,36 @@ public class ContainerLocalizer {
       .setNameFormat("ContainerLocalizer Downloader").build());
   }
 
+  CompletionService<Path> createCompletionService(ExecutorService exec) {
+    return new ExecutorCompletionService<Path>(exec);
+  }
+
   Callable<Path> download(LocalDirAllocator lda, LocalResource rsrc,
-      UserGroupInformation ugi) {
-    return new FSDownload(lfs, ugi, conf, lda, rsrc, new Random());
+      UserGroupInformation ugi) throws IOException {
+    Path destPath = lda.getLocalPathForWrite(".", getEstimatedSize(rsrc), conf);
+    return new FSDownload(lfs, ugi, conf, destPath, rsrc, new Random());
+  }
+
+  static long getEstimatedSize(LocalResource rsrc) {
+    if (rsrc.getSize() < 0) {
+      return -1;
+    }
+    switch (rsrc.getType()) {
+      case ARCHIVE:
+        return 5 * rsrc.getSize();
+      case FILE:
+      default:
+        return rsrc.getSize();
+    }
   }
 
   void sleep(int duration) throws InterruptedException {
     TimeUnit.SECONDS.sleep(duration);
   }
 
-  private void localizeFiles(LocalizationProtocol nodemanager, ExecutorService exec,
-      UserGroupInformation ugi) {
+  private void localizeFiles(LocalizationProtocol nodemanager,
+      CompletionService<Path> cs, UserGroupInformation ugi)
+      throws IOException {
     while (true) {
       try {
         LocalizerStatus status = createStatus();
@@ -220,7 +239,7 @@ public class ContainerLocalizer {
                 break;
               }
               // TODO: Synchronization??
-              pendingResources.put(r, exec.submit(download(lda, r, ugi)));
+              pendingResources.put(r, cs.submit(download(lda, r, ugi)));
             }
           }
           break;
@@ -236,8 +255,7 @@ public class ContainerLocalizer {
           } catch (YarnRemoteException e) { }
           return;
         }
-        // TODO HB immediately when rsrc localized
-        sleep(1);
+        cs.poll(1000, TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
         return;
       } catch (YarnRemoteException e) {

@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
+import junit.framework.Assert;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
@@ -35,22 +37,21 @@ public class TestQueueParsing {
 
     CapacityScheduler capacityScheduler = new CapacityScheduler();
     capacityScheduler.reinitialize(conf, null, null);
-    //capacityScheduler.g
   }
   
   private void setupQueueConfiguration(CapacitySchedulerConfiguration conf) {
     
     // Define top-level queues
-    conf.setQueues(CapacityScheduler.ROOT, new String[] {"a", "b", "c"});
-    conf.setCapacity(CapacityScheduler.ROOT, 100);
+    conf.setQueues(CapacitySchedulerConfiguration.ROOT, new String[] {"a", "b", "c"});
+    conf.setCapacity(CapacitySchedulerConfiguration.ROOT, 100);
     
-    final String A = CapacityScheduler.ROOT + ".a";
+    final String A = CapacitySchedulerConfiguration.ROOT + ".a";
     conf.setCapacity(A, 10);
     
-    final String B = CapacityScheduler.ROOT + ".b";
+    final String B = CapacitySchedulerConfiguration.ROOT + ".b";
     conf.setCapacity(B, 20);
 
-    final String C = CapacityScheduler.ROOT + ".c";
+    final String C = CapacitySchedulerConfiguration.ROOT + ".c";
     conf.setCapacity(C, 70);
 
     LOG.info("Setup top-level queues");
@@ -99,9 +100,53 @@ public class TestQueueParsing {
     CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
 
     // non-100 percent value will throw IllegalArgumentException
-    conf.setCapacity(CapacityScheduler.ROOT, 90);
+    conf.setCapacity(CapacitySchedulerConfiguration.ROOT, 90);
 
     CapacityScheduler capacityScheduler = new CapacityScheduler();
     capacityScheduler.reinitialize(conf, null, null);
   }
+  
+  public void testMaxCapacity() throws Exception {
+    CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
+
+    conf.setQueues(CapacitySchedulerConfiguration.ROOT, new String[] {"a", "b", "c"});
+    conf.setCapacity(CapacitySchedulerConfiguration.ROOT, 100);
+
+    final String A = CapacitySchedulerConfiguration.ROOT + ".a";
+    conf.setCapacity(A, 50);
+    conf.setMaximumCapacity(A, 60);
+
+    final String B = CapacitySchedulerConfiguration.ROOT + ".b";
+    conf.setCapacity(B, 50);
+    conf.setMaximumCapacity(B, 45);  // Should throw an exception
+
+
+    boolean fail = false;
+    CapacityScheduler capacityScheduler;
+    try {
+      capacityScheduler = new CapacityScheduler();
+      capacityScheduler.reinitialize(conf, null, null);
+    } catch (IllegalArgumentException iae) {
+      fail = true;
+    }
+    Assert.assertTrue("Didn't throw IllegalArgumentException for wrong maxCap", 
+        fail);
+
+    conf.setMaximumCapacity(B, 60);
+    
+    // Now this should work
+    capacityScheduler = new CapacityScheduler();
+    capacityScheduler.reinitialize(conf, null, null);
+    
+    fail = false;
+    try {
+    LeafQueue a = (LeafQueue)capacityScheduler.getQueue(A);
+    a.setMaxCapacity(45);
+    } catch  (IllegalArgumentException iae) {
+      fail = true;
+    }
+    Assert.assertTrue("Didn't throw IllegalArgumentException for wrong " +
+    		"setMaxCap", fail);
+  }
+  
 }

@@ -20,15 +20,12 @@ package org.apache.hadoop.yarn.ipc;
 
 import java.net.InetSocketAddress;
 
-import org.apache.hadoop.ipc.Server;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.factory.providers.RpcFactoryProvider;
 
 /**
@@ -40,14 +37,19 @@ import org.apache.hadoop.yarn.factory.providers.RpcFactoryProvider;
  */
 public class HadoopYarnProtoRPC extends YarnRPC {
 
-  private static final Log LOG = LogFactory.getLog(HadoopYarnRPC.class);
+  private static final Log LOG = LogFactory.getLog(HadoopYarnProtoRPC.class);
 
   @Override
   public Object getProxy(Class protocol, InetSocketAddress addr,
       Configuration conf) {
-    LOG.info("Creating a HadoopYarnProtoRpc proxy for protocol " + protocol);
+    LOG.debug("Creating a HadoopYarnProtoRpc proxy for protocol " + protocol);
     return RpcFactoryProvider.getClientFactory(conf).getClient(protocol, 1,
         addr, conf);
+  }
+
+  @Override
+  public void stopProxy(Object proxy, Configuration conf) {
+    RpcFactoryProvider.getClientFactory(conf).stopClient(proxy);
   }
 
   @Override
@@ -55,11 +57,11 @@ public class HadoopYarnProtoRPC extends YarnRPC {
       InetSocketAddress addr, Configuration conf,
       SecretManager<? extends TokenIdentifier> secretManager,
       int numHandlers) {
-    LOG.info("Creating a HadoopYarnProtoRpc server for protocol " + protocol + 
+    LOG.debug("Creating a HadoopYarnProtoRpc server for protocol " + protocol + 
         " with " + numHandlers + " handlers");
     
-    return RpcFactoryProvider.getServerFactory(conf).getServer(protocol, instance, 
-          addr, conf, secretManager, numHandlers);
+    return RpcFactoryProvider.getServerFactory(conf).getServer(protocol, 
+        instance, addr, conf, secretManager, numHandlers);
 
   }
 

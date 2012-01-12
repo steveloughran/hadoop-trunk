@@ -123,10 +123,10 @@ public class ParentQueue implements CSQueue {
     float absoluteCapacity = parentAbsoluteCapacity * capacity; 
 
     float maximumCapacity = 
-      cs.getConfiguration().getMaximumCapacity(getQueuePath());
+      (float) cs.getConfiguration().getMaximumCapacity(getQueuePath()) / 100;
     float absoluteMaxCapacity = 
-      (maximumCapacity == CapacitySchedulerConfiguration.UNDEFINED) ? 
-          1000000000f :  (parentAbsoluteCapacity * maximumCapacity) / 100;
+      (Math.round(maximumCapacity * 100) == CapacitySchedulerConfiguration.UNDEFINED) ? 
+          Float.MAX_VALUE :  (parentAbsoluteCapacity * maximumCapacity);
     
     QueueState state = cs.getConfiguration().getState(getQueuePath());
 
@@ -153,6 +153,9 @@ public class ParentQueue implements CSQueue {
           float maximumCapacity, float absoluteMaxCapacity,
           QueueState state, Map<QueueACL, AccessControlList> acls
   ) {
+    // Sanity check
+    CSQueueUtils.checkMaxCapacity(getQueueName(), capacity, maximumCapacity);
+
     this.capacity = capacity;
     this.absoluteCapacity = absoluteCapacity;
     this.maximumCapacity = maximumCapacity;
@@ -162,9 +165,9 @@ public class ParentQueue implements CSQueue {
 
     this.acls = acls;
     
-    this.queueInfo.setCapacity(capacity);
-    this.queueInfo.setMaximumCapacity(maximumCapacity);
-    this.queueInfo.setQueueState(state);
+    this.queueInfo.setCapacity(this.capacity);
+    this.queueInfo.setMaximumCapacity(this.maximumCapacity);
+    this.queueInfo.setQueueState(this.state);
 
     StringBuilder aclsString = new StringBuilder();
     for (Map.Entry<QueueACL, AccessControlList> e : acls.entrySet()) {
@@ -230,12 +233,12 @@ public class ParentQueue implements CSQueue {
 
   @Override
   public float getAbsoluteMaximumCapacity() {
-    return 0;
+    return absoluteMaxCapacity;
   }
 
   @Override
   public float getMaximumCapacity() {
-    return 0;
+    return maximumCapacity;
   }
 
   @Override
@@ -484,6 +487,9 @@ public class ParentQueue implements CSQueue {
    * @param maximumCapacity new max capacity
    */
   synchronized void setMaxCapacity(float maximumCapacity) {
+    // Sanity check
+    CSQueueUtils.checkMaxCapacity(getQueueName(), capacity, maximumCapacity);
+    
     this.maximumCapacity = maximumCapacity;
     float parentAbsoluteCapacity = 
         (rootQueue) ? 100.0f : parent.getAbsoluteCapacity();

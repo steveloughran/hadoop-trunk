@@ -18,14 +18,19 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.DataChecksum;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 
 
 /**
@@ -33,7 +38,9 @@ import org.apache.hadoop.util.DataChecksum;
  * This is not related to the Block related functionality in Namenode.
  * The biggest part of data block metadata is CRC for the block.
  */
-class BlockMetadataHeader {
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
+public class BlockMetadataHeader {
 
   static final short METADATA_VERSION = FSDataset.METADATA_VERSION;
   
@@ -49,12 +56,14 @@ class BlockMetadataHeader {
     this.checksum = checksum;
     this.version = version;
   }
-    
-  short getVersion() {
+  
+  /** Get the version */
+  public short getVersion() {
     return version;
   }
 
-  DataChecksum getChecksum() {
+  /** Get the checksum */
+  public DataChecksum getChecksum() {
     return checksum;
   }
 
@@ -65,7 +74,7 @@ class BlockMetadataHeader {
    * @return Metadata Header
    * @throws IOException
    */
-  static BlockMetadataHeader readHeader(DataInputStream in) throws IOException {
+  public static BlockMetadataHeader readHeader(DataInputStream in) throws IOException {
     return readHeader(in.readShort(), in);
   }
   
@@ -86,6 +95,18 @@ class BlockMetadataHeader {
     } finally {
       IOUtils.closeStream(in);
     }
+  }
+  
+  /**
+   * Read the header at the beginning of the given block meta file.
+   * The current file position will be altered by this method.
+   * If an error occurs, the file is <em>not</em> closed.
+   */
+  static BlockMetadataHeader readHeader(RandomAccessFile raf) throws IOException {
+    byte[] buf = new byte[getHeaderSize()];
+    raf.seek(0);
+    raf.readFully(buf, 0, buf.length);
+    return readHeader(new DataInputStream(new ByteArrayInputStream(buf)));
   }
   
   // Version is already read.

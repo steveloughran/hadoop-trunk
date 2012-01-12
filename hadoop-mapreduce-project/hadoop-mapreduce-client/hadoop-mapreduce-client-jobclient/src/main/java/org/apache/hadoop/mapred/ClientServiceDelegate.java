@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
-import java.security.PrivilegedAction;
+import java.security.PrivilegedExceptionAction;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.JobStatus;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.TypeConverter;
@@ -93,6 +94,8 @@ public class ClientServiceDelegate {
   private static String UNKNOWN_USER = "Unknown User";
   private String trackingUrl;
 
+  private boolean amAclDisabledStatusLogged = false;
+
   public ClientServiceDelegate(Configuration conf, ResourceMgrDelegate rm,
       JobID jobId, MRClientProtocol historyServerProxy) {
     this.conf = new Configuration(conf); // Cloning for modifying.
@@ -143,7 +146,7 @@ public class ClientServiceDelegate {
         || YarnApplicationState.RUNNING == application
             .getYarnApplicationState()) {
       if (application == null) {
-        LOG.info("Could not get Job info from RM for job " + jobId
+        LOG.debug("Could not get Job info from RM for job " + jobId
             + ". Redirecting to job history server.");
         return checkAndGetHSProxy(null, JobState.NEW);
       }
@@ -156,22 +159,39 @@ public class ClientServiceDelegate {
           application = rm.getApplicationReport(appId);
           continue;
         }
-        serviceAddr = application.getHost() + ":" + application.getRpcPort();
-        if (UserGroupInformation.isSecurityEnabled()) {
-          String clientTokenEncoded = application.getClientToken();
-          Token<ApplicationTokenIdentifier> clientToken =
-            new Token<ApplicationTokenIdentifier>();
-          clientToken.decodeFromUrlString(clientTokenEncoded);
-          // RPC layer client expects ip:port as service for tokens
-          InetSocketAddress addr = NetUtils.createSocketAddr(application
-              .getHost(), application.getRpcPort());
-          clientToken.setService(new Text(addr.getAddress().getHostAddress()
-              + ":" + addr.getPort()));
-          UserGroupInformation.getCurrentUser().addToken(clientToken);
+        if(!conf.getBoolean(MRJobConfig.JOB_AM_ACCESS_DISABLED, false)) {
+          UserGroupInformation newUgi = UserGroupInformation.createRemoteUser(
+              UserGroupInformation.getCurrentUser().getUserName());
+          serviceAddr = application.getHost() + ":" + application.getRpcPort();
+          if (UserGroupInformation.isSecurityEnabled()) {
+            String clientTokenEncoded = application.getClientToken();
+            Token<ApplicationTokenIdentifier> clientToken =
+              new Token<ApplicationTokenIdentifier>();
+            clientToken.decodeFromUrlString(clientTokenEncoded);
+            // RPC layer client expects ip:port as service for tokens
+            InetSocketAddress addr = NetUtils.createSocketAddr(application
+                .getHost(), application.getRpcPort());
+            clientToken.setService(new Text(addr.getAddress().getHostAddress()
+                + ":" + addr.getPort()));
+            newUgi.addToken(clientToken);
+          }
+          LOG.info("The url to track the job: " + application.getTrackingUrl());
+          LOG.debug("Connecting to " + serviceAddr);
+          final String tempStr = serviceAddr;
+          realProxy = newUgi.doAs(new PrivilegedExceptionAction<MRClientProtocol>() {
+            @Override
+            public MRClientProtocol run() throws IOException {
+              return instantiateAMProxy(tempStr);
+            }
+          });
+        } else {
+          if (!amAclDisabledStatusLogged) {
+            LOG.info("Network ACL closed to AM for job " + jobId
+                + ". Not going to try to reach the AM.");
+            amAclDisabledStatusLogged = true;
+          }
+          return getNotRunningJob(null, JobState.RUNNING);
         }
-        LOG.info("Tracking Url of JOB is " + application.getTrackingUrl());
-        LOG.info("Connecting to " + serviceAddr);
-        realProxy = instantiateAMProxy(serviceAddr);
         return realProxy;
       } catch (IOException e) {
         //possibly the AM has crashed
@@ -187,7 +207,7 @@ public class ClientServiceDelegate {
         }
         application = rm.getApplicationReport(appId);
         if (application == null) {
-          LOG.info("Could not get Job info from RM for job " + jobId
+          LOG.debug("Could not get Job info from RM for job " + jobId
               + ". Redirecting to job history server.");
           return checkAndGetHSProxy(null, JobState.RUNNING);
         }
@@ -243,17 +263,11 @@ public class ClientServiceDelegate {
 
   MRClientProtocol instantiateAMProxy(final String serviceAddr)
       throws IOException {
-    UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
     LOG.trace("Connecting to ApplicationMaster at: " + serviceAddr);
-    MRClientProtocol proxy = currentUser
-        .doAs(new PrivilegedAction<MRClientProtocol>() {
-      @Override
-      public MRClientProtocol run() {
-        YarnRPC rpc = YarnRPC.create(conf);
-        return (MRClientProtocol) rpc.getProxy(MRClientProtocol.class,
+    YarnRPC rpc = YarnRPC.create(conf);
+    MRClientProtocol proxy = 
+         (MRClientProtocol) rpc.getProxy(MRClientProtocol.class,
             NetUtils.createSocketAddr(serviceAddr), conf);
-      }
-    });
     LOG.trace("Connected to ApplicationMaster at: " + serviceAddr);
     return proxy;
   }
@@ -281,16 +295,13 @@ public class ClientServiceDelegate {
           LOG.debug("Tracing remote error ", e.getTargetException());
           throw (YarnRemoteException) e.getTargetException();
         }
-        LOG.info("Failed to contact AM/History for job " + jobId + 
-            " retrying..");
-        LOG.debug("Failed exception on AM/History contact", 
-            e.getTargetException());
+        LOG.debug("Failed to contact AM/History for job " + jobId + 
+            " retrying..", e.getTargetException());
         // Force reconnection by setting the proxy to null.
         realProxy = null;
       } catch (Exception e) {
-        LOG.info("Failed to contact AM/History for job " + jobId
-            + "  Will retry..");
-        LOG.debug("Failing to contact application master", e);
+        LOG.debug("Failed to contact AM/History for job " + jobId
+            + "  Will retry..", e);
         // Force reconnection by setting the proxy to null.
         realProxy = null;
       }

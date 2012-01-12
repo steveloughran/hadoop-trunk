@@ -20,8 +20,6 @@ package org.apache.hadoop.hdfs.protocol;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
-import org.apache.avro.reflect.Nullable;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.ContentSummary;
@@ -116,7 +114,6 @@ public interface ClientProtocol extends VersionedProtocol {
    * @throws UnresolvedLinkException If <code>src</code> contains a symlink
    * @throws IOException If an I/O error occurred
    */
-  @Nullable
   public LocatedBlocks getBlockLocations(String src,
                                          long offset,
                                          long length) 
@@ -311,7 +308,7 @@ public interface ClientProtocol extends VersionedProtocol {
    * @throws IOException If an I/O error occurred
    */
   public LocatedBlock addBlock(String src, String clientName,
-      @Nullable ExtendedBlock previous, @Nullable DatanodeInfo[] excludeNodes)
+      ExtendedBlock previous, DatanodeInfo[] excludeNodes)
       throws AccessControlException, FileNotFoundException,
       NotReplicatedYetException, SafeModeException, UnresolvedLinkException,
       IOException;
@@ -665,7 +662,8 @@ public interface ClientProtocol extends VersionedProtocol {
    * 
    * @throws AccessControlException if the superuser privilege is violated.
    */
-  public boolean restoreFailedStorage(String arg) throws AccessControlException;
+  public boolean restoreFailedStorage(String arg) 
+      throws AccessControlException, IOException;
 
   /**
    * Tells the namenode to reread the hosts and exclude files. 
@@ -689,7 +687,6 @@ public interface ClientProtocol extends VersionedProtocol {
    * @return upgrade status information or null if no upgrades are in progress
    * @throws IOException
    */
-  @Nullable
   public UpgradeStatusReport distributedUpgradeProgress(UpgradeAction action) 
       throws IOException;
 
@@ -735,7 +732,6 @@ public interface ClientProtocol extends VersionedProtocol {
    * @throws UnresolvedLinkException if the path contains a symlink. 
    * @throws IOException If an I/O error occurred        
    */
-  @Nullable
   public HdfsFileStatus getFileInfo(String src) throws AccessControlException,
       FileNotFoundException, UnresolvedLinkException, IOException;
 
@@ -828,9 +824,9 @@ public interface ClientProtocol extends VersionedProtocol {
 
   /**
    * Create symlink to a file or directory.
-   * @param target The pathname of the destination that the
+   * @param target The path of the destination that the
    *               link points to.
-   * @param link The pathname of the link being created.
+   * @param link The path of the link being created.
    * @param dirPerm permissions to use when creating parent directories
    * @param createParent - if true then missing parent dirs are created
    *                       if false then parent must exist
@@ -851,14 +847,16 @@ public interface ClientProtocol extends VersionedProtocol {
       IOException;
 
   /**
-   * Resolve the first symbolic link on the specified path.
-   * @param path The pathname that needs to be resolved
-   * 
-   * @return The pathname after resolving the first symbolic link if any.
-   * 
+   * Return the target of the given symlink. If there is an intermediate
+   * symlink in the path (ie a symlink leading up to the final path component)
+   * then the given path is returned with this symlink resolved.
+   *
+   * @param path The path with a link that needs resolution.
+   * @return The path after resolving the first symbolic link in the path.
    * @throws AccessControlException permission denied
    * @throws FileNotFoundException If <code>path</code> does not exist
-   * @throws IOException If an I/O error occurred
+   * @throws IOException If the given path does not refer to a symlink
+   *           or an I/O error occurred
    */
   public String getLinkTarget(String path) throws AccessControlException,
       FileNotFoundException, IOException; 

@@ -26,8 +26,6 @@ import java.io.RandomAccessFile;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.UnknownHostException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -70,7 +68,8 @@ public class NNStorage extends Storage implements Closeable {
   private static final Log LOG = LogFactory.getLog(NNStorage.class.getName());
 
   static final String DEPRECATED_MESSAGE_DIGEST_PROPERTY = "imageMD5Digest";
-  
+  static final String LOCAL_URI_SCHEME = "file";
+
   //
   // The filenames used for storing the images
   //
@@ -324,22 +323,14 @@ public class NNStorage extends Storage implements Closeable {
 
   /**
    * Checks the consistency of a URI, in particular if the scheme
-   * is specified and is supported by a concrete implementation
+   * is specified 
    * @param u URI whose consistency is being checked.
    */
   private static void checkSchemeConsistency(URI u) throws IOException {
     String scheme = u.getScheme();
     // the URI should have a proper scheme
-    if(scheme == null)
+    if(scheme == null) {
       throw new IOException("Undefined scheme for " + u);
-    else {
-      try {
-        // the scheme should be enumerated as JournalType
-        JournalType.valueOf(scheme.toUpperCase());
-      } catch (IllegalArgumentException iae){
-        throw new IOException("Unknown scheme " + scheme +
-            ". It should correspond to a JournalType enumeration value");
-      }
     }
   }
 
@@ -985,13 +976,7 @@ public class NNStorage extends Storage implements Closeable {
       throw e;
     }
     
-    int rand = 0;
-    try {
-      rand = SecureRandom.getInstance("SHA1PRNG").nextInt(Integer.MAX_VALUE);
-    } catch (NoSuchAlgorithmException e) {
-      LOG.warn("Could not use SecureRandom");
-      rand = DFSUtil.getRandom().nextInt(Integer.MAX_VALUE);
-    }
+    int rand = DFSUtil.getSecureRandom().nextInt(Integer.MAX_VALUE);
     String bpid = "BP-" + rand + "-"+ ip + "-" + System.currentTimeMillis();
     return bpid;
   }
