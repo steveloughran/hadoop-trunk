@@ -76,6 +76,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AbandonBlockRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AddBlockRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AppendRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AppendResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CompleteRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ConcatRequestProto;
@@ -83,18 +84,23 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.Create
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CreateSymlinkRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.DeleteRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.DistributedUpgradeProgressRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.DistributedUpgradeProgressResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.FinalizeUpgradeRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.FsyncRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetAdditionalDatanodeRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetBlockLocationsRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetBlockLocationsResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetContentSummaryRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetDatanodeReportRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFileInfoRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFileInfoResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFileLinkInfoRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFileLinkInfoResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFsStatusRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetLinkTargetRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetListingRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetListingResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetPreferredBlockSizeRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetServerDefaultsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ListCorruptFileBlocksRequestProto;
@@ -118,6 +124,8 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SetSaf
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SetTimesRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdateBlockForPipelineRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdatePipelineRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DirectoryListingProto;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.HdfsFileStatusProto;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
@@ -205,7 +213,10 @@ public class ClientNamenodeProtocolTranslatorPB implements
         .setLength(length)
         .build();
     try {
-      return PBHelper.convert(rpcProxy.getBlockLocations(null, req).getLocations());
+      GetBlockLocationsResponseProto resp = rpcProxy.getBlockLocations(null,
+          req);
+      return resp.hasLocations() ? 
+        PBHelper.convert(resp.getLocations()) : null;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -257,7 +268,8 @@ public class ClientNamenodeProtocolTranslatorPB implements
         .setClientName(clientName)
         .build();
     try {
-      return PBHelper.convert(rpcProxy.append(null, req).getBlock());
+      AppendResponseProto res = rpcProxy.append(null, req);
+      return res.hasBlock() ? PBHelper.convert(res.getBlock()) : null;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -298,13 +310,14 @@ public class ClientNamenodeProtocolTranslatorPB implements
   public void setOwner(String src, String username, String groupname)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException {
-    SetOwnerRequestProto req = SetOwnerRequestProto.newBuilder()
-        .setSrc(src)
-        .setUsername(username)
-        .setGroupname(groupname)
-        .build();
+    SetOwnerRequestProto.Builder req = SetOwnerRequestProto.newBuilder()
+        .setSrc(src);
+    if (username != null)
+        req.setUsername(username);
+    if (groupname != null)
+        req.setGroupname(groupname);
     try {
-      rpcProxy.setOwner(null, req);
+      rpcProxy.setOwner(null, req.build());
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -329,12 +342,14 @@ public class ClientNamenodeProtocolTranslatorPB implements
       throws AccessControlException, FileNotFoundException,
       NotReplicatedYetException, SafeModeException, UnresolvedLinkException,
       IOException {
-    AddBlockRequestProto req = AddBlockRequestProto.newBuilder().setSrc(src)
-        .setClientName(clientName).setPrevious(PBHelper.convert(previous))
-        .addAllExcludeNodes(Arrays.asList(PBHelper.convert(excludeNodes)))
-        .build();
+    AddBlockRequestProto.Builder req = AddBlockRequestProto.newBuilder().setSrc(src)
+        .setClientName(clientName);
+    if (previous != null) 
+      req.setPrevious(PBHelper.convert(previous)); 
+    if (excludeNodes != null) 
+      req.addAllExcludeNodes(Arrays.asList(PBHelper.convert(excludeNodes)));
     try {
-      return PBHelper.convert(rpcProxy.addBlock(null, req).getBlock());
+      return PBHelper.convert(rpcProxy.addBlock(null, req.build()).getBlock());
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -367,13 +382,13 @@ public class ClientNamenodeProtocolTranslatorPB implements
   public boolean complete(String src, String clientName, ExtendedBlock last)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException {
-    CompleteRequestProto req = CompleteRequestProto.newBuilder()
+    CompleteRequestProto.Builder req = CompleteRequestProto.newBuilder()
         .setSrc(src)
-        .setClientName(clientName)
-        .setLast(PBHelper.convert(last))
-        .build();
+        .setClientName(clientName);   
+    if (last != null)
+      req.setLast(PBHelper.convert(last));
     try {
-      return rpcProxy.complete(null, req).getResult();
+      return rpcProxy.complete(null, req.build()).getResult();
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -484,7 +499,12 @@ public class ClientNamenodeProtocolTranslatorPB implements
         .setStartAfter(ByteString.copyFrom(startAfter))
         .setNeedLocation(needLocation).build();
     try {
-      return PBHelper.convert(rpcProxy.getListing(null, req).getDirList());
+      GetListingResponseProto result = rpcProxy.getListing(null, req);
+      
+      if (result.hasDirList()) {
+        return PBHelper.convert(result.getDirList());
+      }
+      return null;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -615,8 +635,9 @@ public class ClientNamenodeProtocolTranslatorPB implements
         DistributedUpgradeProgressRequestProto.newBuilder().
         setAction(PBHelper.convert(action)).build();
     try {
-      return PBHelper.convert(
-          rpcProxy.distributedUpgradeProgress(null, req).getReport());
+      DistributedUpgradeProgressResponseProto res = rpcProxy
+          .distributedUpgradeProgress(null, req);
+      return res.hasReport() ? PBHelper.convert(res.getReport()) : null;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -625,11 +646,13 @@ public class ClientNamenodeProtocolTranslatorPB implements
   @Override
   public CorruptFileBlocks listCorruptFileBlocks(String path, String cookie)
       throws IOException {
-    ListCorruptFileBlocksRequestProto req = ListCorruptFileBlocksRequestProto
-        .newBuilder().setPath(path).setCookie(cookie).build();
+    ListCorruptFileBlocksRequestProto.Builder req = 
+        ListCorruptFileBlocksRequestProto.newBuilder().setPath(path);   
+    if (cookie != null) 
+      req.setCookie(cookie);
     try {
       return PBHelper.convert(
-          rpcProxy.listCorruptFileBlocks(null, req).getCorrupt());
+          rpcProxy.listCorruptFileBlocks(null, req.build()).getCorrupt());
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -653,7 +676,8 @@ public class ClientNamenodeProtocolTranslatorPB implements
     GetFileInfoRequestProto req = GetFileInfoRequestProto.newBuilder()
         .setSrc(src).build();
     try {
-      return PBHelper.convert(rpcProxy.getFileInfo(null, req).getFs());
+      GetFileInfoResponseProto res = rpcProxy.getFileInfo(null, req);
+      return res.hasFs() ? PBHelper.convert(res.getFs()) : null;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -665,7 +689,9 @@ public class ClientNamenodeProtocolTranslatorPB implements
     GetFileLinkInfoRequestProto req = GetFileLinkInfoRequestProto.newBuilder()
         .setSrc(src).build();
     try {
-      return PBHelper.convert(rpcProxy.getFileLinkInfo(null, req).getFs());
+      GetFileLinkInfoResponseProto result = rpcProxy.getFileLinkInfo(null, req);
+      return result.hasFs() ?  
+          PBHelper.convert(rpcProxy.getFileLinkInfo(null, req).getFs()) : null;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }

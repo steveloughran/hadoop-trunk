@@ -21,6 +21,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,11 +31,14 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.Priority;
+import org.apache.hadoop.yarn.api.records.QueueACL;
+import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.factories.RecordFactory;
@@ -102,20 +106,35 @@ public class TestLeafQueue {
   
   private static final String A = "a";
   private static final String B = "b";
+  private static final String C = "c";
+  private static final String C1 = "c1";
   private void setupQueueConfiguration(CapacitySchedulerConfiguration conf) {
     
     // Define top-level queues
-    conf.setQueues(CapacityScheduler.ROOT, new String[] {A, B});
-    conf.setCapacity(CapacityScheduler.ROOT, 100);
-    conf.setMaximumCapacity(CapacityScheduler.ROOT, 100);
+    conf.setQueues(CapacitySchedulerConfiguration.ROOT, new String[] {A, B, C});
+    conf.setCapacity(CapacitySchedulerConfiguration.ROOT, 100);
+    conf.setMaximumCapacity(CapacitySchedulerConfiguration.ROOT, 100);
+    conf.setAcl(CapacitySchedulerConfiguration.ROOT, QueueACL.SUBMIT_APPLICATIONS, " ");
     
-    final String Q_A = CapacityScheduler.ROOT + "." + A;
-    conf.setCapacity(Q_A, 10);
+    final String Q_A = CapacitySchedulerConfiguration.ROOT + "." + A;
+    conf.setCapacity(Q_A, 9);
     conf.setMaximumCapacity(Q_A, 20);
+    conf.setAcl(Q_A, QueueACL.SUBMIT_APPLICATIONS, "*");
     
-    final String Q_B = CapacityScheduler.ROOT + "." + B;
+    final String Q_B = CapacitySchedulerConfiguration.ROOT + "." + B;
     conf.setCapacity(Q_B, 90);
     conf.setMaximumCapacity(Q_B, 99);
+    conf.setAcl(Q_B, QueueACL.SUBMIT_APPLICATIONS, "*");
+
+    final String Q_C = CapacitySchedulerConfiguration.ROOT + "." + C;
+    conf.setCapacity(Q_C, 1);
+    conf.setMaximumCapacity(Q_C, 10);
+    conf.setAcl(Q_C, QueueACL.SUBMIT_APPLICATIONS, " ");
+    
+    conf.setQueues(Q_C, new String[] {C1});
+
+    final String Q_C1 = Q_C + "." + C1;
+    conf.setCapacity(Q_C1, 100);
     
     LOG.info("Setup top-level queues a and b");
   }
@@ -167,8 +186,8 @@ public class TestLeafQueue {
 	  //can add more sturdy test with 3-layer queues 
 	  //once MAPREDUCE:3410 is resolved
 	  LeafQueue a = stubLeafQueue((LeafQueue)queues.get(A));
-	  assertEquals(0.1, a.getCapacity(), epsilon);
-	  assertEquals(0.1, a.getAbsoluteCapacity(), epsilon);
+	  assertEquals(0.09, a.getCapacity(), epsilon);
+	  assertEquals(0.09, a.getAbsoluteCapacity(), epsilon);
 	  assertEquals(0.2, a.getMaximumCapacity(), epsilon);
 	  assertEquals(0.2, a.getAbsoluteMaximumCapacity(), epsilon);
 	  
@@ -177,6 +196,12 @@ public class TestLeafQueue {
 	  assertEquals(0.9, b.getAbsoluteCapacity(), epsilon);
 	  assertEquals(0.99, b.getMaximumCapacity(), epsilon);
 	  assertEquals(0.99, b.getAbsoluteMaximumCapacity(), epsilon);
+
+	  ParentQueue c = (ParentQueue)queues.get(C);
+	  assertEquals(0.01, c.getCapacity(), epsilon);
+	  assertEquals(0.01, c.getAbsoluteCapacity(), epsilon);
+	  assertEquals(0.1, c.getMaximumCapacity(), epsilon);
+	  assertEquals(0.1, c.getAbsoluteMaximumCapacity(), epsilon);
   }
  
   @Test
@@ -786,49 +811,56 @@ public class TestLeafQueue {
     app_0.updateResourceRequests(app_0_requests_0);
 
     // Start testing...
+    CSAssignment assignment = null;
     
     // Start with off switch, shouldn't allocate due to delay scheduling
-    a.assignContainers(clusterResource, node_2);
+    assignment = a.assignContainers(clusterResource, node_2);
     verify(app_0, never()).allocate(any(NodeType.class), eq(node_2), 
         any(Priority.class), any(ResourceRequest.class), any(Container.class));
     assertEquals(1, app_0.getSchedulingOpportunities(priority));
     assertEquals(3, app_0.getTotalRequiredResources(priority));
+    assertEquals(NodeType.NODE_LOCAL, assignment.getType()); // None->NODE_LOCAL
 
     // Another off switch, shouldn't allocate due to delay scheduling
-    a.assignContainers(clusterResource, node_2);
+    assignment = a.assignContainers(clusterResource, node_2);
     verify(app_0, never()).allocate(any(NodeType.class), eq(node_2), 
         any(Priority.class), any(ResourceRequest.class), any(Container.class));
     assertEquals(2, app_0.getSchedulingOpportunities(priority));
     assertEquals(3, app_0.getTotalRequiredResources(priority));
+    assertEquals(NodeType.NODE_LOCAL, assignment.getType()); // None->NODE_LOCAL
     
     // Another off switch, shouldn't allocate due to delay scheduling
-    a.assignContainers(clusterResource, node_2);
+    assignment = a.assignContainers(clusterResource, node_2);
     verify(app_0, never()).allocate(any(NodeType.class), eq(node_2), 
         any(Priority.class), any(ResourceRequest.class), any(Container.class));
     assertEquals(3, app_0.getSchedulingOpportunities(priority));
     assertEquals(3, app_0.getTotalRequiredResources(priority));
+    assertEquals(NodeType.NODE_LOCAL, assignment.getType()); // None->NODE_LOCAL
     
     // Another off switch, now we should allocate 
     // since missedOpportunities=3 and reqdContainers=3
-    a.assignContainers(clusterResource, node_2);
+    assignment = a.assignContainers(clusterResource, node_2);
     verify(app_0).allocate(eq(NodeType.OFF_SWITCH), eq(node_2), 
         any(Priority.class), any(ResourceRequest.class), any(Container.class));
     assertEquals(0, app_0.getSchedulingOpportunities(priority)); // should reset
     assertEquals(2, app_0.getTotalRequiredResources(priority));
+    assertEquals(NodeType.OFF_SWITCH, assignment.getType());
     
     // NODE_LOCAL - node_0
-    a.assignContainers(clusterResource, node_0);
+    assignment = a.assignContainers(clusterResource, node_0);
     verify(app_0).allocate(eq(NodeType.NODE_LOCAL), eq(node_0), 
         any(Priority.class), any(ResourceRequest.class), any(Container.class));
     assertEquals(0, app_0.getSchedulingOpportunities(priority)); // should reset
     assertEquals(1, app_0.getTotalRequiredResources(priority));
+    assertEquals(NodeType.NODE_LOCAL, assignment.getType());
     
     // NODE_LOCAL - node_1
-    a.assignContainers(clusterResource, node_1);
+    assignment = a.assignContainers(clusterResource, node_1);
     verify(app_0).allocate(eq(NodeType.NODE_LOCAL), eq(node_1), 
         any(Priority.class), any(ResourceRequest.class), any(Container.class));
     assertEquals(0, app_0.getSchedulingOpportunities(priority)); // should reset
     assertEquals(0, app_0.getTotalRequiredResources(priority));
+    assertEquals(NodeType.NODE_LOCAL, assignment.getType());
     
     // Add 1 more request to check for RACK_LOCAL
     app_0_requests_0.clear();
@@ -847,11 +879,12 @@ public class TestLeafQueue {
     String host_3 = "host_3"; // on rack_1
     SchedulerNode node_3 = TestUtils.getMockNode(host_3, rack_1, 0, 8*GB);
     
-    a.assignContainers(clusterResource, node_3);
+    assignment = a.assignContainers(clusterResource, node_3);
     verify(app_0).allocate(eq(NodeType.RACK_LOCAL), eq(node_3), 
         any(Priority.class), any(ResourceRequest.class), any(Container.class));
     assertEquals(0, app_0.getSchedulingOpportunities(priority)); // should reset
     assertEquals(0, app_0.getTotalRequiredResources(priority));
+    assertEquals(NodeType.RACK_LOCAL, assignment.getType());
   }
   
   @Test
@@ -1080,6 +1113,41 @@ public class TestLeafQueue {
         any(Priority.class), any(ResourceRequest.class), any(Container.class));
     assertEquals(0, app_0.getSchedulingOpportunities(priority)); // should reset
     assertEquals(0, app_0.getTotalRequiredResources(priority));
+
+  }
+
+  public boolean hasQueueACL(List<QueueUserACLInfo> aclInfos, QueueACL acl) {
+    for (QueueUserACLInfo aclInfo : aclInfos) {
+      if (aclInfo.getUserAcls().contains(acl)) {
+        return true;
+      }
+    }    
+    return false;
+  }
+
+  @Test
+  public void testInheritedQueueAcls() throws IOException {
+    UserGroupInformation user = UserGroupInformation.getCurrentUser();
+
+    LeafQueue a = stubLeafQueue((LeafQueue)queues.get(A));
+    LeafQueue b = stubLeafQueue((LeafQueue)queues.get(B));
+    ParentQueue c = (ParentQueue)queues.get(C);
+    LeafQueue c1 = stubLeafQueue((LeafQueue)queues.get(C1));
+
+    assertFalse(root.hasAccess(QueueACL.SUBMIT_APPLICATIONS, user));
+    assertTrue(a.hasAccess(QueueACL.SUBMIT_APPLICATIONS, user));
+    assertTrue(b.hasAccess(QueueACL.SUBMIT_APPLICATIONS, user));
+    assertFalse(c.hasAccess(QueueACL.SUBMIT_APPLICATIONS, user));
+    assertFalse(c1.hasAccess(QueueACL.SUBMIT_APPLICATIONS, user));
+
+    assertTrue(hasQueueACL(
+          a.getQueueUserAclInfo(user), QueueACL.SUBMIT_APPLICATIONS));
+    assertTrue(hasQueueACL(
+          b.getQueueUserAclInfo(user), QueueACL.SUBMIT_APPLICATIONS));
+    assertFalse(hasQueueACL(
+          c.getQueueUserAclInfo(user), QueueACL.SUBMIT_APPLICATIONS));
+    assertFalse(hasQueueACL(
+          c1.getQueueUserAclInfo(user), QueueACL.SUBMIT_APPLICATIONS));
 
   }
   

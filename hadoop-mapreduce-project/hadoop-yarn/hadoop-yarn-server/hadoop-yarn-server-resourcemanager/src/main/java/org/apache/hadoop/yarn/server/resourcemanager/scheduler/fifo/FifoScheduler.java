@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,7 +35,6 @@ import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.yarn.Lock;
@@ -67,6 +65,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptS
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanContainerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
@@ -89,6 +88,7 @@ import org.apache.hadoop.yarn.util.BuilderUtils;
 
 @LimitedPrivate("yarn")
 @Evolving
+@SuppressWarnings("unchecked")
 public class FifoScheduler implements ResourceScheduler {
 
   private static final Log LOG = LogFactory.getLog(FifoScheduler.class);
@@ -179,6 +179,11 @@ public class FifoScheduler implements ResourceScheduler {
     return minimumAllocation;
   }
 
+  @Override
+  public int getNumClusterNodes() {
+    return nodes.size();
+  }
+  
   @Override
   public Resource getMaximumResourceCapability() {
     return maximumAllocation;
@@ -279,7 +284,6 @@ public class FifoScheduler implements ResourceScheduler {
     return nodes.get(nodeId);
   }
   
-  @SuppressWarnings("unchecked")
   private synchronized void addApplication(ApplicationAttemptId appAttemptId,
       String user) {
     // TODO: Fix store
@@ -652,10 +656,14 @@ public class FifoScheduler implements ResourceScheduler {
       LOG.info("Unknown application: " + applicationAttemptId + 
           " launched container " + containerId +
           " on node: " + node);
+      // Some unknown container sneaked into the system. Kill it.
+      this.rmContext.getDispatcher().getEventHandler()
+        .handle(new RMNodeCleanContainerEvent(node.getNodeID(), containerId));
+
       return;
     }
     
-    application.containerLaunchedOnNode(containerId);
+    application.containerLaunchedOnNode(containerId, node.getNodeID());
   }
 
   @Lock(FifoScheduler.class)

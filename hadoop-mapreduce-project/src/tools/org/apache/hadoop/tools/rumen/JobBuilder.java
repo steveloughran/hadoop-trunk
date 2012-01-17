@@ -27,9 +27,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.hadoop.mapred.TaskStatus;
+import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.jobhistory.AMStartedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.HistoryEvent;
+import org.apache.hadoop.mapreduce.jobhistory.JobFinished;
 import org.apache.hadoop.mapreduce.jobhistory.JobFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobInfoChangeEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobInitedEvent;
@@ -44,7 +46,9 @@ import org.apache.hadoop.mapreduce.jobhistory.ReduceAttemptFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptFinished;
 import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptStartedEvent;
+import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptUnsuccessfulCompletion;
 import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptUnsuccessfulCompletionEvent;
+import org.apache.hadoop.mapreduce.jobhistory.TaskFailed;
 import org.apache.hadoop.mapreduce.jobhistory.TaskFailedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskFinished;
 import org.apache.hadoop.mapreduce.jobhistory.TaskFinishedEvent;
@@ -65,16 +69,16 @@ public class JobBuilder {
 
   private boolean finalized = false;
 
-  private LoggedJob result = new LoggedJob();
+  private ParsedJob result = new ParsedJob();
 
-  private Map<String, LoggedTask> mapTasks = new HashMap<String, LoggedTask>();
-  private Map<String, LoggedTask> reduceTasks =
-      new HashMap<String, LoggedTask>();
-  private Map<String, LoggedTask> otherTasks =
-      new HashMap<String, LoggedTask>();
+  private Map<String, ParsedTask> mapTasks = new HashMap<String, ParsedTask>();
+  private Map<String, ParsedTask> reduceTasks =
+      new HashMap<String, ParsedTask>();
+  private Map<String, ParsedTask> otherTasks =
+      new HashMap<String, ParsedTask>();
 
-  private Map<String, LoggedTaskAttempt> attempts =
-      new HashMap<String, LoggedTaskAttempt>();
+  private Map<String, ParsedTaskAttempt> attempts =
+      new HashMap<String, ParsedTaskAttempt>();
 
   private Map<ParsedHost, ParsedHost> allHosts =
       new HashMap<ParsedHost, ParsedHost>();
@@ -83,11 +87,6 @@ public class JobBuilder {
    * The number of splits a task can have, before we ignore them all.
    */
   private final static int MAXIMUM_PREFERRED_LOCATIONS = 25;
-  /**
-   * The regular expression used to parse task attempt IDs in job tracker logs
-   */
-  private final static Pattern taskAttemptIDPattern =
-      Pattern.compile(".*_([0-9]+)");
 
   private int[] attemptTimesPercentiles = null;
 
@@ -126,7 +125,7 @@ public class JobBuilder {
   public void process(HistoryEvent event) {
     if (finalized) {
       throw new IllegalStateException(
-          "JobBuilder.process(HistoryEvent event) called after LoggedJob built");
+          "JobBuilder.process(HistoryEvent event) called after ParsedJob built");
     }
 
     // these are in lexicographical order by class name.
@@ -232,12 +231,16 @@ public class JobBuilder {
   public void process(Properties conf) {
     if (finalized) {
       throw new IllegalStateException(
-          "JobBuilder.process(Properties conf) called after LoggedJob built");
+          "JobBuilder.process(Properties conf) called after ParsedJob built");
     }
 
     //TODO remove this once the deprecate APIs in LoggedJob are removed
-    result.setQueue(extract(conf, JobConfPropertyNames.QUEUE_NAMES
-        .getCandidates(), "default"));
+    String queue = extract(conf, JobConfPropertyNames.QUEUE_NAMES
+                           .getCandidates(), null);
+    // set the queue name if existing
+    if (queue != null) {
+      result.setQueue(queue);
+    }
     result.setJobName(extract(conf, JobConfPropertyNames.JOB_NAMES
         .getCandidates(), null));
 
@@ -255,14 +258,16 @@ public class JobBuilder {
    * Request the builder to build the final object. Once called, the
    * {@link JobBuilder} would accept no more events or job-conf properties.
    * 
-   * @return Parsed {@link LoggedJob} object.
+   * @return Parsed {@link ParsedJob} object.
    */
-  public LoggedJob build() {
+  public ParsedJob build() {
     // The main job here is to build CDFs and manage the conf
     finalized = true;
 
     // set the conf
-    result.setJobProperties(jobConfigurationParameters);
+    if (jobConfigurationParameters != null) {
+      result.setJobProperties(jobConfigurationParameters);
+    }
     
     // initialize all the per-job statistics gathering places
     Histogram[] successfulMapAttemptTimes =
@@ -314,20 +319,10 @@ public class JobBuilder {
               }
             }
 
-            String attemptID = attempt.getAttemptID();
+            TaskAttemptID attemptID = attempt.getAttemptID();
 
             if (attemptID != null) {
-              Matcher matcher = taskAttemptIDPattern.matcher(attemptID);
-
-              if (matcher.matches()) {
-                String attemptNumberString = matcher.group(1);
-
-                if (attemptNumberString != null) {
-                  int attemptNumber = Integer.parseInt(attemptNumberString);
-
-                  successfulNthMapperAttempts.enter(attemptNumber);
-                }
-              }
+              successfulNthMapperAttempts.enter(attemptID.getId());
             }
           } else {
             if (attempt.getResult() == Pre21JobHistoryConstants.Values.FAILED) {
@@ -427,7 +422,7 @@ public class JobBuilder {
   }
 
   private void processTaskUpdatedEvent(TaskUpdatedEvent event) {
-    LoggedTask task = getTask(event.getTaskId().toString());
+    ParsedTask task = getTask(event.getTaskId().toString());
     if (task == null) {
       return;
     }
@@ -435,7 +430,7 @@ public class JobBuilder {
   }
 
   private void processTaskStartedEvent(TaskStartedEvent event) {
-    LoggedTask task =
+    ParsedTask task =
         getOrMakeTask(event.getTaskType(), event.getTaskId().toString(), true);
     task.setStartTime(event.getStartTime());
     task.setPreferredLocations(preferredLocationForSplits(event
@@ -443,7 +438,7 @@ public class JobBuilder {
   }
 
   private void processTaskFinishedEvent(TaskFinishedEvent event) {
-    LoggedTask task =
+    ParsedTask task =
         getOrMakeTask(event.getTaskType(), event.getTaskId().toString(), false);
     if (task == null) {
       return;
@@ -454,18 +449,22 @@ public class JobBuilder {
   }
 
   private void processTaskFailedEvent(TaskFailedEvent event) {
-    LoggedTask task =
+    ParsedTask task =
         getOrMakeTask(event.getTaskType(), event.getTaskId().toString(), false);
     if (task == null) {
       return;
     }
     task.setFinishTime(event.getFinishTime());
     task.setTaskStatus(getPre21Value(event.getTaskStatus()));
+    TaskFailed t = (TaskFailed)(event.getDatum());
+    task.putDiagnosticInfo(t.error.toString());
+    task.putFailedDueToAttemptId(t.failedDueToAttempt.toString());
+    // No counters in TaskFailedEvent
   }
 
   private void processTaskAttemptUnsuccessfulCompletionEvent(
       TaskAttemptUnsuccessfulCompletionEvent event) {
-    LoggedTaskAttempt attempt =
+    ParsedTaskAttempt attempt =
         getOrMakeTaskAttempt(event.getTaskType(), event.getTaskId().toString(),
             event.getTaskAttemptId().toString());
 
@@ -474,10 +473,11 @@ public class JobBuilder {
     }
 
     attempt.setResult(getPre21Value(event.getTaskStatus()));
-    ParsedHost parsedHost = getAndRecordParsedHost(event.getHostname());
-
-    if (parsedHost != null) {
-      attempt.setLocation(parsedHost.makeLoggedLocation());
+    attempt.setHostName(event.getHostname(), event.getRackName());
+    ParsedHost pHost = 
+      getAndRecordParsedHost(event.getRackName(), event.getHostname());
+    if (pHost != null) {
+      attempt.setLocation(pHost.makeLoggedLocation());
     }
 
     attempt.setFinishTime(event.getFinishTime());
@@ -486,28 +486,37 @@ public class JobBuilder {
     attempt.arraySetCpuUsages(event.getCpuUsages());
     attempt.arraySetVMemKbytes(event.getVMemKbytes());
     attempt.arraySetPhysMemKbytes(event.getPhysMemKbytes());
+    TaskAttemptUnsuccessfulCompletion t =
+        (TaskAttemptUnsuccessfulCompletion) (event.getDatum());
+    attempt.putDiagnosticInfo(t.error.toString());
+    // No counters in TaskAttemptUnsuccessfulCompletionEvent
   }
 
   private void processTaskAttemptStartedEvent(TaskAttemptStartedEvent event) {
-    LoggedTaskAttempt attempt =
+    ParsedTaskAttempt attempt =
         getOrMakeTaskAttempt(event.getTaskType(), event.getTaskId().toString(),
             event.getTaskAttemptId().toString());
     if (attempt == null) {
       return;
     }
     attempt.setStartTime(event.getStartTime());
+    attempt.putTrackerName(event.getTrackerName());
+    attempt.putHttpPort(event.getHttpPort());
+    attempt.putShufflePort(event.getShufflePort());
   }
 
   private void processTaskAttemptFinishedEvent(TaskAttemptFinishedEvent event) {
-    LoggedTaskAttempt attempt =
+    ParsedTaskAttempt attempt =
         getOrMakeTaskAttempt(event.getTaskType(), event.getTaskId().toString(),
             event.getAttemptId().toString());
     if (attempt == null) {
       return;
     }
     attempt.setResult(getPre21Value(event.getTaskStatus()));
-    attempt.setLocation(getAndRecordParsedHost(event.getHostname())
-        .makeLoggedLocation());
+    ParsedHost pHost = getAndRecordParsedHost(event.getRackName(), event.getHostname());
+    if (pHost != null) {
+      attempt.setLocation(pHost.makeLoggedLocation());
+    }
     attempt.setFinishTime(event.getFinishTime());
     attempt
         .incorporateCounters(((TaskAttemptFinished) event.getDatum()).counters);
@@ -515,7 +524,7 @@ public class JobBuilder {
 
   private void processReduceAttemptFinishedEvent(
       ReduceAttemptFinishedEvent event) {
-    LoggedTaskAttempt attempt =
+    ParsedTaskAttempt attempt =
         getOrMakeTaskAttempt(event.getTaskType(), event.getTaskId().toString(),
             event.getAttemptId().toString());
     if (attempt == null) {
@@ -523,6 +532,11 @@ public class JobBuilder {
     }
     attempt.setResult(getPre21Value(event.getTaskStatus()));
     attempt.setHostName(event.getHostname(), event.getRackName());
+    ParsedHost pHost = 
+      getAndRecordParsedHost(event.getRackName(), event.getHostname());
+    if (pHost != null) {
+      attempt.setLocation(pHost.makeLoggedLocation());
+    }
 
     // XXX There may be redundant location info available in the event.
     // We might consider extracting it from this event. Currently this
@@ -539,15 +553,21 @@ public class JobBuilder {
   }
 
   private void processMapAttemptFinishedEvent(MapAttemptFinishedEvent event) {
-    LoggedTaskAttempt attempt =
+    ParsedTaskAttempt attempt =
         getOrMakeTaskAttempt(event.getTaskType(), event.getTaskId().toString(),
             event.getAttemptId().toString());
     if (attempt == null) {
       return;
     }
     attempt.setResult(getPre21Value(event.getTaskStatus()));
-    attempt.setHostName(event.getHostname(), event.getRackname());
+    attempt.setHostName(event.getHostname(), event.getRackName());
 
+    ParsedHost pHost = 
+      getAndRecordParsedHost(event.getRackName(), event.getHostname());
+    if (pHost != null) {
+      attempt.setLocation(pHost.makeLoggedLocation());
+    }
+    
     // XXX There may be redundant location info available in the event.
     // We might consider extracting it from this event. Currently this
     // is redundant, but making this will add future-proofing.
@@ -565,6 +585,7 @@ public class JobBuilder {
     result.setOutcome(Pre21JobHistoryConstants.Values
         .valueOf(event.getStatus()));
     result.setFinishTime(event.getFinishTime());
+    // No counters in JobUnsuccessfulCompletionEvent
   }
 
   private void processJobSubmittedEvent(JobSubmittedEvent event) {
@@ -572,8 +593,14 @@ public class JobBuilder {
     result.setJobName(event.getJobName());
     result.setUser(event.getUserName());
     result.setSubmitTime(event.getSubmitTime());
-    // job queue name is set when conf file is processed.
-    // See JobBuilder.process(Properties) method for details.
+    result.putJobConfPath(event.getJobConfPath());
+    result.putJobAcls(event.getJobAcls());
+
+    // set the queue name if existing
+    String queue = event.getJobQueueName();
+    if (queue != null) {
+      result.setQueue(queue);
+    }
   }
 
   private void processJobStatusChangedEvent(JobStatusChangedEvent event) {
@@ -600,10 +627,19 @@ public class JobBuilder {
     result.setFinishTime(event.getFinishTime());
     result.setJobID(jobID);
     result.setOutcome(Values.SUCCESS);
+
+    JobFinished job = (JobFinished)event.getDatum();
+    Map<String, Long> countersMap =
+        JobHistoryUtils.extractCounters(job.totalCounters);
+    result.putTotalCounters(countersMap);
+    countersMap = JobHistoryUtils.extractCounters(job.mapCounters);
+    result.putMapCounters(countersMap);
+    countersMap = JobHistoryUtils.extractCounters(job.reduceCounters);
+    result.putReduceCounters(countersMap);
   }
 
-  private LoggedTask getTask(String taskIDname) {
-    LoggedTask result = mapTasks.get(taskIDname);
+  private ParsedTask getTask(String taskIDname) {
+    ParsedTask result = mapTasks.get(taskIDname);
 
     if (result != null) {
       return result;
@@ -627,9 +663,9 @@ public class JobBuilder {
    *          if true, we can create a task.
    * @return
    */
-  private LoggedTask getOrMakeTask(TaskType type, String taskIDname,
+  private ParsedTask getOrMakeTask(TaskType type, String taskIDname,
       boolean allowCreate) {
-    Map<String, LoggedTask> taskMap = otherTasks;
+    Map<String, ParsedTask> taskMap = otherTasks;
     List<LoggedTask> tasks = this.result.getOtherTasks();
 
     switch (type) {
@@ -647,10 +683,10 @@ public class JobBuilder {
       // no code
     }
 
-    LoggedTask result = taskMap.get(taskIDname);
+    ParsedTask result = taskMap.get(taskIDname);
 
     if (result == null && allowCreate) {
-      result = new LoggedTask();
+      result = new ParsedTask();
       result.setTaskType(getPre21Value(type.toString()));
       result.setTaskID(taskIDname);
       taskMap.put(taskIDname, result);
@@ -660,13 +696,13 @@ public class JobBuilder {
     return result;
   }
 
-  private LoggedTaskAttempt getOrMakeTaskAttempt(TaskType type,
+  private ParsedTaskAttempt getOrMakeTaskAttempt(TaskType type,
       String taskIDName, String taskAttemptName) {
-    LoggedTask task = getOrMakeTask(type, taskIDName, false);
-    LoggedTaskAttempt result = attempts.get(taskAttemptName);
+    ParsedTask task = getOrMakeTask(type, taskIDName, false);
+    ParsedTaskAttempt result = attempts.get(taskAttemptName);
 
     if (result == null && task != null) {
-      result = new LoggedTaskAttempt();
+      result = new ParsedTaskAttempt();
       result.setAttemptID(taskAttemptName);
       attempts.put(taskAttemptName, result);
       task.getAttempts().add(result);
@@ -676,7 +712,19 @@ public class JobBuilder {
   }
 
   private ParsedHost getAndRecordParsedHost(String hostName) {
-    ParsedHost result = ParsedHost.parse(hostName);
+    return getAndRecordParsedHost(null, hostName);
+  }
+  
+  private ParsedHost getAndRecordParsedHost(String rackName, String hostName) {
+    ParsedHost result = null;
+    if (rackName == null) {
+      // for old (pre-23) job history files where hostname was represented as
+      // /rackname/hostname
+      result = ParsedHost.parse(hostName);
+    } else {
+      // for new (post-23) job history files
+      result = new ParsedHost(rackName, hostName);
+    }
 
     if (result != null) {
       ParsedHost canonicalResult = allHosts.get(result);

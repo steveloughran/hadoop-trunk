@@ -1,6 +1,9 @@
 Hadoop HDFS Change Log
 
 Trunk (unreleased changes)
+  INCOMPATIBLE CHANGES
+    HDFS-2676. Remove Avro RPC. (suresh)
+
   NEW FEATURES
     HDFS-395.  DFS Scalability: Incremental block reports. (Tomasz Nykiel
     via hairong)
@@ -24,13 +27,23 @@ Trunk (unreleased changes)
     HDFS-2430. The number of failed or low-resource volumes the NN can tolerate
                should be configurable. (atm)
 
-    HDFS-2178. Contributing Hoop to HDFS, replacement for HDFS proxy with 
-    read/write capabilities. (tucu)
-
     HDFS-2642. Protobuf translators for DatanodeProtocol. (jitendra)
 
     HDFS-2647. Used protobuf based RPC for InterDatanodeProtocol, 
     ClientDatanodeProtocol, JournalProtocol, NamenodeProtocol. (suresh)
+
+    HDFS-2666. Fix TestBackupNode failure. (suresh)
+
+    HDFS-234. Integration with BookKeeper logging system. (Ivan Kelly 
+    via jitendra)
+
+    HDFS-2663. Optional protobuf parameters are not handled correctly.
+    (suresh)
+
+    HDFS-2661. Enable protobuf RPC for DatanodeProtocol. (jitendra)
+
+    HDFS-2697. Move RefreshAuthPolicy, RefreshUserMappings, GetUserMappings 
+    protocol to protocol buffers. (jitendra)
 
   IMPROVEMENTS
 
@@ -48,10 +61,6 @@ Trunk (unreleased changes)
 
     HDFS-2337. DFSClient shouldn't keep multiple RPC proxy references (atm)
 
-    HDFS-362.  FSEditLog should not writes long and short as UTF8, and should
-    not use ArrayWritable for writing non-array items.  (Uma Maheswara Rao G
-    via szetszwo)
-
     HDFS-2351 Change Namenode and Datanode to register each of their protocols
     seperately. (Sanjay Radia)
 
@@ -62,11 +71,6 @@ Trunk (unreleased changes)
     HDFS-2480. Separate datatypes for NamenodeProtocol. (suresh)
 
     HDFS-2181 Separate HDFS Client wire protocol data types (sanjay)
-
-    HDFS-2294. Download of commons-daemon TAR should not be under target (tucu)
-
-    HDFS-2322. the build fails in Windows because commons-daemon TAR cannot be 
-    fetched. (tucu)
 
     HDFS-2489. Move Finalize and Register to separate file out of
     DatanodeCommand.java. (suresh)
@@ -82,34 +86,33 @@ Trunk (unreleased changes)
     HDFS-2564. Cleanup unnecessary exceptions thrown and unnecessary casts.
     (Hari Mankude via eli)
 
-    HDFS-2572. Remove unnecessary double-check in DN#getHostName. (harsh)
-
     HDFS-2410. Further cleanup of hardcoded configuration keys and values.
     (suresh)
 
     HADOOP-7862   Hdfs changes to work with HADOOP 7862: 
-                  Move the support for multiple protocols to lower layer so that Writable,
-                  PB and Avro can all use it (Sanjay)
+    Move the support for multiple protocols to lower layer so that Writable,
+    PB and Avro can all use it (Sanjay)
 
     HDFS-1580. Add interface for generic Write Ahead Logging mechanisms.
     (Ivan Kelly via jitendra)
 
     HDFS-2597 ClientNameNodeProtocol in Protocol Buffers (sanjay)
 
-    HDFS-2511. Add dev script to generate HDFS protobufs. (tucu)
-
     HDFS-2651 ClientNameNodeProtocol Translators for Protocol Buffers (sanjay)
+
+    HDFS-2650. Replace @inheritDoc with @Override. (Hari Mankude via suresh).
+
+    HDFS-2669 Enable protobuf rpc for ClientNamenodeProtocol
 
   OPTIMIZATIONS
     HDFS-2477. Optimize computing the diff between a block report and the
-               namenode state. (Tomasz Nykiel via hairong)
+    namenode state. (Tomasz Nykiel via hairong)
 
     HDFS-2495. Increase granularity of write operations in ReplicationMonitor
     thus reducing contention for write lock. (Tomasz Nykiel via hairong)
 
     HDFS-2476. More CPU efficient data structure for under-replicated,
-               over-replicated, and invalidated blocks.
-               (Tomasz Nykiel via todd)
+    over-replicated, and invalidated blocks. (Tomasz Nykiel via todd)
 
   BUG FIXES
     HDFS-2299. TestOfflineEditsViewer is failing on trunk. (Uma Maheswara Rao G
@@ -131,9 +134,6 @@ Trunk (unreleased changes)
     HDFS-2373. Commands using WebHDFS and hftp print unnecessary debug 
     info on the console with security enabled. (Arpit Gupta via suresh)
 
-    HDFS-2349. Corruption detected during block transfers between DNs
-               should log a WARN instead of INFO. (harsh)
-
     HDFS-2188. Make FSEditLog create its journals from a list of URIs rather 
     than NNStorage. (Ivan Kelly via jitendra)
 
@@ -142,14 +142,32 @@ Trunk (unreleased changes)
 
     HDFS-2497 Fix TestBackupNode failure. (suresh)
 
+    HDFS-2499. RPC client is created incorrectly introduced in HDFS-2459.
+    (suresh)
+
     HDFS-2526. (Client)NamenodeProtocolTranslatorR23 do not need to keep a
-               reference to rpcProxyWithoutRetry (atm)
+    reference to rpcProxyWithoutRetry (atm)
 
     HDFS-2532. TestDfsOverAvroRpc timing out in trunk (Uma Maheswara Rao G
-               via todd)
+    via todd)
 
-    HDFS-2606. webhdfs client filesystem impl must set the content-type 
-    header for create/append. (tucu)
+    HDFS-1765. Block Replication should respect under-replication
+    block priority. (Uma Maheswara Rao G via eli)
+
+    HDFS-2694. Removal of Avro broke non-PB NN services. (atm)
+
+    HDFS-2687. Tests failing with ClassCastException post protobuf RPC
+    changes. (suresh)
+
+    HDFS-2700. Fix failing TestDataNodeMultipleRegistrations in trunk
+    (Uma Maheswara Rao G via todd)
+
+    HDFS-2765. TestNameEditsConfigs is incorrectly swallowing IOE. (atm)
+
+    HDFS-2739. SecondaryNameNode doesn't start up. (jitendra)
+
+    HDFS-2776. Missing interface annotation on JournalSet. 
+    (Brandon Li via jitendra)
 
 Release 0.23.1 - UNRELEASED
 
@@ -162,6 +180,12 @@ Release 0.23.1 - UNRELEASED
 
     HDFS-2594. Support getDelegationTokens and createSymlink in WebHDFS.
     (szetszwo)
+
+    HDFS-2545. Change WebHDFS to support multiple namenodes in federation.
+    (szetszwo)
+
+    HDFS-2178. Contributing Hoop to HDFS, replacement for HDFS proxy with 
+    read/write capabilities. (tucu)
 
   IMPROVEMENTS
     HDFS-2560. Refactor BPOfferService to be a static inner class (todd)
@@ -199,6 +223,49 @@ Release 0.23.1 - UNRELEASED
     HDFS-2604. Add a log message to show if WebHDFS is enabled and a
     configuration section in the forrest doc.  (szetszwo)
 
+    HDFS-2654. Make BlockReaderLocal not extend RemoteBlockReader2. (eli)
+
+    HDFS-2675. Reduce warning verbosity when double-closing edit logs
+    (todd)
+
+    HDFS-2335. DataNodeCluster and NNStorage always pull fresh entropy.
+    (Uma Maheswara Rao G via eli)
+
+    HDFS-2574. Remove references to some deprecated properties in conf 
+    templates and defaults files. (Joe Crobak via harsh)
+
+    HDFS-2722. HttpFs should not be using an int for block size. (harsh)
+
+    HDFS-2710. Add HDFS tests related to HADOOP-7933. (sid via suresh)
+
+    HDFS-2294. Download of commons-daemon TAR should not be under target (tucu)
+
+    HDFS-2322. the build fails in Windows because commons-daemon TAR cannot be 
+    fetched. (tucu)
+
+    HDFS-2511. Add dev script to generate HDFS protobufs. (tucu)
+
+    HDFS-2349. Corruption detected during block transfers between DNs
+    should log a WARN instead of INFO. (harsh)
+
+    HDFS-2572. Remove unnecessary double-check in DN#getHostName. (harsh)
+
+    HDFS-2729. Update BlockManager's comments regarding the invalid block set (harsh)
+
+    HDFS-2726. Fix a logging issue under DFSClient's createBlockOutputStream method (harsh)
+
+    HDFS-554. Use System.arraycopy in BlockInfo.ensureCapacity. (harsh)
+
+    HDFS-1314. Make dfs.blocksize accept size-indicating prefixes (Sho Shimauchi via harsh)
+
+    HDFS-69. Improve the 'dfsadmin' commandline help. (harsh)
+
+    HDFS-2788. HdfsServerConstants#DN_KEEPALIVE_TIMEOUT is dead code (eli)
+
+    HDFS-362.  FSEditLog should not writes long and short as UTF8, and should
+    not use ArrayWritable for writing non-array items.  (Uma Maheswara Rao G
+    via szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-2130. Switch default checksum to CRC32C. (todd)
@@ -231,7 +298,40 @@ Release 0.23.1 - UNRELEASED
     HDFS-2590. Fix the missing links in the WebHDFS forrest doc.  (szetszwo)
 
     HDFS-2596. TestDirectoryScanner doesn't test parallel scans. (eli)
-    
+
+    HDFS-2653. DFSClient should cache whether addrs are non-local when
+    short-circuiting is enabled. (eli)
+
+    HDFS-2649. eclipse:eclipse build fails for hadoop-hdfs-httpfs.
+    (Jason Lowe via eli)
+
+    HDFS-2640. Javadoc generation hangs. (tomwhite)
+
+    HDFS-2553. Fix BlockPoolSliceScanner spinning in a tight loop (Uma
+    Maheswara Rao G via todd)
+
+    HDFS-2706. Use configuration for blockInvalidateLimit if it is set.
+    (szetszwo)
+
+    HDFS-2606. webhdfs client filesystem impl must set the content-type 
+    header for create/append. (tucu)
+
+    HDFS-2658. HttpFS introduced 70 javadoc warnings. (tucu)
+
+    HDFS-2646. Hadoop HttpFS introduced 4 findbug warnings. (tucu)
+
+    HDFS-2657. TestHttpFSServer and TestServerWebApp are failing on trunk. 
+    (tucu)
+
+    HttpFS server should check that upload requests have correct 
+    content-type. (tucu)
+
+    HDFS-2707. HttpFS should read the hadoop-auth secret from a file 
+    instead inline from the configuration. (tucu)
+
+    HDFS-2790. FSNamesystem.setTimes throws exception with wrong
+    configuration name in the message. (Arpit Gupta via eli)
+
 Release 0.23.0 - 2011-11-01 
 
   INCOMPATIBLE CHANGES

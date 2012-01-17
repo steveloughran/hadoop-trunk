@@ -21,6 +21,7 @@ package org.apache.hadoop.mapreduce.v2.app.rm;
 import java.io.IOException;
 import java.security.PrivilegedAction;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -65,8 +66,9 @@ public abstract class RMCommunicator extends AbstractService  {
   private int rmPollInterval;//millis
   protected ApplicationId applicationId;
   protected ApplicationAttemptId applicationAttemptId;
-  private volatile boolean stopped;
+  private AtomicBoolean stopped;
   protected Thread allocatorThread;
+  @SuppressWarnings("rawtypes")
   protected EventHandler eventHandler;
   protected AMRMProtocol scheduler;
   private final ClientService clientService;
@@ -88,6 +90,7 @@ public abstract class RMCommunicator extends AbstractService  {
     this.eventHandler = context.getEventHandler();
     this.applicationId = context.getApplicationID();
     this.applicationAttemptId = context.getApplicationAttemptId();
+    this.stopped = new AtomicBoolean(false);
   }
 
   @Override
@@ -101,10 +104,9 @@ public abstract class RMCommunicator extends AbstractService  {
   @Override
   public void start() {
     scheduler= createSchedulerProxy();
-    //LOG.info("Scheduler is " + scheduler);
     register();
     startAllocatorThread();
-    JobID id = TypeConverter.fromYarn(context.getApplicationID());
+    JobID id = TypeConverter.fromYarn(this.applicationId);
     JobId jobId = TypeConverter.toYarn(id);
     job = context.getJob(jobId);
     super.start();
@@ -125,25 +127,7 @@ public abstract class RMCommunicator extends AbstractService  {
   protected float getApplicationProgress() {
     // For now just a single job. In future when we have a DAG, we need an
     // aggregate progress.
-    JobReport report = this.job.getReport();
-    float setupWeight = 0.05f;
-    float cleanupWeight = 0.05f;
-    float mapWeight = 0.0f;
-    float reduceWeight = 0.0f;
-    int numMaps = this.job.getTotalMaps();
-    int numReduces = this.job.getTotalReduces();
-    if (numMaps == 0 && numReduces == 0) {
-    } else if (numMaps == 0) {
-      reduceWeight = 0.9f;
-    } else if (numReduces == 0) {
-      mapWeight = 0.9f;
-    } else {
-      mapWeight = reduceWeight = 0.45f;
-    }
-    return (report.getSetupProgress() * setupWeight
-        + report.getCleanupProgress() * cleanupWeight
-        + report.getMapProgress() * mapWeight + report.getReduceProgress()
-        * reduceWeight);
+    return this.job.getProgress();
   }
 
   protected void register() {
@@ -213,7 +197,10 @@ public abstract class RMCommunicator extends AbstractService  {
 
   @Override
   public void stop() {
-    stopped = true;
+    if (stopped.getAndSet(true)) {
+      // return if already stopped
+      return;
+    }
     allocatorThread.interrupt();
     try {
       allocatorThread.join();
@@ -228,7 +215,7 @@ public abstract class RMCommunicator extends AbstractService  {
     allocatorThread = new Thread(new Runnable() {
       @Override
       public void run() {
-        while (!stopped && !Thread.currentThread().isInterrupted()) {
+        while (!stopped.get() && !Thread.currentThread().isInterrupted()) {
           try {
             Thread.sleep(rmPollInterval);
             try {
