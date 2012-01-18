@@ -73,6 +73,8 @@ Trunk (unreleased changes)
     findBugs, correct links to findBugs artifacts and no links to the
     artifacts when there are no warnings. (Tom White via vinodkv).
 
+    MAPREDUCE-3664. Federation Documentation has incorrect configuration example.
+    (Brandon Li via jitendra)
 
 Release 0.23.1 - Unreleased
 
@@ -180,6 +182,10 @@ Release 0.23.1 - Unreleased
 
     MAPREDUCE-3553. Add support for data returned when exceptions thrown from web 
     service apis to be in either xml or in JSON. (Thomas Graves via mahadev)
+
+    MAPREDUCE-3641. Making CapacityScheduler more conservative so as to 
+    assign only one off-switch container in a single scheduling
+    iteration. (Arun C Murthy via vinodkv)
 
   OPTIMIZATIONS
 
@@ -478,6 +484,33 @@ Release 0.23.1 - Unreleased
 
     MAPREDUCE-3625. CapacityScheduler web-ui display of queue's used capacity is broken.
     (Jason Lowe via mahadev)
+
+    MAPREDUCE-3596. Fix scheduler to handle cleaned up containers, which NMs
+    may subsequently report as running. (Vinod Kumar Vavilapalli via sseth)
+
+    MAPREDUCE-3656. Fixed a race condition in MR AM which is failing the sort
+    benchmark consistently. (Siddarth Seth via vinodkv)
+
+    MAPREDUCE-3532. Modified NM to report correct http address when an ephemeral
+    web port is configured. (Bhallamudi Venkata Siva Kamesh via vinodkv)
+
+    MAPREDUCE-3404. Corrected MR AM to honor speculative configuration and enable
+    speculating either maps or reduces. (Eric Payne via vinodkv)
+
+    MAPREDUCE-3649. Job End notification gives an error on calling back.
+    (Ravi Prakash via mahadev)
+
+    MAPREDUCE-3657. State machine visualize build fails. (Jason Lowe 
+    via mahadev)
+
+    MAPREDUCE-2450. Fixed a corner case with interrupted communication threads
+    leading to a long timeout in Task. (Rajesh Balamohan via acmurthy)
+
+    MAPREDUCE-3669. Allow clients to talk to MR HistoryServer using both
+    delegation tokens and kerberos. (mahadev via acmurthy)
+
+    MAPREDUCE-3684. LocalDistributedCacheManager does not shut down its thread
+    pool (tomwhite)
 
 Release 0.23.0 - 2011-11-01 
 
