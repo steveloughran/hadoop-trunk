@@ -187,6 +187,8 @@ Release 0.23.1 - Unreleased
     assign only one off-switch container in a single scheduling
     iteration. (Arun C Murthy via vinodkv)
 
+    MAPREDUCE-3692. yarn-resourcemanager out and log files can get big. (eli)
+
   OPTIMIZATIONS
 
     MAPREDUCE-3567. Extraneous JobConf objects in AM heap. (Vinod Kumar
@@ -511,6 +513,9 @@ Release 0.23.1 - Unreleased
 
     MAPREDUCE-3684. LocalDistributedCacheManager does not shut down its thread
     pool (tomwhite)
+
+    MAPREDUCE-3582. Move successfully passing MR1 tests to MR2 maven tree.
+    (ahmed via tucu)
 
 Release 0.23.0 - 2011-11-01 
 
