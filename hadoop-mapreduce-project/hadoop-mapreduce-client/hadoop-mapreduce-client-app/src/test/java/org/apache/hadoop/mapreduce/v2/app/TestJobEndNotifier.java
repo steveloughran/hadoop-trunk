@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.mapreduce.v2.app;
 
+import java.net.Proxy;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.v2.api.records.JobReport;
@@ -71,6 +73,34 @@ public class TestJobEndNotifier extends JobEndNotifier {
       waitInterval == 5);
   }
 
+  private void testProxyConfiguration(Configuration conf) {
+    conf.set(MRJobConfig.MR_JOB_END_NOTIFICATION_PROXY, "somehost");
+    setConf(conf);
+    Assert.assertTrue("Proxy shouldn't be set because port wasn't specified",
+      proxyToUse.type() == Proxy.Type.DIRECT);
+    conf.set(MRJobConfig.MR_JOB_END_NOTIFICATION_PROXY, "somehost:someport");
+    setConf(conf);
+    Assert.assertTrue("Proxy shouldn't be set because port wasn't numeric",
+      proxyToUse.type() == Proxy.Type.DIRECT);
+    conf.set(MRJobConfig.MR_JOB_END_NOTIFICATION_PROXY, "somehost:1000");
+    setConf(conf);
+    Assert.assertTrue("Proxy should have been set but wasn't ",
+      proxyToUse.toString().equals("HTTP @ somehost:1000"));
+    conf.set(MRJobConfig.MR_JOB_END_NOTIFICATION_PROXY, "socks@somehost:1000");
+    setConf(conf);
+    Assert.assertTrue("Proxy should have been socks but wasn't ",
+      proxyToUse.toString().equals("SOCKS @ somehost:1000"));
+    conf.set(MRJobConfig.MR_JOB_END_NOTIFICATION_PROXY, "SOCKS@somehost:1000");
+    setConf(conf);
+    Assert.assertTrue("Proxy should have been socks but wasn't ",
+      proxyToUse.toString().equals("SOCKS @ somehost:1000"));
+    conf.set(MRJobConfig.MR_JOB_END_NOTIFICATION_PROXY, "sfafn@somehost:1000");
+    setConf(conf);
+    Assert.assertTrue("Proxy should have been http but wasn't ",
+      proxyToUse.toString().equals("HTTP @ somehost:1000"));
+    
+  }
+
   /**
    * Test that setting parameters has the desired effect
    */
@@ -79,6 +109,7 @@ public class TestJobEndNotifier extends JobEndNotifier {
     Configuration conf = new Configuration();
     testNumRetries(conf);
     testWaitInterval(conf);
+    testProxyConfiguration(conf);
   }
 
   protected int notificationCount = 0;
@@ -96,13 +127,20 @@ public class TestJobEndNotifier extends JobEndNotifier {
     conf.set(MRJobConfig.MR_JOB_END_NOTIFICATION_URL, "http://nonexistent");
     conf.set(MRJobConfig.MR_JOB_END_NOTIFICATION_MAX_ATTEMPTS, "3");
     conf.set(MRJobConfig.MR_JOB_END_RETRY_ATTEMPTS, "3");
+    conf.set(MRJobConfig.MR_JOB_END_RETRY_INTERVAL, "3000");
+    conf.set(MRJobConfig.MR_JOB_END_NOTIFICATION_MAX_RETRY_INTERVAL, "3000");
     JobReport jobReport = Mockito.mock(JobReport.class);
 
+    long startTime = System.currentTimeMillis();
     this.notificationCount = 0;
     this.setConf(conf);
     this.notify(jobReport);
+    long endTime = System.currentTimeMillis();
     Assert.assertEquals("Only 3 retries were expected but was : "
       + this.notificationCount, this.notificationCount, 3);
+    Assert.assertTrue("Should have taken more than 9 seconds it took "
+      + (endTime - startTime), endTime - startTime > 9000);
+
   }
 
 }

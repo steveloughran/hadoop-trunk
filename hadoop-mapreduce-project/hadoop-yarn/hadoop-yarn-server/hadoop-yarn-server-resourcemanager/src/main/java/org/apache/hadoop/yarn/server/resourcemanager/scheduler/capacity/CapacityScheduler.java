@@ -57,6 +57,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event.RMAppAt
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanContainerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
@@ -76,6 +77,7 @@ import org.apache.hadoop.yarn.server.security.ContainerTokenSecretManager;
 
 @LimitedPrivate("yarn")
 @Evolving
+@SuppressWarnings("unchecked")
 public class CapacityScheduler 
 implements ResourceScheduler, CapacitySchedulerContext {
 
@@ -159,6 +161,7 @@ implements ResourceScheduler, CapacitySchedulerContext {
     return maximumAllocation;
   }
 
+  @Override
   public synchronized int getNumClusterNodes() {
     return numNodeManagers;
   }
@@ -200,11 +203,8 @@ implements ResourceScheduler, CapacitySchedulerContext {
   }
 
   @Private
-  public static final String ROOT = "root";
-
-  @Private
   public static final String ROOT_QUEUE = 
-    CapacitySchedulerConfiguration.PREFIX + ROOT;
+    CapacitySchedulerConfiguration.PREFIX + CapacitySchedulerConfiguration.ROOT;
 
   static class QueueHook {
     public CSQueue hook(CSQueue queue) {
@@ -217,7 +217,7 @@ implements ResourceScheduler, CapacitySchedulerContext {
   private void initializeQueues(CapacitySchedulerConfiguration conf)
     throws IOException {
     root = 
-        parseQueue(this, conf, null, ROOT, queues, queues, 
+        parseQueue(this, conf, null, CapacitySchedulerConfiguration.ROOT, queues, queues, 
             queueComparator, applicationComparator, noop);
     LOG.info("Initialized root queue " + root);
   }
@@ -228,7 +228,7 @@ implements ResourceScheduler, CapacitySchedulerContext {
     // Parse new queues
     Map<String, CSQueue> newQueues = new HashMap<String, CSQueue>();
     CSQueue newRoot = 
-        parseQueue(this, conf, null, ROOT, newQueues, queues, 
+        parseQueue(this, conf, null, CapacitySchedulerConfiguration.ROOT, newQueues, queues, 
             queueComparator, applicationComparator, noop);
     
     // Ensure all existing queues are still present
@@ -590,10 +590,12 @@ implements ResourceScheduler, CapacitySchedulerContext {
       LOG.info("Unknown application: " + applicationAttemptId + 
           " launched container " + containerId +
           " on node: " + node);
+      this.rmContext.getDispatcher().getEventHandler()
+        .handle(new RMNodeCleanContainerEvent(node.getNodeID(), containerId));
       return;
     }
     
-    application.containerLaunchedOnNode(containerId);
+    application.containerLaunchedOnNode(containerId, node.getNodeID());
   }
 
   @Override

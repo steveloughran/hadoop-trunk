@@ -30,6 +30,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -69,10 +70,22 @@ public class DFSUtil {
       return new Random();
     }
   };
+  
+  private static final ThreadLocal<SecureRandom> SECURE_RANDOM = new ThreadLocal<SecureRandom>() {
+    @Override
+    protected SecureRandom initialValue() {
+      return new SecureRandom();
+    }
+  };
 
-  /** @return a pseudorandom number generator. */
+  /** @return a pseudo random number generator. */
   public static Random getRandom() {
     return RANDOM.get();
+  }
+  
+  /** @return a pseudo secure random number generator. */
+  public static SecureRandom getSecureRandom() {
+    return SECURE_RANDOM.get();
   }
 
   /**
@@ -627,12 +640,12 @@ public class DFSUtil {
       Configuration conf, UserGroupInformation ugi) throws IOException {
     /** 
      * Currently we have simply burnt-in support for a SINGLE
-     * protocol - protocolR23Compatible. This will be replaced
+     * protocol - protocolPB. This will be replaced
      * by a way to pick the right protocol based on the 
      * version of the target server.  
      */
-    return new org.apache.hadoop.hdfs.protocolR23Compatible.
-        ClientNamenodeProtocolTranslatorR23(nameNodeAddr, conf, ugi);
+    return new org.apache.hadoop.hdfs.protocolPB.
+        ClientNamenodeProtocolTranslatorPB(nameNodeAddr, conf, ugi);
   }
 
   /** Create a {@link ClientDatanodeProtocol} proxy */

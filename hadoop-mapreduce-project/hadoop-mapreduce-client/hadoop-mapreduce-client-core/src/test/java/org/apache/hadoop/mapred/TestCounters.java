@@ -21,7 +21,10 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
 import java.text.ParseException;
+import java.util.Random;
 
+import org.apache.hadoop.mapred.Counters.Counter;
+import org.apache.hadoop.mapreduce.FileSystemCounter;
 import org.apache.hadoop.mapreduce.JobCounter;
 import org.apache.hadoop.mapreduce.TaskCounter;
 import org.junit.Test;
@@ -96,12 +99,44 @@ public class TestCounters {
     }
   }
   
+  /**
+   * Verify counter value works
+   */
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testCounterValue() {
+    Counters counters = new Counters();
+    final int NUMBER_TESTS = 100;
+    final int NUMBER_INC = 10;
+    final Random rand = new Random();
+    for (int i = 0; i < NUMBER_TESTS; i++) {
+      long initValue = rand.nextInt();
+      long expectedValue = initValue;
+      Counter counter = counters.findCounter("foo", "bar");
+      counter.setValue(initValue);
+      assertEquals("Counter value is not initialized correctly",
+                   expectedValue, counter.getValue());
+      for (int j = 0; j < NUMBER_INC; j++) {
+        int incValue = rand.nextInt();
+        counter.increment(incValue);
+        expectedValue += incValue;
+        assertEquals("Counter value is not incremented correctly",
+                     expectedValue, counter.getValue());
+      }
+      expectedValue = rand.nextInt();
+      counter.setValue(expectedValue);
+      assertEquals("Counter value is not set correctly",
+                   expectedValue, counter.getValue());
+    }
+  }
+  
   @SuppressWarnings("deprecation")
   @Test
   public void testLegacyNames() {
     Counters counters = new Counters();
     counters.incrCounter(TaskCounter.MAP_INPUT_RECORDS, 1);
     counters.incrCounter(JobCounter.DATA_LOCAL_MAPS, 1);
+    counters.findCounter("file", FileSystemCounter.BYTES_READ).increment(1);
     
     assertEquals("New name", 1, counters.findCounter(
         TaskCounter.class.getName(), "MAP_INPUT_RECORDS").getValue());
@@ -114,6 +149,14 @@ public class TestCounters {
     assertEquals("Legacy name", 1, counters.findCounter(
         "org.apache.hadoop.mapred.JobInProgress$Counter",
         "DATA_LOCAL_MAPS").getValue());
+
+    assertEquals("New name", 1, counters.findCounter(
+        FileSystemCounter.class.getName(), "FILE_BYTES_READ").getValue());
+    assertEquals("New name and method", 1, counters.findCounter("file",
+        FileSystemCounter.BYTES_READ).getValue());
+    assertEquals("Legacy name", 1, counters.findCounter(
+        "FileSystemCounter",
+        "FILE_BYTES_READ").getValue());
   }
   
   public static void main(String[] args) throws IOException {

@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,7 +34,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
@@ -492,11 +490,8 @@ public class LeafQueue implements CSQueue {
     QueueUserACLInfo userAclInfo = 
       recordFactory.newRecordInstance(QueueUserACLInfo.class);
     List<QueueACL> operations = new ArrayList<QueueACL>();
-    for (Map.Entry<QueueACL, AccessControlList> e : acls.entrySet()) {
-      QueueACL operation = e.getKey();
-      AccessControlList acl = e.getValue();
-
-      if (acl.isUserAllowed(user)) {
+    for (QueueACL operation : QueueACL.values()) {
+      if (hasAccess(operation, user)) {
         operations.add(operation);
       }
     }
@@ -706,8 +701,11 @@ public class LeafQueue implements CSQueue {
     return applicationsMap.get(applicationAttemptId);
   }
 
+  private static final CSAssignment NULL_ASSIGNMENT =
+      new CSAssignment(Resources.createResource(0), NodeType.NODE_LOCAL);
+  
   @Override
-  public synchronized Resource 
+  public synchronized CSAssignment 
   assignContainers(Resource clusterResource, SchedulerNode node) {
 
     if(LOG.isDebugEnabled()) {
@@ -720,8 +718,11 @@ public class LeafQueue implements CSQueue {
     if (reservedContainer != null) {
       SchedulerApp application = 
           getApplication(reservedContainer.getApplicationAttemptId());
-      return assignReservedContainer(application, node, reservedContainer, 
-          clusterResource);
+      return new CSAssignment(
+          assignReservedContainer(application, node, reservedContainer, 
+              clusterResource),
+          NodeType.NODE_LOCAL); // Don't care about locality constraints 
+                                // for reserved containers
     }
     
     // Try to assign containers to applications in order
@@ -749,7 +750,7 @@ public class LeafQueue implements CSQueue {
           // Are we going over limits by allocating to this application?
           // Maximum Capacity of the queue
           if (!assignToQueue(clusterResource, required)) {
-            return Resources.none();
+            return NULL_ASSIGNMENT;
           }
 
           // User limits
@@ -763,24 +764,23 @@ public class LeafQueue implements CSQueue {
           application.addSchedulingOpportunity(priority);
           
           // Try to schedule
-          Resource assigned = 
+          CSAssignment assignment =  
             assignContainersOnNode(clusterResource, node, application, priority, 
                 null);
-  
+          
+          Resource assigned = assignment.getResource();
+            
           // Did we schedule or reserve a container?
           if (Resources.greaterThan(assigned, Resources.none())) {
-            Resource assignedResource = 
-              application.getResourceRequest(priority, RMNode.ANY).getCapability();
 
             // Book-keeping
-            allocateResource(clusterResource, 
-                application, assignedResource);
+            allocateResource(clusterResource, application, assigned);
             
             // Reset scheduling opportunities
             application.resetSchedulingOpportunities(priority);
             
             // Done
-            return assignedResource; 
+            return assignment;
           } else {
             // Do not assign out of order w.r.t priorities
             break;
@@ -795,7 +795,7 @@ public class LeafQueue implements CSQueue {
       application.showRequests();
     }
   
-    return Resources.none();
+    return NULL_ASSIGNMENT;
 
   }
 
@@ -812,11 +812,12 @@ public class LeafQueue implements CSQueue {
               container.getId(), 
               SchedulerUtils.UNRESERVED_CONTAINER), 
           RMContainerEventType.RELEASED);
-      return container.getResource();
+      return container.getResource(); // Ugh, return resource to force re-sort
     }
 
     // Try to assign if we have sufficient resources
-    assignContainersOnNode(clusterResource, node, application, priority, rmContainer);
+    assignContainersOnNode(clusterResource, node, application, priority, 
+        rmContainer);
     
     // Doesn't matter... since it's already charged for at time of reservation
     // "re-reservation" is *free*
@@ -969,7 +970,7 @@ public class LeafQueue implements CSQueue {
     return (((starvation + requiredContainers) - reservedContainers) > 0);
   }
 
-  private Resource assignContainersOnNode(Resource clusterResource, 
+  private CSAssignment assignContainersOnNode(Resource clusterResource, 
       SchedulerNode node, SchedulerApp application, 
       Priority priority, RMContainer reservedContainer) {
 
@@ -980,7 +981,7 @@ public class LeafQueue implements CSQueue {
         assignNodeLocalContainers(clusterResource, node, application, priority,
             reservedContainer); 
     if (Resources.greaterThan(assigned, Resources.none())) {
-      return assigned;
+      return new CSAssignment(assigned, NodeType.NODE_LOCAL);
     }
 
     // Rack-local
@@ -988,12 +989,14 @@ public class LeafQueue implements CSQueue {
         assignRackLocalContainers(clusterResource, node, application, priority, 
             reservedContainer);
     if (Resources.greaterThan(assigned, Resources.none())) {
-      return assigned;
+      return new CSAssignment(assigned, NodeType.RACK_LOCAL);
     }
     
     // Off-switch
-    return assignOffSwitchContainers(clusterResource, node, application, 
-        priority, reservedContainer);
+    return new CSAssignment(
+        assignOffSwitchContainers(clusterResource, node, application, 
+            priority, reservedContainer), 
+        NodeType.OFF_SWITCH);
   }
 
   private Resource assignNodeLocalContainers(Resource clusterResource, 
@@ -1275,7 +1278,7 @@ public class LeafQueue implements CSQueue {
     metrics.setAvailableResourcesToUser(userName, application.getHeadroom());
     LOG.info(getQueueName() + 
         " used=" + usedResources + " numContainers=" + numContainers + 
-        " user=" + userName + " resources=" + user.getConsumedResources());
+        " user=" + userName + " user-resources=" + user.getConsumedResources());
   }
 
   synchronized void releaseResource(Resource clusterResource, 
@@ -1293,7 +1296,7 @@ public class LeafQueue implements CSQueue {
       
     LOG.info(getQueueName() + 
         " used=" + usedResources + " numContainers=" + numContainers + 
-        " user=" + userName + " resources=" + user.getConsumedResources());
+        " user=" + userName + " user-resources=" + user.getConsumedResources());
   }
 
   @Override

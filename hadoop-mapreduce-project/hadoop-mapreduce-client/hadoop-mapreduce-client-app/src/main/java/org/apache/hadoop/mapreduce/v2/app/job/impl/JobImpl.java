@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobACLsManager;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.JobACL;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRJobConfig;
@@ -61,9 +62,6 @@ import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitMetaInfo;
 import org.apache.hadoop.mapreduce.split.SplitMetaInfoReader;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.v2.api.records.AMInfo;
-import org.apache.hadoop.mapreduce.v2.api.records.Counter;
-import org.apache.hadoop.mapreduce.v2.api.records.CounterGroup;
-import org.apache.hadoop.mapreduce.v2.api.records.Counters;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 import org.apache.hadoop.mapreduce.v2.api.records.JobReport;
 import org.apache.hadoop.mapreduce.v2.api.records.JobState;
@@ -99,7 +97,6 @@ import org.apache.hadoop.yarn.Clock;
 import org.apache.hadoop.yarn.YarnException;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.event.EventHandler;
-import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.state.InvalidStateTransitonException;
 import org.apache.hadoop.yarn.state.MultipleArcTransition;
 import org.apache.hadoop.yarn.state.SingleArcTransition;
@@ -109,8 +106,12 @@ import org.apache.hadoop.yarn.state.StateMachineFactory;
 /** Implementation of Job interface. Maintains the state machines of Job.
  * The read and write calls use ReadWriteLock for concurrency.
  */
+@SuppressWarnings({ "rawtypes", "deprecation", "unchecked" })
 public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job, 
   EventHandler<JobEvent> {
+
+  private static final TaskAttemptCompletionEvent[]
+    EMPTY_TASK_ATTEMPT_COMPLETION_EVENTS = new TaskAttemptCompletionEvent[0];
 
   private static final Log LOG = LogFactory.getLog(JobImpl.class);
 
@@ -127,6 +128,10 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
   private final String username;
   private final OutputCommitter committer;
   private final Map<JobACL, AccessControlList> jobACLs;
+  private float setupWeight = 0.05f;
+  private float cleanupWeight = 0.05f;
+  private float mapWeight = 0.0f;
+  private float reduceWeight = 0.0f;
   private final Set<TaskId> completedTasksFromPreviousRun;
   private final List<AMInfo> amInfos;
   private final Lock readLock;
@@ -146,14 +151,14 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
   private final long appSubmitTime;
 
   private boolean lazyTasksCopyNeeded = false;
-  private volatile Map<TaskId, Task> tasks = new LinkedHashMap<TaskId, Task>();
-  private Counters jobCounters = newCounters();
+  volatile Map<TaskId, Task> tasks = new LinkedHashMap<TaskId, Task>();
+  private Counters jobCounters = new Counters();
     // FIXME:  
     //
     // Can then replace task-level uber counters (MR-2424) with job-level ones
     // sent from LocalContainerLauncher, and eventually including a count of
     // of uber-AM attempts (probably sent from MRAppMaster).
-  public Configuration conf;
+  public JobConf conf;
 
   //fields initialized in init
   private FileSystem fs;
@@ -352,6 +357,8 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
   private long startTime;
   private long finishTime;
   private float setupProgress;
+  private float mapProgress;
+  private float reduceProgress;
   private float cleanupProgress;
   private boolean isUber = false;
 
@@ -370,7 +377,7 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
     this.applicationAttemptId = applicationAttemptId;
     this.jobId = jobId;
     this.jobName = conf.get(JobContext.JOB_NAME, "<missing job name>");
-    this.conf = conf;
+    this.conf = new JobConf(conf);
     this.metrics = metrics;
     this.clock = clock;
     this.completedTasksFromPreviousRun = completedTasksFromPreviousRun;
@@ -468,88 +475,29 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
   }
 
   @Override
-  public Counters getCounters() {
-    Counters counters = newCounters();
+  public Counters getAllCounters() {
+    Counters counters = new Counters();
     readLock.lock();
     try {
-      incrAllCounters(counters, jobCounters);
+      counters.incrAllCounters(jobCounters);
       return incrTaskCounters(counters, tasks.values());
     } finally {
       readLock.unlock();
     }
   }
 
-  private Counters getTypeCounters(Set<TaskId> taskIds) {
-    Counters counters = newCounters();
-    for (TaskId taskId : taskIds) {
-      Task task = tasks.get(taskId);
-      incrAllCounters(counters, task.getCounters());
-    }
-    return counters;
-  }
-
-  private Counters getMapCounters() {
-    readLock.lock();
-    try {
-      return getTypeCounters(mapTasks);
-    } finally {
-      readLock.unlock();
-    }
-  }
-  
-  private Counters getReduceCounters() {
-    readLock.lock();
-    try {
-      return getTypeCounters(reduceTasks);
-    } finally {
-      readLock.unlock();
-    }
-  }
-  
-  public static Counters newCounters() {
-    Counters counters = RecordFactoryProvider.getRecordFactory(null)
-        .newRecordInstance(Counters.class);
-    return counters;
-  }
-
-  public static Counters incrTaskCounters(Counters counters,
-                                          Collection<Task> tasks) {
+  public static Counters incrTaskCounters(
+      Counters counters, Collection<Task> tasks) {
     for (Task task : tasks) {
-      incrAllCounters(counters, task.getCounters());
+      counters.incrAllCounters(task.getCounters());
     }
     return counters;
-  }
-
-  public static void incrAllCounters(Counters counters, Counters other) {
-    if (other != null) {
-      for (CounterGroup otherGroup: other.getAllCounterGroups().values()) {
-        CounterGroup group = counters.getCounterGroup(otherGroup.getName());
-        if (group == null) {
-          group = RecordFactoryProvider.getRecordFactory(null)
-              .newRecordInstance(CounterGroup.class);
-          group.setName(otherGroup.getName());
-          counters.setCounterGroup(group.getName(), group);
-        }
-        group.setDisplayName(otherGroup.getDisplayName());
-        for (Counter otherCounter : otherGroup.getAllCounters().values()) {
-          Counter counter = group.getCounter(otherCounter.getName());
-          if (counter == null) {
-            counter = RecordFactoryProvider.getRecordFactory(null)
-                .newRecordInstance(Counter.class);
-            counter.setName(otherCounter.getName());
-            group.setCounter(counter.getName(), counter);
-          }
-          counter.setDisplayName(otherCounter.getDisplayName());
-          counter.setValue(counter.getValue() + otherCounter.getValue());
-        }
-      }
-    }
   }
 
   @Override
   public TaskAttemptCompletionEvent[] getTaskAttemptCompletionEvents(
       int fromEventId, int maxEvents) {
-    TaskAttemptCompletionEvent[] events = new TaskAttemptCompletionEvent[0];
+    TaskAttemptCompletionEvent[] events = EMPTY_TASK_ATTEMPT_COMPLETION_EVENTS;
     readLock.lock();
     try {
       if (taskAttemptCompletionEvents.size() > fromEventId) {
@@ -583,33 +531,54 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       if (getState() == JobState.NEW) {
         return MRBuilderUtils.newJobReport(jobId, jobName, username, state,
             appSubmitTime, startTime, finishTime, setupProgress, 0.0f, 0.0f,
-            cleanupProgress, remoteJobConfFile.toString(), amInfos);
+            cleanupProgress, remoteJobConfFile.toString(), amInfos, isUber);
       }
 
+      computeProgress();
       return MRBuilderUtils.newJobReport(jobId, jobName, username, state,
           appSubmitTime, startTime, finishTime, setupProgress,
-          computeProgress(mapTasks), computeProgress(reduceTasks),
-          cleanupProgress, remoteJobConfFile.toString(), amInfos);
+          this.mapProgress, this.reduceProgress,
+          cleanupProgress, remoteJobConfFile.toString(), amInfos, isUber);
     } finally {
       readLock.unlock();
     }
   }
 
-  private float computeProgress(Set<TaskId> taskIds) {
-    readLock.lock();
+  @Override
+  public float getProgress() {
+    this.readLock.lock();
     try {
-      float progress = 0;
-      for (TaskId taskId : taskIds) {
-        Task task = tasks.get(taskId);
-        progress += task.getProgress();
-      }
-      int taskIdsSize = taskIds.size();
-      if (taskIdsSize != 0) {
-        progress = progress/taskIdsSize;
-      }
-      return progress;
+      computeProgress();
+      return (this.setupProgress * this.setupWeight + this.cleanupProgress
+          * this.cleanupWeight + this.mapProgress * this.mapWeight + this.reduceProgress
+          * this.reduceWeight);
     } finally {
-      readLock.unlock();
+      this.readLock.unlock();
+    }
+  }
+
+  private void computeProgress() {
+    this.readLock.lock();
+    try {
+      float mapProgress = 0f;
+      float reduceProgress = 0f;
+      for (Task task : this.tasks.values()) {
+        if (task.getType() == TaskType.MAP) {
+          mapProgress += task.getProgress();
+        } else {
+          reduceProgress += task.getProgress();
+        }
+      }
+      if (this.numMapTasks != 0) {
+        mapProgress = mapProgress / this.numMapTasks;
+      }
+      if (this.numReduceTasks != 0) {
+        reduceProgress = reduceProgress / this.numReduceTasks;
+      }
+      this.mapProgress = mapProgress;
+      this.reduceProgress = reduceProgress;
+    } finally {
+      this.readLock.unlock();
     }
   }
 
@@ -663,7 +632,7 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
    * The only entry point to change the Job.
    */
   public void handle(JobEvent event) {
-    LOG.info("Processing " + event.getJobId() + " of type " + event.getType());
+    LOG.debug("Processing " + event.getJobId() + " of type " + event.getType());
     try {
       writeLock.lock();
       JobState oldState = getState();
@@ -730,7 +699,7 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
   
   static JobState checkJobCompleteSuccess(JobImpl job) {
     // check for Job success
-    if (job.completedTaskCount == job.getTasks().size()) {
+    if (job.completedTaskCount == job.tasks.size()) {
       try {
         // Commit job & do cleanup
         job.getCommitter().commitJob(job.getJobContext());
@@ -812,6 +781,130 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
     return amInfos;
   }
 
+  /**
+   * Decide whether job can be run in uber mode based on various criteria.
+   * @param dataInputLength Total length for all splits
+   */
+  private void makeUberDecision(long dataInputLength) {
+    //FIXME:  need new memory criterion for uber-decision (oops, too late here;
+    // until AM-resizing supported,
+    // must depend on job client to pass fat-slot needs)
+    // these are no longer "system" settings, necessarily; user may override
+    int sysMaxMaps = conf.getInt(MRJobConfig.JOB_UBERTASK_MAXMAPS, 9);
+
+    //FIXME: handling multiple reduces within a single AM does not seem to
+    //work.
+    // int sysMaxReduces =
+    //     job.conf.getInt(MRJobConfig.JOB_UBERTASK_MAXREDUCES, 1);
+    int sysMaxReduces = 1;
+
+    long sysMaxBytes = conf.getLong(MRJobConfig.JOB_UBERTASK_MAXBYTES,
+        fs.getDefaultBlockSize()); // FIXME: this is wrong; get FS from
+                                   // [File?]InputFormat and default block size
+                                   // from that
+
+    long sysMemSizeForUberSlot =
+        conf.getInt(MRJobConfig.MR_AM_VMEM_MB,
+            MRJobConfig.DEFAULT_MR_AM_VMEM_MB);
+
+    boolean uberEnabled =
+        conf.getBoolean(MRJobConfig.JOB_UBERTASK_ENABLE, false);
+    boolean smallNumMapTasks = (numMapTasks <= sysMaxMaps);
+    boolean smallNumReduceTasks = (numReduceTasks <= sysMaxReduces);
+    boolean smallInput = (dataInputLength <= sysMaxBytes);
+    // ignoring overhead due to UberAM and statics as negligible here:
+    boolean smallMemory =
+        ( (Math.max(conf.getLong(MRJobConfig.MAP_MEMORY_MB, 0),
+            conf.getLong(MRJobConfig.REDUCE_MEMORY_MB, 0))
+            <= sysMemSizeForUberSlot)
+            || (sysMemSizeForUberSlot == JobConf.DISABLED_MEMORY_LIMIT));
+    boolean notChainJob = !isChainJob(conf);
+
+    // User has overall veto power over uberization, or user can modify
+    // limits (overriding system settings and potentially shooting
+    // themselves in the head).  Note that ChainMapper/Reducer are
+    // fundamentally incompatible with MR-1220; they employ a blocking
+    // queue between the maps/reduces and thus require parallel execution,
+    // while "uber-AM" (MR AM + LocalContainerLauncher) loops over tasks
+    // and thus requires sequential execution.
+    isUber = uberEnabled && smallNumMapTasks && smallNumReduceTasks
+        && smallInput && smallMemory && notChainJob;
+
+    if (isUber) {
+      LOG.info("Uberizing job " + jobId + ": " + numMapTasks + "m+"
+          + numReduceTasks + "r tasks (" + dataInputLength
+          + " input bytes) will run sequentially on single node.");
+
+      // make sure reduces are scheduled only after all map are completed
+      conf.setFloat(MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART,
+                        1.0f);
+      // uber-subtask attempts all get launched on same node; if one fails,
+      // probably should retry elsewhere, i.e., move entire uber-AM:  ergo,
+      // limit attempts to 1 (or at most 2?  probably not...)
+      conf.setInt(MRJobConfig.MAP_MAX_ATTEMPTS, 1);
+      conf.setInt(MRJobConfig.REDUCE_MAX_ATTEMPTS, 1);
+
+      // disable speculation
+      conf.setBoolean(MRJobConfig.MAP_SPECULATIVE, false);
+      conf.setBoolean(MRJobConfig.REDUCE_SPECULATIVE, false);
+    } else {
+      StringBuilder msg = new StringBuilder();
+      msg.append("Not uberizing ").append(jobId).append(" because:");
+      if (!uberEnabled)
+        msg.append(" not enabled;");
+      if (!smallNumMapTasks)
+        msg.append(" too many maps;");
+      if (!smallNumReduceTasks)
+        msg.append(" too many reduces;");
+      if (!smallInput)
+        msg.append(" too much input;");
+      if (!smallMemory)
+        msg.append(" too much RAM;");
+      if (!notChainJob)
+        msg.append(" chainjob");
+      LOG.info(msg.toString());
+    }
+  }
+
+  /**
+   * ChainMapper and ChainReducer must execute in parallel, so they're not
+   * compatible with uberization/LocalContainerLauncher (100% sequential).
+   */
+  private boolean isChainJob(Configuration conf) {
+    boolean isChainJob = false;
+    try {
+      String mapClassName = conf.get(MRJobConfig.MAP_CLASS_ATTR);
+      if (mapClassName != null) {
+        Class<?> mapClass = Class.forName(mapClassName);
+        if (ChainMapper.class.isAssignableFrom(mapClass))
+          isChainJob = true;
+      }
+    } catch (ClassNotFoundException cnfe) {
+      // don't care; assume it's not derived from ChainMapper
+    }
+    try {
+      String reduceClassName = conf.get(MRJobConfig.REDUCE_CLASS_ATTR);
+      if (reduceClassName != null) {
+        Class<?> reduceClass = Class.forName(reduceClassName);
+        if (ChainReducer.class.isAssignableFrom(reduceClass))
+          isChainJob = true;
+      }
+    } catch (ClassNotFoundException cnfe) {
+      // don't care; assume it's not derived from ChainReducer
+    }
+    return isChainJob;
+  }
+
+  /*
+  private int getBlockSize() {
+    String inputClassName = conf.get(MRJobConfig.INPUT_FORMAT_CLASS_ATTR);
+    if (inputClassName != null) {
+      Class<?> inputClass - Class.forName(inputClassName);
+      if (FileInputFormat<K, V>)
+    }
+  }
+  */
+
   public static class InitTransition 
       implements MultipleArcTransition<JobImpl, JobEvent, JobState> {
 
@@ -846,6 +939,12 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
 
         if (job.numMapTasks == 0 && job.numReduceTasks == 0) {
           job.addDiagnostic("No of maps and reduces are 0 " + job.jobId);
+        } else if (job.numMapTasks == 0) {
+          job.reduceWeight = 0.9f;
+        } else if (job.numReduceTasks == 0) {
+          job.mapWeight = 0.9f;
+        } else {
+          job.mapWeight = job.reduceWeight = 0.45f;
         }
 
         checkTaskLimits();
@@ -855,7 +954,7 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
               job.oldJobId);
         } else {
           job.jobContext = new org.apache.hadoop.mapred.JobContextImpl(
-              new JobConf(job.conf), job.oldJobId);
+              job.conf, job.oldJobId);
         }
         
         long inputLength = 0;
@@ -863,81 +962,8 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
           inputLength += taskSplitMetaInfo[i].getInputDataLength();
         }
 
-        //FIXME:  need new memory criterion for uber-decision (oops, too late here; 
-        // until AM-resizing supported, must depend on job client to pass fat-slot needs)
-        // these are no longer "system" settings, necessarily; user may override
-        int sysMaxMaps = job.conf.getInt(MRJobConfig.JOB_UBERTASK_MAXMAPS, 9);
-        int sysMaxReduces =
-            job.conf.getInt(MRJobConfig.JOB_UBERTASK_MAXREDUCES, 1);
-        long sysMaxBytes = job.conf.getLong(MRJobConfig.JOB_UBERTASK_MAXBYTES,
-            job.conf.getLong("dfs.block.size", 64*1024*1024));  //FIXME: this is 
-        // wrong; get FS from [File?]InputFormat and default block size from that
-        //long sysMemSizeForUberSlot = JobTracker.getMemSizeForReduceSlot(); 
-        // FIXME [could use default AM-container memory size...]
-
-        boolean uberEnabled =
-            job.conf.getBoolean(MRJobConfig.JOB_UBERTASK_ENABLE, false);
-        boolean smallNumMapTasks = (job.numMapTasks <= sysMaxMaps);
-        boolean smallNumReduceTasks = (job.numReduceTasks <= sysMaxReduces);
-        boolean smallInput = (inputLength <= sysMaxBytes);
-        boolean smallMemory = true;  //FIXME (see above)
-            // ignoring overhead due to UberTask and statics as negligible here:
-        //  FIXME   && (Math.max(memoryPerMap, memoryPerReduce) <= sysMemSizeForUberSlot
-        //              || sysMemSizeForUberSlot == JobConf.DISABLED_MEMORY_LIMIT)
-        boolean notChainJob = !isChainJob(job.conf);
-
-        // User has overall veto power over uberization, or user can modify
-        // limits (overriding system settings and potentially shooting
-        // themselves in the head).  Note that ChainMapper/Reducer are
-        // fundamentally incompatible with MR-1220; they employ a blocking
-
-        // User has overall veto power over uberization, or user can modify
-        // limits (overriding system settings and potentially shooting
-        // themselves in the head).  Note that ChainMapper/Reducer are
-        // fundamentally incompatible with MR-1220; they employ a blocking
-        // queue between the maps/reduces and thus require parallel execution,
-        // while "uber-AM" (MR AM + LocalContainerLauncher) loops over tasks
-        // and thus requires sequential execution.
-        job.isUber = uberEnabled && smallNumMapTasks && smallNumReduceTasks
-            && smallInput && smallMemory && notChainJob;
-
-        if (job.isUber) {
-          LOG.info("Uberizing job " + job.jobId + ": " + job.numMapTasks + "m+"
-              + job.numReduceTasks + "r tasks (" + inputLength
-              + " input bytes) will run sequentially on single node.");
-              //TODO: also note which node?
-
-          // make sure reduces are scheduled only after all map are completed
-          job.conf.setFloat(MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART,
-                            1.0f);
-          // uber-subtask attempts all get launched on same node; if one fails,
-          // probably should retry elsewhere, i.e., move entire uber-AM:  ergo,
-          // limit attempts to 1 (or at most 2?  probably not...)
-          job.conf.setInt(MRJobConfig.MAP_MAX_ATTEMPTS, 1);
-          job.conf.setInt(MRJobConfig.REDUCE_MAX_ATTEMPTS, 1);
-
-          // disable speculation:  makes no sense to speculate an entire job
-          //canSpeculateMaps = canSpeculateReduces = false; // [TODO: in old 
-          //version, ultimately was from conf.getMapSpeculativeExecution(), 
-          //conf.getReduceSpeculativeExecution()]
-        } else {
-          StringBuilder msg = new StringBuilder();
-          msg.append("Not uberizing ").append(job.jobId).append(" because:");
-          if (!uberEnabled)
-            msg.append(" not enabled;");
-          if (!smallNumMapTasks)
-            msg.append(" too many maps;");
-          if (!smallNumReduceTasks)
-            msg.append(" too many reduces;");
-          if (!smallInput)
-            msg.append(" too much input;");
-          if (!smallMemory)
-            msg.append(" too much RAM;");
-          if (!notChainJob)
-            msg.append(" chainjob");
-          LOG.info(msg.toString());
-        }
-
+        job.makeUberDecision(inputLength);
+        
         job.taskAttemptCompletionEvents =
             new ArrayList<TaskAttemptCompletionEvent>(
                 job.numMapTasks + job.numReduceTasks + 10);
@@ -1006,35 +1032,6 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       if (UserGroupInformation.isSecurityEnabled()) {
         tokenStorage.addAll(job.fsTokens);
       }
-    }
-
-    /**
-     * ChainMapper and ChainReducer must execute in parallel, so they're not
-     * compatible with uberization/LocalContainerLauncher (100% sequential).
-     */
-    boolean isChainJob(Configuration conf) {
-      boolean isChainJob = false;
-      try {
-        String mapClassName = conf.get(MRJobConfig.MAP_CLASS_ATTR);
-        if (mapClassName != null) {
-          Class<?> mapClass = Class.forName(mapClassName);
-          if (ChainMapper.class.isAssignableFrom(mapClass))
-            isChainJob = true;
-        }
-      } catch (ClassNotFoundException cnfe) {
-        // don't care; assume it's not derived from ChainMapper
-      }
-      try {
-        String reduceClassName = conf.get(MRJobConfig.REDUCE_CLASS_ATTR);
-        if (reduceClassName != null) {
-          Class<?> reduceClass = Class.forName(reduceClassName);
-          if (ChainReducer.class.isAssignableFrom(reduceClass))
-            isChainJob = true;
-        }
-      } catch (ClassNotFoundException cnfe) {
-        // don't care; assume it's not derived from ChainReducer
-      }
-      return isChainJob;
     }
 
     private void createMapTasks(JobImpl job, long inputLength,
@@ -1148,13 +1145,24 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
   // area. May need to create a new event type for this if JobFinished should 
   // not be generated for KilledJobs, etc.
   private static JobFinishedEvent createJobFinishedEvent(JobImpl job) {
+
+    Counters mapCounters = new Counters();
+    Counters reduceCounters = new Counters();
+    for (Task t : job.tasks.values()) {
+      Counters counters = t.getCounters();
+      switch (t.getType()) {
+        case MAP:     mapCounters.incrAllCounters(counters);     break;
+        case REDUCE:  reduceCounters.incrAllCounters(counters);  break;
+      }
+    }
+
     JobFinishedEvent jfe = new JobFinishedEvent(
         job.oldJobId, job.finishTime,
         job.succeededMapTaskCount, job.succeededReduceTaskCount,
         job.failedMapTaskCount, job.failedReduceTaskCount,
-        TypeConverter.fromYarn(job.getMapCounters()),
-        TypeConverter.fromYarn(job.getReduceCounters()),
-        TypeConverter.fromYarn(job.getCounters()));
+        mapCounters,
+        reduceCounters,
+        job.getAllCounters());
     return jfe;
   }
 
@@ -1394,7 +1402,8 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       JobCounterUpdateEvent jce = (JobCounterUpdateEvent) event;
       for (JobCounterUpdateEvent.CounterIncrementalUpdate ci : jce
           .getCounterUpdates()) {
-        job.jobCounters.incrCounter(ci.getCounterKey(), ci.getIncrementValue());
+        job.jobCounters.findCounter(ci.getCounterKey()).increment(
+          ci.getIncrementValue());
       }
     }
   }

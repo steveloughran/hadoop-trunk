@@ -104,13 +104,19 @@ public class CapacitySchedulerConfiguration extends Configuration {
   
   @Private
   public static final float DEFAULT_USER_LIMIT_FACTOR = 1.0f;
-  
+
   @Private
-  public static final String DEFAULT_ACL = "*";
+  public static final String ALL_ACL = "*";
+
+  @Private
+  public static final String NONE_ACL = " ";
 
   @Private public static final String ENABLE_USER_METRICS =
       PREFIX +"user-metrics.enable";
   @Private public static final boolean DEFAULT_ENABLE_USER_METRICS = false;
+
+  @Private
+  public static final String ROOT = "root";
 
   public CapacitySchedulerConfiguration() {
     this(new Configuration());
@@ -143,14 +149,14 @@ public class CapacitySchedulerConfiguration extends Configuration {
       throw new IllegalArgumentException("Illegal " +
       		"capacity of " + capacity + " for queue " + queue);
     }
-    LOG.info("CSConf - setCapacity: queuePrefix=" + getQueuePrefix(queue) + 
+    LOG.debug("CSConf - setCapacity: queuePrefix=" + getQueuePrefix(queue) + 
         ", capacity=" + capacity);
     return capacity;
   }
   
   public void setCapacity(String queue, int capacity) {
     setInt(getQueuePrefix(queue) + CAPACITY, capacity);
-    LOG.info("CSConf - setCapacity: queuePrefix=" + getQueuePrefix(queue) + 
+    LOG.debug("CSConf - setCapacity: queuePrefix=" + getQueuePrefix(queue) + 
         ", capacity=" + capacity);
   }
 
@@ -162,7 +168,7 @@ public class CapacitySchedulerConfiguration extends Configuration {
   
   public void setMaximumCapacity(String queue, int maxCapacity) {
     setInt(getQueuePrefix(queue) + MAXIMUM_CAPACITY, maxCapacity);
-    LOG.info("CSConf - setMaxCapacity: queuePrefix=" + getQueuePrefix(queue) + 
+    LOG.debug("CSConf - setMaxCapacity: queuePrefix=" + getQueuePrefix(queue) + 
         ", maxCapacity=" + maxCapacity);
   }
   
@@ -174,7 +180,7 @@ public class CapacitySchedulerConfiguration extends Configuration {
 
   public void setUserLimit(String queue, int userLimit) {
     setInt(getQueuePrefix(queue) + USER_LIMIT, userLimit);
-    LOG.info("here setUserLimit: queuePrefix=" + getQueuePrefix(queue) + 
+    LOG.debug("here setUserLimit: queuePrefix=" + getQueuePrefix(queue) + 
         ", userLimit=" + getUserLimit(queue));
   }
   
@@ -198,30 +204,47 @@ public class CapacitySchedulerConfiguration extends Configuration {
   private static String getAclKey(QueueACL acl) {
     return "acl_" + acl.toString().toLowerCase();
   }
-  
-  public Map<QueueACL, AccessControlList> getAcls(String queue) {
-    Map<QueueACL, AccessControlList> acls = 
-      new HashMap<QueueACL, AccessControlList>();
+
+  public AccessControlList getAcl(String queue, QueueACL acl) {
     String queuePrefix = getQueuePrefix(queue);
+    // The root queue defaults to all access if not defined
+    // Sub queues inherit access if not defined
+    String defaultAcl = queue.equals(ROOT) ? ALL_ACL : NONE_ACL;
+    String aclString = get(queuePrefix + getAclKey(acl), defaultAcl);
+    return new AccessControlList(aclString);
+  }
+
+  public void setAcl(String queue, QueueACL acl, String aclString) {
+    String queuePrefix = getQueuePrefix(queue);
+    set(queuePrefix + getAclKey(acl), aclString);
+  }
+
+  public Map<QueueACL, AccessControlList> getAcls(String queue) {
+    Map<QueueACL, AccessControlList> acls =
+      new HashMap<QueueACL, AccessControlList>();
     for (QueueACL acl : QueueACL.values()) {
-      acls.put(acl, 
-          new AccessControlList(get(queuePrefix + getAclKey(acl), 
-              DEFAULT_ACL)));
+      acls.put(acl, getAcl(queue, acl));
     }
     return acls;
   }
 
+  public void setAcls(String queue, Map<QueueACL, AccessControlList> acls) {
+    for (Map.Entry<QueueACL, AccessControlList> e : acls.entrySet()) {
+      setAcl(queue, e.getKey(), e.getValue().getAclString());
+    }
+  }
+
   public String[] getQueues(String queue) {
-    LOG.info("CSConf - getQueues called for: queuePrefix=" + getQueuePrefix(queue));
+    LOG.debug("CSConf - getQueues called for: queuePrefix=" + getQueuePrefix(queue));
     String[] queues = getStrings(getQueuePrefix(queue) + QUEUES);
-    LOG.info("CSConf - getQueues: queuePrefix=" + getQueuePrefix(queue) + 
+    LOG.debug("CSConf - getQueues: queuePrefix=" + getQueuePrefix(queue) + 
         ", queues=" + ((queues == null) ? "" : StringUtils.arrayToString(queues)));
     return queues;
   }
   
   public void setQueues(String queue, String[] subQueues) {
     set(getQueuePrefix(queue) + QUEUES, StringUtils.arrayToString(subQueues));
-    LOG.info("CSConf - setQueues: qPrefix=" + getQueuePrefix(queue) + 
+    LOG.debug("CSConf - setQueues: qPrefix=" + getQueuePrefix(queue) + 
         ", queues=" + StringUtils.arrayToString(subQueues));
   }
   
