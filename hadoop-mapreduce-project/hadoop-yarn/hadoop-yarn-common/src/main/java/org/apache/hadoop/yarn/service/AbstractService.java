@@ -176,7 +176,9 @@ public abstract class AbstractService implements Service {
    */
   @Override
   public String toString() {
-    return "Service " + getName() + " in state " + state;
+    return "Service " + super.toString() 
+        + " name \"" + (getName() != null? getName() : "") + "" 
+        + " in state " + state;
   }
 
   /**
@@ -240,8 +242,9 @@ public abstract class AbstractService implements Service {
    * operations
    *
    * @param service a service; may be null
+   * @return any exception that was caught
    */
-  public static void stopServiceQuietly(Service service) {
+  public static Exception stopServiceQuietly(Service service) {
     if (service != null) {
       try {
         service.stop();
@@ -249,8 +252,10 @@ public abstract class AbstractService implements Service {
         LOG.warn("When stopping the service " + service.getName()
                      + " : " + e,
                      e);
+        return e;
       }
     }
+    return null;
   }
 
 }
