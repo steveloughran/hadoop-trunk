@@ -54,6 +54,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.util.Apps;
 import org.apache.hadoop.yarn.util.BuilderUtils;
@@ -171,7 +172,7 @@ public class MRApps extends Apps {
   }
 
   private static void setMRFrameworkClasspath(
-      Map<String, String> environment) throws IOException {
+      Map<String, String> environment, Configuration conf) throws IOException {
     InputStream classpathFileStream = null;
     BufferedReader reader = null;
     try {
@@ -208,8 +209,10 @@ public class MRApps extends Apps {
       }
 
       // Add standard Hadoop classes
-      for (String c : ApplicationConstants.APPLICATION_CLASSPATH) {
-        Apps.addToEnvironment(environment, Environment.CLASSPATH.name(), c);
+      for (String c : conf.get(YarnConfiguration.YARN_APPLICATION_CLASSPATH)
+          .split(",")) {
+        Apps.addToEnvironment(environment, Environment.CLASSPATH.name(), c
+            .trim());
       }
     } finally {
       if (classpathFileStream != null) {
@@ -222,17 +225,25 @@ public class MRApps extends Apps {
     // TODO: Remove duplicates.
   }
   
-  public static void setClasspath(Map<String, String> environment) 
-      throws IOException {
+  public static void setClasspath(Map<String, String> environment,
+      Configuration conf) throws IOException {
+    boolean userClassesTakesPrecedence = 
+      conf.getBoolean(MRJobConfig.MAPREDUCE_JOB_USER_CLASSPATH_FIRST, false);
+
+    if (!userClassesTakesPrecedence) {
+      MRApps.setMRFrameworkClasspath(environment, conf);
+    }
     Apps.addToEnvironment(
-        environment, 
-        Environment.CLASSPATH.name(), 
+        environment,
+        Environment.CLASSPATH.name(),
         MRJobConfig.JOB_JAR);
     Apps.addToEnvironment(
-        environment, 
+        environment,
         Environment.CLASSPATH.name(),
         Environment.PWD.$() + Path.SEPARATOR + "*");
-    MRApps.setMRFrameworkClasspath(environment);
+    if (userClassesTakesPrecedence) {
+      MRApps.setMRFrameworkClasspath(environment, conf);
+    }
   }
   
   private static final String STAGING_CONSTANT = ".staging";

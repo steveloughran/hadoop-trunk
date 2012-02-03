@@ -355,7 +355,8 @@ implements ResourceScheduler, CapacitySchedulerContext {
 
     // TODO: Fix store
     SchedulerApp SchedulerApp = 
-        new SchedulerApp(applicationAttemptId, user, queue, rmContext, null);
+        new SchedulerApp(applicationAttemptId, user, queue, 
+            queue.getActiveUsersManager(), rmContext, null);
 
     // Submit to the queue
     try {
@@ -530,8 +531,10 @@ implements ResourceScheduler, CapacitySchedulerContext {
   private synchronized void nodeUpdate(RMNode nm, 
       List<ContainerStatus> newlyLaunchedContainers,
       List<ContainerStatus> completedContainers) {
-    LOG.info("nodeUpdate: " + nm + " clusterResources: " + clusterResource);
-    
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("nodeUpdate: " + nm + " clusterResources: " + clusterResource);
+    }
+                  
     SchedulerNode node = getNode(nm.getNodeID());
 
     // Processing the newly launched containers
