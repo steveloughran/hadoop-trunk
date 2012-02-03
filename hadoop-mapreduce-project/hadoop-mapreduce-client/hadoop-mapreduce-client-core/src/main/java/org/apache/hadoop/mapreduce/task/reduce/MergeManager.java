@@ -46,7 +46,6 @@ import org.apache.hadoop.mapred.RawKeyValueIterator;
 import org.apache.hadoop.mapred.Reducer;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.Task;
-import org.apache.hadoop.mapred.Counters.Counter;
 import org.apache.hadoop.mapred.IFile.Reader;
 import org.apache.hadoop.mapred.IFile.Writer;
 import org.apache.hadoop.mapred.Merger.Segment;
@@ -68,7 +67,8 @@ public class MergeManager<K, V> {
   
   /* Maximum percentage of the in-memory limit that a single shuffle can 
    * consume*/ 
-  private static final float MAX_SINGLE_SHUFFLE_SEGMENT_FRACTION = 0.25f;
+  private static final float DEFAULT_SHUFFLE_MEMORY_LIMIT_PERCENT
+    = 0.25f;
 
   private final TaskAttemptID reduceId;
   
@@ -92,6 +92,7 @@ public class MergeManager<K, V> {
   
   private final long memoryLimit;
   private long usedMemory;
+  private long commitMemory;
   private final long maxSingleShuffleLimit;
   
   private final int memToMemMergeOutputsThreshold; 
@@ -168,18 +169,35 @@ public class MergeManager<K, V> {
  
     this.ioSortFactor = jobConf.getInt(MRJobConfig.IO_SORT_FACTOR, 100);
 
+    final float singleShuffleMemoryLimitPercent =
+        jobConf.getFloat(MRJobConfig.SHUFFLE_MEMORY_LIMIT_PERCENT,
+            DEFAULT_SHUFFLE_MEMORY_LIMIT_PERCENT);
+    if (singleShuffleMemoryLimitPercent <= 0.0f
+        || singleShuffleMemoryLimitPercent > 1.0f) {
+      throw new IllegalArgumentException("Invalid value for "
+          + MRJobConfig.SHUFFLE_MEMORY_LIMIT_PERCENT + ": "
+          + singleShuffleMemoryLimitPercent);
+    }
+
     this.maxSingleShuffleLimit = 
-      (long)(memoryLimit * MAX_SINGLE_SHUFFLE_SEGMENT_FRACTION);
+      (long)(memoryLimit * singleShuffleMemoryLimitPercent);
     this.memToMemMergeOutputsThreshold = 
             jobConf.getInt(MRJobConfig.REDUCE_MEMTOMEM_THRESHOLD, ioSortFactor);
     this.mergeThreshold = (long)(this.memoryLimit * 
-                          jobConf.getFloat(MRJobConfig.SHUFFLE_MERGE_EPRCENT, 
+                          jobConf.getFloat(MRJobConfig.SHUFFLE_MERGE_PERCENT, 
                                            0.90f));
     LOG.info("MergerManager: memoryLimit=" + memoryLimit + ", " +
              "maxSingleShuffleLimit=" + maxSingleShuffleLimit + ", " +
              "mergeThreshold=" + mergeThreshold + ", " + 
              "ioSortFactor=" + ioSortFactor + ", " +
              "memToMemMergeOutputsThreshold=" + memToMemMergeOutputsThreshold);
+
+    if (this.maxSingleShuffleLimit >= this.mergeThreshold) {
+      throw new RuntimeException("Invlaid configuration: "
+          + "maxSingleShuffleLimit should be less than mergeThreshold"
+          + "maxSingleShuffleLimit: " + this.maxSingleShuffleLimit
+          + "mergeThreshold: " + this.mergeThreshold);
+    }
 
     boolean allowMemToMemMerge = 
       jobConf.getBoolean(MRJobConfig.REDUCE_MEMTOMEM_ENABLED, false);
@@ -245,16 +263,16 @@ public class MergeManager<K, V> {
     // all the stalled threads
     
     if (usedMemory > memoryLimit) {
-      LOG.debug(mapId + ": Stalling shuffle since usedMemory (" + usedMemory + 
-               ") is greater than memoryLimit (" + memoryLimit + ")"); 
-      
+      LOG.debug(mapId + ": Stalling shuffle since usedMemory (" + usedMemory
+          + ") is greater than memoryLimit (" + memoryLimit + ")." + 
+          " CommitMemory is (" + commitMemory + ")"); 
       return stallShuffle;
     }
     
     // Allow the in-memory shuffle to progress
-    LOG.debug(mapId + ": Proceeding with shuffle since usedMemory (" +
-        usedMemory + 
-        ") is lesser than memoryLimit (" + memoryLimit + ")"); 
+    LOG.debug(mapId + ": Proceeding with shuffle since usedMemory ("
+        + usedMemory + ") is lesser than memoryLimit (" + memoryLimit + ")."
+        + "CommitMemory is (" + commitMemory + ")"); 
     return unconditionalReserve(mapId, requestedSize, true);
   }
   
@@ -270,18 +288,24 @@ public class MergeManager<K, V> {
   }
   
   synchronized void unreserve(long size) {
+    commitMemory -= size;
     usedMemory -= size;
   }
-  
+
   public synchronized void closeInMemoryFile(MapOutput<K,V> mapOutput) { 
     inMemoryMapOutputs.add(mapOutput);
     LOG.info("closeInMemoryFile -> map-output of size: " + mapOutput.getSize()
-        + ", inMemoryMapOutputs.size() -> " + inMemoryMapOutputs.size());
-    
+        + ", inMemoryMapOutputs.size() -> " + inMemoryMapOutputs.size()
+        + ", commitMemory -> " + commitMemory + ", usedMemory ->" + usedMemory);
+
+    commitMemory+= mapOutput.getSize();
+
     synchronized (inMemoryMerger) {
-      if (!inMemoryMerger.isInProgress() && usedMemory >= mergeThreshold) {
-        LOG.info("Starting inMemoryMerger's merge since usedMemory=" +
-            usedMemory + " > mergeThreshold=" + mergeThreshold);
+      // Can hang if mergeThreshold is really low.
+      if (!inMemoryMerger.isInProgress() && commitMemory >= mergeThreshold) {
+        LOG.info("Starting inMemoryMerger's merge since commitMemory=" +
+            commitMemory + " > mergeThreshold=" + mergeThreshold + 
+            ". Current usedMemory=" + usedMemory);
         inMemoryMapOutputs.addAll(inMemoryMergedMapOutputs);
         inMemoryMergedMapOutputs.clear();
         inMemoryMerger.startMerge(inMemoryMapOutputs);

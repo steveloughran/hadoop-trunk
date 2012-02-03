@@ -48,7 +48,7 @@ Trunk (unreleased changes)
   IMPROVEMENTS
 
     HADOOP-7524 Change RPC to allow multiple protocols including multuple 
-    versions of the same protocol (sanjay Radia)
+    versions of the same protocol (Sanjay Radia)
 
     HDFS-1620. Rename HdfsConstants -> HdfsServerConstants, FSConstants ->
                HdfsConstants. (Harsh J Chouraria via atm)
@@ -100,9 +100,18 @@ Trunk (unreleased changes)
 
     HDFS-2651 ClientNameNodeProtocol Translators for Protocol Buffers (sanjay)
 
-    HDFS-2650. Replace @inheritDoc with @Override. (Hari Mankude via suresh).
+    HDFS-2650. Replace @inheritDoc with @Override. (Hari Mankude via suresh)
 
-    HDFS-2669 Enable protobuf rpc for ClientNamenodeProtocol
+    HDFS-2669. Enable protobuf rpc for ClientNamenodeProtocol. (Sanjay Radia)
+
+    HDFS-2801. Provide a method in client side translators to check for a 
+    methods supported in underlying protocol. (jitendra)
+
+    HDFS-2814 NamenodeMXBean does not account for svn revision in the version 
+    information. (Hitesh Shah via jitendra)
+
+    HDFS-2784. Update hftp and hdfs for host-based token support. 
+    (Kihwal Lee via jitendra)
 
   OPTIMIZATIONS
     HDFS-2477. Optimize computing the diff between a block report and the
@@ -171,6 +180,9 @@ Trunk (unreleased changes)
 
     HDFS-2768. BackupNode stop can not close proxy connections because
     it is not a proxy instance. (Uma Maheswara Rao G via eli)
+
+    HDFS-2759. Pre-allocate HDFS edit log files after writing version number.
+    (atm)
 
 Release 0.23.1 - UNRELEASED
 
@@ -272,6 +284,14 @@ Release 0.23.1 - UNRELEASED
     HDFS-2803. Add logging to LeaseRenewer for better lease expiration debugging.
     (Jimmy Xiang via todd)
 
+    HDFS-2817. Combine the two TestSafeMode test suites. (todd)
+
+    HDFS-2818. Fix a missing space issue in HDFS webapps' title tags. (Devaraj K via harsh)
+
+    HDFS-2397. Undeprecate SecondaryNameNode (eli)
+
+    HDFS-2857. Cleanup BlockInfo class. (suresh)
+
   OPTIMIZATIONS
 
     HDFS-2130. Switch default checksum to CRC32C. (todd)
@@ -285,6 +305,17 @@ Release 0.23.1 - UNRELEASED
     HDFS-2246. Enable reading a block directly from local file system
     for a client on the same node as the block file.  (Andrew Purtell,
     Suresh Srinivas and Jitendra Nath Pandey via szetszwo)
+
+    HDFS-2825. Add test hook to turn off the writer preferring its local
+    DN. (todd)
+
+    HDFS-2826. Add test case for HDFS-1476 (safemode can initialize
+    replication queues before exiting) (todd)
+
+    HDFS-2864. Remove some redundant methods and the constant METADATA_VERSION
+    from FSDataset.  (szetszwo)
+
+    HDFS-2879. Change FSDataset to package private.  (szetszwo)
 
   BUG FIXES
 
@@ -342,6 +373,30 @@ Release 0.23.1 - UNRELEASED
 
     HDFS-2751. Datanode may incorrectly drop OS cache behind reads
     even for short reads. (todd)
+
+    HDFS-2816. Fix missing license header in httpfs findbugsExcludeFile.xml.
+    (hitesh via tucu)
+
+    HDFS-2822. processMisReplicatedBlock incorrectly identifies
+    under-construction blocks as under-replicated. (todd)
+
+    HDFS-442. dfsthroughput in test jar throws NPE (harsh)
+
+    HDFS-2836. HttpFSServer still has 2 javadoc warnings in trunk (revans2 via tucu)
+
+    HDFS-2837. mvn javadoc:javadoc not seeing LimitedPrivate class (revans2 via tucu)
+
+    HDFS-2840. TestHostnameFilter should work with localhost or localhost.localdomain (tucu)
+
+    HDFS-2791. If block report races with closing of file, replica is
+    incorrectly marked corrupt. (todd)
+
+    HDFS-2827.  When the parent of a directory is the root, renaming the
+    directory results in leases updated incorrectly.  (Uma Maheswara Rao G
+    via szetszwo)
+
+    HDFS-2835. Fix findbugs and javadoc issue with GetConf.java.
+    (suresh)
 
 Release 0.23.0 - 2011-11-01 
 
@@ -1615,7 +1670,12 @@ Release 0.22.1 - Unreleased
 
   OPTIMIZATIONS
 
+    HDFS-2718. Optimize OP_ADD in edits loading. (shv)
+
   BUG FIXES
+
+    HDFS-2877. If locking of a storage dir fails, it will remove the other
+    NN's lock file on exit. (todd)
 
 Release 0.22.0 - 2011-11-29
 

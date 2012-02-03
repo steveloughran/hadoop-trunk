@@ -31,8 +31,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ClusterMetricsInfo {
 
-  private static final long MB_IN_GB = 1024;
-
   protected int appsSubmitted;
   protected long reservedMB;
   protected long availableMB;
@@ -44,6 +42,7 @@ public class ClusterMetricsInfo {
   protected int unhealthyNodes;
   protected int decommissionedNodes;
   protected int rebootedNodes;
+  protected int activeNodes;
 
   public ClusterMetricsInfo() {
   } // JAXB needs this
@@ -54,17 +53,18 @@ public class ClusterMetricsInfo {
     ClusterMetrics clusterMetrics = ClusterMetrics.getMetrics();
 
     this.appsSubmitted = metrics.getAppsSubmitted();
-    this.reservedMB = metrics.getReservedGB() * MB_IN_GB;
-    this.availableMB = metrics.getAvailableGB() * MB_IN_GB;
-    this.allocatedMB = metrics.getAllocatedGB() * MB_IN_GB;
+    this.reservedMB = metrics.getReservedMB();
+    this.availableMB = metrics.getAvailableMB();
+    this.allocatedMB = metrics.getAllocatedMB();
     this.containersAllocated = metrics.getAllocatedContainers();
     this.totalMB = availableMB + reservedMB + allocatedMB;
-    this.totalNodes = clusterMetrics.getNumNMs();
+    this.activeNodes = clusterMetrics.getNumActiveNMs();
     this.lostNodes = clusterMetrics.getNumLostNMs();
     this.unhealthyNodes = clusterMetrics.getUnhealthyNMs();
     this.decommissionedNodes = clusterMetrics.getNumDecommisionedNMs();
     this.rebootedNodes = clusterMetrics.getNumRebootedNMs();
-
+    this.totalNodes = activeNodes + lostNodes + decommissionedNodes
+        + rebootedNodes;
   }
 
   public int getAppsSubmitted() {
@@ -93,6 +93,10 @@ public class ClusterMetricsInfo {
 
   public int getTotalNodes() {
     return this.totalNodes;
+  }
+  
+  public int getActiveNodes() {
+    return this.activeNodes;
   }
 
   public int getLostNodes() {
