@@ -21,6 +21,7 @@ package org.apache.hadoop.mapreduce.v2.app.rm;
 import java.io.IOException;
 import java.security.PrivilegedAction;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -29,7 +30,6 @@ import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
-import org.apache.hadoop.mapreduce.v2.api.records.JobReport;
 import org.apache.hadoop.mapreduce.v2.api.records.JobState;
 import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.client.ClientService;
@@ -45,9 +45,9 @@ import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
+import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -65,8 +65,9 @@ public abstract class RMCommunicator extends AbstractService  {
   private int rmPollInterval;//millis
   protected ApplicationId applicationId;
   protected ApplicationAttemptId applicationAttemptId;
-  private volatile boolean stopped;
+  private AtomicBoolean stopped;
   protected Thread allocatorThread;
+  @SuppressWarnings("rawtypes")
   protected EventHandler eventHandler;
   protected AMRMProtocol scheduler;
   private final ClientService clientService;
@@ -88,6 +89,7 @@ public abstract class RMCommunicator extends AbstractService  {
     this.eventHandler = context.getEventHandler();
     this.applicationId = context.getApplicationID();
     this.applicationAttemptId = context.getApplicationAttemptId();
+    this.stopped = new AtomicBoolean(false);
   }
 
   @Override
@@ -101,10 +103,9 @@ public abstract class RMCommunicator extends AbstractService  {
   @Override
   public void start() {
     scheduler= createSchedulerProxy();
-    //LOG.info("Scheduler is " + scheduler);
     register();
     startAllocatorThread();
-    JobID id = TypeConverter.fromYarn(context.getApplicationID());
+    JobID id = TypeConverter.fromYarn(this.applicationId);
     JobId jobId = TypeConverter.toYarn(id);
     job = context.getJob(jobId);
     super.start();
@@ -125,25 +126,7 @@ public abstract class RMCommunicator extends AbstractService  {
   protected float getApplicationProgress() {
     // For now just a single job. In future when we have a DAG, we need an
     // aggregate progress.
-    JobReport report = this.job.getReport();
-    float setupWeight = 0.05f;
-    float cleanupWeight = 0.05f;
-    float mapWeight = 0.0f;
-    float reduceWeight = 0.0f;
-    int numMaps = this.job.getTotalMaps();
-    int numReduces = this.job.getTotalReduces();
-    if (numMaps == 0 && numReduces == 0) {
-    } else if (numMaps == 0) {
-      reduceWeight = 0.9f;
-    } else if (numReduces == 0) {
-      mapWeight = 0.9f;
-    } else {
-      mapWeight = reduceWeight = 0.45f;
-    }
-    return (report.getSetupProgress() * setupWeight
-        + report.getCleanupProgress() * cleanupWeight
-        + report.getMapProgress() * mapWeight + report.getReduceProgress()
-        * reduceWeight);
+    return this.job.getProgress();
   }
 
   protected void register() {
@@ -165,7 +148,7 @@ public abstract class RMCommunicator extends AbstractService  {
       LOG.info("minContainerCapability: " + minContainerCapability.getMemory());
       LOG.info("maxContainerCapability: " + maxContainerCapability.getMemory());
     } catch (Exception are) {
-      LOG.info("Exception while registering", are);
+      LOG.error("Exception while registering", are);
       throw new YarnException(are);
     }
   }
@@ -199,7 +182,7 @@ public abstract class RMCommunicator extends AbstractService  {
       request.setTrackingUrl(historyUrl);
       scheduler.finishApplicationMaster(request);
     } catch(Exception are) {
-      LOG.info("Exception while unregistering ", are);
+      LOG.error("Exception while unregistering ", are);
     }
   }
 
@@ -213,12 +196,15 @@ public abstract class RMCommunicator extends AbstractService  {
 
   @Override
   public void stop() {
-    stopped = true;
+    if (stopped.getAndSet(true)) {
+      // return if already stopped
+      return;
+    }
     allocatorThread.interrupt();
     try {
       allocatorThread.join();
     } catch (InterruptedException ie) {
-      LOG.info("InterruptedException while stopping", ie);
+      LOG.warn("InterruptedException while stopping", ie);
     }
     unregister();
     super.stop();
@@ -228,7 +214,7 @@ public abstract class RMCommunicator extends AbstractService  {
     allocatorThread = new Thread(new Runnable() {
       @Override
       public void run() {
-        while (!stopped && !Thread.currentThread().isInterrupted()) {
+        while (!stopped.get() && !Thread.currentThread().isInterrupted()) {
           try {
             Thread.sleep(rmPollInterval);
             try {
@@ -241,7 +227,7 @@ public abstract class RMCommunicator extends AbstractService  {
               // TODO: for other exceptions
             }
           } catch (InterruptedException e) {
-            LOG.info("Allocated thread interrupted. Returning.");
+            LOG.warn("Allocated thread interrupted. Returning.");
             return;
           }
         }
@@ -268,7 +254,9 @@ public abstract class RMCommunicator extends AbstractService  {
     if (UserGroupInformation.isSecurityEnabled()) {
       String tokenURLEncodedStr = System.getenv().get(
           ApplicationConstants.APPLICATION_MASTER_TOKEN_ENV_NAME);
-      LOG.debug("AppMasterToken is " + tokenURLEncodedStr);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("AppMasterToken is " + tokenURLEncodedStr);
+      }
       Token<? extends TokenIdentifier> token = new Token<TokenIdentifier>();
 
       try {

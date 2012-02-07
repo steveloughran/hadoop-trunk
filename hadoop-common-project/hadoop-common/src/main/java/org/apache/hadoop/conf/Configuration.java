@@ -345,7 +345,17 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     }
     return name;
   }
-  
+ 
+  private void handleDeprecation() {
+    LOG.debug("Handling deprecation for all properties in config...");
+    Set<Object> keys = new HashSet<Object>();
+    keys.addAll(getProps().keySet());
+    for (Object item: keys) {
+      LOG.debug("Handling deprecation for " + (String)item);
+      handleDeprecation((String)item);
+    }
+  }
+ 
   static{
     //print deprecation warning if hadoop-site.xml is found in classpath
     ClassLoader cL = Thread.currentThread().getContextClassLoader();
@@ -737,6 +747,27 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     return Long.parseLong(valueString);
   }
 
+  /**
+   * Get the value of the <code>name</code> property as a <code>long</code> or
+   * human readable format. If no such property exists, the provided default
+   * value is returned, or if the specified value is not a valid
+   * <code>long</code> or human readable format, then an error is thrown. You
+   * can use the following suffix (case insensitive): k(kilo), m(mega), g(giga),
+   * t(tera), p(peta), e(exa)
+   *
+   * @param name property name.
+   * @param defaultValue default value.
+   * @throws NumberFormatException when the value is invalid
+   * @return property value as a <code>long</code>,
+   *         or <code>defaultValue</code>.
+   */
+  public long getLongBytes(String name, long defaultValue) {
+    String valueString = getTrimmed(name);
+    if (valueString == null)
+      return defaultValue;
+    return StringUtils.TraditionalBinaryPrefix.string2long(valueString);
+  }
+
   private String getHexDigits(String value) {
     boolean negative = false;
     String str = value;
@@ -805,6 +836,12 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    */
   public boolean getBoolean(String name, boolean defaultValue) {
     String valueString = getTrimmed(name);
+    if (null == valueString || "".equals(valueString)) {
+      return defaultValue;
+    }
+
+    valueString = valueString.toLowerCase();
+
     if ("true".equals(valueString))
       return true;
     else if ("false".equals(valueString))
@@ -1640,7 +1677,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     Element conf = doc.createElement("configuration");
     doc.appendChild(conf);
     conf.appendChild(doc.createTextNode("\n"));
-    getProps(); // ensure properties is set
+    handleDeprecation(); //ensure properties is set and deprecation is handled
     for (Enumeration e = properties.keys(); e.hasMoreElements();) {
       String name = (String)e.nextElement();
       Object object = properties.get(name);

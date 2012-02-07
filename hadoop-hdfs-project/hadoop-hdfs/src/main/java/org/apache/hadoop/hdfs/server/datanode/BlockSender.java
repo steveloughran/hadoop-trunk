@@ -226,7 +226,7 @@ class BlockSender implements java.io.Closeable {
         // read and handle the common header here. For now just a version
         BlockMetadataHeader header = BlockMetadataHeader.readHeader(checksumIn);
         short version = header.getVersion();
-        if (version != FSDataset.METADATA_VERSION) {
+        if (version != BlockMetadataHeader.VERSION) {
           LOG.warn("Wrong version (" + version + ") for metadata file for "
               + block + " ignoring ...");
         }
@@ -315,7 +315,7 @@ class BlockSender implements java.io.Closeable {
    * close opened files.
    */
   public void close() throws IOException {
-    if (blockInFd != null && shouldDropCacheBehindRead) {
+    if (blockInFd != null && shouldDropCacheBehindRead && isLongRead()) {
       // drop the last few MB of the file from cache
       try {
         NativeIO.posixFadviseIfPossible(

@@ -21,7 +21,14 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
 import java.text.ParseException;
+import java.util.Iterator;
+import java.util.Random;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.mapred.Counters.Counter;
+import org.apache.hadoop.mapred.Counters.Group;
+import org.apache.hadoop.mapreduce.FileSystemCounter;
 import org.apache.hadoop.mapreduce.JobCounter;
 import org.apache.hadoop.mapreduce.TaskCounter;
 import org.junit.Test;
@@ -32,6 +39,7 @@ import org.junit.Test;
 public class TestCounters {
   enum myCounters {TEST1, TEST2};
   private static final long MAX_VALUE = 10;
+  private static final Log LOG = LogFactory.getLog(TestCounters.class);
   
   // Generates enum based counters
   private Counters getEnumCounters(Enum[] keys) {
@@ -68,8 +76,6 @@ public class TestCounters {
     // Check for recovery from string
     assertEquals("Recovered counter does not match on content", 
                  counter, recoveredCounter);
-    assertEquals("recovered counter has wrong hash code",
-                 counter.hashCode(), recoveredCounter.hashCode());
   }
   
   @Test
@@ -96,24 +102,106 @@ public class TestCounters {
     }
   }
   
+  /**
+   * Verify counter value works
+   */
   @SuppressWarnings("deprecation")
   @Test
-  public void testLegacyNames() {
+  public void testCounterValue() {
+    Counters counters = new Counters();
+    final int NUMBER_TESTS = 100;
+    final int NUMBER_INC = 10;
+    final Random rand = new Random();
+    for (int i = 0; i < NUMBER_TESTS; i++) {
+      long initValue = rand.nextInt();
+      long expectedValue = initValue;
+      Counter counter = counters.findCounter("foo", "bar");
+      counter.setValue(initValue);
+      assertEquals("Counter value is not initialized correctly",
+                   expectedValue, counter.getValue());
+      for (int j = 0; j < NUMBER_INC; j++) {
+        int incValue = rand.nextInt();
+        counter.increment(incValue);
+        expectedValue += incValue;
+        assertEquals("Counter value is not incremented correctly",
+                     expectedValue, counter.getValue());
+      }
+      expectedValue = rand.nextInt();
+      counter.setValue(expectedValue);
+      assertEquals("Counter value is not set correctly",
+                   expectedValue, counter.getValue());
+    }
+  }
+  
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testReadWithLegacyNames() {
     Counters counters = new Counters();
     counters.incrCounter(TaskCounter.MAP_INPUT_RECORDS, 1);
     counters.incrCounter(JobCounter.DATA_LOCAL_MAPS, 1);
+    counters.findCounter("file", FileSystemCounter.BYTES_READ).increment(1);
     
+    checkLegacyNames(counters);
+  }
+  
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testWriteWithLegacyNames() {
+    Counters counters = new Counters();
+    counters.incrCounter(Task.Counter.MAP_INPUT_RECORDS, 1);
+    counters.incrCounter(JobInProgress.Counter.DATA_LOCAL_MAPS, 1);
+    counters.findCounter("FileSystemCounter", "FILE_BYTES_READ").increment(1);
+    
+    checkLegacyNames(counters);
+  }
+
+  @SuppressWarnings("deprecation")
+  private void checkLegacyNames(Counters counters) {
     assertEquals("New name", 1, counters.findCounter(
         TaskCounter.class.getName(), "MAP_INPUT_RECORDS").getValue());
     assertEquals("Legacy name", 1, counters.findCounter(
         "org.apache.hadoop.mapred.Task$Counter",
         "MAP_INPUT_RECORDS").getValue());
+    assertEquals("Legacy enum", 1,
+        counters.findCounter(Task.Counter.MAP_INPUT_RECORDS).getValue());
 
     assertEquals("New name", 1, counters.findCounter(
         JobCounter.class.getName(), "DATA_LOCAL_MAPS").getValue());
     assertEquals("Legacy name", 1, counters.findCounter(
         "org.apache.hadoop.mapred.JobInProgress$Counter",
         "DATA_LOCAL_MAPS").getValue());
+    assertEquals("Legacy enum", 1,
+        counters.findCounter(JobInProgress.Counter.DATA_LOCAL_MAPS).getValue());
+
+    assertEquals("New name", 1, counters.findCounter(
+        FileSystemCounter.class.getName(), "FILE_BYTES_READ").getValue());
+    assertEquals("New name and method", 1, counters.findCounter("file",
+        FileSystemCounter.BYTES_READ).getValue());
+    assertEquals("Legacy name", 1, counters.findCounter(
+        "FileSystemCounter",
+        "FILE_BYTES_READ").getValue());
+  }
+  
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testCounterIteratorConcurrency() {
+    Counters counters = new Counters();
+    counters.incrCounter("group1", "counter1", 1);
+    Iterator<Group> iterator = counters.iterator();
+    counters.incrCounter("group2", "counter2", 1);
+    iterator.next();
+  }
+  
+  
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testGroupIteratorConcurrency() {
+    Counters counters = new Counters();
+    counters.incrCounter("group1", "counter1", 1);
+    Group group = counters.getGroup("group1");
+    Iterator<Counter> iterator = group.iterator();
+    counters.incrCounter("group1", "counter2", 1);
+    iterator.next();
   }
   
   public static void main(String[] args) throws IOException {

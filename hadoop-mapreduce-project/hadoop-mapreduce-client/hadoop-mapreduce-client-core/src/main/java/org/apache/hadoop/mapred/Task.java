@@ -80,6 +80,33 @@ abstract public class Task implements Writable, Configurable {
 
   public static String MERGED_OUTPUT_PREFIX = ".merged";
   public static final long DEFAULT_COMBINE_RECORDS_BEFORE_PROGRESS = 10000;
+  
+  /**
+   * @deprecated Provided for compatibility. Use {@link TaskCounter} instead.
+   */
+  @Deprecated
+  public static enum Counter { 
+    MAP_INPUT_RECORDS, 
+    MAP_OUTPUT_RECORDS,
+    MAP_SKIPPED_RECORDS,
+    MAP_INPUT_BYTES, 
+    MAP_OUTPUT_BYTES,
+    MAP_OUTPUT_MATERIALIZED_BYTES,
+    COMBINE_INPUT_RECORDS,
+    COMBINE_OUTPUT_RECORDS,
+    REDUCE_INPUT_GROUPS,
+    REDUCE_SHUFFLE_BYTES,
+    REDUCE_INPUT_RECORDS,
+    REDUCE_OUTPUT_RECORDS,
+    REDUCE_SKIPPED_GROUPS,
+    REDUCE_SKIPPED_RECORDS,
+    SPILLED_RECORDS,
+    SPLIT_RAW_BYTES,
+    CPU_MILLISECONDS,
+    PHYSICAL_MEMORY_BYTES,
+    VIRTUAL_MEMORY_BYTES,
+    COMMITTED_HEAP_BYTES
+  }
 
   /**
    * Counters to measure the usage of the different file systems.
@@ -525,7 +552,7 @@ abstract public class Task implements Writable, Configurable {
     if (outputPath != null) {
       if ((committer instanceof FileOutputCommitter)) {
         FileOutputFormat.setWorkOutputPath(conf, 
-          ((FileOutputCommitter)committer).getTempTaskOutputPath(taskContext));
+          ((FileOutputCommitter)committer).getTaskAttemptPath(taskContext));
       } else {
         FileOutputFormat.setWorkOutputPath(conf, outputPath);
       }
@@ -552,6 +579,8 @@ abstract public class Task implements Writable, Configurable {
     private InputSplit split = null;
     private Progress taskProgress;
     private Thread pingThread = null;
+    private boolean done = true;
+    private Object lock = new Object();
 
     /**
      * flag that indicates whether progress update needs to be sent to parent.
@@ -648,17 +677,19 @@ abstract public class Task implements Writable, Configurable {
       // get current flag value and reset it as well
       boolean sendProgress = resetProgressFlag();
       while (!taskDone.get()) {
+        synchronized (lock) {
+          done = false;
+        }
         try {
           boolean taskFound = true; // whether TT knows about this task
           // sleep for a bit
-          try {
-            Thread.sleep(PROGRESS_INTERVAL);
-          } 
-          catch (InterruptedException e) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug(getTaskID() + " Progress/ping thread exiting " +
-                        "since it got interrupted");
+          synchronized(lock) {
+            if (taskDone.get()) {
+              break;
             }
+            lock.wait(PROGRESS_INTERVAL);
+          }
+          if (taskDone.get()) {
             break;
           }
 
@@ -680,6 +711,7 @@ abstract public class Task implements Writable, Configurable {
           // came back up), kill ourselves
           if (!taskFound) {
             LOG.warn("Parent died.  Exiting "+taskId);
+            resetDoneFlag();
             System.exit(66);
           }
 
@@ -692,9 +724,18 @@ abstract public class Task implements Writable, Configurable {
           if (remainingRetries == 0) {
             ReflectionUtils.logThreadInfo(LOG, "Communication exception", 0);
             LOG.warn("Last retry, killing "+taskId);
+            resetDoneFlag();
             System.exit(65);
           }
         }
+      }
+      //Notify that we are done with the work
+      resetDoneFlag();
+    }
+    void resetDoneFlag() {
+      synchronized (lock) {
+        done = true;
+        lock.notify();
       }
     }
     public void startCommunicationThread() {
@@ -706,6 +747,18 @@ abstract public class Task implements Writable, Configurable {
     }
     public void stopCommunicationThread() throws InterruptedException {
       if (pingThread != null) {
+        // Intent of the lock is to not send an interupt in the middle of an
+        // umbilical.ping or umbilical.statusUpdate
+        synchronized(lock) {
+        //Interrupt if sleeping. Otherwise wait for the RPC call to return.
+          lock.notify(); 
+        }
+
+        synchronized (lock) { 
+          while (!done) {
+            lock.wait();
+          }
+        }
         pingThread.interrupt();
         pingThread.join();
       }
@@ -800,7 +853,8 @@ abstract public class Task implements Writable, Configurable {
         return; // nothing to do.
       }
 
-      Counter gcCounter = counters.findCounter(TaskCounter.GC_TIME_MILLIS);
+      org.apache.hadoop.mapred.Counters.Counter gcCounter =
+        counters.findCounter(TaskCounter.GC_TIME_MILLIS);
       if (null != gcCounter) {
         gcCounter.increment(getElapsedGc());
       }
@@ -1458,11 +1512,11 @@ abstract public class Task implements Writable, Configurable {
       try {
         CombineValuesIterator<K,V> values = 
           new CombineValuesIterator<K,V>(kvIter, comparator, keyClass, 
-                                         valueClass, job, Reporter.NULL,
+                                         valueClass, job, reporter,
                                          inputCounter);
         while (values.more()) {
           combiner.reduce(values.getKey(), values, combineCollector,
-              Reporter.NULL);
+              reporter);
           values.nextKey();
         }
       } finally {

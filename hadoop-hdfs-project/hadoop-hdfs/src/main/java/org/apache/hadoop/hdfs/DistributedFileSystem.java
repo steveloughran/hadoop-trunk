@@ -108,43 +108,8 @@ public class DistributedFileSystem extends FileSystem {
 
     InetSocketAddress namenode = NameNode.getAddress(uri.getAuthority());
     this.dfs = new DFSClient(namenode, conf, statistics);
-    this.uri = URI.create(HdfsConstants.HDFS_URI_SCHEME + "://" + uri.getAuthority());
+    this.uri = URI.create(uri.getScheme()+"://"+uri.getAuthority());
     this.workingDir = getHomeDirectory();
-  }
-
-  /** Permit paths which explicitly specify the default port. */
-  @Override
-  protected void checkPath(Path path) {
-    URI thisUri = this.getUri();
-    URI thatUri = path.toUri();
-    String thatAuthority = thatUri.getAuthority();
-    if (thatUri.getScheme() != null
-        && thatUri.getScheme().equalsIgnoreCase(thisUri.getScheme())
-        && thatUri.getPort() == NameNode.DEFAULT_PORT
-        && (thisUri.getPort() == -1 || 
-            thisUri.getPort() == NameNode.DEFAULT_PORT)
-        && thatAuthority.substring(0,thatAuthority.indexOf(":"))
-        .equalsIgnoreCase(thisUri.getAuthority()))
-      return;
-    super.checkPath(path);
-  }
-
-  /** Normalize paths that explicitly specify the default port. */
-  @Override
-  public Path makeQualified(Path path) {
-    URI thisUri = this.getUri();
-    URI thatUri = path.toUri();
-    String thatAuthority = thatUri.getAuthority();
-    if (thatUri.getScheme() != null
-        && thatUri.getScheme().equalsIgnoreCase(thisUri.getScheme())
-        && thatUri.getPort() == NameNode.DEFAULT_PORT
-        && thisUri.getPort() == -1
-        && thatAuthority.substring(0,thatAuthority.indexOf(":"))
-        .equalsIgnoreCase(thisUri.getAuthority())) {
-      path = new Path(thisUri.getScheme(), thisUri.getAuthority(),
-                      thatUri.getPath());
-    }
-    return super.makeQualified(path);
   }
 
   @Override
@@ -180,7 +145,7 @@ public class DistributedFileSystem extends FileSystem {
     workingDir = makeAbsolute(dir);
   }
 
-  /** {@inheritDoc} */
+  
   @Override
   public Path getHomeDirectory() {
     return makeQualified(new Path("/user/" + dfs.ugi.getShortUserName()));
@@ -307,7 +272,7 @@ public class DistributedFileSystem extends FileSystem {
     dfs.concat(getPathName(trg), srcs);
   }
 
-  /** {@inheritDoc} */
+  
   @SuppressWarnings("deprecation")
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
@@ -316,7 +281,6 @@ public class DistributedFileSystem extends FileSystem {
   }
 
   /** 
-   * {@inheritDoc}
    * This rename operation is guaranteed to be atomic.
    */
   @SuppressWarnings("deprecation")
@@ -332,7 +296,6 @@ public class DistributedFileSystem extends FileSystem {
     return dfs.delete(getPathName(f), recursive);
   }
   
-  /** {@inheritDoc} */
   @Override
   public ContentSummary getContentSummary(Path f) throws IOException {
     statistics.incrementReadOps(1);
@@ -513,7 +476,7 @@ public class DistributedFileSystem extends FileSystem {
     return dfs.primitiveMkdir(getPathName(f), absolutePermission);
   }
 
-  /** {@inheritDoc} */
+ 
   @Override
   public void close() throws IOException {
     try {
@@ -553,7 +516,6 @@ public class DistributedFileSystem extends FileSystem {
     }
   }
   
-  /** {@inheritDoc} */
   @Override
   public FsStatus getStatus(Path p) throws IOException {
     statistics.incrementReadOps(1);
@@ -615,9 +577,6 @@ public class DistributedFileSystem extends FileSystem {
     return dfs.getCorruptBlocksCount();
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public RemoteIterator<Path> listCorruptFileBlocks(Path path)
     throws IOException {
@@ -695,7 +654,6 @@ public class DistributedFileSystem extends FileSystem {
     dfs.metaSave(pathname);
   }
 
-  /** {@inheritDoc} */
   @Override
   public FsServerDefaults getServerDefaults() throws IOException {
     return dfs.getServerDefaults();
@@ -766,14 +724,12 @@ public class DistributedFileSystem extends FileSystem {
     }
   }
 
-  /** {@inheritDoc} */
   @Override
   public MD5MD5CRC32FileChecksum getFileChecksum(Path f) throws IOException {
     statistics.incrementReadOps(1);
     return dfs.getFileChecksum(getPathName(f));
   }
 
-  /** {@inheritDoc }*/
   @Override
   public void setPermission(Path p, FsPermission permission
       ) throws IOException {
@@ -781,7 +737,6 @@ public class DistributedFileSystem extends FileSystem {
     dfs.setPermission(getPathName(p), permission);
   }
 
-  /** {@inheritDoc }*/
   @Override
   public void setOwner(Path p, String username, String groupname
       ) throws IOException {
@@ -792,7 +747,6 @@ public class DistributedFileSystem extends FileSystem {
     dfs.setOwner(getPathName(p), username, groupname);
   }
 
-  /** {@inheritDoc }*/
   @Override
   public void setTimes(Path p, long mtime, long atime
       ) throws IOException {

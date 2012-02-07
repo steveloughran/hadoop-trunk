@@ -29,7 +29,6 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
-import org.apache.hadoop.metrics2.lib.MutableCounterInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEventType;
 
@@ -39,9 +38,9 @@ public class ClusterMetrics {
   
   private static AtomicBoolean isInitialized = new AtomicBoolean(false);
   
-  @Metric("# of NMs") MutableGaugeInt numNMs;
-  @Metric("# of decommissioned NMs") MutableCounterInt numDecommissionedNMs;
-  @Metric("# of lost NMs") MutableCounterInt numLostNMs;
+  @Metric("# of active NMs") MutableGaugeInt numActiveNMs;
+  @Metric("# of decommissioned NMs") MutableGaugeInt numDecommissionedNMs;
+  @Metric("# of lost NMs") MutableGaugeInt numLostNMs;
   @Metric("# of unhealthy NMs") MutableGaugeInt numUnhealthyNMs;
   @Metric("# of Rebooted NMs") MutableGaugeInt numRebootedNMs;
   
@@ -73,9 +72,9 @@ public class ClusterMetrics {
     }
   }
   
-  //Total Nodemanagers
-  public int getNumNMs() {
-    return numNMs.value();
+  //Active Nodemanagers
+  public int getNumActiveNMs() {
+    return numActiveNMs.value();
   }
   
   //Decommisioned NMs
@@ -87,6 +86,10 @@ public class ClusterMetrics {
     numDecommissionedNMs.incr();
   }
   
+  public void decrDecommisionedNMs() {
+    numDecommissionedNMs.decr();
+  }
+  
   //Lost NMs
   public int getNumLostNMs() {
     return numLostNMs.value();
@@ -94,6 +97,10 @@ public class ClusterMetrics {
 
   public void incrNumLostNMs() {
     numLostNMs.incr();
+  }
+  
+  public void decrNumLostNMs() {
+    numLostNMs.decr();
   }
   
   //Unhealthy NMs
@@ -118,16 +125,15 @@ public class ClusterMetrics {
     numRebootedNMs.incr();
   }
   
-  public void removeNode(RMNodeEventType nodeEventType) {
-    numNMs.decr();
-    switch(nodeEventType){
-    case DECOMMISSION: incrDecommisionedNMs(); break;
-    case EXPIRE: incrNumLostNMs();break;
-    case REBOOTING: incrNumRebootedNMs();break;
-    }
+  public void decrNumRebootedNMs() {
+    numRebootedNMs.decr();
   }
-  
-  public void addNode() {
-    numNMs.incr();
+
+  public void incrNumActiveNodes() {
+    numActiveNMs.incr();
+  }
+
+  public void decrNumActiveNodes() {
+    numActiveNMs.decr();
   }
 }

@@ -32,13 +32,13 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.JobACLsManager;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.JobACL;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskInfo;
 import org.apache.hadoop.mapreduce.v2.api.records.AMInfo;
-import org.apache.hadoop.mapreduce.v2.api.records.Counters;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 import org.apache.hadoop.mapreduce.v2.api.records.JobReport;
 import org.apache.hadoop.mapreduce.v2.api.records.JobState;
@@ -89,7 +89,7 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
     
     loadFullHistoryData(loadTasks, historyFile);
     user = userName;
-    counters = TypeConverter.toYarn(jobInfo.getTotalCounters());
+    counters = jobInfo.getTotalCounters();
     diagnostics.add(jobInfo.getErrorInfo());
     report =
         RecordFactoryProvider.getRecordFactory(null).newRecordInstance(
@@ -107,6 +107,7 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
     report.setTrackingUrl(JobHistoryUtils.getHistoryUrl(conf, TypeConverter
         .toYarn(TypeConverter.fromYarn(jobId)).getAppId()));
     report.setAMInfos(getAMInfos());
+    report.setIsUber(isUber());
   }
 
   @Override
@@ -120,7 +121,7 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
   }
 
   @Override
-  public Counters getCounters() {
+  public Counters getAllCounters() {
     return counters;
   }
 
@@ -132,6 +133,11 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
   @Override
   public JobReport getReport() {
     return report;
+  }
+
+  @Override
+  public float getProgress() {
+    return 1.0f;
   }
 
   @Override
@@ -243,14 +249,21 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
     }
     
     if (historyFileAbsolute != null) {
+      JobHistoryParser parser = null;
       try {
-        JobHistoryParser parser =
+        parser =
             new JobHistoryParser(historyFileAbsolute.getFileSystem(conf),
                 historyFileAbsolute);
         jobInfo = parser.parse();
       } catch (IOException e) {
         throw new YarnException("Could not load history file "
             + historyFileAbsolute, e);
+      }
+      IOException parseException = parser.getParseException(); 
+      if (parseException != null) {
+        throw new YarnException(
+            "Could not parse history file " + historyFileAbsolute, 
+            parseException);
       }
     } else {
       throw new IOException("History file not found");
@@ -315,9 +328,6 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
   @Override
   public
       boolean checkAccess(UserGroupInformation callerUGI, JobACL jobOperation) {
-    if (!UserGroupInformation.isSecurityEnabled()) {
-      return true;
-    }
     Map<JobACL, AccessControlList> jobACLs = jobInfo.getJobACLs();
     AccessControlList jobACL = jobACLs.get(jobOperation);
     return aclsMgr.checkAccess(callerUGI, jobOperation, 

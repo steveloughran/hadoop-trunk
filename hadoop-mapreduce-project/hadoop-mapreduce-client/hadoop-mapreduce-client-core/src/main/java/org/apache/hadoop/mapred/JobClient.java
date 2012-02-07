@@ -29,6 +29,9 @@ import java.util.List;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.ClusterStatus.BlackListInfo;
 import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.ClusterMetrics;
@@ -40,13 +43,10 @@ import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.mapreduce.tools.CLI;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
-import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -132,15 +132,26 @@ import org.apache.hadoop.util.ToolRunner;
  * @see ClusterStatus
  * @see Tool
  * @see DistributedCache
- * @deprecated Use {@link Job} and {@link Cluster} instead
  */
-@Deprecated
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class JobClient extends CLI {
   public static enum TaskStatusFilter { NONE, KILLED, FAILED, SUCCEEDED, ALL }
   private TaskStatusFilter taskOutputFilter = TaskStatusFilter.FAILED; 
-
+  /* notes that get delegation token was called. Again this is hack for oozie 
+   * to make sure we add history server delegation tokens to the credentials
+   *  for the job. Since the api only allows one delegation token to be returned, 
+   *  we have to add this hack.
+   */
+  private boolean getDelegationTokenCalled = false;
+  /* notes the renewer that will renew the delegation token */
+  private String dtRenewer = null;
+  /* do we need a HS delegation token for this client */
+  static final String HS_DELEGATION_TOKEN_REQUIRED 
+      = "mapreduce.history.server.delegationtoken.required";
+  static final String HS_DELEGATION_TOKEN_RENEWER 
+      = "mapreduce.history.server.delegationtoken.renewer";
+  
   static{
     ConfigUtil.loadResources();
   }
@@ -420,9 +431,18 @@ public class JobClient extends CLI {
     boolean monitorAndPrintJob() throws IOException, InterruptedException {
       return job.monitorAndPrintJob();
     }
+    
+    @Override
+    public String getFailureInfo() throws IOException {
+      try {
+        return job.getStatus().getFailureInfo();
+      } catch (InterruptedException ie) {
+        throw new IOException(ie);
+      }
+    }
+
   }
 
-  Cluster cluster;
   /**
    * Ugi of the client. We store this ugi when the client is created and 
    * then make sure that the same ugi is used to run the various protocols.
@@ -575,6 +595,12 @@ public class JobClient extends CLI {
     try {
       conf.setBooleanIfUnset("mapred.mapper.new-api", false);
       conf.setBooleanIfUnset("mapred.reducer.new-api", false);
+      if (getDelegationTokenCalled) {
+        conf.setBoolean(HS_DELEGATION_TOKEN_REQUIRED, getDelegationTokenCalled);
+        getDelegationTokenCalled = false;
+        conf.set(HS_DELEGATION_TOKEN_RENEWER, dtRenewer);
+        dtRenewer = null;
+      }
       Job job = clientUgi.doAs(new PrivilegedExceptionAction<Job> () {
         @Override
         public Job run() throws IOException, ClassNotFoundException, 
@@ -714,6 +740,8 @@ public class JobClient extends CLI {
    * @param type the type of the task (map/reduce/setup/cleanup)
    * @param state the state of the task 
    * (pending/running/completed/failed/killed)
+   * @throws IOException when there is an error communicating with the master
+   * @throws IllegalArgumentException if an invalid type/state is passed
    */
   public void displayTasks(final JobID jobId, String type, String state) 
   throws IOException {
@@ -1003,11 +1031,25 @@ public class JobClient extends CLI {
     }
   }
 
-  private JobQueueInfo[] getJobQueueInfoArray(QueueInfo[] queues) 
-  throws IOException {
+  private JobQueueInfo getJobQueueInfo(QueueInfo queue) {
+    JobQueueInfo ret = new JobQueueInfo(queue);
+    // make sure to convert any children
+    if (queue.getQueueChildren().size() > 0) {
+      List<JobQueueInfo> childQueues = new ArrayList<JobQueueInfo>(queue
+          .getQueueChildren().size());
+      for (QueueInfo child : queue.getQueueChildren()) {
+        childQueues.add(getJobQueueInfo(child));
+      }
+      ret.setChildren(childQueues);
+    }
+    return ret;
+  }
+
+  private JobQueueInfo[] getJobQueueInfoArray(QueueInfo[] queues)
+      throws IOException {
     JobQueueInfo[] ret = new JobQueueInfo[queues.length];
     for (int i = 0; i < queues.length; i++) {
-      ret[i] = new JobQueueInfo(queues[i]);
+      ret[i] = getJobQueueInfo(queues[i]);
     }
     return ret;
   }
@@ -1159,6 +1201,8 @@ public class JobClient extends CLI {
    */
   public Token<DelegationTokenIdentifier> 
     getDelegationToken(final Text renewer) throws IOException, InterruptedException {
+    getDelegationTokenCalled = true;
+    dtRenewer = renewer.toString();
     return clientUgi.doAs(new 
         PrivilegedExceptionAction<Token<DelegationTokenIdentifier>>() {
       public Token<DelegationTokenIdentifier> run() throws IOException, 

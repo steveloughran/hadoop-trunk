@@ -23,12 +23,13 @@ import java.util.List;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.RecordReader;
+import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
@@ -50,10 +51,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
  * Subclasses implement {@link org.apache.hadoop.mapred.InputFormat#getRecordReader(InputSplit, JobConf, Reporter)}
  * to construct <code>RecordReader</code>'s for <code>CombineFileSplit</code>'s.
  * @see CombineFileSplit
- * @deprecated Use 
- * {@link org.apache.hadoop.mapreduce.lib.input.CombineFileInputFormat}
  */
-@Deprecated
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public abstract class CombineFileInputFormat<K, V>
@@ -114,6 +112,19 @@ public abstract class CombineFileInputFormat<K, V>
       org.apache.hadoop.mapreduce.InputSplit split,
       TaskAttemptContext context) throws IOException {
     return null;
+  }
+  
+  /** List input directories.
+   * Subclasses may override to, e.g., select only files matching a regular
+   * expression. 
+   * 
+   * @param job the job to list input paths for
+   * @return array of FileStatus objects
+   * @throws IOException if zero items.
+   */
+  protected FileStatus[] listStatus(JobConf job) throws IOException {
+    List<FileStatus> result = super.listStatus(new Job(job));
+    return result.toArray(new FileStatus[result.size()]);
   }
 
 }

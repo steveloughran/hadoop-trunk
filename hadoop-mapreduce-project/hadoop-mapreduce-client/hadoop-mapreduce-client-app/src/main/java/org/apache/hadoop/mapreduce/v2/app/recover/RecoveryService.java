@@ -32,8 +32,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
@@ -92,7 +94,6 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
 
 //TODO:
 //task cleanup for all non completed tasks
-
 public class RecoveryService extends CompositeService implements Recovery {
 
   private static final Log LOG = LogFactory.getLog(RecoveryService.class);
@@ -192,6 +193,11 @@ public class RecoveryService extends CompositeService implements Recovery {
     in = fc.open(historyFile);
     JobHistoryParser parser = new JobHistoryParser(in);
     jobInfo = parser.parse();
+    Exception parseException = parser.getParseException();
+    if (parseException != null) {
+      LOG.info("Got an error parsing job-history file " + historyFile + 
+          ", ignoring incomplete events.", parseException);
+    }
     Map<org.apache.hadoop.mapreduce.TaskID, TaskInfo> taskInfos = jobInfo
         .getAllTasks();
     for (TaskInfo taskInfo : taskInfos.values()) {
@@ -354,16 +360,24 @@ public class RecoveryService extends CompositeService implements Recovery {
           //recover the task output
           TaskAttemptContext taskContext = new TaskAttemptContextImpl(getConfig(),
               attInfo.getAttemptId());
-          try {
-            committer.recoverTask(taskContext);
+          try { 
+            TaskType type = taskContext.getTaskAttemptID().getTaskID().getTaskType();
+            int numReducers = taskContext.getConfiguration().getInt(MRJobConfig.NUM_REDUCES, 1); 
+            if(type == TaskType.REDUCE || (type == TaskType.MAP && numReducers <= 0)) {
+              committer.recoverTask(taskContext);
+              LOG.info("Recovered output from task attempt " + attInfo.getAttemptId());
+            } else {
+              LOG.info("Will not try to recover output for "
+                  + taskContext.getTaskAttemptID());
+            }
           } catch (IOException e) {
+            LOG.error("Caught an exception while trying to recover task "+aId, e);
             actualHandler.handle(new JobDiagnosticsUpdateEvent(
                 aId.getTaskId().getJobId(), "Error in recovering task output " + 
                 e.getMessage()));
             actualHandler.handle(new JobEvent(aId.getTaskId().getJobId(),
                 JobEventType.INTERNAL_ERROR));
           }
-          LOG.info("Recovered output from task attempt " + attInfo.getAttemptId());
           
           // send the done event
           LOG.info("Sending done event to " + aId);
@@ -411,8 +425,7 @@ public class RecoveryService extends CompositeService implements Recovery {
       if (cntrs == null) {
         taskAttemptStatus.counters = null;
       } else {
-        taskAttemptStatus.counters = TypeConverter.toYarn(attemptInfo
-            .getCounters());
+        taskAttemptStatus.counters = cntrs;
       }
       actualHandler.handle(new TaskAttemptStatusUpdateEvent(
           taskAttemptStatus.id, taskAttemptStatus));

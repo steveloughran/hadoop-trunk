@@ -32,7 +32,6 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.proto.JournalProtocolProtos.JournalProtocolService;
 import org.apache.hadoop.hdfs.protocolPB.JournalProtocolPB;
 import org.apache.hadoop.hdfs.protocolPB.JournalProtocolServerSideTranslatorPB;
-import org.apache.hadoop.hdfs.protocolPB.NamenodeProtocolPB;
 import org.apache.hadoop.hdfs.protocolPB.NamenodeProtocolTranslatorPB;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.Storage;
@@ -42,8 +41,10 @@ import org.apache.hadoop.hdfs.server.protocol.NamenodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import com.google.protobuf.BlockingService;
 
@@ -69,7 +70,7 @@ public class BackupNode extends NameNode {
   private static final String BN_SERVICE_RPC_ADDRESS_KEY = DFSConfigKeys.DFS_NAMENODE_BACKUP_SERVICE_RPC_ADDRESS_KEY;
 
   /** Name-node proxy */
-  NamenodeProtocol namenode;
+  NamenodeProtocolTranslatorPB namenode;
   /** Name-node RPC address */
   String nnRpcAddress;
   /** Name-node HTTP address */
@@ -189,7 +190,7 @@ public class BackupNode extends NameNode {
     }
     // Stop the RPC client
     if (namenode != null) {
-      RPC.stopProxy(namenode);
+      IOUtils.cleanup(LOG, namenode);
     }
     namenode = null;
     // Stop the checkpoint manager
@@ -304,11 +305,8 @@ public class BackupNode extends NameNode {
   private NamespaceInfo handshake(Configuration conf) throws IOException {
     // connect to name node
     InetSocketAddress nnAddress = NameNode.getServiceAddress(conf, true);
-    NamenodeProtocolPB proxy = 
-      RPC.waitForProxy(NamenodeProtocolPB.class,
-          RPC.getProtocolVersion(NamenodeProtocolPB.class),
-          nnAddress, conf);
-    this.namenode = new NamenodeProtocolTranslatorPB(proxy);
+    this.namenode = new NamenodeProtocolTranslatorPB(nnAddress, conf,
+        UserGroupInformation.getCurrentUser());
     this.nnRpcAddress = getHostPortString(nnAddress);
     this.nnHttpAddress = getHostPortString(super.getHttpServerAddress(conf));
     // get version and id info from the name-node

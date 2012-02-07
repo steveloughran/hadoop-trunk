@@ -21,16 +21,24 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.QueueACL;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.factories.RecordFactory;
+import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.Resources;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApp;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
 import org.junit.After;
@@ -88,13 +96,13 @@ public class TestApplicationLimits {
   private void setupQueueConfiguration(CapacitySchedulerConfiguration conf) {
     
     // Define top-level queues
-    conf.setQueues(CapacityScheduler.ROOT, new String[] {A, B});
-    conf.setCapacity(CapacityScheduler.ROOT, 100);
+    conf.setQueues(CapacitySchedulerConfiguration.ROOT, new String[] {A, B});
+    conf.setCapacity(CapacitySchedulerConfiguration.ROOT, 100);
     
-    final String Q_A = CapacityScheduler.ROOT + "." + A;
+    final String Q_A = CapacitySchedulerConfiguration.ROOT + "." + A;
     conf.setCapacity(Q_A, 10);
     
-    final String Q_B = CapacityScheduler.ROOT + "." + B;
+    final String Q_B = CapacitySchedulerConfiguration.ROOT + "." + B;
     conf.setCapacity(Q_B, 90);
     
     LOG.info("Setup top-level queues a and b");
@@ -134,7 +142,7 @@ public class TestApplicationLimits {
         CapacityScheduler.parseQueue(csContext, csConf, null, "root", 
             queues, queues, 
             CapacityScheduler.queueComparator, 
-            CapacityScheduler.applicationComparator, 
+            CapacityScheduler.applicationComparator,
             TestUtils.spyHook);
 
     LeafQueue queue = (LeafQueue)queues.get(A);
@@ -145,29 +153,39 @@ public class TestApplicationLimits {
     		queue.getMaximumActiveApplicationsPerUser());
     int expectedMaxActiveApps = 
         Math.max(1, 
-            (int)((clusterResource.getMemory() / LeafQueue.DEFAULT_AM_RESOURCE) * 
+            (int)Math.ceil(((float)clusterResource.getMemory() / (1*GB)) * 
                    csConf.getMaximumApplicationMasterResourcePercent() *
-                   queue.getAbsoluteCapacity()));
+                   queue.getAbsoluteMaximumCapacity()));
     assertEquals(expectedMaxActiveApps, 
                  queue.getMaximumActiveApplications());
-    assertEquals((int)(expectedMaxActiveApps * (queue.getUserLimit() / 100.0f) * 
-                       queue.getUserLimitFactor()), 
-                 queue.getMaximumActiveApplicationsPerUser());
+    assertEquals(
+        (int)Math.ceil(
+            expectedMaxActiveApps * (queue.getUserLimit() / 100.0f) * 
+            queue.getUserLimitFactor()), 
+        queue.getMaximumActiveApplicationsPerUser());
+    assertEquals(
+        (int)(clusterResource.getMemory() * queue.getAbsoluteCapacity()),
+        queue.getMetrics().getAvailableMB()
+        );
     
     // Add some nodes to the cluster & test new limits
     clusterResource = Resources.createResource(120 * 16 * GB);
     root.updateClusterResource(clusterResource);
     expectedMaxActiveApps = 
         Math.max(1, 
-            (int)((clusterResource.getMemory() / LeafQueue.DEFAULT_AM_RESOURCE) * 
+            (int)Math.ceil(((float)clusterResource.getMemory() / (1*GB)) * 
                    csConf.getMaximumApplicationMasterResourcePercent() *
-                   queue.getAbsoluteCapacity()));
+                   queue.getAbsoluteMaximumCapacity()));
     assertEquals(expectedMaxActiveApps, 
                  queue.getMaximumActiveApplications());
-    assertEquals((int)(expectedMaxActiveApps * (queue.getUserLimit() / 100.0f) * 
-                       queue.getUserLimitFactor()), 
-                 queue.getMaximumActiveApplicationsPerUser());
-    
+    assertEquals(
+        (int)Math.ceil(expectedMaxActiveApps * 
+            (queue.getUserLimit() / 100.0f) * queue.getUserLimitFactor()), 
+        queue.getMaximumActiveApplicationsPerUser());
+    assertEquals(
+        (int)(clusterResource.getMemory() * queue.getAbsoluteCapacity()),
+        queue.getMetrics().getAvailableMB()
+        );
   }
   
   @Test
@@ -249,10 +267,91 @@ public class TestApplicationLimits {
   }
 
   @Test
+  public void testActiveLimitsWithKilledApps() throws Exception {
+    final String user_0 = "user_0";
+
+    int APPLICATION_ID = 0;
+
+    // set max active to 2
+    doReturn(2).when(queue).getMaximumActiveApplications();
+
+    // Submit first application
+    SchedulerApp app_0 = getMockApplication(APPLICATION_ID++, user_0);
+    queue.submitApplication(app_0, user_0, A);
+    assertEquals(1, queue.getNumActiveApplications());
+    assertEquals(0, queue.getNumPendingApplications());
+    assertEquals(1, queue.getNumActiveApplications(user_0));
+    assertEquals(0, queue.getNumPendingApplications(user_0));
+    assertTrue(queue.activeApplications.contains(app_0));
+
+    // Submit second application
+    SchedulerApp app_1 = getMockApplication(APPLICATION_ID++, user_0);
+    queue.submitApplication(app_1, user_0, A);
+    assertEquals(2, queue.getNumActiveApplications());
+    assertEquals(0, queue.getNumPendingApplications());
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(0, queue.getNumPendingApplications(user_0));
+    assertTrue(queue.activeApplications.contains(app_1));
+
+    // Submit third application, should remain pending
+    SchedulerApp app_2 = getMockApplication(APPLICATION_ID++, user_0);
+    queue.submitApplication(app_2, user_0, A);
+    assertEquals(2, queue.getNumActiveApplications());
+    assertEquals(1, queue.getNumPendingApplications());
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(1, queue.getNumPendingApplications(user_0));
+    assertTrue(queue.pendingApplications.contains(app_2));
+
+    // Submit fourth application, should remain pending
+    SchedulerApp app_3 = getMockApplication(APPLICATION_ID++, user_0);
+    queue.submitApplication(app_3, user_0, A);
+    assertEquals(2, queue.getNumActiveApplications());
+    assertEquals(2, queue.getNumPendingApplications());
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(2, queue.getNumPendingApplications(user_0));
+    assertTrue(queue.pendingApplications.contains(app_3));
+
+    // Kill 3rd pending application
+    queue.finishApplication(app_2, A);
+    assertEquals(2, queue.getNumActiveApplications());
+    assertEquals(1, queue.getNumPendingApplications());
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(1, queue.getNumPendingApplications(user_0));
+    assertFalse(queue.pendingApplications.contains(app_2));
+    assertFalse(queue.activeApplications.contains(app_2));
+
+    // Finish 1st application, app_3 should become active
+    queue.finishApplication(app_0, A);
+    assertEquals(2, queue.getNumActiveApplications());
+    assertEquals(0, queue.getNumPendingApplications());
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(0, queue.getNumPendingApplications(user_0));
+    assertTrue(queue.activeApplications.contains(app_3));
+    assertFalse(queue.pendingApplications.contains(app_3));
+    assertFalse(queue.activeApplications.contains(app_0));
+
+    // Finish 2nd application
+    queue.finishApplication(app_1, A);
+    assertEquals(1, queue.getNumActiveApplications());
+    assertEquals(0, queue.getNumPendingApplications());
+    assertEquals(1, queue.getNumActiveApplications(user_0));
+    assertEquals(0, queue.getNumPendingApplications(user_0));
+    assertFalse(queue.activeApplications.contains(app_1));
+
+    // Finish 4th application
+    queue.finishApplication(app_3, A);
+    assertEquals(0, queue.getNumActiveApplications());
+    assertEquals(0, queue.getNumPendingApplications());
+    assertEquals(0, queue.getNumActiveApplications(user_0));
+    assertEquals(0, queue.getNumPendingApplications(user_0));
+    assertFalse(queue.activeApplications.contains(app_3));
+  }
+
+  @Test
   public void testHeadroom() throws Exception {
     CapacitySchedulerConfiguration csConf = 
         new CapacitySchedulerConfiguration();
-    csConf.setUserLimit(CapacityScheduler.ROOT + "." + A, 25);
+    csConf.setUserLimit(CapacitySchedulerConfiguration.ROOT + "." + A, 25);
     setupQueueConfiguration(csConf);
     
     CapacitySchedulerContext csContext = mock(CapacitySchedulerContext.class);
@@ -283,38 +382,79 @@ public class TestApplicationLimits {
     final String user_0 = "user_0";
     final String user_1 = "user_1";
     
-    int APPLICATION_ID = 0;
+    RecordFactory recordFactory = 
+        RecordFactoryProvider.getRecordFactory(null);
+    RMContext rmContext = TestUtils.getMockRMContext();
 
-    // Submit first application from user_0, check headroom
-    SchedulerApp app_0_0 = getMockApplication(APPLICATION_ID++, user_0);
+    Priority priority_1 = TestUtils.createMockPriority(1);
+
+    // Submit first application with some resource-requests from user_0, 
+    // and check headroom
+    final ApplicationAttemptId appAttemptId_0_0 = 
+        TestUtils.getMockApplicationAttemptId(0, 0); 
+    SchedulerApp app_0_0 = 
+        spy(new SchedulerApp(appAttemptId_0_0, user_0, queue, 
+            queue.getActiveUsersManager(), rmContext, null));
     queue.submitApplication(app_0_0, user_0, A);
-    queue.assignContainers(clusterResource, node_0); // Schedule to compute
+
+    List<ResourceRequest> app_0_0_requests = new ArrayList<ResourceRequest>();
+    app_0_0_requests.add(
+        TestUtils.createResourceRequest(RMNodeImpl.ANY, 1*GB, 2, 
+            priority_1, recordFactory));
+    app_0_0.updateResourceRequests(app_0_0_requests);
+
+    // Schedule to compute 
+    queue.assignContainers(clusterResource, node_0);
     Resource expectedHeadroom = Resources.createResource(10*16*GB);
-    verify(app_0_0).setAvailableResourceLimit(eq(expectedHeadroom));
+    verify(app_0_0).setHeadroom(eq(expectedHeadroom));
 
     // Submit second application from user_0, check headroom
-    SchedulerApp app_0_1 = getMockApplication(APPLICATION_ID++, user_0);
+    final ApplicationAttemptId appAttemptId_0_1 = 
+        TestUtils.getMockApplicationAttemptId(1, 0); 
+    SchedulerApp app_0_1 = 
+        spy(new SchedulerApp(appAttemptId_0_1, user_0, queue, 
+            queue.getActiveUsersManager(), rmContext, null));
     queue.submitApplication(app_0_1, user_0, A);
+    
+    List<ResourceRequest> app_0_1_requests = new ArrayList<ResourceRequest>();
+    app_0_1_requests.add(
+        TestUtils.createResourceRequest(RMNodeImpl.ANY, 1*GB, 2, 
+            priority_1, recordFactory));
+    app_0_1.updateResourceRequests(app_0_1_requests);
+
+    // Schedule to compute 
     queue.assignContainers(clusterResource, node_0); // Schedule to compute
-    verify(app_0_0, times(2)).setAvailableResourceLimit(eq(expectedHeadroom));
-    verify(app_0_1).setAvailableResourceLimit(eq(expectedHeadroom));// no change
+    verify(app_0_0, times(2)).setHeadroom(eq(expectedHeadroom));
+    verify(app_0_1).setHeadroom(eq(expectedHeadroom));// no change
     
     // Submit first application from user_1, check  for new headroom
-    SchedulerApp app_1_0 = getMockApplication(APPLICATION_ID++, user_1);
+    final ApplicationAttemptId appAttemptId_1_0 = 
+        TestUtils.getMockApplicationAttemptId(2, 0); 
+    SchedulerApp app_1_0 = 
+        spy(new SchedulerApp(appAttemptId_1_0, user_1, queue, 
+            queue.getActiveUsersManager(), rmContext, null));
     queue.submitApplication(app_1_0, user_1, A);
+
+    List<ResourceRequest> app_1_0_requests = new ArrayList<ResourceRequest>();
+    app_1_0_requests.add(
+        TestUtils.createResourceRequest(RMNodeImpl.ANY, 1*GB, 2, 
+            priority_1, recordFactory));
+    app_1_0.updateResourceRequests(app_1_0_requests);
+    
+    // Schedule to compute 
     queue.assignContainers(clusterResource, node_0); // Schedule to compute
     expectedHeadroom = Resources.createResource(10*16*GB / 2); // changes
-    verify(app_0_0).setAvailableResourceLimit(eq(expectedHeadroom));
-    verify(app_0_1).setAvailableResourceLimit(eq(expectedHeadroom));
-    verify(app_1_0).setAvailableResourceLimit(eq(expectedHeadroom));
-    
+    verify(app_0_0).setHeadroom(eq(expectedHeadroom));
+    verify(app_0_1).setHeadroom(eq(expectedHeadroom));
+    verify(app_1_0).setHeadroom(eq(expectedHeadroom));
+
     // Now reduce cluster size and check for the smaller headroom
     clusterResource = Resources.createResource(90*16*GB);
     queue.assignContainers(clusterResource, node_0); // Schedule to compute
     expectedHeadroom = Resources.createResource(9*16*GB / 2); // changes
-    verify(app_0_0).setAvailableResourceLimit(eq(expectedHeadroom));
-    verify(app_0_1).setAvailableResourceLimit(eq(expectedHeadroom));
-    verify(app_1_0).setAvailableResourceLimit(eq(expectedHeadroom));
+    verify(app_0_0).setHeadroom(eq(expectedHeadroom));
+    verify(app_0_1).setHeadroom(eq(expectedHeadroom));
+    verify(app_1_0).setHeadroom(eq(expectedHeadroom));
   }
   
 

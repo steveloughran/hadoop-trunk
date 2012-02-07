@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Maps;
@@ -76,6 +77,7 @@ public abstract class AbstractCounters<C extends Counter,
                   TaskCounter.class.getName());
     legacyMap.put("org.apache.hadoop.mapred.JobInProgress$Counter",
                   JobCounter.class.getName());
+    legacyMap.put("FileSystemCounter", FileSystemCounter.class.getName());
   }
 
   private final Limits limits = new Limits();
@@ -170,7 +172,8 @@ public abstract class AbstractCounters<C extends Counter,
   @InterfaceAudience.Private
   public synchronized C findCounter(String scheme, FileSystemCounter key) {
     return ((FileSystemCounterGroup<C>) getGroup(
-        FileSystemCounter.class.getName())).findCounter(scheme, key);
+        FileSystemCounter.class.getName()).getUnderlyingGroup()).
+        findCounter(scheme, key);
   }
 
   /**
@@ -178,13 +181,14 @@ public abstract class AbstractCounters<C extends Counter,
    * @return Set of counter names.
    */
   public synchronized Iterable<String> getGroupNames() {
-    return Iterables.concat(fgroups.keySet(), groups.keySet());
+    return Iterables.concat(ImmutableSet.copyOf(fgroups.keySet()),
+                            ImmutableSet.copyOf(groups.keySet()));
   }
 
   @Override
-  public Iterator<G> iterator() {
-    return Iterators.concat(fgroups.values().iterator(),
-                            groups.values().iterator());
+  public synchronized Iterator<G> iterator() {
+    return Iterators.concat(ImmutableSet.copyOf(fgroups.values()).iterator(),
+                            ImmutableSet.copyOf(groups.values()).iterator());
   }
 
   /**
@@ -240,11 +244,11 @@ public abstract class AbstractCounters<C extends Counter,
     WritableUtils.writeVInt(out, groupFactory.version());
     WritableUtils.writeVInt(out, fgroups.size());  // framework groups first
     for (G group : fgroups.values()) {
-      if (group instanceof FrameworkCounterGroup<?, ?>) {
+      if (group.getUnderlyingGroup() instanceof FrameworkCounterGroup<?, ?>) {
         WritableUtils.writeVInt(out, GroupType.FRAMEWORK.ordinal());
         WritableUtils.writeVInt(out, getFrameworkGroupId(group.getName()));
         group.write(out);
-      } else if (group instanceof FileSystemCounterGroup<?>) {
+      } else if (group.getUnderlyingGroup() instanceof FileSystemCounterGroup<?>) {
         WritableUtils.writeVInt(out, GroupType.FILESYSTEM.ordinal());
         group.write(out);
       }

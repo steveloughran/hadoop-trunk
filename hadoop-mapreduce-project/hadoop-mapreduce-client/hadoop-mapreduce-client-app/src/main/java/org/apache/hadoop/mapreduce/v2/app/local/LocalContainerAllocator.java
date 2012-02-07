@@ -60,8 +60,8 @@ public class LocalContainerAllocator extends RMCommunicator
   private static final Log LOG =
       LogFactory.getLog(LocalContainerAllocator.class);
 
+  @SuppressWarnings("rawtypes")
   private final EventHandler eventHandler;
-//  private final ApplicationId appID;
   private AtomicInteger containerCount = new AtomicInteger();
   private long retryInterval;
   private long retrystartTime;
@@ -73,8 +73,6 @@ public class LocalContainerAllocator extends RMCommunicator
                                  AppContext context) {
     super(clientService, context);
     this.eventHandler = context.getEventHandler();
-//    this.appID = context.getApplicationID();
-    
   }
 
   @Override
@@ -88,6 +86,7 @@ public class LocalContainerAllocator extends RMCommunicator
     retrystartTime = System.currentTimeMillis();
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   protected synchronized void heartbeat() throws Exception {
     AllocateRequest allocateRequest = BuilderUtils.newAllocateRequest(
@@ -104,6 +103,7 @@ public class LocalContainerAllocator extends RMCommunicator
       // This can happen when the connection to the RM has gone down. Keep
       // re-trying until the retryInterval has expired.
       if (System.currentTimeMillis() - retrystartTime >= retryInterval) {
+        LOG.error("Could not contact RM after " + retryInterval + " milliseconds.");
         eventHandler.handle(new JobEvent(this.getJob().getID(),
                                          JobEventType.INTERNAL_ERROR));
         throw new YarnException("Could not contact RM after " +
@@ -124,6 +124,7 @@ public class LocalContainerAllocator extends RMCommunicator
     }
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   public void handle(ContainerAllocatorEvent event) {
     if (event.getType() == ContainerAllocator.EventType.CONTAINER_REQ) {

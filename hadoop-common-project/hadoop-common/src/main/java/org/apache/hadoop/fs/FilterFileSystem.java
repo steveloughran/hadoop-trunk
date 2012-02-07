@@ -20,6 +20,7 @@ package org.apache.hadoop.fs;
 
 import java.io.*;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.EnumSet;
 import java.util.List;
 
@@ -27,6 +28,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
 
@@ -50,6 +52,7 @@ import org.apache.hadoop.util.Progressable;
 public class FilterFileSystem extends FileSystem {
   
   protected FileSystem fs;
+  private String swapScheme;
   
   /*
    * so that extending classes can define it
@@ -62,13 +65,25 @@ public class FilterFileSystem extends FileSystem {
     this.statistics = fs.statistics;
   }
 
+  /**
+   * Get the raw file system 
+   * @return FileSystem being filtered
+   */
+  public FileSystem getRawFileSystem() {
+    return fs;
+  }
+
   /** Called after a new FileSystem instance is constructed.
    * @param name a uri whose authority section names the host, port, etc.
    *   for this FileSystem
    * @param conf the configuration
    */
   public void initialize(URI name, Configuration conf) throws IOException {
-    fs.initialize(name, conf);
+    super.initialize(name, conf);
+    String scheme = name.getScheme();
+    if (!scheme.equals(fs.getUri().getScheme())) {
+      swapScheme = scheme;
+    }
   }
 
   /** Returns a URI whose scheme and authority identify this FileSystem.*/
@@ -76,9 +91,30 @@ public class FilterFileSystem extends FileSystem {
     return fs.getUri();
   }
 
+  /**
+   * Returns a qualified URI whose scheme and authority identify this
+   * FileSystem.
+   */
+  @Override
+  protected URI getCanonicalUri() {
+    return fs.getCanonicalUri();
+  }
+  
   /** Make sure that a path specifies a FileSystem. */
   public Path makeQualified(Path path) {
-    return fs.makeQualified(path);
+    Path fqPath = fs.makeQualified(path);
+    // swap in our scheme if the filtered fs is using a different scheme
+    if (swapScheme != null) {
+      try {
+        // NOTE: should deal with authority, but too much other stuff is broken 
+        fqPath = new Path(
+            new URI(swapScheme, fqPath.toUri().getSchemeSpecificPart(), null)
+        );
+      } catch (URISyntaxException e) {
+        throw new IllegalArgumentException(e);
+      }
+    }
+    return fqPath;
   }
   
   ///////////////////////////////////////////////////////////////
@@ -387,5 +423,12 @@ public class FilterFileSystem extends FileSystem {
   @Override // FileSystem
   public List<Token<?>> getDelegationTokens(String renewer) throws IOException {
     return fs.getDelegationTokens(renewer);
+  }
+  
+  @Override
+  // FileSystem
+  public List<Token<?>> getDelegationTokens(String renewer,
+      Credentials credentials) throws IOException {
+    return fs.getDelegationTokens(renewer, credentials);
   }
 }

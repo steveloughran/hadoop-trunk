@@ -44,7 +44,7 @@
 bin=`dirname "${BASH_SOURCE-$0}"`
 bin=`cd "$bin"; pwd`
 
-DEFAULT_LIBEXEC_DIR="$bin"
+DEFAULT_LIBEXEC_DIR="$bin"/../libexec
 HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
 . $HADOOP_LIBEXEC_DIR/yarn-config.sh
 
@@ -59,7 +59,6 @@ if [ $# = 0 ]; then
   echo "where COMMAND is one of:"
   echo "  resourcemanager      run the ResourceManager" 
   echo "  nodemanager          run a nodemanager on each slave" 
-  echo "  historyserver        run job history servers as a standalone daemon"
   echo "  rmadmin              admin tools" 
   echo "  version              print the version"
   echo "  jar <jar>            run a jar file"
@@ -109,9 +108,7 @@ if [ ! -d "$HADOOP_CONF_DIR" ]; then
   exit 1
 fi
 
-CLASSPATH="${HADOOP_CONF_DIR}:${YARN_CONF_DIR}"
-CLASSPATH=${CLASSPATH}:${YARN_CLASSPATH}
-CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar
+CLASSPATH="${HADOOP_CONF_DIR}:${YARN_CONF_DIR}:${CLASSPATH}"
 
 # for developers, add Hadoop classes to CLASSPATH
 if [ -d "$YARN_HOME/yarn-api/target/classes" ]; then
@@ -142,41 +139,11 @@ if [ -d "$YARN_HOME/build/tools" ]; then
   CLASSPATH=${CLASSPATH}:$YARN_HOME/build/tools
 fi
 
+CLASSPATH=${CLASSPATH}:$YARN_HOME/${YARN_DIR}/*
+CLASSPATH=${CLASSPATH}:$YARN_HOME/${YARN_LIB_JARS_DIR}/*
 
 # so that filenames w/ spaces are handled correctly in loops below
 IFS=
-
-# add hadoop-common libs to CLASSPATH
-if [ ! -d "$HADOOP_COMMON_HOME" ]; then
-  if [ -d "$HADOOP_PREFIX" ]; then
-    export HADOOP_COMMON_HOME=$HADOOP_PREFIX
-  else
-    echo No HADOOP_COMMON_HOME set. 
-    echo Please specify it either in yarn-env.sh or in the environment.
-    exit 1
-  fi
-fi
-
-CLASSPATH=${CLASSPATH}:$HADOOP_COMMON_HOME/share/hadoop/common'/*'
-CLASSPATH=${CLASSPATH}:$HADOOP_COMMON_HOME/share/hadoop/common/lib'/*'
-
-# add hadoop-hdfs libs to CLASSPATH
-if [ ! -d "$HADOOP_HDFS_HOME" ]; then
-  if [ -d "$HADOOP_PREFIX" ]; then
-    export HADOOP_HDFS_HOME=$HADOOP_PREFIX
-  else
-    echo No HADOOP_HDFS_HOME set. 
-    echo Please specify it either in yarn-env.sh or in the environment.
-    exit 1
-  fi
-fi
-CLASSPATH=${CLASSPATH}:$HADOOP_HDFS_HOME/share/hadoop/hdfs'/*'
-CLASSPATH=${CLASSPATH}:$HADOOP_HDFS_HOME/share/hadoop/hdfs/lib'/*'
-
-# add yarn libs to CLASSPATH
-
-CLASSPATH=${CLASSPATH}:$YARN_HOME/modules'/*'
-CLASSPATH=${CLASSPATH}:$YARN_HOME/lib'/*'
 
 # default log directory & file
 if [ "$YARN_LOG_DIR" = "" ]; then
@@ -185,8 +152,6 @@ fi
 if [ "$YARN_LOGFILE" = "" ]; then
   YARN_LOGFILE='yarn.log'
 fi
-
-YARN_JOB_HISTORYSERVER_OPTS="-Dmapred.jobsummary.logger=${YARN_JHS_LOGGER:-INFO,console}"
 
 # restore ordinary behaviour
 unset IFS
@@ -213,9 +178,6 @@ elif [ "$COMMAND" = "nodemanager" ] ; then
   else
     YARN_OPTS="$YARN_OPTS -server $YARN_NODEMANAGER_OPTS"
   fi
-elif [ "$COMMAND" = "historyserver" ] ; then
-  CLASS=org.apache.hadoop.mapreduce.v2.hs.JobHistoryServer
-  YARN_OPTS="$YARN_OPTS $YARN_JOB_HISTORYSERVER_OPTS"
 elif [ "$COMMAND" = "proxyserver" ] ; then
   CLASS='org.apache.hadoop.yarn.server.webproxy.WebAppProxyServer'
   YARN_OPTS="$YARN_OPTS $YARN_PROXYSERVER_OPTS"
@@ -226,7 +188,7 @@ elif [ "$COMMAND" = "jar" ] ; then
   CLASS=org.apache.hadoop.util.RunJar
   YARN_OPTS="$YARN_OPTS $YARN_CLIENT_OPTS"
 elif [ "$COMMAND" = "logs" ] ; then
-  CLASS=org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation.LogDumper
+  CLASS=org.apache.hadoop.yarn.logaggregation.LogDumper
   YARN_OPTS="$YARN_OPTS $YARN_CLIENT_OPTS"
 elif [ "$COMMAND" = "daemonlog" ] ; then
   CLASS=org.apache.hadoop.log.LogLevel

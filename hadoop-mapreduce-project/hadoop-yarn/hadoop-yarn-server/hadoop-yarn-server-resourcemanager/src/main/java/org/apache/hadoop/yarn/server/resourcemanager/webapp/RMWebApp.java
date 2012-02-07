@@ -23,15 +23,14 @@ import static org.apache.hadoop.yarn.util.StringHelper.pajoin;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
+import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
 import org.apache.hadoop.yarn.webapp.WebApp;
+import org.apache.hadoop.yarn.webapp.YarnWebParams;
 
 /**
  * The RM webapp
  */
-public class RMWebApp extends WebApp {
-  static final String APP_ID = "app.id";
-  static final String QUEUE_NAME = "queue.name";
-  static final String NODE_STATE = "node.state";
+public class RMWebApp extends WebApp implements YarnWebParams {
 
   private final ResourceManager rm;
 
@@ -41,6 +40,9 @@ public class RMWebApp extends WebApp {
 
   @Override
   public void setup() {
+    bind(JAXBContextResolver.class);
+    bind(RMWebServices.class);
+    bind(GenericExceptionHandler.class);
     if (rm != null) {
       bind(ResourceManager.class).toInstance(rm);
       bind(RMContext.class).toInstance(rm.getRMContext());
@@ -49,9 +51,9 @@ public class RMWebApp extends WebApp {
     }
     route("/", RmController.class);
     route(pajoin("/nodes", NODE_STATE), RmController.class, "nodes");
-    route("/apps", RmController.class);
+    route(pajoin("/apps", APP_STATE), RmController.class);
     route("/cluster", RmController.class, "about");
-    route(pajoin("/app", APP_ID), RmController.class, "app");
+    route(pajoin("/app", APPLICATION_ID), RmController.class, "app");
     route("/scheduler", RmController.class, "scheduler");
     route(pajoin("/queue", QUEUE_NAME), RmController.class, "queue");
   }

@@ -31,8 +31,10 @@ import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.v2.util.MRApps;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.Apps;
 
+@SuppressWarnings("deprecation")
 public class MapReduceChildJVM {
 
   private static String getTaskLogFile(LogName filter) {
@@ -46,7 +48,7 @@ public class MapReduceChildJVM {
           jobConf.get(JobConf.MAPRED_TASK_ENV));
     }
     return jobConf.get(JobConf.MAPRED_REDUCE_TASK_ENV,
-        jobConf.get(jobConf.MAPRED_TASK_ENV));
+        jobConf.get(JobConf.MAPRED_TASK_ENV));
   }
 
   private static String getChildLogLevel(JobConf conf, boolean isMap) {
@@ -68,29 +70,9 @@ public class MapReduceChildJVM {
 
     JobConf conf = task.conf;
 
-    // Shell
-    environment.put(
-        Environment.SHELL.name(), 
-        conf.get(
-            MRJobConfig.MAPRED_ADMIN_USER_SHELL, 
-            MRJobConfig.DEFAULT_SHELL)
-            );
-    
-    // Add pwd to LD_LIBRARY_PATH, add this before adding anything else
-    Apps.addToEnvironment(
-        environment, 
-        Environment.LD_LIBRARY_PATH.name(), 
-        Environment.PWD.$());
-
-    // Add the env variables passed by the user & admin
+    // Add the env variables passed by the user
     String mapredChildEnv = getChildEnv(conf, task.isMapTask());
     Apps.setEnvFromInputString(environment, mapredChildEnv);
-    Apps.setEnvFromInputString(
-        environment, 
-        conf.get(
-            MRJobConfig.MAPRED_ADMIN_USER_ENV, 
-            MRJobConfig.DEFAULT_MAPRED_ADMIN_USER_ENV)
-        );
 
     // Set logging level in the environment.
     // This is so that, if the child forks another "bin/hadoop" (common in
@@ -220,7 +202,8 @@ public class MapReduceChildJVM {
       vargs.add(javaOptsSplit[i]);
     }
 
-    String childTmpDir = Environment.PWD.$() + Path.SEPARATOR + "tmp";
+    Path childTmpDir = new Path(Environment.PWD.$(),
+        YarnConfiguration.DEFAULT_CONTAINER_TEMP_DIR);
     vargs.add("-Djava.io.tmpdir=" + childTmpDir);
 
     // Setup the log4j prop
@@ -236,6 +219,13 @@ public class MapReduceChildJVM {
                 getTaskLogFile(TaskLog.LogName.PROFILE)
                 )
             );
+        if (task.isMapTask()) {
+          vargs.add(conf.get(MRJobConfig.TASK_MAP_PROFILE_PARAMS, ""));
+        }
+        else {
+          vargs.add(conf.get(MRJobConfig.TASK_REDUCE_PROFILE_PARAMS, ""));
+        }
+        
       }
     }
 

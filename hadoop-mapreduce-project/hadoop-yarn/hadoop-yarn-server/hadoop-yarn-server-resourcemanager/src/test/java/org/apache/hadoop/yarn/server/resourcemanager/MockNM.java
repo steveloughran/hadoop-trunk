@@ -39,15 +39,17 @@ public class MockNM {
 
   private int responseId;
   private NodeId nodeId;
-  private final String nodeIdStr;
   private final int memory;
   private final ResourceTrackerService resourceTracker;
   private final int httpPort = 2;
 
   MockNM(String nodeIdStr, int memory, ResourceTrackerService resourceTracker) {
-    this.nodeIdStr = nodeIdStr;
     this.memory = memory;
     this.resourceTracker = resourceTracker;
+    String[] splits = nodeIdStr.split(":");
+    nodeId = Records.newRecord(NodeId.class);
+    nodeId.setHost(splits[0]);
+    nodeId.setPort(Integer.parseInt(splits[1]));
   }
 
   public NodeId getNodeId() {
@@ -63,14 +65,10 @@ public class MockNM {
         new HashMap<ApplicationId, List<ContainerStatus>>();
     conts.put(container.getId().getApplicationAttemptId().getApplicationId(), 
         Arrays.asList(new ContainerStatus[] { container.getContainerStatus() }));
-    nodeHeartbeat(conts, true,nodeId);
+    nodeHeartbeat(conts, true);
   }
 
   public NodeId registerNode() throws Exception {
-    String[] splits = nodeIdStr.split(":");
-    nodeId = Records.newRecord(NodeId.class);
-    nodeId.setHost(splits[0]);
-    nodeId.setPort(Integer.parseInt(splits[1]));
     RegisterNodeManagerRequest req = Records.newRecord(
         RegisterNodeManagerRequest.class);
     req.setNodeId(nodeId);
@@ -83,13 +81,20 @@ public class MockNM {
   }
 
   public HeartbeatResponse nodeHeartbeat(boolean b) throws Exception {
-    return nodeHeartbeat(new HashMap<ApplicationId, List<ContainerStatus>>(), b,nodeId);
+    return nodeHeartbeat(new HashMap<ApplicationId, List<ContainerStatus>>(),
+        b, ++responseId);
   }
 
   public HeartbeatResponse nodeHeartbeat(Map<ApplicationId, 
-      List<ContainerStatus>> conts, boolean isHealthy, NodeId nodeId) throws Exception {
+      List<ContainerStatus>> conts, boolean isHealthy) throws Exception {
+    return nodeHeartbeat(conts, isHealthy, ++responseId);
+  }
+
+  public HeartbeatResponse nodeHeartbeat(Map<ApplicationId, 
+      List<ContainerStatus>> conts, boolean isHealthy, int resId) throws Exception {
     NodeHeartbeatRequest req = Records.newRecord(NodeHeartbeatRequest.class);
     NodeStatus status = Records.newRecord(NodeStatus.class);
+    status.setResponseId(resId);
     status.setNodeId(nodeId);
     for (Map.Entry<ApplicationId, List<ContainerStatus>> entry : conts.entrySet()) {
       status.setContainersStatuses(entry.getValue());
@@ -99,7 +104,6 @@ public class MockNM {
     healthStatus.setIsNodeHealthy(isHealthy);
     healthStatus.setLastHealthReportTime(1);
     status.setNodeHealthStatus(healthStatus);
-    status.setResponseId(++responseId);
     req.setNodeStatus(status);
     return resourceTracker.nodeHeartbeat(req).getHeartbeatResponse();
   }

@@ -27,6 +27,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -46,6 +47,8 @@ import org.apache.hadoop.mapred.Task;
 import org.apache.hadoop.mapred.TaskAttemptContextImpl;
 import org.apache.hadoop.mapred.WrappedJvmID;
 import org.apache.hadoop.mapred.WrappedProgressSplitsBlock;
+import org.apache.hadoop.mapreduce.Counter;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.JobCounter;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.OutputCommitter;
@@ -59,8 +62,6 @@ import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptStartedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptUnsuccessfulCompletionEvent;
 import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
-import org.apache.hadoop.mapreduce.v2.api.records.Counter;
-import org.apache.hadoop.mapreduce.v2.api.records.Counters;
 import org.apache.hadoop.mapreduce.v2.api.records.Phase;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptReport;
@@ -109,6 +110,7 @@ import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
@@ -125,20 +127,21 @@ import org.apache.hadoop.yarn.util.RackResolver;
 /**
  * Implementation of TaskAttempt interface.
  */
+@SuppressWarnings({ "rawtypes" })
 public abstract class TaskAttemptImpl implements
     org.apache.hadoop.mapreduce.v2.app.job.TaskAttempt,
       EventHandler<TaskAttemptEvent> {
 
+  static final Counters EMPTY_COUNTERS = new Counters();
   private static final Log LOG = LogFactory.getLog(TaskAttemptImpl.class);
   private static final long MEMORY_SPLITS_RESOLUTION = 1024; //TODO Make configurable?
   private static final int MAP_MEMORY_MB_DEFAULT = 1024;
   private static final int REDUCE_MEMORY_MB_DEFAULT = 1024;
   private final static RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
 
-  protected final Configuration conf;
+  protected final JobConf conf;
   protected final Path jobFile;
   protected final int partition;
-  @SuppressWarnings("rawtypes")
   protected final EventHandler eventHandler;
   private final TaskAttemptId attemptId;
   private final Clock clock;
@@ -154,6 +157,8 @@ public abstract class TaskAttemptImpl implements
   private Token<JobTokenIdentifier> jobToken;
   private static AtomicBoolean initialClasspathFlag = new AtomicBoolean();
   private static String initialClasspath = null;
+  private static Object commonContainerSpecLock = new Object();
+  private static ContainerLaunchContext commonContainerSpec = null;
   private static final Object classpathLock = new Object();
   private long launchTime;
   private long finishTime;
@@ -445,9 +450,9 @@ public abstract class TaskAttemptImpl implements
       .getProperty("line.separator");
 
   public TaskAttemptImpl(TaskId taskId, int i, 
-      @SuppressWarnings("rawtypes") EventHandler eventHandler,
+      EventHandler eventHandler,
       TaskAttemptListener taskAttemptListener, Path jobFile, int partition,
-      Configuration conf, String[] dataLocalHosts, OutputCommitter committer,
+      JobConf conf, String[] dataLocalHosts, OutputCommitter committer,
       Token<JobTokenIdentifier> jobToken,
       Collection<Token<? extends TokenIdentifier>> fsTokens, Clock clock) {
     oldJobId = TypeConverter.fromYarn(taskId.getJobId());
@@ -497,35 +502,33 @@ public abstract class TaskAttemptImpl implements
 
   /**
    * Create a {@link LocalResource} record with all the given parameters.
-   * TODO: This should pave way for Builder pattern.
    */
-  private static LocalResource createLocalResource(FileSystem fc,
-      RecordFactory recordFactory, Path file, LocalResourceType type,
-      LocalResourceVisibility visibility) throws IOException {
+  private static LocalResource createLocalResource(FileSystem fc, Path file,
+      LocalResourceType type, LocalResourceVisibility visibility)
+      throws IOException {
     FileStatus fstat = fc.getFileStatus(file);
-    LocalResource resource =
-        recordFactory.newRecordInstance(LocalResource.class);
-    resource.setResource(ConverterUtils.getYarnUrlFromPath(fc.resolvePath(fstat
-        .getPath())));
-    resource.setType(type);
-    resource.setVisibility(visibility);
-    resource.setSize(fstat.getLen());
-    resource.setTimestamp(fstat.getModificationTime());
-    return resource;
+    URL resourceURL = ConverterUtils.getYarnUrlFromPath(fc.resolvePath(fstat
+        .getPath()));
+    long resourceSize = fstat.getLen();
+    long resourceModificationTime = fstat.getModificationTime();
+
+    return BuilderUtils.newLocalResource(resourceURL, type, visibility,
+        resourceSize, resourceModificationTime);
   }
 
   /**
    * Lock this on initialClasspath so that there is only one fork in the AM for
-   * getting the initial class-path. TODO: This should go away once we construct
-   * a parent CLC and use it for all the containers.
+   * getting the initial class-path. TODO: We already construct
+   * a parent CLC and use it for all the containers, so this should go away
+   * once the mr-generated-classpath stuff is gone.
    */
-  private String getInitialClasspath() throws IOException {
+  private static String getInitialClasspath(Configuration conf) throws IOException {
     synchronized (classpathLock) {
       if (initialClasspathFlag.get()) {
         return initialClasspath;
       }
       Map<String, String> env = new HashMap<String, String>();
-      MRApps.setClasspath(env);
+      MRApps.setClasspath(env, conf);
       initialClasspath = env.get(Environment.CLASSPATH.name());
       initialClasspathFlag.set(true);
       return initialClasspath;
@@ -534,11 +537,14 @@ public abstract class TaskAttemptImpl implements
 
 
   /**
-   * Create the {@link ContainerLaunchContext} for this attempt.
+   * Create the common {@link ContainerLaunchContext} for all attempts.
    * @param applicationACLs 
    */
-  private ContainerLaunchContext createContainerLaunchContext(
-      Map<ApplicationAccessType, String> applicationACLs) {
+  private static ContainerLaunchContext createCommonContainerLaunchContext(
+      Map<ApplicationAccessType, String> applicationACLs, Configuration conf,
+      Token<JobTokenIdentifier> jobToken,
+      final org.apache.hadoop.mapred.JobID oldJobId,
+      Collection<Token<? extends TokenIdentifier>> fsTokens) {
 
     // Application resources
     Map<String, LocalResource> localResources = 
@@ -556,13 +562,13 @@ public abstract class TaskAttemptImpl implements
       FileSystem remoteFS = FileSystem.get(conf);
 
       // //////////// Set up JobJar to be localized properly on the remote NM.
-      if (conf.get(MRJobConfig.JAR) != null) {
-        Path remoteJobJar = (new Path(remoteTask.getConf().get(
-              MRJobConfig.JAR))).makeQualified(remoteFS.getUri(), 
-                                               remoteFS.getWorkingDirectory());
+      String jobJar = conf.get(MRJobConfig.JAR);
+      if (jobJar != null) {
+        Path remoteJobJar = (new Path(jobJar)).makeQualified(remoteFS
+            .getUri(), remoteFS.getWorkingDirectory());
         localResources.put(
             MRJobConfig.JOB_JAR,
-            createLocalResource(remoteFS, recordFactory, remoteJobJar,
+            createLocalResource(remoteFS, remoteJobJar,
                 LocalResourceType.FILE, LocalResourceVisibility.APPLICATION));
         LOG.info("The job-jar file on the remote FS is "
             + remoteJobJar.toUri().toASCIIString());
@@ -584,7 +590,7 @@ public abstract class TaskAttemptImpl implements
           new Path(remoteJobSubmitDir, MRJobConfig.JOB_CONF_FILE);
       localResources.put(
           MRJobConfig.JOB_CONF_FILE,
-          createLocalResource(remoteFS, recordFactory, remoteJobConfPath,
+          createLocalResource(remoteFS, remoteJobConfPath,
               LocalResourceType.FILE, LocalResourceVisibility.APPLICATION));
       LOG.info("The job-conf file on the remote FS is "
           + remoteJobConfPath.toUri().toASCIIString());
@@ -625,24 +631,86 @@ public abstract class TaskAttemptImpl implements
       Apps.addToEnvironment(
           environment,  
           Environment.CLASSPATH.name(), 
-          getInitialClasspath());
+          getInitialClasspath(conf));
     } catch (IOException e) {
       throw new YarnException(e);
     }
 
-    // Setup environment
-    MapReduceChildJVM.setVMEnv(environment, remoteTask);
+    // Shell
+    environment.put(
+        Environment.SHELL.name(), 
+        conf.get(
+            MRJobConfig.MAPRED_ADMIN_USER_SHELL, 
+            MRJobConfig.DEFAULT_SHELL)
+            );
+
+    // Add pwd to LD_LIBRARY_PATH, add this before adding anything else
+    Apps.addToEnvironment(
+        environment, 
+        Environment.LD_LIBRARY_PATH.name(), 
+        Environment.PWD.$());
+
+    // Add the env variables passed by the admin
+    Apps.setEnvFromInputString(
+        environment, 
+        conf.get(
+            MRJobConfig.MAPRED_ADMIN_USER_ENV, 
+            MRJobConfig.DEFAULT_MAPRED_ADMIN_USER_ENV)
+        );
+
+    // Construct the actual Container
+    // The null fields are per-container and will be constructed for each
+    // container separately.
+    ContainerLaunchContext container = BuilderUtils
+        .newContainerLaunchContext(null, conf
+            .get(MRJobConfig.USER_NAME), null, localResources,
+            environment, null, serviceData, tokens, applicationACLs);
+
+    return container;
+  }
+
+  static ContainerLaunchContext createContainerLaunchContext(
+      Map<ApplicationAccessType, String> applicationACLs,
+      ContainerId containerID, Configuration conf,
+      Token<JobTokenIdentifier> jobToken, Task remoteTask,
+      final org.apache.hadoop.mapred.JobID oldJobId,
+      Resource assignedCapability, WrappedJvmID jvmID,
+      TaskAttemptListener taskAttemptListener,
+      Collection<Token<? extends TokenIdentifier>> fsTokens) {
+
+    synchronized (commonContainerSpecLock) {
+      if (commonContainerSpec == null) {
+        commonContainerSpec = createCommonContainerLaunchContext(
+            applicationACLs, conf, jobToken, oldJobId, fsTokens);
+      }
+    }
+
+    // Fill in the fields needed per-container that are missing in the common
+    // spec.
+
+    // Setup environment by cloning from common env.
+    Map<String, String> env = commonContainerSpec.getEnvironment();
+    Map<String, String> myEnv = new HashMap<String, String>(env.size());
+    myEnv.putAll(env);
+    MapReduceChildJVM.setVMEnv(myEnv, remoteTask);
 
     // Set up the launch command
     List<String> commands = MapReduceChildJVM.getVMCommand(
-        taskAttemptListener.getAddress(), remoteTask,
-        jvmID);
-    
+        taskAttemptListener.getAddress(), remoteTask, jvmID);
+
+    // Duplicate the ByteBuffers for access by multiple containers.
+    Map<String, ByteBuffer> myServiceData = new HashMap<String, ByteBuffer>();
+    for (Entry<String, ByteBuffer> entry : commonContainerSpec
+                .getServiceData().entrySet()) {
+      myServiceData.put(entry.getKey(), entry.getValue().duplicate());
+    }
+
     // Construct the actual Container
-    ContainerLaunchContext container = BuilderUtils
-        .newContainerLaunchContext(containerID, conf
-            .get(MRJobConfig.USER_NAME), assignedCapability, localResources,
-            environment, commands, serviceData, tokens, applicationACLs);
+    ContainerLaunchContext container = BuilderUtils.newContainerLaunchContext(
+        containerID, commonContainerSpec.getUser(), assignedCapability,
+        commonContainerSpec.getLocalResources(), myEnv, commands,
+        myServiceData, commonContainerSpec.getContainerTokens().duplicate(),
+        applicationACLs);
 
     return container;
   }
@@ -779,7 +847,7 @@ public abstract class TaskAttemptImpl implements
       result.setDiagnosticInfo(StringUtils.join(LINE_SEPARATOR, getDiagnostics()));
       result.setPhase(reportedStatus.phase);
       result.setStateString(reportedStatus.stateString);
-      result.setCounters(getCounters());
+      result.setCounters(TypeConverter.toYarn(getCounters()));
       result.setContainerId(this.getAssignedContainerID());
       result.setNodeManagerHost(trackerName);
       result.setNodeManagerHttpPort(httpPort);
@@ -810,7 +878,7 @@ public abstract class TaskAttemptImpl implements
     try {
       Counters counters = reportedStatus.counters;
       if (counters == null) {
-        counters = recordFactory.newRecordInstance(Counters.class);
+        counters = EMPTY_COUNTERS;
 //        counters.groups = new HashMap<String, CounterGroup>();
       }
       return counters;
@@ -842,8 +910,10 @@ public abstract class TaskAttemptImpl implements
   @SuppressWarnings("unchecked")
   @Override
   public void handle(TaskAttemptEvent event) {
-    LOG.info("Processing " + event.getTaskAttemptID() +
-        " of type " + event.getType());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Processing " + event.getTaskAttemptID() + " of type "
+          + event.getType());
+    }
     writeLock.lock();
     try {
       final TaskAttemptState oldState = getState();
@@ -926,6 +996,8 @@ public abstract class TaskAttemptImpl implements
                 : taskAttempt.containerNodeId.getHost(),
             taskAttempt.containerNodeId == null ? -1 
                 : taskAttempt.containerNodeId.getPort(),    
+            taskAttempt.nodeRackName == null ? "UNKNOWN" 
+                : taskAttempt.nodeRackName,
             StringUtils.join(
                 LINE_SEPARATOR, taskAttempt.getDiagnostics()), taskAttempt
                 .getProgressSplitBlock().burst());
@@ -962,22 +1034,21 @@ public abstract class TaskAttemptImpl implements
             (int) (now - start));
       }
 
-      Counter cpuCounter = counters.getCounter(
-          TaskCounter.CPU_MILLISECONDS);
+      Counter cpuCounter = counters.findCounter(TaskCounter.CPU_MILLISECONDS);
       if (cpuCounter != null && cpuCounter.getValue() <= Integer.MAX_VALUE) {
         splitsBlock.getProgressCPUTime().extend(newProgress,
-            (int) cpuCounter.getValue());
+            (int) cpuCounter.getValue()); // long to int? TODO: FIX. Same below
       }
 
-      Counter virtualBytes = counters.getCounter(
-          TaskCounter.VIRTUAL_MEMORY_BYTES);
+      Counter virtualBytes = counters
+        .findCounter(TaskCounter.VIRTUAL_MEMORY_BYTES);
       if (virtualBytes != null) {
         splitsBlock.getProgressVirtualMemoryKbytes().extend(newProgress,
             (int) (virtualBytes.getValue() / (MEMORY_SPLITS_RESOLUTION)));
       }
 
-      Counter physicalBytes = counters.getCounter(
-          TaskCounter.PHYSICAL_MEMORY_BYTES);
+      Counter physicalBytes = counters
+        .findCounter(TaskCounter.PHYSICAL_MEMORY_BYTES);
       if (physicalBytes != null) {
         splitsBlock.getProgressPhysicalMemoryKbytes().extend(newProgress,
             (int) (physicalBytes.getValue() / (MEMORY_SPLITS_RESOLUTION)));
@@ -1020,7 +1091,7 @@ public abstract class TaskAttemptImpl implements
 
   private static class ContainerAssignedTransition implements
       SingleArcTransition<TaskAttemptImpl, TaskAttemptEvent> {
-    @SuppressWarnings({ "unchecked", "deprecation" })
+    @SuppressWarnings({ "unchecked" })
     @Override
     public void transition(final TaskAttemptImpl taskAttempt, 
         TaskAttemptEvent event) {
@@ -1040,24 +1111,21 @@ public abstract class TaskAttemptImpl implements
       taskAttempt.jvmID = new WrappedJvmID(
           taskAttempt.remoteTask.getTaskID().getJobID(), 
           taskAttempt.remoteTask.isMapTask(), taskAttempt.containerID.getId());
-      taskAttempt.taskAttemptListener.registerPendingTask(taskAttempt.jvmID);
+      taskAttempt.taskAttemptListener.registerPendingTask(
+          taskAttempt.remoteTask, taskAttempt.jvmID);
       
       //launch the container
       //create the container object to be launched for a given Task attempt
-      taskAttempt.eventHandler.handle(
-          new ContainerRemoteLaunchEvent(taskAttempt.attemptId, 
-              taskAttempt.containerID, 
-              taskAttempt.containerMgrAddress, taskAttempt.containerToken) {
-        @Override
-        public ContainerLaunchContext getContainer() {
-          return taskAttempt.createContainerLaunchContext(cEvent
-              .getApplicationACLs());
-        }
-        @Override
-        public Task getRemoteTask() {  // classic mapred Task, not YARN version
-          return taskAttempt.remoteTask;
-        }
-      });
+      ContainerLaunchContext launchContext = createContainerLaunchContext(
+          cEvent.getApplicationACLs(), taskAttempt.containerID,
+          taskAttempt.conf, taskAttempt.jobToken, taskAttempt.remoteTask,
+          taskAttempt.oldJobId, taskAttempt.assignedCapability,
+          taskAttempt.jvmID, taskAttempt.taskAttemptListener,
+          taskAttempt.fsTokens);
+      taskAttempt.eventHandler.handle(new ContainerRemoteLaunchEvent(
+          taskAttempt.attemptId, taskAttempt.containerID,
+          taskAttempt.containerMgrAddress, taskAttempt.containerToken,
+          launchContext, taskAttempt.remoteTask));
 
       // send event to speculator that our container needs are satisfied
       taskAttempt.eventHandler.handle
@@ -1133,10 +1201,9 @@ public abstract class TaskAttemptImpl implements
       taskAttempt.launchTime = taskAttempt.clock.getTime();
       taskAttempt.shufflePort = event.getShufflePort();
 
-      // register it to TaskAttemptListener so that it start listening
-      // for it
-      taskAttempt.taskAttemptListener.registerLaunchedTask(
-          taskAttempt.attemptId, taskAttempt.remoteTask, taskAttempt.jvmID);
+      // register it to TaskAttemptListener so that it can start monitoring it.
+      taskAttempt.taskAttemptListener
+        .registerLaunchedTask(taskAttempt.attemptId, taskAttempt.jvmID);
       //TODO Resolve to host / IP in case of a local address.
       InetSocketAddress nodeHttpInetAddr =
           NetUtils.createSocketAddr(taskAttempt.nodeHttpAddress); // TODO:
@@ -1195,9 +1262,8 @@ public abstract class TaskAttemptImpl implements
     @Override
     public void transition(TaskAttemptImpl taskAttempt, 
         TaskAttemptEvent event) {
-      @SuppressWarnings("deprecation")
       TaskAttemptContext taskContext =
-        new TaskAttemptContextImpl(new JobConf(taskAttempt.conf),
+        new TaskAttemptContextImpl(taskAttempt.conf,
             TypeConverter.fromYarn(taskAttempt.attemptId));
       taskAttempt.eventHandler.handle(new TaskCleanupEvent(
           taskAttempt.attemptId,
@@ -1214,15 +1280,11 @@ public abstract class TaskAttemptImpl implements
         TaskAttemptEvent event) {
       //set the finish time
       taskAttempt.setFinishTime();
-      String taskType = 
-          TypeConverter.fromYarn(taskAttempt.attemptId.getTaskId().getTaskType()).toString();
-      LOG.info("In TaskAttemptImpl taskType: " + taskType);
       long slotMillis = computeSlotMillis(taskAttempt);
-      JobCounterUpdateEvent jce =
-          new JobCounterUpdateEvent(taskAttempt.attemptId.getTaskId()
-              .getJobId());
+      TaskId taskId = taskAttempt.attemptId.getTaskId();
+      JobCounterUpdateEvent jce = new JobCounterUpdateEvent(taskId.getJobId());
       jce.addCounterUpdate(
-        taskAttempt.attemptId.getTaskId().getTaskType() == TaskType.MAP ? 
+        taskId.getTaskType() == TaskType.MAP ? 
           JobCounter.SLOTS_MILLIS_MAPS : JobCounter.SLOTS_MILLIS_REDUCES,
           slotMillis);
       taskAttempt.eventHandler.handle(jce);
@@ -1279,7 +1341,7 @@ public abstract class TaskAttemptImpl implements
          this.containerNodeId == null ? -1 : this.containerNodeId.getPort(),
          this.nodeRackName == null ? "UNKNOWN" : this.nodeRackName,
          this.reportedStatus.stateString,
-         TypeConverter.fromYarn(getCounters()),
+         getCounters(),
          getProgressSplitBlock().burst());
          eventHandler.handle(
            new JobHistoryEvent(attemptId.getTaskId().getJobId(), mfe));
@@ -1296,7 +1358,7 @@ public abstract class TaskAttemptImpl implements
          this.containerNodeId == null ? -1 : this.containerNodeId.getPort(),
          this.nodeRackName == null ? "UNKNOWN" : this.nodeRackName,
          this.reportedStatus.stateString,
-         TypeConverter.fromYarn(getCounters()),
+         getCounters(),
          getProgressSplitBlock().burst());
          eventHandler.handle(
            new JobHistoryEvent(attemptId.getTaskId().getJobId(), rfe));
@@ -1434,8 +1496,8 @@ public abstract class TaskAttemptImpl implements
     result.phase = Phase.STARTING;
     result.stateString = "NEW";
     result.taskState = TaskAttemptState.NEW;
-    Counters counters = recordFactory.newRecordInstance(Counters.class);
-//    counters.groups = new HashMap<String, CounterGroup>();
+    Counters counters = EMPTY_COUNTERS;
+    //    counters.groups = new HashMap<String, CounterGroup>();
     result.counters = counters;
   }
 

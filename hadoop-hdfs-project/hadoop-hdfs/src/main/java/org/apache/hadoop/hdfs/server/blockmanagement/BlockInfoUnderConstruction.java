@@ -112,7 +112,6 @@ public class BlockInfoUnderConstruction extends BlockInfo {
       return (this == obj) || super.equals(obj);
     }
 
-    /** {@inheritDoc} */
     @Override
     public String toString() {
       final StringBuilder b = new StringBuilder(getClass().getSimpleName());
@@ -158,9 +157,6 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   BlockInfo convertToCompleteBlock() throws IOException {
     assert getBlockUCState() != BlockUCState.COMPLETE :
       "Trying to convert a COMPLETE block";
-    if(getBlockUCState() != BlockUCState.COMMITTED)
-      throw new IOException(
-          "Cannot complete block: block has not been COMMITTED by the client");
     return new BlockInfo(this);
   }
 
@@ -271,7 +267,6 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     return (this == obj) || super.equals(obj);
   }
 
-  /** {@inheritDoc} */
   @Override
   public String toString() {
     final StringBuilder b = new StringBuilder(super.toString());

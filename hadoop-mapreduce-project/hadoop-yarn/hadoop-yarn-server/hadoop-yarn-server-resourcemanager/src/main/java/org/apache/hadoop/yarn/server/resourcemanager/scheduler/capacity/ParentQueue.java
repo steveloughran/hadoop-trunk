@@ -48,6 +48,8 @@ import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.Resources;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManager;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApp;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
@@ -95,7 +97,8 @@ public class ParentQueue implements CSQueue {
     RecordFactoryProvider.getRecordFactory(null);
 
   public ParentQueue(CapacitySchedulerContext cs, 
-      String queueName, Comparator<CSQueue> comparator, CSQueue parent, CSQueue old) {
+      String queueName, Comparator<CSQueue> comparator, 
+      CSQueue parent, CSQueue old) {
     minimumAllocation = cs.getMinimumResourceCapability();
     
     this.parent = parent;
@@ -117,16 +120,14 @@ public class ParentQueue implements CSQueue {
     }
 
     float capacity = (float) rawCapacity / 100;
-
     float parentAbsoluteCapacity = 
-      (parent == null) ? 1.0f : parent.getAbsoluteCapacity();
+      (rootQueue) ? 1.0f : parent.getAbsoluteCapacity();
     float absoluteCapacity = parentAbsoluteCapacity * capacity; 
 
-    float maximumCapacity = 
+    float  maximumCapacity =
       (float) cs.getConfiguration().getMaximumCapacity(getQueuePath()) / 100;
     float absoluteMaxCapacity = 
-      (Math.round(maximumCapacity * 100) == CapacitySchedulerConfiguration.UNDEFINED) ? 
-          Float.MAX_VALUE :  (parentAbsoluteCapacity * maximumCapacity);
+          CSQueueUtils.computeAbsoluteMaximumCapacity(maximumCapacity, parent);
     
     QueueState state = cs.getConfiguration().getState(getQueuePath());
 
@@ -137,7 +138,8 @@ public class ParentQueue implements CSQueue {
     this.queueInfo.setQueueName(queueName);
     this.queueInfo.setChildQueues(new ArrayList<QueueInfo>());
 
-    setupQueueConfigs(capacity, absoluteCapacity, 
+    setupQueueConfigs(cs.getClusterResources(),
+        capacity, absoluteCapacity, 
         maximumCapacity, absoluteMaxCapacity, state, acls);
     
     this.queueComparator = comparator;
@@ -149,9 +151,10 @@ public class ParentQueue implements CSQueue {
   }
 
   private synchronized void setupQueueConfigs(
-          float capacity, float absoluteCapacity, 
-          float maximumCapacity, float absoluteMaxCapacity,
-          QueueState state, Map<QueueACL, AccessControlList> acls
+      Resource clusterResource,
+      float capacity, float absoluteCapacity, 
+      float maximumCapacity, float absoluteMaxCapacity,
+      QueueState state, Map<QueueACL, AccessControlList> acls
   ) {
     // Sanity check
     CSQueueUtils.checkMaxCapacity(getQueueName(), capacity, maximumCapacity);
@@ -173,6 +176,10 @@ public class ParentQueue implements CSQueue {
     for (Map.Entry<QueueACL, AccessControlList> e : acls.entrySet()) {
       aclsString.append(e.getKey() + ":" + e.getValue().getAclString());
     }
+
+    // Update metrics
+    CSQueueUtils.updateQueueStatistics(
+        this, parent, clusterResource, minimumAllocation);
 
     LOG.info(queueName +
         ", capacity=" + capacity +
@@ -239,6 +246,12 @@ public class ParentQueue implements CSQueue {
   @Override
   public float getMaximumCapacity() {
     return maximumCapacity;
+  }
+
+  @Override
+  public ActiveUsersManager getActiveUsersManager() {
+    // Should never be called since all applications are submitted to LeafQueues
+    return null;
   }
 
   @Override
@@ -332,10 +345,15 @@ public class ParentQueue implements CSQueue {
   }
 
   public String toString() {
-    return queueName + ":" + capacity + ":" + absoluteCapacity + ":" + 
-      getUsedCapacity() + ":" + getUtilization() + ":" + 
-      getNumApplications() + ":" + getNumContainers() + ":" + 
-      childQueues.size() + " child-queues";
+    return queueName + ": " +
+        "numChildQueue= " + childQueues.size() + ", " + 
+        "capacity=" + capacity + ", " +  
+        "absoluteCapacity=" + absoluteCapacity + ", " +
+        "usedResources=" + usedResources.getMemory() + "MB, " + 
+        "usedCapacity=" + getUsedCapacity() + ", " + 
+        "utilization=" + getUtilization() + ", " +
+        "numApps=" + getNumApplications() + ", " + 
+        "numContainers=" + getNumContainers();
   }
   
   @Override
@@ -373,12 +391,10 @@ public class ParentQueue implements CSQueue {
     childQueues.addAll(currentChildQueues.values());
 
     // Set new configs
-    setupQueueConfigs(parentQueue.capacity, parentQueue.absoluteCapacity,
+    setupQueueConfigs(clusterResource,
+        parentQueue.capacity, parentQueue.absoluteCapacity,
         parentQueue.maximumCapacity, parentQueue.absoluteMaxCapacity,
         parentQueue.state, parentQueue.acls);
-
-    // Update
-    updateResource(clusterResource);
   }
 
   Map<String, CSQueue> getQueues(Set<CSQueue> queues) {
@@ -474,11 +490,11 @@ public class ParentQueue implements CSQueue {
         " #applications: " + getNumApplications());
   }
   
-  synchronized void setUsedCapacity(float usedCapacity) {
+  public synchronized void setUsedCapacity(float usedCapacity) {
     this.usedCapacity = usedCapacity;
   }
   
-  synchronized void setUtilization(float utilization) {
+  public synchronized void setUtilization(float utilization) {
     this.utilization = utilization;
   }
 
@@ -491,19 +507,17 @@ public class ParentQueue implements CSQueue {
     CSQueueUtils.checkMaxCapacity(getQueueName(), capacity, maximumCapacity);
     
     this.maximumCapacity = maximumCapacity;
-    float parentAbsoluteCapacity = 
-        (rootQueue) ? 100.0f : parent.getAbsoluteCapacity();
     this.absoluteMaxCapacity = 
-      (maximumCapacity == CapacitySchedulerConfiguration.UNDEFINED) ? 
-          Float.MAX_VALUE : 
-          (parentAbsoluteCapacity * maximumCapacity);
+        CSQueueUtils.computeAbsoluteMaximumCapacity(maximumCapacity, parent);
   }
 
   @Override
-  public synchronized Resource assignContainers(
+  public synchronized CSAssignment assignContainers(
       Resource clusterResource, SchedulerNode node) {
-    Resource assigned = Resources.createResource(0);
-
+    CSAssignment assignment = 
+        new CSAssignment(Resources.createResource(0), NodeType.NODE_LOCAL);
+    boolean assignedOffSwitch = false;
+    
     while (canAssign(node)) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Trying to assign containers to child-queue of "
@@ -516,16 +530,18 @@ public class ParentQueue implements CSQueue {
       }
       
       // Schedule
-      Resource assignedToChild = 
+      CSAssignment assignedToChild = 
           assignContainersToChildQueues(clusterResource, node);
+      assignedOffSwitch = (assignedToChild.getType() == NodeType.OFF_SWITCH);
       
       // Done if no child-queue assigned anything
-      if (Resources.greaterThan(assignedToChild, Resources.none())) {
+      if (Resources.greaterThan(assignedToChild.getResource(), 
+              Resources.none())) {
         // Track resource utilization for the parent-queue
-        allocateResource(clusterResource, assignedToChild);
+        allocateResource(clusterResource, assignedToChild.getResource());
         
         // Track resource utilization in this pass of the scheduler
-        Resources.addTo(assigned, assignedToChild);
+        Resources.addTo(assignment.getResource(), assignedToChild.getResource());
         
         LOG.info("assignedContainer" +
             " queue=" + getQueueName() + 
@@ -539,17 +555,26 @@ public class ParentQueue implements CSQueue {
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("ParentQ=" + getQueueName()
-          + " assignedSoFarInThisIteration=" + assigned
+          + " assignedSoFarInThisIteration=" + assignment.getResource()
           + " utilization=" + getUtilization());
       }
 
       // Do not assign more than one container if this isn't the root queue
-      if (!rootQueue) {
+      // or if we've already assigned an off-switch container
+      if (rootQueue) {
+        if (assignedOffSwitch) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Not assigning more than one off-switch container," +
+            		" assignments so far: " + assignment);
+          }
+          break;
+        }
+      } else {
         break;
       }
     } 
     
-    return assigned;
+    return assignment;
   }
 
   private synchronized boolean assignToQueue(Resource clusterResource) {
@@ -573,9 +598,10 @@ public class ParentQueue implements CSQueue {
                                      minimumAllocation);
   }
   
-  synchronized Resource assignContainersToChildQueues(Resource cluster, 
+  synchronized CSAssignment assignContainersToChildQueues(Resource cluster, 
       SchedulerNode node) {
-    Resource assigned = Resources.createResource(0);
+    CSAssignment assignment = 
+        new CSAssignment(Resources.createResource(0), NodeType.NODE_LOCAL);
     
     printChildQueues();
 
@@ -586,25 +612,28 @@ public class ParentQueue implements CSQueue {
         LOG.debug("Trying to assign to queue: " + childQueue.getQueuePath()
           + " stats: " + childQueue);
       }
-      assigned = childQueue.assignContainers(cluster, node);
+      assignment = childQueue.assignContainers(cluster, node);
       if(LOG.isDebugEnabled()) {
-        LOG.debug("Assignedto queue: " + childQueue.getQueuePath()
-          + " stats: " + childQueue + " --> " + assigned.getMemory());
+        LOG.debug("Assigned to queue: " + childQueue.getQueuePath() +
+          " stats: " + childQueue + " --> " + 
+          assignment.getResource().getMemory() + ", " + assignment.getType());
       }
 
       // If we do assign, remove the queue and re-insert in-order to re-sort
-      if (Resources.greaterThan(assigned, Resources.none())) {
+      if (Resources.greaterThan(assignment.getResource(), Resources.none())) {
         // Remove and re-insert to sort
         iter.remove();
         LOG.info("Re-sorting queues since queue: " + childQueue.getQueuePath() + 
             " stats: " + childQueue);
         childQueues.add(childQueue);
-        printChildQueues();
+        if (LOG.isDebugEnabled()) {
+          printChildQueues();
+        }
         break;
       }
     }
     
-    return assigned;
+    return assignment;
   }
 
   String getChildQueuesToPrint() {
@@ -650,14 +679,16 @@ public class ParentQueue implements CSQueue {
   synchronized void allocateResource(Resource clusterResource, 
       Resource resource) {
     Resources.addTo(usedResources, resource);
-    updateResource(clusterResource);
+    CSQueueUtils.updateQueueStatistics(
+        this, parent, clusterResource, minimumAllocation);
     ++numContainers;
   }
   
   synchronized void releaseResource(Resource clusterResource, 
       Resource resource) {
     Resources.subtractFrom(usedResources, resource);
-    updateResource(clusterResource);
+    CSQueueUtils.updateQueueStatistics(
+        this, parent, clusterResource, minimumAllocation);
     --numContainers;
   }
 
@@ -667,20 +698,12 @@ public class ParentQueue implements CSQueue {
     for (CSQueue childQueue : childQueues) {
       childQueue.updateClusterResource(clusterResource);
     }
+    
+    // Update metrics
+    CSQueueUtils.updateQueueStatistics(
+        this, parent, clusterResource, minimumAllocation);
   }
   
-  private synchronized void updateResource(Resource clusterResource) {
-    float queueLimit = clusterResource.getMemory() * absoluteCapacity; 
-    setUtilization(usedResources.getMemory() / queueLimit);
-    setUsedCapacity(
-        usedResources.getMemory() / (clusterResource.getMemory() * capacity));
-    
-    Resource resourceLimit = 
-      Resources.createResource((int)queueLimit);
-    metrics.setAvailableResourcesToQueue(
-        Resources.subtractFrom(resourceLimit, usedResources));
-  }
-
   @Override
   public QueueMetrics getMetrics() {
     return metrics;

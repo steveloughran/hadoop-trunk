@@ -25,12 +25,8 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocolR23Compatible.ClientNamenodeWireProtocol;
-import org.apache.hadoop.hdfs.server.protocolR23Compatible.DatanodeWireProtocol;
 import org.apache.hadoop.ipc.VersionedProtocol;
 import org.apache.hadoop.security.KerberosInfo;
-
-import org.apache.avro.reflect.Nullable;
 
 /**********************************************************************
  * Protocol that a DFS datanode uses to communicate with the NameNode.
@@ -50,10 +46,11 @@ public interface DatanodeProtocol extends VersionedProtocol {
    * to insulate from the protocol serialization.
    * 
    * If you are adding/changing DN's interface then you need to 
-   * change both this class and ALSO
-   * {@link DatanodeWireProtocol}.
-   * These changes need to be done in a compatible fashion as described in 
-   * {@link ClientNamenodeWireProtocol}
+   * change both this class and ALSO related protocol buffer
+   * wire protocol definition in DatanodeProtocol.proto.
+   * 
+   * For more details on protocol buffer wire protocol, please see 
+   * .../org/apache/hadoop/hdfs/protocolPB/overview.html
    */
   public static final long versionID = 28L;
   
@@ -76,6 +73,8 @@ public interface DatanodeProtocol extends VersionedProtocol {
   final static int DNA_RECOVERBLOCK = 6;  // request a block recovery
   final static int DNA_ACCESSKEYUPDATE = 7;  // update access key
   final static int DNA_BALANCERBANDWIDTHUPDATE = 8; // update balancer bandwidth
+  final static int DNA_UC_ACTION_REPORT_STATUS = 100; // Report upgrade status
+  final static int DNA_UC_ACTION_START_UPGRADE = 101; // start upgrade
 
   /** 
    * Register Datanode.
@@ -105,7 +104,6 @@ public interface DatanodeProtocol extends VersionedProtocol {
    * @param failedVolumes number of failed volumes
    * @throws IOException on error
    */
-  @Nullable
   public DatanodeCommand[] sendHeartbeat(DatanodeRegistration registration,
                                        long capacity,
                                        long dfsUsed, long remaining,

@@ -220,10 +220,6 @@ public class ResourceTrackerService extends AbstractService implements
     if (rmNode == null) {
       /* node does not exist */
       LOG.info("Node not found rebooting " + remoteNodeStatus.getNodeId());
-      
-      // Updating the metrics directly as reboot event cannot be 
-      // triggered on a null rmNode
-      ClusterMetrics.getMetrics().incrNumRebootedNMs();
       return reboot;
     }
 
@@ -265,14 +261,15 @@ public class ResourceTrackerService extends AbstractService implements
     HeartbeatResponse latestResponse = recordFactory
         .newRecordInstance(HeartbeatResponse.class);
     latestResponse.setResponseId(lastHeartbeatResponse.getResponseId() + 1);
-    latestResponse.addAllContainersToCleanup(rmNode.pullContainersToCleanUp());
-    latestResponse.addAllApplicationsToCleanup(rmNode.pullAppsToCleanup());
+    latestResponse.addAllContainersToCleanup(rmNode.getContainersToCleanUp());
+    latestResponse.addAllApplicationsToCleanup(rmNode.getAppsToCleanup());
     latestResponse.setNodeAction(NodeAction.NORMAL);
 
     // 4. Send status to RMNode, saving the latest response.
     this.rmContext.getDispatcher().getEventHandler().handle(
         new RMNodeStatusEvent(nodeId, remoteNodeStatus.getNodeHealthStatus(),
-            remoteNodeStatus.getContainersStatuses(), latestResponse));
+            remoteNodeStatus.getContainersStatuses(), 
+            remoteNodeStatus.getKeepAliveApplications(), latestResponse));
 
     nodeHeartBeatResponse.setHeartbeatResponse(latestResponse);
     return nodeHeartBeatResponse;

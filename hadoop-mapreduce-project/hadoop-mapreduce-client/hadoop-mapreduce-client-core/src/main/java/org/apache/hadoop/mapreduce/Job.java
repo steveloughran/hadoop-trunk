@@ -455,10 +455,14 @@ public class Job extends JobContextImpl implements JobContext {
   public String toString() {
     ensureState(JobState.RUNNING);
     String reasonforFailure = " ";
+    int numMaps = 0;
+    int numReduces = 0;
     try {
       updateStatus();
       if (status.getState().equals(JobStatus.State.FAILED))
         reasonforFailure = getTaskFailureEventString();
+      numMaps = getTaskReports(TaskType.MAP).length;
+      numReduces = getTaskReports(TaskType.REDUCE).length;
     } catch (IOException e) {
     } catch (InterruptedException ie) {
     }
@@ -467,6 +471,9 @@ public class Job extends JobContextImpl implements JobContext {
     sb.append("Job File: ").append(status.getJobFile()).append("\n");
     sb.append("Job Tracking URL : ").append(status.getTrackingUrl());
     sb.append("\n");
+    sb.append("Uber job : ").append(status.isUber()).append("\n");
+    sb.append("Number of maps: ").append(numMaps).append("\n");
+    sb.append("Number of reduces: ").append(numReduces).append("\n");
     sb.append("map() completion: ");
     sb.append(status.getMapProgress()).append("\n");
     sb.append("reduce() completion: ");
@@ -1029,7 +1036,7 @@ public class Job extends JobContextImpl implements JobContext {
   public void addFileToClassPath(Path file)
     throws IOException {
     ensureState(JobState.DEFINE);
-    DistributedCache.addFileToClassPath(file, conf);
+    DistributedCache.addFileToClassPath(file, conf, file.getFileSystem(conf));
   }
 
   /**
@@ -1044,7 +1051,7 @@ public class Job extends JobContextImpl implements JobContext {
   public void addArchiveToClassPath(Path archive)
     throws IOException {
     ensureState(JobState.DEFINE);
-    DistributedCache.addArchiveToClassPath(archive, conf);
+    DistributedCache.addArchiveToClassPath(archive, conf, archive.getFileSystem(conf));
   }
 
   /**
@@ -1215,6 +1222,7 @@ public class Job extends JobContextImpl implements JobContext {
       }
     });
     state = JobState.RUNNING;
+    LOG.info("The url to track the job: " + getTrackingURL());
    }
   
   /**
@@ -1268,12 +1276,20 @@ public class Job extends JobContextImpl implements JobContext {
       Job.getProgressPollInterval(clientConf);
     /* make sure to report full progress after the job is done */
     boolean reportedAfterCompletion = false;
+    boolean reportedUberMode = false;
     while (!isComplete() || !reportedAfterCompletion) {
       if (isComplete()) {
         reportedAfterCompletion = true;
       } else {
         Thread.sleep(progMonitorPollIntervalMillis);
       }
+      if (status.getState() == JobStatus.State.PREP) {
+        continue;
+      }      
+      if (!reportedUberMode) {
+        reportedUberMode = true;
+        LOG.info("Job " + jobId + " running in uber mode : " + isUber());
+      }      
       String report = 
         (" map " + StringUtils.formatPercent(mapProgress(), 0)+
             " reduce " + 
@@ -1497,4 +1513,10 @@ public class Job extends JobContextImpl implements JobContext {
     conf.set(Job.OUTPUT_FILTER, newValue.toString());
   }
 
+  public boolean isUber() throws IOException, InterruptedException {
+    ensureState(JobState.RUNNING);
+    updateStatus();
+    return status.isUber();
+  }
+  
 }

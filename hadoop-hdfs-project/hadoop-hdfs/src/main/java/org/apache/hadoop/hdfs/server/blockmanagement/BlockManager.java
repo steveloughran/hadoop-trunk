@@ -170,9 +170,6 @@ public class BlockManager {
   /** variable to enable check for enough racks */
   final boolean shouldCheckForEnoughRacks;
 
-  /** Last block index used for replication work. */
-  private int replIndex = 0;
-
   /** for block replicas placement */
   private BlockPlacementPolicy blockplacement;
   
@@ -444,15 +441,23 @@ public class BlockManager {
    */
   private BlockInfo completeBlock(final INodeFile fileINode,
       final int blkIndex) throws IOException {
+    return completeBlock(fileINode, blkIndex, false);
+  }
+
+  public BlockInfo completeBlock(final INodeFile fileINode, 
+      final int blkIndex, final boolean force) throws IOException {
     if(blkIndex < 0)
       return null;
     BlockInfo curBlock = fileINode.getBlocks()[blkIndex];
     if(curBlock.isComplete())
       return curBlock;
     BlockInfoUnderConstruction ucBlock = (BlockInfoUnderConstruction)curBlock;
-    if(ucBlock.numNodes() < minReplication)
+    if(!force && ucBlock.numNodes() < minReplication)
       throw new IOException("Cannot complete block: " +
           "block does not satisfy minimal replication requirement.");
+    if(!force && ucBlock.getBlockUCState() != BlockUCState.COMMITTED)
+      throw new IOException(
+          "Cannot complete block: block has not been COMMITTED by the client");
     BlockInfo completeBlock = ucBlock.convertToCompleteBlock();
     // replace penultimate block in file
     fileINode.setBlock(blkIndex, completeBlock);
@@ -926,74 +931,16 @@ public class BlockManager {
    * @return number of blocks scheduled for replication during this iteration.
    */
   private int computeReplicationWork(int blocksToProcess) throws IOException {
-    // Choose the blocks to be replicated
-    List<List<Block>> blocksToReplicate =
-      chooseUnderReplicatedBlocks(blocksToProcess);
-
-    // replicate blocks
-    return computeReplicationWorkForBlocks(blocksToReplicate);
-  }
-
-  /**
-   * Get a list of block lists to be replicated The index of block lists
-   * represents the
-   *
-   * @param blocksToProcess
-   * @return Return a list of block lists to be replicated. The block list index
-   *         represents its replication priority.
-   */
-  private List<List<Block>> chooseUnderReplicatedBlocks(int blocksToProcess) {
-    // initialize data structure for the return value
-    List<List<Block>> blocksToReplicate = new ArrayList<List<Block>>(
-        UnderReplicatedBlocks.LEVEL);
-    for (int i = 0; i < UnderReplicatedBlocks.LEVEL; i++) {
-      blocksToReplicate.add(new ArrayList<Block>());
-    }
+    List<List<Block>> blocksToReplicate = null;
     namesystem.writeLock();
     try {
-      synchronized (neededReplications) {
-        if (neededReplications.size() == 0) {
-          return blocksToReplicate;
-        }
-
-        // Go through all blocks that need replications.
-        UnderReplicatedBlocks.BlockIterator neededReplicationsIterator = 
-            neededReplications.iterator();
-        // skip to the first unprocessed block, which is at replIndex
-        for (int i = 0; i < replIndex && neededReplicationsIterator.hasNext(); i++) {
-          neededReplicationsIterator.next();
-        }
-        // # of blocks to process equals either twice the number of live
-        // data-nodes or the number of under-replicated blocks whichever is less
-        blocksToProcess = Math.min(blocksToProcess, neededReplications.size());
-
-        for (int blkCnt = 0; blkCnt < blocksToProcess; blkCnt++, replIndex++) {
-          if (!neededReplicationsIterator.hasNext()) {
-            // start from the beginning
-            replIndex = 0;
-            blocksToProcess = Math.min(blocksToProcess, neededReplications
-                .size());
-            if (blkCnt >= blocksToProcess)
-              break;
-            neededReplicationsIterator = neededReplications.iterator();
-            assert neededReplicationsIterator.hasNext() : "neededReplications should not be empty.";
-          }
-
-          Block block = neededReplicationsIterator.next();
-          int priority = neededReplicationsIterator.getPriority();
-          if (priority < 0 || priority >= blocksToReplicate.size()) {
-            LOG.warn("Unexpected replication priority: "
-                + priority + " " + block);
-          } else {
-            blocksToReplicate.get(priority).add(block);
-          }
-        } // end for
-      } // end synchronized neededReplication
+      // Choose the blocks to be replicated
+      blocksToReplicate = neededReplications
+          .chooseUnderReplicatedBlocks(blocksToProcess);
     } finally {
       namesystem.writeUnlock();
     }
-
-    return blocksToReplicate;
+    return computeReplicationWorkForBlocks(blocksToReplicate);
   }
 
   /** Replicate a set of blocks
@@ -1022,7 +969,7 @@ public class BlockManager {
             // abandoned block or block reopened for append
             if(fileINode == null || fileINode.isUnderConstruction()) {
               neededReplications.remove(block, priority); // remove from neededReplications
-              replIndex--;
+              neededReplications.decrementReplicationIndex(priority);
               continue;
             }
 
@@ -1046,7 +993,7 @@ public class BlockManager {
               if ( (pendingReplications.getNumReplicas(block) > 0) ||
                    (blockHasEnoughRacks(block)) ) {
                 neededReplications.remove(block, priority); // remove from neededReplications
-                replIndex--;
+                neededReplications.decrementReplicationIndex(priority);
                 NameNode.stateChangeLog.info("BLOCK* "
                     + "Removing block " + block
                     + " from neededReplications as it has enough replicas.");
@@ -1107,7 +1054,7 @@ public class BlockManager {
           if(fileINode == null || fileINode.isUnderConstruction()) {
             neededReplications.remove(block, priority); // remove from neededReplications
             rw.targets = null;
-            replIndex--;
+            neededReplications.decrementReplicationIndex(priority);
             continue;
           }
           requiredReplication = fileINode.getReplication();
@@ -1121,7 +1068,7 @@ public class BlockManager {
             if ( (pendingReplications.getNumReplicas(block) > 0) ||
                  (blockHasEnoughRacks(block)) ) {
               neededReplications.remove(block, priority); // remove from neededReplications
-              replIndex--;
+              neededReplications.decrementReplicationIndex(priority);
               rw.targets = null;
               NameNode.stateChangeLog.info("BLOCK* "
                   + "Removing block " + block
@@ -1159,7 +1106,7 @@ public class BlockManager {
           // remove from neededReplications
           if(numEffectiveReplicas + targets.length >= requiredReplication) {
             neededReplications.remove(block, priority); // remove from neededReplications
-            replIndex--;
+            neededReplications.decrementReplicationIndex(priority);
           }
         }
       }
@@ -1556,7 +1503,7 @@ public class BlockManager {
     // Ignore replicas already scheduled to be removed from the DN
     if(invalidateBlocks.contains(dn.getStorageID(), block)) {
       assert storedBlock.findDatanode(dn) < 0 : "Block " + block
-        + " in recentInvalidatesSet should not appear in DN " + dn;
+        + " in invalidated blocks set should not appear in DN " + dn;
       return storedBlock;
     }
 
@@ -1601,7 +1548,24 @@ public class BlockManager {
       }
     case RBW:
     case RWR:
-      return storedBlock.isComplete();
+      if (!storedBlock.isComplete()) {
+        return false;
+      } else if (storedBlock.getGenerationStamp() != iblk.getGenerationStamp()) {
+        return true;
+      } else { // COMPLETE block, same genstamp
+        if (reportedState == ReplicaState.RBW) {
+          // If it's a RBW report for a COMPLETE block, it may just be that
+          // the block report got a little bit delayed after the pipeline
+          // closed. So, ignore this report, assuming we will get a
+          // FINALIZED replica later. See HDFS-2791
+          LOG.info("Received an RBW replica for block " + storedBlock +
+              " on " + dn.getName() + ": ignoring it, since the block is " +
+              "complete with the same generation stamp.");
+          return false;
+        } else {
+          return true;
+        }
+      }
     case RUR:       // should not be reported
     case TEMPORARY: // should not be reported
     default:
@@ -1784,7 +1748,7 @@ public class BlockManager {
    * Invalidate corrupt replicas.
    * <p>
    * This will remove the replicas from the block's location list,
-   * add them to {@link #recentInvalidateSets} so that they could be further
+   * add them to {@link #invalidateBlocks} so that they could be further
    * deleted from the respective data-nodes,
    * and remove the block from corruptReplicasMap.
    * <p>
@@ -1823,7 +1787,8 @@ public class BlockManager {
   public void processMisReplicatedBlocks() {
     assert namesystem.hasWriteLock();
 
-    long nrInvalid = 0, nrOverReplicated = 0, nrUnderReplicated = 0;
+    long nrInvalid = 0, nrOverReplicated = 0, nrUnderReplicated = 0,
+         nrUnderConstruction = 0;
     neededReplications.clear();
     for (BlockInfo block : blocksMap.getBlocks()) {
       INodeFile fileINode = block.getINode();
@@ -1831,6 +1796,12 @@ public class BlockManager {
         // block does not belong to any file
         nrInvalid++;
         addToInvalidates(block);
+        continue;
+      }
+      if (!block.isComplete()) {
+        // Incomplete blocks are never considered mis-replicated --
+        // they'll be reached when they are completed or recovered.
+        nrUnderConstruction++;
         continue;
       }
       // calculate current replication
@@ -1856,6 +1827,7 @@ public class BlockManager {
     LOG.info("Number of invalid blocks          = " + nrInvalid);
     LOG.info("Number of under-replicated blocks = " + nrUnderReplicated);
     LOG.info("Number of  over-replicated blocks = " + nrOverReplicated);
+    LOG.info("Number of blocks being written    = " + nrUnderConstruction);
   }
 
   /** Set replication for the blocks. */
@@ -2013,7 +1985,7 @@ public class BlockManager {
       //
       addToInvalidates(b, cur);
       NameNode.stateChangeLog.info("BLOCK* chooseExcessReplicates: "
-                +"("+cur.getName()+", "+b+") is added to recentInvalidateSets");
+                +"("+cur.getName()+", "+b+") is added to invalidated blocks set.");
     }
   }
 
@@ -2429,7 +2401,7 @@ public class BlockManager {
 
   /**
    * Get blocks to invalidate for <i>nodeId</i>
-   * in {@link #recentInvalidateSets}.
+   * in {@link #invalidateBlocks}.
    *
    * @return number of blocks scheduled for removal during this iteration.
    */

@@ -64,6 +64,7 @@ import org.apache.hadoop.yarn.util.BuilderUtils.ContainerIdComparator;
  */
 @Private
 @Unstable
+@SuppressWarnings("unchecked")
 public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
   private static final Log LOG = LogFactory.getLog(RMNodeImpl.class);
@@ -89,7 +90,6 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   /* set of containers that have just launched */
   private final Map<ContainerId, ContainerStatus> justLaunchedContainers = 
     new HashMap<ContainerId, ContainerStatus>();
-  
 
   /* set of containers that need to be cleaned */
   private final Set<ContainerId> containersToClean = new TreeSet<ContainerId>(
@@ -117,11 +117,14 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
          EnumSet.of(RMNodeState.RUNNING, RMNodeState.UNHEALTHY),
          RMNodeEventType.STATUS_UPDATE, new StatusUpdateWhenHealthyTransition())
      .addTransition(RMNodeState.RUNNING, RMNodeState.DECOMMISSIONED,
-         RMNodeEventType.DECOMMISSION, new RemoveNodeTransition())
+         RMNodeEventType.DECOMMISSION,
+         new DeactivateNodeTransition(RMNodeState.DECOMMISSIONED))
      .addTransition(RMNodeState.RUNNING, RMNodeState.LOST,
-         RMNodeEventType.EXPIRE, new RemoveNodeTransition())
-     .addTransition(RMNodeState.RUNNING, RMNodeState.LOST,
-         RMNodeEventType.REBOOTING, new RemoveNodeTransition())
+         RMNodeEventType.EXPIRE,
+         new DeactivateNodeTransition(RMNodeState.LOST))
+     .addTransition(RMNodeState.RUNNING, RMNodeState.REBOOTED,
+         RMNodeEventType.REBOOTING,
+         new DeactivateNodeTransition(RMNodeState.REBOOTED))
      .addTransition(RMNodeState.RUNNING, RMNodeState.RUNNING,
          RMNodeEventType.CLEANUP_APP, new CleanUpAppTransition())
      .addTransition(RMNodeState.RUNNING, RMNodeState.RUNNING,
@@ -248,49 +251,43 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   }
 
   @Override
-  public List<ApplicationId> pullAppsToCleanup() {
-    this.writeLock.lock();
+  public List<ApplicationId> getAppsToCleanup() {
+    this.readLock.lock();
 
     try {
-      List<ApplicationId> lastfinishedApplications = new ArrayList<ApplicationId>();
-      lastfinishedApplications.addAll(this.finishedApplications);
-      this.finishedApplications.clear();
-      return lastfinishedApplications;
+      return new ArrayList<ApplicationId>(this.finishedApplications);
     } finally {
-      this.writeLock.unlock();
+      this.readLock.unlock();
     }
 
   }
-
+  
   @Override
-  public List<ContainerId> pullContainersToCleanUp() {
+  public List<ContainerId> getContainersToCleanUp() {
 
-    this.writeLock.lock();
+    this.readLock.lock();
 
     try {
-      List<ContainerId> containersToCleanUp = new ArrayList<ContainerId>();
-      containersToCleanUp.addAll(this.containersToClean);
-      this.containersToClean.clear();
-      return containersToCleanUp;
+      return new ArrayList<ContainerId>(this.containersToClean);
     } finally {
-      this.writeLock.unlock();
+      this.readLock.unlock();
     }
   };
 
   @Override
   public HeartbeatResponse getLastHeartBeatResponse() {
 
-    this.writeLock.lock();
+    this.readLock.lock();
 
     try {
       return this.latestHeartBeatResponse;
     } finally {
-      this.writeLock.unlock();
+      this.readLock.unlock();
     }
   }
 
   public void handle(RMNodeEvent event) {
-    LOG.info("Processing " + event.getNodeId() + " of type " + event.getType());
+    LOG.debug("Processing " + event.getNodeId() + " of type " + event.getType());
     try {
       writeLock.lock();
       RMNodeState oldState = getState();
@@ -311,19 +308,67 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       writeLock.unlock();
     }
   }
-  
+
+  private void updateMetricsForRejoinedNode(RMNodeState previousNodeState) {
+    ClusterMetrics metrics = ClusterMetrics.getMetrics();
+    metrics.incrNumActiveNodes();
+
+    switch (previousNodeState) {
+    case LOST:
+      metrics.decrNumLostNMs();
+      break;
+    case REBOOTED:
+      metrics.decrNumRebootedNMs();
+      break;
+    case DECOMMISSIONED:
+      metrics.decrDecommisionedNMs();
+      break;
+    case UNHEALTHY:
+      metrics.decrNumUnhealthyNMs();
+      break;
+    }
+  }
+
+  private void updateMetricsForDeactivatedNode(RMNodeState finalState) {
+    ClusterMetrics metrics = ClusterMetrics.getMetrics();
+    metrics.decrNumActiveNodes();
+
+    switch (finalState) {
+    case DECOMMISSIONED:
+      metrics.incrDecommisionedNMs();
+      break;
+    case LOST:
+      metrics.incrNumLostNMs();
+      break;
+    case REBOOTED:
+      metrics.incrNumRebootedNMs();
+      break;
+    case UNHEALTHY:
+      metrics.incrNumUnhealthyNMs();
+      break;
+    }
+  }
+
   public static class AddNodeTransition implements
       SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
-    @SuppressWarnings("unchecked")
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
       // Inform the scheduler
 
       rmNode.context.getDispatcher().getEventHandler().handle(
           new NodeAddedSchedulerEvent(rmNode));
-
-      ClusterMetrics.getMetrics().addNode();
+      
+      String host = rmNode.nodeId.getHost();
+      if (rmNode.context.getInactiveRMNodes().containsKey(host)) {
+        // Old node rejoining
+        RMNode previouRMNode = rmNode.context.getInactiveRMNodes().get(host);
+        rmNode.context.getInactiveRMNodes().remove(host);
+        rmNode.updateMetricsForRejoinedNode(previouRMNode.getState());
+      } else {
+        // Increment activeNodes explicitly because this is a new node.
+        ClusterMetrics.getMetrics().incrNumActiveNodes();
+      }
     }
   }
   
@@ -342,34 +387,38 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
-
       rmNode.containersToClean.add(((
           RMNodeCleanContainerEvent) event).getContainerId());
     }
   }
 
-  public static class RemoveNodeTransition
+  public static class DeactivateNodeTransition
     implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
-    @SuppressWarnings("unchecked")
+    private final RMNodeState finalState;
+    public DeactivateNodeTransition(RMNodeState finalState) {
+      this.finalState = finalState;
+    }
+
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
       // Inform the scheduler
       rmNode.context.getDispatcher().getEventHandler().handle(
           new NodeRemovedSchedulerEvent(rmNode));
 
-      // Remove the node from the system.
+      // Deactivate the node
       rmNode.context.getRMNodes().remove(rmNode.nodeId);
-      LOG.info("Removed Node " + rmNode.nodeId);
-      
-      //Update the metrics 
-      ClusterMetrics.getMetrics().removeNode(event.getType());
+      LOG.info("Deactivating Node " + rmNode.nodeId + " as it is now "
+          + finalState);
+      rmNode.context.getInactiveRMNodes().put(rmNode.nodeId.getHost(), rmNode);
+
+      //Update the metrics
+      rmNode.updateMetricsForDeactivatedNode(finalState);
     }
   }
 
   public static class StatusUpdateWhenHealthyTransition implements
       MultipleArcTransition<RMNodeImpl, RMNodeEvent, RMNodeState> {
-    @SuppressWarnings("unchecked")
     @Override
     public RMNodeState transition(RMNodeImpl rmNode, RMNodeEvent event) {
 
@@ -385,7 +434,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         // Inform the scheduler
         rmNode.context.getDispatcher().getEventHandler().handle(
             new NodeRemovedSchedulerEvent(rmNode));
-        ClusterMetrics.getMetrics().incrNumUnhealthyNMs();
+        // Update metrics
+        rmNode.updateMetricsForDeactivatedNode(RMNodeState.UNHEALTHY);
         return RMNodeState.UNHEALTHY;
       }
 
@@ -396,8 +446,25 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       List<ContainerStatus> completedContainers = 
           new ArrayList<ContainerStatus>();
       for (ContainerStatus remoteContainer : statusEvent.getContainers()) {
-        // Process running containers
         ContainerId containerId = remoteContainer.getContainerId();
+        
+        // Don't bother with containers already scheduled for cleanup, or for
+        // applications already killed. The scheduler doens't need to know any
+        // more about this container
+        if (rmNode.containersToClean.contains(containerId)) {
+          LOG.info("Container " + containerId + " already scheduled for " +
+          		"cleanup, no further processing");
+          continue;
+        }
+        if (rmNode.finishedApplications.contains(containerId
+            .getApplicationAttemptId().getApplicationId())) {
+          LOG.info("Container " + containerId
+              + " belongs to an application that is already killed,"
+              + " no further processing");
+          continue;
+        }
+
+        // Process running containers
         if (remoteContainer.getState() == ContainerState.RUNNING) {
           if (!rmNode.justLaunchedContainers.containsKey(containerId)) {
             // Just launched container. RM knows about it the first time.
@@ -414,16 +481,22 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       rmNode.context.getDispatcher().getEventHandler().handle(
           new NodeUpdateSchedulerEvent(rmNode, newlyLaunchedContainers, 
               completedContainers));
+      
+      rmNode.context.getDelegationTokenRenewer().updateKeepAliveApplications(
+          statusEvent.getKeepAliveAppIds());
+
+      // HeartBeat processing from our end is done, as node pulls the following
+      // lists before sending status-updates. Clear data-structures
+      rmNode.containersToClean.clear();
+      rmNode.finishedApplications.clear();
 
       return RMNodeState.RUNNING;
     }
   }
 
-  public static class StatusUpdateWhenUnHealthyTransition
- implements
+  public static class StatusUpdateWhenUnHealthyTransition implements
       MultipleArcTransition<RMNodeImpl, RMNodeEvent, RMNodeState> {
 
-    @SuppressWarnings("unchecked")
     @Override
     public RMNodeState transition(RMNodeImpl rmNode, RMNodeEvent event) {
       RMNodeStatusEvent statusEvent = (RMNodeStatusEvent) event;
@@ -435,7 +508,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       if (remoteNodeHealthStatus.getIsNodeHealthy()) {
         rmNode.context.getDispatcher().getEventHandler().handle(
             new NodeAddedSchedulerEvent(rmNode));
-        ClusterMetrics.getMetrics().decrNumUnhealthyNMs();
+        // Update metrics
+        rmNode.updateMetricsForRejoinedNode(RMNodeState.UNHEALTHY);
         return RMNodeState.RUNNING;
       }
 

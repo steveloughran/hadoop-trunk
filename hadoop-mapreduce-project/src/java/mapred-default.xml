@@ -434,18 +434,6 @@
 </property>
 
 <property>
-  <name>mapreduce.task.tmp.dir</name>
-  <value>./tmp</value>
-  <description> To set the value of tmp directory for map and reduce tasks.
-  If the value is an absolute path, it is directly assigned. Otherwise, it is
-  prepended with task's working directory. The java tasks are executed with
-  option -Djava.io.tmpdir='the absolute path of the tmp dir'. Pipes and
-  streaming are set with environment variable,
-   TMPDIR='the absolute path of the tmp dir'
-  </description>
-</property>
-
-<property>
   <name>mapreduce.map.log.level</name>
   <value>INFO</value>
   <description>The logging level for the map task. The allowed levels are:
@@ -957,6 +945,12 @@
     For enabling this flag(mapreduce.cluster.acls.enabled), this is to be set
     to true in mapred-site.xml on JobTracker node and on all TaskTracker nodes.
   </description>
+</property>
+
+<property>
+  <description>Network ACL to AM closed.</description>
+  <name>mapreduce.job.am-access-disabled</name>
+  <value>false</value>
 </property>
 
 <property>

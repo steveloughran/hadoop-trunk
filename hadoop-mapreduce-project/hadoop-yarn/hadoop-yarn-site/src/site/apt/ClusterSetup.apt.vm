@@ -95,7 +95,7 @@ Hadoop MapReduce Next Generation - Cluster Setup
 *--------------------------------------+--------------------------------------+
 | DataNode                             | HADOOP_DATANODE_OPTS                 |
 *--------------------------------------+--------------------------------------+
-| Backup NameNode                      | HADOOP_SECONDARYNAMENODE_OPTS        |
+| Secondary NameNode                   | HADOOP_SECONDARYNAMENODE_OPTS        |
 *--------------------------------------+--------------------------------------+
 | ResourceManager                      | YARN_RESOURCEMANAGER_OPTS            |
 *--------------------------------------+--------------------------------------+
@@ -194,6 +194,10 @@ Hadoop MapReduce Next Generation - Cluster Setup
 | | | Defaults to special value of <<*>> which means <anyone>. |
 | | | Special value of just <space> means no one has access. |
 *-------------------------+-------------------------+------------------------+
+| <<<yarn.log-aggregation-enable>>> | | |
+| | <false> | |
+| | | Configuration to enable or disable log aggregation |
+*-------------------------+-------------------------+------------------------+
 
 
         * Configurations for ResourceManager:
@@ -259,10 +263,6 @@ Hadoop MapReduce Next Generation - Cluster Setup
 | | Comma-separated list of paths on the local filesystem where logs  | |
 | | are written. | |
 | | | Multiple paths help spread disk i/o. |
-*-------------------------+-------------------------+------------------------+
-| <<<yarn.nodemanager.log-aggregation-enable>>> | | |
-| | <false> | |
-| | | Configuration to enable or disable log aggregation |
 *-------------------------+-------------------------+------------------------+
 | <<<yarn.nodemanager.log.retain-seconds>>> | | |
 | | <10800> | |
@@ -476,7 +476,7 @@ Hadoop MapReduce Next Generation - Cluster Setup
     designated server:
   
 ----
-  $ $YARN_HOME/bin/yarn start historyserver --config $HADOOP_CONF_DIR  
+  $ $YARN_HOME/bin/mapred start historyserver --config $YARN_CONF_DIR  
 ----    	  
 
     * Hadoop Shutdown      
@@ -519,7 +519,7 @@ Hadoop MapReduce Next Generation - Cluster Setup
     designated server:
   
 ----
-  $ $YARN_HOME/bin/yarn stop historyserver --config $HADOOP_CONF_DIR  
+  $ $YARN_HOME/bin/mapred stop historyserver --config $YARN_CONF_DIR  
 ----    	  
 
     
@@ -537,15 +537,15 @@ Hadoop MapReduce Next Generation - Cluster Setup
       
   It's recommended to have them share a Unix group, for e.g. <<<hadoop>>>.
       
-*--------------------------------------+--------------------------------------+
-|| User:Group                          || Daemons                             |
-*--------------------------------------+--------------------------------------+
-| hdfs:hadoop                          | NameNode, Backup NameNode, DataNode  |
-*--------------------------------------+--------------------------------------+
-| yarn:hadoop                          | ResourceManager, NodeManager         |
-*--------------------------------------+--------------------------------------+
-| mapred:hadoop                        | MapReduce JobHistory Server          |  
-*--------------------------------------+--------------------------------------+
+*--------------------------------------+----------------------------------------------------------------------+
+|| User:Group                          || Daemons                                                             |
+*--------------------------------------+----------------------------------------------------------------------+
+| hdfs:hadoop                          | NameNode, Secondary NameNode, Checkpoint Node, Backup Node, DataNode |
+*--------------------------------------+----------------------------------------------------------------------+
+| yarn:hadoop                          | ResourceManager, NodeManager                                         |
+*--------------------------------------+----------------------------------------------------------------------+
+| mapred:hadoop                        | MapReduce JobHistory Server                                          |
+*--------------------------------------+----------------------------------------------------------------------+
       
   * <<<Permissions for both HDFS and local fileSystem paths>>>
      
@@ -1020,7 +1020,7 @@ KVNO Timestamp         Principal
     designated server as <mapred>:
   
 ----
-[mapred]$ $YARN_HOME/bin/yarn start historyserver --config $HADOOP_CONF_DIR  
+[mapred]$ $YARN_HOME/bin/mapred start historyserver --config $YARN_CONF_DIR  
 ----    	  
 
     * Hadoop Shutdown      
@@ -1063,7 +1063,7 @@ KVNO Timestamp         Principal
     designated server as <mapred>:
 
 ----
-[mapred]$ $YARN_HOME/bin/yarn stop historyserver --config $HADOOP_CONF_DIR  
+[mapred]$ $YARN_HOME/bin/mapred stop historyserver --config $YARN_CONF_DIR  
 ----    	  
     
 * {Web Interfaces}      

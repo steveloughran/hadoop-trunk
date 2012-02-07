@@ -40,6 +40,7 @@ import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.RegisterData
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.RegisterDatanodeResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ReportBadBlocksRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ReportBadBlocksResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DatanodeIDProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.LocatedBlockProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.VersionRequestProto;
@@ -95,11 +96,12 @@ public class DatanodeProtocolServerSideTranslatorPB implements
   @Override
   public HeartbeatResponseProto sendHeartbeat(RpcController controller,
       HeartbeatRequestProto request) throws ServiceException {
-    DatanodeCommand[] cmds;
+    DatanodeCommand[] cmds = null;
     try {
+      StorageReportProto report = request.getReports(0);
       cmds = impl.sendHeartbeat(PBHelper.convert(request.getRegistration()),
-          request.getCapacity(), request.getDfsUsed(), request.getRemaining(),
-          request.getBlockPoolUsed(), request.getXmitsInProgress(),
+          report.getCapacity(), report.getDfsUsed(), report.getRemaining(),
+          report.getBlockPoolUsed(), request.getXmitsInProgress(),
           request.getXceiverCount(), request.getFailedVolumes());
     } catch (IOException e) {
       throw new ServiceException(e);
@@ -108,7 +110,9 @@ public class DatanodeProtocolServerSideTranslatorPB implements
         .newBuilder();
     if (cmds != null) {
       for (int i = 0; i < cmds.length; i++) {
-        builder.addCmds(i, PBHelper.convert(cmds[i]));
+        if (cmds[i] != null) {
+          builder.addCmds(PBHelper.convert(cmds[i]));
+        }
       }
     }
     return builder.build();
@@ -117,8 +121,8 @@ public class DatanodeProtocolServerSideTranslatorPB implements
   @Override
   public BlockReportResponseProto blockReport(RpcController controller,
       BlockReportRequestProto request) throws ServiceException {
-    DatanodeCommand cmd;
-    List<Long> blockIds = request.getBlocksList();
+    DatanodeCommand cmd = null;
+    List<Long> blockIds = request.getReports(0).getBlocksList();
     long[] blocks = new long[blockIds.size()];
     for (int i = 0; i < blockIds.size(); i++) {
       blocks[i] = blockIds.get(i);
@@ -129,15 +133,20 @@ public class DatanodeProtocolServerSideTranslatorPB implements
     } catch (IOException e) {
       throw new ServiceException(e);
     }
-    return BlockReportResponseProto.newBuilder().setCmd(PBHelper.convert(cmd))
-        .build();
+    BlockReportResponseProto.Builder builder = 
+        BlockReportResponseProto.newBuilder();
+    if (cmd != null) {
+      builder.setCmd(PBHelper.convert(cmd));
+    }
+    return builder.build();
   }
 
   @Override
   public BlockReceivedAndDeletedResponseProto blockReceivedAndDeleted(
       RpcController controller, BlockReceivedAndDeletedRequestProto request)
       throws ServiceException {
-    List<ReceivedDeletedBlockInfoProto> rdbip = request.getBlocksList();
+    List<ReceivedDeletedBlockInfoProto> rdbip = request.getBlocks(0)
+        .getBlocksList();
     ReceivedDeletedBlockInfo[] info = 
         new ReceivedDeletedBlockInfo[rdbip.size()];
     for (int i = 0; i < rdbip.size(); i++) {
@@ -180,14 +189,20 @@ public class DatanodeProtocolServerSideTranslatorPB implements
   @Override
   public ProcessUpgradeResponseProto processUpgrade(RpcController controller,
       ProcessUpgradeRequestProto request) throws ServiceException {
-    UpgradeCommand cmd;
+    UpgradeCommand ret;
     try {
-      cmd = impl.processUpgradeCommand(PBHelper.convert(request.getCmd()));
+      UpgradeCommand cmd = request.hasCmd() ? PBHelper
+          .convert(request.getCmd()) : null;
+      ret = impl.processUpgradeCommand(cmd);
     } catch (IOException e) {
       throw new ServiceException(e);
     }
-    return ProcessUpgradeResponseProto.newBuilder()
-        .setCmd(PBHelper.convert(cmd)).build();
+    ProcessUpgradeResponseProto.Builder builder = 
+        ProcessUpgradeResponseProto.newBuilder();
+    if (ret != null) {
+      builder.setCmd(PBHelper.convert(ret));
+    }
+    return builder.build();
   }
 
   @Override

@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,7 +35,6 @@ import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.yarn.Lock;
@@ -67,6 +65,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptS
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanContainerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
@@ -89,6 +89,7 @@ import org.apache.hadoop.yarn.util.BuilderUtils;
 
 @LimitedPrivate("yarn")
 @Evolving
+@SuppressWarnings("unchecked")
 public class FifoScheduler implements ResourceScheduler {
 
   private static final Log LOG = LogFactory.getLog(FifoScheduler.class);
@@ -124,10 +125,11 @@ public class FifoScheduler implements ResourceScheduler {
 
   private Map<ApplicationAttemptId, SchedulerApp> applications
       = new TreeMap<ApplicationAttemptId, SchedulerApp>();
+  
+  private final ActiveUsersManager activeUsersManager;
 
   private static final String DEFAULT_QUEUE_NAME = "default";
-  private final QueueMetrics metrics =
-    QueueMetrics.forQueue(DEFAULT_QUEUE_NAME, null, false);
+  private final QueueMetrics metrics;
 
   private final Queue DEFAULT_QUEUE = new Queue() {
     @Override
@@ -174,11 +176,21 @@ public class FifoScheduler implements ResourceScheduler {
     }
   };
 
+  public FifoScheduler() {
+    metrics = QueueMetrics.forQueue(DEFAULT_QUEUE_NAME, null, false);
+    activeUsersManager = new ActiveUsersManager(metrics);
+  }
+  
   @Override
   public Resource getMinimumResourceCapability() {
     return minimumAllocation;
   }
 
+  @Override
+  public int getNumClusterNodes() {
+    return nodes.size();
+  }
+  
   @Override
   public Resource getMaximumResourceCapability() {
     return maximumAllocation;
@@ -218,7 +230,7 @@ public class FifoScheduler implements ResourceScheduler {
     }
 
     // Sanity check
-    SchedulerUtils.normalizeRequests(ask, MINIMUM_MEMORY);
+    SchedulerUtils.normalizeRequests(ask, minimumAllocation.getMemory());
 
     // Release containers
     for (ContainerId releasedContainer : release) {
@@ -279,15 +291,16 @@ public class FifoScheduler implements ResourceScheduler {
     return nodes.get(nodeId);
   }
   
-  @SuppressWarnings("unchecked")
   private synchronized void addApplication(ApplicationAttemptId appAttemptId,
       String user) {
     // TODO: Fix store
     SchedulerApp schedulerApp = 
-        new SchedulerApp(appAttemptId, user, DEFAULT_QUEUE, 
+        new SchedulerApp(appAttemptId, user, DEFAULT_QUEUE, activeUsersManager,
             this.rmContext, null);
     applications.put(appAttemptId, schedulerApp);
-    metrics.submitApp(user);
+    if (appAttemptId.getAttemptId() == 1) {
+      metrics.submitApp(user);
+    }
     LOG.info("Application Submission: " + appAttemptId.getApplicationId() + 
         " from " + user + ", currently active: " + applications.size());
     rmContext.getDispatcher().getEventHandler().handle(
@@ -312,6 +325,12 @@ public class FifoScheduler implements ResourceScheduler {
               container.getContainerId(), 
               SchedulerUtils.COMPLETED_APPLICATION),
           RMContainerEventType.KILL);
+    }
+
+    // Inform the activeUsersManager
+    synchronized (application) {
+      activeUsersManager.deactivateApplication(
+          application.getUser(), application.getApplicationId());
     }
 
     // Clean up pending requests, metrics etc.
@@ -354,7 +373,7 @@ public class FifoScheduler implements ResourceScheduler {
         }
       }
       
-      application.setAvailableResourceLimit(clusterResource);
+      application.setHeadroom(clusterResource);
       
       LOG.debug("post-assignContainers");
       application.showRequests();
@@ -571,12 +590,12 @@ public class FifoScheduler implements ResourceScheduler {
 
     if (Resources.greaterThanOrEqual(node.getAvailableResource(),
         minimumAllocation)) {
-      LOG.info("Node heartbeat " + rmNode.getNodeID() + 
+      LOG.debug("Node heartbeat " + rmNode.getNodeID() + 
           " available resource = " + node.getAvailableResource());
-      
+
       assignContainers(node);
 
-      LOG.info("Node after allocation " + rmNode.getNodeID() + " resource = "
+      LOG.debug("Node after allocation " + rmNode.getNodeID() + " resource = "
           + node.getAvailableResource());
     }
     
@@ -652,10 +671,14 @@ public class FifoScheduler implements ResourceScheduler {
       LOG.info("Unknown application: " + applicationAttemptId + 
           " launched container " + containerId +
           " on node: " + node);
+      // Some unknown container sneaked into the system. Kill it.
+      this.rmContext.getDispatcher().getEventHandler()
+        .handle(new RMNodeCleanContainerEvent(node.getNodeID(), containerId));
+
       return;
     }
     
-    application.containerLaunchedOnNode(containerId);
+    application.containerLaunchedOnNode(containerId, node.getNodeID());
   }
 
   @Lock(FifoScheduler.class)

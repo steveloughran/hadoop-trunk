@@ -118,6 +118,8 @@ public interface MRJobConfig {
 
   public static final String USER_LOG_RETAIN_HOURS = "mapreduce.job.userlog.retain.hours";
 
+  public static final String MAPREDUCE_JOB_USER_CLASSPATH_FIRST = "mapreduce.job.user.classpath.first";
+
   public static final String IO_SORT_FACTOR = "mapreduce.task.io.sort.factor";
 
   public static final String IO_SORT_MB = "mapreduce.task.io.sort.mb";
@@ -150,8 +152,14 @@ public interface MRJobConfig {
 
   public static final String NUM_REDUCE_PROFILES = "mapreduce.task.profile.reduces";
 
+  public static final String TASK_MAP_PROFILE_PARAMS = "mapreduce.task.profile.map.params";
+  
+  public static final String TASK_REDUCE_PROFILE_PARAMS = "mapreduce.task.profile.reduce.params";
+  
   public static final String TASK_TIMEOUT = "mapreduce.task.timeout";
 
+  public static final String TASK_TIMEOUT_CHECK_INTERVAL_MS = "mapreduce.task.timeout.check-interval-ms";
+  
   public static final String TASK_ID = "mapreduce.task.id";
 
   public static final String TASK_OUTPUT_DIR = "mapreduce.task.output.dir";
@@ -222,7 +230,10 @@ public interface MRJobConfig {
 
   public static final String SHUFFLE_INPUT_BUFFER_PERCENT = "mapreduce.reduce.shuffle.input.buffer.percent";
 
-  public static final String SHUFFLE_MERGE_EPRCENT = "mapreduce.reduce.shuffle.merge.percent";
+  public static final String SHUFFLE_MEMORY_LIMIT_PERCENT
+    = "mapreduce.reduce.shuffle.memory.limit.percent";
+
+  public static final String SHUFFLE_MERGE_PERCENT = "mapreduce.reduce.shuffle.merge.percent";
 
   public static final String REDUCE_FAILURES_MAXPERCENT = "mapreduce.reduce.failures.maxpercent";
 
@@ -273,6 +284,12 @@ public interface MRJobConfig {
   public static final String JOB_ACL_MODIFY_JOB = "mapreduce.job.acl-modify-job";
 
   public static final String DEFAULT_JOB_ACL_MODIFY_JOB = " ";
+  
+  /* config for tracking the local file where all the credentials for the job
+   * credentials.
+   */
+  public static final String MAPREDUCE_JOB_CREDENTIALS_BINARY = 
+      "mapreduce.job.credentials.binary";
 
   public static final String JOB_SUBMITHOST =
     "mapreduce.job.submithostname";
@@ -298,17 +315,18 @@ public interface MRJobConfig {
     "mapreduce.job.ubertask.maxreduces";
   public static final String JOB_UBERTASK_MAXBYTES =
     "mapreduce.job.ubertask.maxbytes";
-  public static final String UBERTASK_JAVA_OPTS =
-    "mapreduce.ubertask.child.java.opts";  // or mapreduce.uber.java.opts?
-  public static final String UBERTASK_ULIMIT =
-    "mapreduce.ubertask.child.ulimit";     // or mapreduce.uber.ulimit?
-  public static final String UBERTASK_ENV =
-    "mapreduce.ubertask.child.env";        // or mapreduce.uber.env?
 
   public static final String MR_PREFIX = "yarn.app.mapreduce.";
 
   public static final String MR_AM_PREFIX = MR_PREFIX + "am.";
 
+  /** The number of client retires to the AM - before reconnecting to the RM
+   * to fetch Application State. 
+   */
+  public static final String MR_CLIENT_TO_AM_IPC_MAX_RETRIES = 
+    MR_PREFIX + "client-am.ipc.max-retries";
+  public static final int DEFAULT_MR_CLIENT_TO_AM_IPC_MAX_RETRIES = 3;
+  
   /** The staging directory for map reduce.*/
   public static final String MR_AM_STAGING_DIR = 
     MR_AM_PREFIX+"staging-dir";
@@ -350,8 +368,14 @@ public interface MRJobConfig {
 
   /** Enable blacklisting of nodes in the job.*/
   public static final String MR_AM_JOB_NODE_BLACKLISTING_ENABLE = 
-    MR_AM_PREFIX  + "job.node.blacklisting.enable";
+    MR_AM_PREFIX  + "job.node-blacklisting.enable";
 
+  /** Ignore blacklisting if a certain percentage of nodes have been blacklisted */
+  public static final String MR_AM_IGNORE_BLACKLISTING_BLACKLISTED_NODE_PERECENT =
+      MR_AM_PREFIX + "job.node-blacklisting.ignore-threshold-node-percent";
+  public static final int DEFAULT_MR_AM_IGNORE_BLACKLISTING_BLACKLISTED_NODE_PERCENT =
+      33;
+  
   /** Enable job recovery.*/
   public static final String MR_AM_JOB_RECOVERY_ENABLE = 
     MR_AM_PREFIX + "job.recovery.enable";
@@ -363,6 +387,11 @@ public interface MRJobConfig {
   public static final String MR_AM_JOB_REDUCE_PREEMPTION_LIMIT = 
     MR_AM_PREFIX  + "job.reduce.preemption.limit";
   public static final float DEFAULT_MR_AM_JOB_REDUCE_PREEMPTION_LIMIT = 0.5f;
+  
+  /** AM ACL disabled. **/
+  public static final String JOB_AM_ACCESS_DISABLED = 
+    "mapreduce.job.am-access-disabled";
+  public static final boolean DEFAULT_JOB_AM_ACCESS_DISABLED = false;
 
   /**
    * Limit reduces starting until a certain percentage of maps have finished.
@@ -395,12 +424,12 @@ public interface MRJobConfig {
   /** The number of threads used to handle task RPC calls.*/
   public static final String MR_AM_TASK_LISTENER_THREAD_COUNT =
     MR_AM_PREFIX + "job.task.listener.thread-count";
-  public static final int DEFAULT_MR_AM_TASK_LISTENER_THREAD_COUNT = 10;
+  public static final int DEFAULT_MR_AM_TASK_LISTENER_THREAD_COUNT = 30;
 
   /** How often the AM should send heartbeats to the RM.*/
   public static final String MR_AM_TO_RM_HEARTBEAT_INTERVAL_MS =
     MR_AM_PREFIX + "scheduler.heartbeat.interval-ms";
-  public static final int DEFAULT_MR_AM_TO_RM_HEARTBEAT_INTERVAL_MS = 2000;
+  public static final int DEFAULT_MR_AM_TO_RM_HEARTBEAT_INTERVAL_MS = 1000;
 
   /**
    * If contact with RM is lost, the AM will wait MR_AM_TO_RM_WAIT_INTERVAL_MS
@@ -418,6 +447,26 @@ public interface MRJobConfig {
    */
   public static final String MR_AM_CREATE_JH_INTERMEDIATE_BASE_DIR = 
     MR_AM_PREFIX + "create-intermediate-jh-base-dir";
+  
+  public static final String MR_AM_HISTORY_MAX_UNFLUSHED_COMPLETE_EVENTS =
+      MR_AM_PREFIX + "history.max-unflushed-events";
+  public static final int DEFAULT_MR_AM_HISTORY_MAX_UNFLUSHED_COMPLETE_EVENTS =
+      200;
+
+  public static final String MR_AM_HISTORY_JOB_COMPLETE_UNFLUSHED_MULTIPLIER =
+      MR_AM_PREFIX + "history.job-complete-unflushed-multiplier";
+  public static final int DEFAULT_MR_AM_HISTORY_JOB_COMPLETE_UNFLUSHED_MULTIPLIER =
+      30;
+
+  public static final String MR_AM_HISTORY_COMPLETE_EVENT_FLUSH_TIMEOUT_MS =
+      MR_AM_PREFIX + "history.complete-event-flush-timeout";
+  public static final long DEFAULT_MR_AM_HISTORY_COMPLETE_EVENT_FLUSH_TIMEOUT_MS =
+      30 * 1000l;
+
+  public static final String MR_AM_HISTORY_USE_BATCHED_FLUSH_QUEUE_SIZE_THRESHOLD =
+      MR_AM_PREFIX + "history.use-batched-flush.queue-size.threshold";
+  public static final int DEFAULT_MR_AM_HISTORY_USE_BATCHED_FLUSH_QUEUE_SIZE_THRESHOLD =
+      50;
   
   public static final String MAPRED_MAP_ADMIN_JAVA_OPTS =
       "mapreduce.admin.map.child.java.opts";
@@ -494,6 +543,9 @@ public interface MRJobConfig {
    */
   public static final String MR_JOB_END_NOTIFICATION_URL =
     "mapreduce.job.end-notification.url";
+
+  public static final String MR_JOB_END_NOTIFICATION_PROXY =
+    "mapreduce.job.end-notification.proxy";
 
   public static final String MR_JOB_END_RETRY_ATTEMPTS =
     "mapreduce.job.end-notification.retry.attempts";

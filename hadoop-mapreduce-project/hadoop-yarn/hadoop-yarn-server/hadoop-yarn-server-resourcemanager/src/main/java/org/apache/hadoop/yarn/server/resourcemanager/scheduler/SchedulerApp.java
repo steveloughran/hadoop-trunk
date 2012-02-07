@@ -39,9 +39,9 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
-import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger.AuditConstants;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.ApplicationsStore.ApplicationStore;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.Resources;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
@@ -52,6 +52,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerFini
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerReservedEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanContainerEvent;
 
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
@@ -61,6 +62,7 @@ import com.google.common.collect.Multiset;
  * Each running Application in the RM corresponds to one instance
  * of this class.
  */
+@SuppressWarnings("unchecked")
 public class SchedulerApp {
 
   private static final Log LOG = LogFactory.getLog(SchedulerApp.class);
@@ -100,11 +102,12 @@ public class SchedulerApp {
 
   private final RMContext rmContext;
   public SchedulerApp(ApplicationAttemptId applicationAttemptId, 
-      String user, Queue queue, 
+      String user, Queue queue, ActiveUsersManager activeUsersManager,
       RMContext rmContext, ApplicationStore store) {
     this.rmContext = rmContext;
     this.appSchedulingInfo = 
-        new AppSchedulingInfo(applicationAttemptId, user, queue, store);
+        new AppSchedulingInfo(applicationAttemptId, user, queue,  
+            activeUsersManager, store);
     this.queue = queue;
   }
 
@@ -174,13 +177,20 @@ public class SchedulerApp {
     this.appSchedulingInfo.stop(rmAppAttemptFinalState);
   }
 
-  synchronized public void containerLaunchedOnNode(ContainerId containerId) {
+  public synchronized void containerLaunchedOnNode(ContainerId containerId,
+      NodeId nodeId) {
     // Inform the container
     RMContainer rmContainer = 
         getRMContainer(containerId);
-    rmContainer.handle(
-        new RMContainerEvent(containerId, 
-            RMContainerEventType.LAUNCHED));
+    if (rmContainer == null) {
+      // Some unknown container sneaked into the system. Kill it.
+      this.rmContext.getDispatcher().getEventHandler()
+        .handle(new RMNodeCleanContainerEvent(nodeId, containerId));
+      return;
+    }
+
+    rmContainer.handle(new RMContainerEvent(containerId,
+      RMContainerEventType.LAUNCHED));
   }
 
   synchronized public void containerCompleted(RMContainer rmContainer,
@@ -284,10 +294,6 @@ public class SchedulerApp {
         }
       }
     }
-  }
-
-  public synchronized void setAvailableResourceLimit(Resource globalLimit) {
-    this.resourceLimit = globalLimit; 
   }
 
   public synchronized RMContainer getRMContainer(ContainerId id) {
@@ -437,20 +443,21 @@ public class SchedulerApp {
     return reservedContainers;
   }
   
+  public synchronized void setHeadroom(Resource globalLimit) {
+    this.resourceLimit = globalLimit; 
+  }
+
   /**
    * Get available headroom in terms of resources for the application's user.
    * @return available resource headroom
    */
   public synchronized Resource getHeadroom() {
-    Resource limit = Resources.subtract(resourceLimit, currentConsumption);
-    Resources.subtractFrom(limit, currentReservation);
-
     // Corner case to deal with applications being slightly over-limit
-    if (limit.getMemory() < 0) {
-      limit.setMemory(0);
+    if (resourceLimit.getMemory() < 0) {
+      resourceLimit.setMemory(0);
     }
     
-    return limit;
+    return resourceLimit;
   }
 
   public Queue getQueue() {

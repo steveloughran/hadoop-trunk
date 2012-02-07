@@ -23,6 +23,8 @@ import java.net.URI;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.security.AccessController;
+import java.util.Arrays;
+import java.util.List;
 import java.util.ServiceLoader;
 import java.util.Set;
 
@@ -35,11 +37,17 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenInfo;
 
+import com.google.common.annotations.VisibleForTesting;
+
+//this will need to be replaced someday when there is a suitable replacement
+import sun.net.dns.ResolverConfiguration;
+import sun.net.util.IPAddressUtil;
 import sun.security.jgss.krb5.Krb5Util;
 import sun.security.krb5.Credentials;
 import sun.security.krb5.PrincipalName;
@@ -50,6 +58,31 @@ public class SecurityUtil {
   public static final Log LOG = LogFactory.getLog(SecurityUtil.class);
   public static final String HOSTNAME_PATTERN = "_HOST";
 
+  // controls whether buildTokenService will use an ip or host/ip as given
+  // by the user
+  @VisibleForTesting
+  static boolean useIpForTokenService;
+  @VisibleForTesting
+  static HostResolver hostResolver;
+  
+  static {
+    boolean useIp = new Configuration().getBoolean(
+      CommonConfigurationKeys.HADOOP_SECURITY_TOKEN_SERVICE_USE_IP,
+      CommonConfigurationKeys.HADOOP_SECURITY_TOKEN_SERVICE_USE_IP_DEFAULT);
+    setTokenServiceUseIp(useIp);
+  }
+  
+  /**
+   * For use only by tests and initialization
+   */
+  @InterfaceAudience.Private
+  static void setTokenServiceUseIp(boolean flag) {
+    useIpForTokenService = flag;
+    hostResolver = !useIpForTokenService
+        ? new QualifiedHostResolver()
+        : new StandardHostResolver();
+  }
+  
   /**
    * Find the original TGT within the current subject's credentials. Cross-realm
    * TGT's of the form "krbtgt/TWO.COM@ONE.COM" may be present.
@@ -112,7 +145,7 @@ public class SecurityUtil {
    * it will be removed when the Java behavior is changed.
    * 
    * @param remoteHost Target URL the krb-https client will access
-   * @throws IOException
+   * @throws IOException if the service ticket cannot be retrieved
    */
   public static void fetchServiceTicket(URL remoteHost) throws IOException {
     if(!UserGroupInformation.isSecurityEnabled())
@@ -149,7 +182,7 @@ public class SecurityUtil {
    * @param hostname
    *          the fully-qualified domain name used for substitution
    * @return converted Kerberos principal name
-   * @throws IOException
+   * @throws IOException if the client address cannot be determined
    */
   public static String getServerPrincipal(String principalConfig,
       String hostname) throws IOException {
@@ -174,7 +207,7 @@ public class SecurityUtil {
    * @param addr
    *          InetAddress of the host used for substitution
    * @return converted Kerberos principal name
-   * @throws IOException
+   * @throws IOException if the client address cannot be determined
    */
   public static String getServerPrincipal(String principalConfig,
       InetAddress addr) throws IOException {
@@ -203,7 +236,7 @@ public class SecurityUtil {
     if (fqdn == null || fqdn.equals("") || fqdn.equals("0.0.0.0")) {
       fqdn = getLocalHostName();
     }
-    return components[0] + "/" + fqdn + "@" + components[2];
+    return components[0] + "/" + fqdn.toLowerCase() + "@" + components[2];
   }
   
   static String getLocalHostName() throws UnknownHostException {
@@ -221,7 +254,7 @@ public class SecurityUtil {
    *          the key to look for keytab file in conf
    * @param userNameKey
    *          the key to look for user's Kerberos principal name in conf
-   * @throws IOException
+   * @throws IOException if login fails
    */
   public static void login(final Configuration conf,
       final String keytabFileKey, final String userNameKey) throws IOException {
@@ -241,7 +274,7 @@ public class SecurityUtil {
    *          the key to look for user's Kerberos principal name in conf
    * @param hostname
    *          hostname to use for substitution
-   * @throws IOException
+   * @throws IOException if the config doesn't specify a keytab
    */
   public static void login(final Configuration conf,
       final String keytabFileKey, final String userNameKey, String hostname)
@@ -263,29 +296,20 @@ public class SecurityUtil {
   }
 
   /**
-   * create service name for Delegation token ip:port
-   * @param uri
-   * @param defPort
-   * @return "ip:port"
+   * create the service name for a Delegation token
+   * @param uri of the service
+   * @param defPort is used if the uri lacks a port
+   * @return the token service, or null if no authority
+   * @see #buildTokenService(InetSocketAddress)
    */
   public static String buildDTServiceName(URI uri, int defPort) {
-    int port = uri.getPort();
-    if(port == -1) 
-      port = defPort;
-
-    // build the service name string "/ip:port"
-    // for whatever reason using NetUtils.createSocketAddr(target).toString()
-    // returns "localhost/ip:port"
-    StringBuffer sb = new StringBuffer();
-    String host = uri.getHost();
-    if (host != null) {
-      host = NetUtils.normalizeHostName(host);
-    } else {
-      host = "";
+    String authority = uri.getAuthority();
+    if (authority == null) {
+      return null;
     }
-    sb.append(host).append(":").append(port);
-    return sb.toString();
-  }
+    InetSocketAddress addr = NetUtils.createSocketAddr(authority, defPort);
+    return buildTokenService(addr).toString();
+   }
   
   /**
    * Get the host name from the principal name of format <service>/host@realm.
@@ -342,7 +366,7 @@ public class SecurityUtil {
    * Look up the TokenInfo for a given protocol. It searches all known
    * SecurityInfo providers.
    * @param protocol The protocol class to get the information for.
-   * @conf conf Configuration object
+   * @param conf Configuration object
    * @return the TokenInfo or null if it has no KerberosInfo defined
    */
   public static TokenInfo getTokenInfo(Class<?> protocol, Configuration conf) {
@@ -368,21 +392,210 @@ public class SecurityUtil {
   }
 
   /**
+   * Decode the given token's service field into an InetAddress
+   * @param token from which to obtain the service
+   * @return InetAddress for the service
+   */
+  public static InetSocketAddress getTokenServiceAddr(Token<?> token) {
+    return NetUtils.createSocketAddr(token.getService().toString());
+  }
+
+  /**
    * Set the given token's service to the format expected by the RPC client 
    * @param token a delegation token
    * @param addr the socket for the rpc connection
    */
   public static void setTokenService(Token<?> token, InetSocketAddress addr) {
-    token.setService(buildTokenService(addr));
+    Text service = buildTokenService(addr);
+    if (token != null) {
+      token.setService(service);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Acquired token "+token);  // Token#toString() prints service
+      }
+    } else {
+      LOG.warn("Failed to get token for service "+service);
+    }
   }
   
   /**
    * Construct the service key for a token
    * @param addr InetSocketAddress of remote connection with a token
-   * @return "ip:port"
+   * @return "ip:port" or "host:port" depending on the value of
+   *          hadoop.security.token.service.use_ip
    */
   public static Text buildTokenService(InetSocketAddress addr) {
-    String host = addr.getAddress().getHostAddress();
+    String host = null;
+    if (useIpForTokenService) {
+      if (addr.isUnresolved()) { // host has no ip address
+        throw new IllegalArgumentException(
+            new UnknownHostException(addr.getHostName())
+        );
+      }
+      host = addr.getAddress().getHostAddress();
+    } else {
+      host = addr.getHostName().toLowerCase();
+    }
     return new Text(host + ":" + addr.getPort());
   }
+
+  /**
+   * Construct the service key for a token
+   * @param uri of remote connection with a token
+   * @return "ip:port" or "host:port" depending on the value of
+   *          hadoop.security.token.service.use_ip
+   */
+  public static Text buildTokenService(URI uri) {
+    return buildTokenService(NetUtils.createSocketAddr(uri.getAuthority()));
+  }
+  
+  /**
+   * Resolves a host subject to the security requirements determined by
+   * hadoop.security.token.service.use_ip.
+   * 
+   * @param hostname host or ip to resolve
+   * @return a resolved host
+   * @throws UnknownHostException if the host doesn't exist
+   */
+  @InterfaceAudience.Private
+  public static
+  InetAddress getByName(String hostname) throws UnknownHostException {
+    return hostResolver.getByName(hostname);
+  }
+  
+  interface HostResolver {
+    InetAddress getByName(String host) throws UnknownHostException;    
+  }
+  
+  /**
+   * Uses standard java host resolution
+   */
+  static class StandardHostResolver implements HostResolver {
+    public InetAddress getByName(String host) throws UnknownHostException {
+      return InetAddress.getByName(host);
+    }
+  }
+  
+  /**
+   * This an alternate resolver with important properties that the standard
+   * java resolver lacks:
+   * 1) The hostname is fully qualified.  This avoids security issues if not
+   *    all hosts in the cluster do not share the same search domains.  It
+   *    also prevents other hosts from performing unnecessary dns searches.
+   *    In contrast, InetAddress simply returns the host as given.
+   * 2) The InetAddress is instantiated with an exact host and IP to prevent
+   *    further unnecessary lookups.  InetAddress may perform an unnecessary
+   *    reverse lookup for an IP.
+   * 3) A call to getHostName() will always return the qualified hostname, or
+   *    more importantly, the IP if instantiated with an IP.  This avoids
+   *    unnecessary dns timeouts if the host is not resolvable.
+   * 4) Point 3 also ensures that if the host is re-resolved, ex. during a
+   *    connection re-attempt, that a reverse lookup to host and forward
+   *    lookup to IP is not performed since the reverse/forward mappings may
+   *    not always return the same IP.  If the client initiated a connection
+   *    with an IP, then that IP is all that should ever be contacted.
+   *    
+   * NOTE: this resolver is only used if:
+   *       hadoop.security.token.service.use_ip=false 
+   */
+  protected static class QualifiedHostResolver implements HostResolver {
+    @SuppressWarnings("unchecked")
+    private List<String> searchDomains =
+        ResolverConfiguration.open().searchlist();
+    
+    /**
+     * Create an InetAddress with a fully qualified hostname of the given
+     * hostname.  InetAddress does not qualify an incomplete hostname that
+     * is resolved via the domain search list.
+     * {@link InetAddress#getCanonicalHostName()} will fully qualify the
+     * hostname, but it always return the A record whereas the given hostname
+     * may be a CNAME.
+     * 
+     * @param host a hostname or ip address
+     * @return InetAddress with the fully qualified hostname or ip
+     * @throws UnknownHostException if host does not exist
+     */
+    public InetAddress getByName(String host) throws UnknownHostException {
+      InetAddress addr = null;
+
+      if (IPAddressUtil.isIPv4LiteralAddress(host)) {
+        // use ipv4 address as-is
+        byte[] ip = IPAddressUtil.textToNumericFormatV4(host);
+        addr = InetAddress.getByAddress(host, ip);
+      } else if (IPAddressUtil.isIPv6LiteralAddress(host)) {
+        // use ipv6 address as-is
+        byte[] ip = IPAddressUtil.textToNumericFormatV6(host);
+        addr = InetAddress.getByAddress(host, ip);
+      } else if (host.endsWith(".")) {
+        // a rooted host ends with a dot, ex. "host."
+        // rooted hosts never use the search path, so only try an exact lookup
+        addr = getByExactName(host);
+      } else if (host.contains(".")) {
+        // the host contains a dot (domain), ex. "host.domain"
+        // try an exact host lookup, then fallback to search list
+        addr = getByExactName(host);
+        if (addr == null) {
+          addr = getByNameWithSearch(host);
+        }
+      } else {
+        // it's a simple host with no dots, ex. "host"
+        // try the search list, then fallback to exact host
+        InetAddress loopback = InetAddress.getByName(null);
+        if (host.equalsIgnoreCase(loopback.getHostName())) {
+          addr = InetAddress.getByAddress(host, loopback.getAddress());
+        } else {
+          addr = getByNameWithSearch(host);
+          if (addr == null) {
+            addr = getByExactName(host);
+          }
+        }
+      }
+      // unresolvable!
+      if (addr == null) {
+        throw new UnknownHostException(host);
+      }
+      return addr;
+    }
+
+    InetAddress getByExactName(String host) {
+      InetAddress addr = null;
+      // InetAddress will use the search list unless the host is rooted
+      // with a trailing dot.  The trailing dot will disable any use of the
+      // search path in a lower level resolver.  See RFC 1535.
+      String fqHost = host;
+      if (!fqHost.endsWith(".")) fqHost += ".";
+      try {
+        addr = getInetAddressByName(fqHost);
+        // can't leave the hostname as rooted or other parts of the system
+        // malfunction, ex. kerberos principals are lacking proper host
+        // equivalence for rooted/non-rooted hostnames
+        addr = InetAddress.getByAddress(host, addr.getAddress());
+      } catch (UnknownHostException e) {
+        // ignore, caller will throw if necessary
+      }
+      return addr;
+    }
+
+    InetAddress getByNameWithSearch(String host) {
+      InetAddress addr = null;
+      if (host.endsWith(".")) { // already qualified?
+        addr = getByExactName(host); 
+      } else {
+        for (String domain : searchDomains) {
+          String dot = !domain.startsWith(".") ? "." : "";
+          addr = getByExactName(host + dot + domain);
+          if (addr != null) break;
+        }
+      }
+      return addr;
+    }
+
+    // implemented as a separate method to facilitate unit testing
+    InetAddress getInetAddressByName(String host) throws UnknownHostException {
+      return InetAddress.getByName(host);
+    }
+
+    void setSearchDomains(String ... domains) {
+      searchDomains = Arrays.asList(domains);
+    }
+  }  
 }

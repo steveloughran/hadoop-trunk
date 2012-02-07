@@ -467,7 +467,7 @@ public class SequenceFile {
                Metadata metadata) throws IOException {
     return createWriter(FileContext.getFileContext(fs.getUri(), conf),
         conf, name, keyClass, valClass, compressionType, codec,
-        metadata, EnumSet.of(CreateFlag.CREATE),
+        metadata, EnumSet.of(CreateFlag.CREATE,CreateFlag.OVERWRITE),
         CreateOpts.bufferSize(bufferSize),
         createParent ? CreateOpts.createParent()
                      : CreateOpts.donotCreateParent(),
@@ -1190,6 +1190,13 @@ public class SequenceFile {
         out.writeInt(SYNC_ESCAPE);                // mark the start of the sync
         out.write(sync);                          // write sync
         lastSyncPos = out.getPos();               // update lastSyncPos
+      }
+    }
+
+    /** flush all currently written data to the file system */
+    public void syncFs() throws IOException {
+      if (out != null) {
+        out.sync();                               // flush contents to file system
       }
     }
 

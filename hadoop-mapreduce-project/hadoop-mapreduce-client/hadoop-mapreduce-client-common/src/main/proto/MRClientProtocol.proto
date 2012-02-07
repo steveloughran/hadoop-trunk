@@ -22,6 +22,7 @@ option java_generic_services = true;
 
 import "mr_service_protos.proto";
 
+/* If making changes to this, please edit HSClientProtocolService */
 service MRClientProtocolService {
   rpc getJobReport (GetJobReportRequestProto) returns (GetJobReportResponseProto);
   rpc getTaskReport (GetTaskReportRequestProto) returns (GetTaskReportResponseProto);
@@ -30,7 +31,7 @@ service MRClientProtocolService {
   rpc getTaskAttemptCompletionEvents (GetTaskAttemptCompletionEventsRequestProto) returns (GetTaskAttemptCompletionEventsResponseProto);
   rpc getTaskReports (GetTaskReportsRequestProto) returns (GetTaskReportsResponseProto);
   rpc getDiagnostics (GetDiagnosticsRequestProto) returns (GetDiagnosticsResponseProto);
-
+  rpc getDelegationToken (GetDelegationTokenRequestProto) returns (GetDelegationTokenResponseProto);
   rpc killJob (KillJobRequestProto) returns (KillJobResponseProto);
   rpc killTask (KillTaskRequestProto) returns (KillTaskResponseProto);
   rpc killTaskAttempt (KillTaskAttemptRequestProto) returns (KillTaskAttemptResponseProto);

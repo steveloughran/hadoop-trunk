@@ -1056,7 +1056,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
 
       } catch (IOException ie) {
 
-        DFSClient.LOG.info("Exception in createBlockOutputStream " + ie);
+        DFSClient.LOG.info("Exception in createBlockOutputStream", ie);
 
         // find the datanode that matches
         if (firstBadLink.length() != 0) {
@@ -1538,7 +1538,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
    * write pipeline have failed. 
    * @return the number of valid replicas of the current block
    */
-  synchronized int getNumCurrentReplicas() throws IOException {
+  public synchronized int getNumCurrentReplicas() throws IOException {
     dfsClient.checkOpen();
     isClosed();
     if (streamer == null) {

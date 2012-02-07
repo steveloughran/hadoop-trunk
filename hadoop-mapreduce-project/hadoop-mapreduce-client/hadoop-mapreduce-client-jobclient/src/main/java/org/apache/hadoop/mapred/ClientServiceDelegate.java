@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.JobStatus;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.TypeConverter;
@@ -93,12 +94,16 @@ public class ClientServiceDelegate {
   private static String UNKNOWN_USER = "Unknown User";
   private String trackingUrl;
 
+  private boolean amAclDisabledStatusLogged = false;
+
   public ClientServiceDelegate(Configuration conf, ResourceMgrDelegate rm,
       JobID jobId, MRClientProtocol historyServerProxy) {
     this.conf = new Configuration(conf); // Cloning for modifying.
     // For faster redirects from AM to HS.
     this.conf.setInt(
-        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 3);
+        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
+        this.conf.getInt(MRJobConfig.MR_CLIENT_TO_AM_IPC_MAX_RETRIES,
+            MRJobConfig.DEFAULT_MR_CLIENT_TO_AM_IPC_MAX_RETRIES));
     this.rm = rm;
     this.jobId = jobId;
     this.historyServerProxy = historyServerProxy;
@@ -156,30 +161,38 @@ public class ClientServiceDelegate {
           application = rm.getApplicationReport(appId);
           continue;
         }
-        UserGroupInformation newUgi = UserGroupInformation.createRemoteUser(
-            UserGroupInformation.getCurrentUser().getUserName());
-        serviceAddr = application.getHost() + ":" + application.getRpcPort();
-        if (UserGroupInformation.isSecurityEnabled()) {
-          String clientTokenEncoded = application.getClientToken();
-          Token<ApplicationTokenIdentifier> clientToken =
-            new Token<ApplicationTokenIdentifier>();
-          clientToken.decodeFromUrlString(clientTokenEncoded);
-          // RPC layer client expects ip:port as service for tokens
-          InetSocketAddress addr = NetUtils.createSocketAddr(application
-              .getHost(), application.getRpcPort());
-          clientToken.setService(new Text(addr.getAddress().getHostAddress()
-              + ":" + addr.getPort()));
-          newUgi.addToken(clientToken);
-        }
-        LOG.info("The url to track the job: " + application.getTrackingUrl());
-        LOG.debug("Connecting to " + serviceAddr);
-        final String tempStr = serviceAddr;
-        realProxy = newUgi.doAs(new PrivilegedExceptionAction<MRClientProtocol>() {
-          @Override
-          public MRClientProtocol run() throws IOException {
-            return instantiateAMProxy(tempStr);
+        if(!conf.getBoolean(MRJobConfig.JOB_AM_ACCESS_DISABLED, false)) {
+          UserGroupInformation newUgi = UserGroupInformation.createRemoteUser(
+              UserGroupInformation.getCurrentUser().getUserName());
+          serviceAddr = application.getHost() + ":" + application.getRpcPort();
+          if (UserGroupInformation.isSecurityEnabled()) {
+            String clientTokenEncoded = application.getClientToken();
+            Token<ApplicationTokenIdentifier> clientToken =
+              new Token<ApplicationTokenIdentifier>();
+            clientToken.decodeFromUrlString(clientTokenEncoded);
+            // RPC layer client expects ip:port as service for tokens
+            InetSocketAddress addr = NetUtils.createSocketAddr(application
+                .getHost(), application.getRpcPort());
+            clientToken.setService(new Text(addr.getAddress().getHostAddress()
+                + ":" + addr.getPort()));
+            newUgi.addToken(clientToken);
           }
-        });
+          LOG.debug("Connecting to " + serviceAddr);
+          final String tempStr = serviceAddr;
+          realProxy = newUgi.doAs(new PrivilegedExceptionAction<MRClientProtocol>() {
+            @Override
+            public MRClientProtocol run() throws IOException {
+              return instantiateAMProxy(tempStr);
+            }
+          });
+        } else {
+          if (!amAclDisabledStatusLogged) {
+            LOG.info("Network ACL closed to AM for job " + jobId
+                + ". Not going to try to reach the AM.");
+            amAclDisabledStatusLogged = true;
+          }
+          return getNotRunningJob(null, JobState.RUNNING);
+        }
         return realProxy;
       } catch (IOException e) {
         //possibly the AM has crashed

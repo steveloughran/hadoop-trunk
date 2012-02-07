@@ -31,8 +31,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryEvent;
@@ -40,7 +41,6 @@ import org.apache.hadoop.mapreduce.jobhistory.TaskFailedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskStartedEvent;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
-import org.apache.hadoop.mapreduce.v2.api.records.Counters;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptCompletionEvent;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptCompletionEventStatus;
@@ -50,8 +50,6 @@ import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskReport;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskState;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskType;
-import org.apache.hadoop.mapreduce.v2.app.metrics.MRAppMetrics;
-import org.apache.hadoop.mapreduce.v2.app.rm.ContainerFailedEvent;
 import org.apache.hadoop.mapreduce.v2.app.TaskAttemptListener;
 import org.apache.hadoop.mapreduce.v2.app.job.Task;
 import org.apache.hadoop.mapreduce.v2.app.job.TaskAttempt;
@@ -66,6 +64,8 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskTAttemptEvent;
+import org.apache.hadoop.mapreduce.v2.app.metrics.MRAppMetrics;
+import org.apache.hadoop.mapreduce.v2.app.rm.ContainerFailedEvent;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.yarn.Clock;
@@ -81,11 +81,12 @@ import org.apache.hadoop.yarn.state.StateMachineFactory;
 /**
  * Implementation of Task interface.
  */
+@SuppressWarnings({ "rawtypes", "unchecked" })
 public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
 
   private static final Log LOG = LogFactory.getLog(TaskImpl.class);
 
-  protected final Configuration conf;
+  protected final JobConf conf;
   protected final Path jobFile;
   protected final OutputCommitter committer;
   protected final int partition;
@@ -225,7 +226,7 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
   }
 
   public TaskImpl(JobId jobId, TaskType taskType, int partition,
-      EventHandler eventHandler, Path remoteJobConfFile, Configuration conf,
+      EventHandler eventHandler, Path remoteJobConfFile, JobConf conf,
       TaskAttemptListener taskAttemptListener, OutputCommitter committer,
       Token<JobTokenIdentifier> jobToken,
       Collection<Token<? extends TokenIdentifier>> fsTokens, Clock clock,
@@ -328,7 +329,6 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
       report.setFinishTime(getFinishTime());
       report.setTaskState(getState());
       report.setProgress(getProgress());
-      report.setCounters(getCounters());
 
       for (TaskAttempt attempt : attempts.values()) {
         if (TaskAttemptState.RUNNING.equals(attempt.getState())) {
@@ -345,6 +345,11 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
           
         }
       }
+
+      // Add a copy of counters as the last step so that their lifetime on heap
+      // is as small as possible.
+      report.setCounters(TypeConverter.toYarn(getCounters()));
+
       return report;
     } finally {
       readLock.unlock();
@@ -360,7 +365,7 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
       if (bestAttempt != null) {
         counters = bestAttempt.getCounters();
       } else {
-        counters = recordFactory.newRecordInstance(Counters.class);
+        counters = TaskAttemptImpl.EMPTY_COUNTERS;
 //        counters.groups = new HashMap<CharSequence, CounterGroup>();
       }
       return counters;
@@ -375,7 +380,7 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
     try {
       TaskAttempt bestAttempt = selectBestAttempt();
       if (bestAttempt == null) {
-        return 0;
+        return 0f;
       }
       return bestAttempt.getProgress();
     } finally {
@@ -456,9 +461,10 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
         result = at; //The first time around
       }
       // calculate the best progress
-      if (at.getProgress() > progress) {
+      float attemptProgress = at.getProgress();
+      if (attemptProgress > progress) {
         result = at;
-        progress = at.getProgress();
+        progress = attemptProgress;
       }
     }
     return result;
@@ -499,7 +505,9 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
   // This is always called in the Write Lock
   private void addAndScheduleAttempt() {
     TaskAttempt attempt = createAttempt();
-    LOG.info("Created attempt " + attempt.getID());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Created attempt " + attempt.getID());
+    }
     switch (attempts.size()) {
       case 0:
         attempts = Collections.singletonMap(attempt.getID(), attempt);
@@ -531,7 +539,10 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
 
   @Override
   public void handle(TaskEvent event) {
-    LOG.info("Processing " + event.getTaskID() + " of type " + event.getType());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Processing " + event.getTaskID() + " of type "
+          + event.getType());
+    }
     try {
       writeLock.lock();
       TaskState oldState = getState();
@@ -553,6 +564,7 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
   }
 
   private void internalError(TaskEventType type) {
+    LOG.error("Invalid event " + type + " on Task " + this.taskId);
     eventHandler.handle(new JobDiagnosticsUpdateEvent(
         this.taskId.getJobId(), "Invalid event " + type + 
         " on Task " + this.taskId));
@@ -593,7 +605,7 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
         task.getFinishTime(task.successfulAttempt),
         TypeConverter.fromYarn(task.taskId.getTaskType()),
         taskState.toString(),
-        TypeConverter.fromYarn(task.getCounters()));
+        task.getCounters());
     return tfe;
   }
   

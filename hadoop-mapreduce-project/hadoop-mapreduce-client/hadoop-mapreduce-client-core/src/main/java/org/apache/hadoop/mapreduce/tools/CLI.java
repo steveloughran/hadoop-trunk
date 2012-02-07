@@ -18,13 +18,18 @@
 package org.apache.hadoop.mapreduce.tools;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Arrays;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.ipc.RemoteException;
@@ -55,7 +60,11 @@ import org.apache.hadoop.yarn.logaggregation.LogDumper;
 @InterfaceStability.Stable
 public class CLI extends Configured implements Tool {
   private static final Log LOG = LogFactory.getLog(CLI.class);
-  private Cluster cluster;
+  protected Cluster cluster;
+  private final Set<String> taskTypes = new HashSet<String>(
+              Arrays.asList("map", "reduce", "setup", "cleanup"));
+  private final Set<String> taskStates = new HashSet<String>(
+              Arrays.asList("pending", "running", "completed", "failed", "killed"));
 
   public CLI() {
   }
@@ -336,7 +345,7 @@ public class CLI extends Configured implements Tool {
         LogParams logParams = cluster.getLogParams(jobID, taskAttemptID);
         LogDumper logDumper = new LogDumper();
         logDumper.setConf(getConf());
-        logDumper.dumpAContainersLogs(logParams.getApplicationId(),
+        exitCode = logDumper.dumpAContainersLogs(logParams.getApplicationId(),
             logParams.getContainerId(), logParams.getNodeId(),
             logParams.getOwner());
         } catch (IOException e) {
@@ -545,9 +554,21 @@ public class CLI extends Configured implements Tool {
    * @param type the type of the task (map/reduce/setup/cleanup)
    * @param state the state of the task 
    * (pending/running/completed/failed/killed)
+   * @throws IOException when there is an error communicating with the master
+   * @throws InterruptedException
+   * @throws IllegalArgumentException if an invalid type/state is passed
    */
   protected void displayTasks(Job job, String type, String state) 
   throws IOException, InterruptedException {
+    if (!taskTypes.contains(type)) {
+      throw new IllegalArgumentException("Invalid type: " + type + 
+          ". Valid types for task are: map, reduce, setup, cleanup.");
+    }
+    if (!taskStates.contains(state)) {
+      throw new java.lang.IllegalArgumentException("Invalid state: " + state + 
+          ". Valid states for task are: pending, running, completed, failed, killed.");
+    }
+
     TaskReport[] reports = job.getTaskReports(TaskType.valueOf(type));
     for (TaskReport report : reports) {
       TIPStatus status = report.getCurrentStatus();
@@ -560,25 +581,28 @@ public class CLI extends Configured implements Tool {
       }
     }
   }
-  
+
   public void displayJobList(JobStatus[] jobs) 
       throws IOException, InterruptedException {
-    System.out.println("Total jobs:" + jobs.length);
-    System.out.println("JobId\tState\tStartTime\t" +
-        "UserName\tQueue\tPriority\tMaps\tReduces\tUsedContainers\t" +
-        "RsvdContainers\tUsedMem\tRsvdMem\tNeededMem\tAM info");
-    for (JobStatus job : jobs) {
-      TaskReport[] mapReports =
-                 cluster.getJob(job.getJobID()).getTaskReports(TaskType.MAP);
-      TaskReport[] reduceReports =
-                 cluster.getJob(job.getJobID()).getTaskReports(TaskType.REDUCE);
+    displayJobList(jobs, new PrintWriter(System.out));
+  }
 
-      System.out.printf("%s\t%s\t%d\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%dM\t%dM\t%dM\t%s\n",
+  @Private
+  public static String headerPattern = "%23s\t%10s\t%14s\t%12s\t%12s\t%10s\t%15s\t%15s\t%8s\t%8s\t%10s\t%10s\n";
+  @Private
+  public static String dataPattern   = "%23s\t%10s\t%14d\t%12s\t%12s\t%10s\t%14d\t%14d\t%7dM\t%7sM\t%9dM\t%10s\n";
+
+  @Private
+  public void displayJobList(JobStatus[] jobs, PrintWriter writer) {
+    writer.println("Total jobs:" + jobs.length);
+    writer.printf(headerPattern, "JobId", "State", "StartTime", "UserName",
+      "Queue", "Priority", "UsedContainers",
+      "RsvdContainers", "UsedMem", "RsvdMem", "NeededMem", "AM info");
+    for (JobStatus job : jobs) {
+      writer.printf(dataPattern,
           job.getJobID().toString(), job.getState(), job.getStartTime(),
           job.getUsername(), job.getQueue(), 
           job.getPriority().name(),
-          mapReports.length,
-          reduceReports.length,
           job.getNumUsedSlots(),
           job.getNumReservedSlots(),
           job.getUsedMem(),
@@ -586,6 +610,7 @@ public class CLI extends Configured implements Tool {
           job.getNeededMem(),
           job.getSchedulingInfo());
     }
+    writer.flush();
   }
   
   public static void main(String[] argv) throws Exception {

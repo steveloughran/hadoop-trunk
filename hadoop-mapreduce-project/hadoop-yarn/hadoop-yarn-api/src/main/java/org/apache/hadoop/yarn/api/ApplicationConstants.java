@@ -24,7 +24,6 @@ import org.apache.hadoop.security.UserGroupInformation;
  * This is the API for the applications comprising of constants that YARN sets
  * up for the applications and the containers.
  * 
- * TODO: Should also be defined in avro/pb IDLs
  * TODO: Investigate the semantics and security of each cross-boundary refs.
  */
 public interface ApplicationConstants {
@@ -85,21 +84,7 @@ public interface ApplicationConstants {
   public static final String STDERR = "stderr";
 
   public static final String STDOUT = "stdout";
-  
-  /**
-   * Classpath for typical applications.
-   */
-  public static final String[] APPLICATION_CLASSPATH =
-      new String[] {
-        "$HADOOP_CONF_DIR",
-        "$HADOOP_COMMON_HOME/share/hadoop/common/*",
-        "$HADOOP_COMMON_HOME/share/hadoop/common/lib/*",
-        "$HADOOP_HDFS_HOME/share/hadoop/hdfs/*",
-        "$HADOOP_HDFS_HOME/share/hadoop/hdfs/lib/*",
-        "$YARN_HOME/modules/*",
-        "$YARN_HOME/lib/*"
-      };
-  
+
   /**
    * Environment for Applications.
    * 

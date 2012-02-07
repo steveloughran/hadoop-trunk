@@ -34,9 +34,7 @@ import org.apache.hadoop.conf.Configuration;
  * progress etc.</p> 
  * 
  * @see JobClient
- * @deprecated Use {@link org.apache.hadoop.mapreduce.Job} instead
  */
-@Deprecated
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface RunningJob {
@@ -223,4 +221,11 @@ public interface RunningJob {
    * @throws IOException
    */
   public boolean isRetired() throws IOException;
+  
+  /**
+   * Get failure info for the job.
+   * @return the failure info for the job.
+   * @throws IOException
+   */
+  public String getFailureInfo() throws IOException;
 }

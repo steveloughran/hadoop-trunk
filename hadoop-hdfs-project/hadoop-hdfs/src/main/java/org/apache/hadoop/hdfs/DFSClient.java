@@ -33,10 +33,8 @@ import java.net.SocketException;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import javax.net.SocketFactory;
 
@@ -182,7 +180,7 @@ public class DFSClient implements java.io.Closeable {
       /** dfs.write.packet.size is an internal config variable */
       writePacketSize = conf.getInt(DFS_CLIENT_WRITE_PACKET_SIZE_KEY,
           DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT);
-      defaultBlockSize = conf.getLong(DFS_BLOCK_SIZE_KEY,
+      defaultBlockSize = conf.getLongBytes(DFS_BLOCK_SIZE_KEY,
           DFS_BLOCK_SIZE_DEFAULT);
       defaultReplication = (short) conf.getInt(
           DFS_REPLICATION_KEY, DFS_REPLICATION_DEFAULT);
@@ -375,11 +373,17 @@ public class DFSClient implements java.io.Closeable {
     return clientRunning;
   }
 
-  /** Renew leases */
-  void renewLease() throws IOException {
+  /**
+   * Renew leases.
+   * @return true if lease was renewed. May return false if this
+   * client has been closed or has no files open.
+   **/
+  boolean renewLease() throws IOException {
     if (clientRunning && !isFilesBeingWrittenEmpty()) {
       namenode.renewLease(clientName);
+      return true;
     }
+    return false;
   }
   
   /**
@@ -532,12 +536,13 @@ public class DFSClient implements java.io.Closeable {
     }
   }
   
-  private static Set<String> localIpAddresses = Collections
-      .synchronizedSet(new HashSet<String>());
+  private static Map<String, Boolean> localAddrMap = Collections
+      .synchronizedMap(new HashMap<String, Boolean>());
   
   private static boolean isLocalAddress(InetSocketAddress targetAddr) {
     InetAddress addr = targetAddr.getAddress();
-    if (localIpAddresses.contains(addr.getHostAddress())) {
+    Boolean cached = localAddrMap.get(addr.getHostAddress());
+    if (cached != null && cached) {
       if (LOG.isTraceEnabled()) {
         LOG.trace("Address " + targetAddr + " is local");
       }
@@ -558,9 +563,7 @@ public class DFSClient implements java.io.Closeable {
     if (LOG.isTraceEnabled()) {
       LOG.trace("Address " + targetAddr + " is local");
     }
-    if (local == true) {
-      localIpAddresses.add(addr.getHostAddress());
-    }
+    localAddrMap.put(addr.getHostAddress(), local);
     return local;
   }
   
@@ -628,7 +631,7 @@ public class DFSClient implements java.io.Closeable {
                DelegationTokenIdentifier.stringifyToken(delToken));
       ClientProtocol nn = 
         DFSUtil.createNamenode
-           (NameNode.getAddress(token.getService().toString()),
+           (SecurityUtil.getTokenServiceAddr(delToken),
             conf, UserGroupInformation.getCurrentUser());
       try {
         return nn.renewDelegationToken(delToken);
@@ -646,7 +649,7 @@ public class DFSClient implements java.io.Closeable {
       LOG.info("Cancelling " + 
                DelegationTokenIdentifier.stringifyToken(delToken));
       ClientProtocol nn = DFSUtil.createNamenode(
-          NameNode.getAddress(token.getService().toString()), conf,
+          SecurityUtil.getTokenServiceAddr(delToken), conf,
           UserGroupInformation.getCurrentUser());
       try {
         nn.cancelDelegationToken(delToken);
@@ -1692,8 +1695,7 @@ public class DFSClient implements java.io.Closeable {
     }
   }
   
-  boolean shouldTryShortCircuitRead(InetSocketAddress targetAddr)
-      throws IOException {
+  boolean shouldTryShortCircuitRead(InetSocketAddress targetAddr) {
     if (shortCircuitLocalReads && isLocalAddress(targetAddr)) {
       return true;
     }
@@ -1716,7 +1718,7 @@ public class DFSClient implements java.io.Closeable {
     }
   }
 
-  /** {@inheritDoc} */
+  @Override
   public String toString() {
     return getClass().getSimpleName() + "[clientName=" + clientName
         + ", ugi=" + ugi + "]"; 
