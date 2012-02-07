@@ -221,6 +221,7 @@ public class BlockManager {
     DNSToSwitchMapping dnsMap = datanodeManager.getDnsToSwitchMapping();
     this.shouldCheckForEnoughRacks = !AbstractDNSToSwitchMapping
         .isMappingSingleSwitch(dnsMap);
+    
 
     this.replicationRecheckInterval = 
       conf.getInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 
@@ -230,6 +231,7 @@ public class BlockManager {
     LOG.info("minReplication     = " + minReplication);
     LOG.info("maxReplicationStreams      = " + maxReplicationStreams);
     LOG.info("shouldCheckForEnoughRacks  = " + shouldCheckForEnoughRacks);
+    LOG.info("mapping instance  = " + dnsMap);
     LOG.info("replicationRecheckInterval = " + replicationRecheckInterval);
   }
 

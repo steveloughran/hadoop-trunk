@@ -22,6 +22,12 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * This is a base class for DNS to Switch mappings. <p/> It is not mandatory to
@@ -90,6 +96,32 @@ public abstract class AbstractDNSToSwitchMapping
   }
 
   /**
+   * Get a copy of the map (for diagnostics)
+   * @return a clone of the map or null for none known
+   */
+  public Map<String, String> getSwitchMap() {
+    return null;
+  }
+
+  public String dumpTopology() {
+    Map<String, String> rack = getSwitchMap();
+    StringBuilder builder = new StringBuilder();
+    Set<String> switches = new HashSet<String>();
+    for (Map.Entry<String, String> entry: rack.entrySet()) {
+      builder.append(entry.getKey()).append(" -> ")
+          .append(entry.getValue()).append("\n");
+      switches.add(entry.getValue());
+    }
+    builder.append("Nodes: ").append(rack.size()).append("\n");
+    builder.append("Switches: ").append(switches.size()).append("\n");
+    return builder.toString();
+  }
+
+  protected boolean isSingleSwitchByScriptPolicy() {
+    return conf.get(CommonConfigurationKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY) == null;
+  }
+  
+  /**
    * Query for a {@link DNSToSwitchMapping} instance being on a single
    * switch.
    * <p/>
@@ -100,7 +132,7 @@ public abstract class AbstractDNSToSwitchMapping
    * is not derived from this class.
    */
   public static boolean isMappingSingleSwitch(DNSToSwitchMapping mapping) {
-    return mapping instanceof AbstractDNSToSwitchMapping
+    return mapping != null && mapping instanceof AbstractDNSToSwitchMapping
         && ((AbstractDNSToSwitchMapping) mapping).isSingleSwitch();
   }
 
