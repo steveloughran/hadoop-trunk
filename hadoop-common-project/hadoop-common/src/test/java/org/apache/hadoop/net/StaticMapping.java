@@ -36,8 +36,8 @@ import java.util.Set;
  * When an instance of the class has its {@link #setConf(Configuration)}
  * method called, nodes listed in the configuration will be added to the map.
  * These do not get removed when the instance is garbage collected.
- * 
- * The switch mapping policy of this class is the same as for the 
+ *
+ * The switch mapping policy of this class is the same as for the
  * {@link ScriptBasedMapping} -the presence of a non-empty topology script.
  * The script itself is not used.
  */
