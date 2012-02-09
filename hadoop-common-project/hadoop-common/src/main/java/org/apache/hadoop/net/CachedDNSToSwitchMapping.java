@@ -124,10 +124,20 @@ public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
 
   }
 
+  /**
+   * Get the (host x switch) map.
+   * @return the cached map of hosts to rack
+   */
   @Override
   public Map<String, String> getSwitchMap() {
     Map<String, String > switchMap = new HashMap<String, String>(cache);
     return switchMap;
+  }
+
+
+  @Override
+  public String toString() {
+    return "cached switch mapping relaying to " + rawMapping;
   }
 
   /**

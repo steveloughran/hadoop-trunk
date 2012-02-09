@@ -136,7 +136,11 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
     }
   }
 
-  
+  @Override
+  public String toString() {
+    return "static mapping with single switch = " + isSingleSwitch();
+  }
+
   /**
    * Clear the map
    */
