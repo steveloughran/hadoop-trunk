@@ -41,6 +41,7 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.StaticMapping;
+import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.GenericTestUtils.DelayAnswer;
 import org.apache.log4j.Level;
@@ -148,8 +149,9 @@ public class TestBlockReport {
     DataNode dn = cluster.getDataNodes().get(DN_N0);
     String poolId = cluster.getNamesystem().getBlockPoolId();
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
-    cluster.getNameNodeRpc().blockReport(dnR, poolId,
-      new BlockListAsLongs(blocks, null).getBlockListAsLongs());
+    StorageBlockReport[] report = { new StorageBlockReport(dnR.getStorageID(),
+        new BlockListAsLongs(blocks, null).getBlockListAsLongs()) };
+    cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
 
     List<LocatedBlock> blocksAfterReport =
       DFSTestUtil.getAllBlocks(fs.open(filePath));
@@ -182,7 +184,7 @@ public class TestBlockReport {
 
     Path filePath = new Path("/" + METHOD_NAME + ".dat");
     DFSTestUtil.createFile(fs, filePath,
-      (long) FILE_SIZE, REPL_FACTOR, rand.nextLong());
+      FILE_SIZE, REPL_FACTOR, rand.nextLong());
 
     // mock around with newly created blocks and delete some
     File dataDir = new File(cluster.getDataDirectory());
@@ -228,8 +230,9 @@ public class TestBlockReport {
     DataNode dn = cluster.getDataNodes().get(DN_N0);
     String poolId = cluster.getNamesystem().getBlockPoolId();
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
-    cluster.getNameNodeRpc().blockReport(dnR, poolId,
-      new BlockListAsLongs(blocks, null).getBlockListAsLongs());
+    StorageBlockReport[] report = { new StorageBlockReport(dnR.getStorageID(),
+        new BlockListAsLongs(blocks, null).getBlockListAsLongs()) };
+    cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
 
     BlockManagerTestUtil.getComputedDatanodeWork(cluster.getNamesystem()
         .getBlockManager());
@@ -268,9 +271,10 @@ public class TestBlockReport {
     DataNode dn = cluster.getDataNodes().get(DN_N0);
     String poolId = cluster.getNamesystem().getBlockPoolId();
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
+    StorageBlockReport[] report = { new StorageBlockReport(dnR.getStorageID(),
+        new BlockListAsLongs(blocks, null).getBlockListAsLongs()) };
     DatanodeCommand dnCmd =
-      cluster.getNameNodeRpc().blockReport(dnR, poolId,
-        new BlockListAsLongs(blocks, null).getBlockListAsLongs());
+      cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
     if(LOG.isDebugEnabled()) {
       LOG.debug("Got the command: " + dnCmd);
     }
@@ -286,9 +290,8 @@ public class TestBlockReport {
    * This test isn't a representative case for BlockReport
    * The empty method is going to be left here to keep the naming
    * of the test plan in synch with the actual implementation
-   * @throws IOException in case of errors
    */
-  public void blockReport_04() throws IOException {
+  public void blockReport_04() {
   }
 
   // Client requests new block from NN. The test corrupts this very block
@@ -297,7 +300,7 @@ public class TestBlockReport {
   // BlockScanner which is out of scope of this test
   // Keeping the name to be in synch with the test plan
   //
-  public void blockReport_05() throws IOException {
+  public void blockReport_05() {
   }
 
   /**
@@ -321,8 +324,9 @@ public class TestBlockReport {
     DataNode dn = cluster.getDataNodes().get(DN_N1);
     String poolId = cluster.getNamesystem().getBlockPoolId();
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
-    cluster.getNameNodeRpc().blockReport(dnR, poolId,
-        new BlockListAsLongs(blocks, null).getBlockListAsLongs());
+    StorageBlockReport[] report = { new StorageBlockReport(dnR.getStorageID(),
+        new BlockListAsLongs(blocks, null).getBlockListAsLongs()) };
+    cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
     printStats();
     assertEquals("Wrong number of PendingReplication Blocks",
       0, cluster.getNamesystem().getUnderReplicatedBlocks());
@@ -370,8 +374,9 @@ public class TestBlockReport {
     DataNode dn = cluster.getDataNodes().get(DN_N1);
     String poolId = cluster.getNamesystem().getBlockPoolId();
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
-    cluster.getNameNodeRpc().blockReport(dnR, poolId,
-        new BlockListAsLongs(blocks, null).getBlockListAsLongs());
+    StorageBlockReport[] report = { new StorageBlockReport(dnR.getStorageID(),
+        new BlockListAsLongs(blocks, null).getBlockListAsLongs()) };
+    cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
     printStats();
     assertEquals("Wrong number of Corrupted blocks",
       1, cluster.getNamesystem().getCorruptReplicaBlocks() +
@@ -392,8 +397,9 @@ public class TestBlockReport {
       LOG.debug("Done corrupting length of " + corruptedBlock.getBlockName());
     }
     
-    cluster.getNameNodeRpc().blockReport(dnR, poolId,
+    report[0] = new StorageBlockReport(dnR.getStorageID(),
         new BlockListAsLongs(blocks, null).getBlockListAsLongs());
+    cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
     printStats();
 
     assertEquals("Wrong number of Corrupted blocks",
@@ -442,8 +448,9 @@ public class TestBlockReport {
       DataNode dn = cluster.getDataNodes().get(DN_N1);
       String poolId = cluster.getNamesystem().getBlockPoolId();
       DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
-      cluster.getNameNodeRpc().blockReport(dnR, poolId,
-          new BlockListAsLongs(blocks, null).getBlockListAsLongs());
+      StorageBlockReport[] report = { new StorageBlockReport(dnR.getStorageID(),
+          new BlockListAsLongs(blocks, null).getBlockListAsLongs()) };
+      cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
       printStats();
       assertEquals("Wrong number of PendingReplication blocks",
         blocks.size(), cluster.getNamesystem().getPendingReplicationBlocks());
@@ -488,8 +495,9 @@ public class TestBlockReport {
       DataNode dn = cluster.getDataNodes().get(DN_N1);
       String poolId = cluster.getNamesystem().getBlockPoolId();
       DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
-      cluster.getNameNodeRpc().blockReport(dnR, poolId,
-          new BlockListAsLongs(blocks, null).getBlockListAsLongs());
+      StorageBlockReport[] report = { new StorageBlockReport(dnR.getStorageID(),
+          new BlockListAsLongs(blocks, null).getBlockListAsLongs()) };
+      cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
       printStats();
       assertEquals("Wrong number of PendingReplication blocks",
         2, cluster.getNamesystem().getPendingReplicationBlocks());
@@ -552,7 +560,7 @@ public class TestBlockReport {
         .when(spy).blockReport(
           Mockito.<DatanodeRegistration>anyObject(),
           Mockito.anyString(),
-          Mockito.<long[]>anyObject());
+          Mockito.<StorageBlockReport[]>anyObject());
       
       // Force a block report to be generated. The block report will have
       // an RBW replica in it. Wait for the RPC to be sent, but block
@@ -640,8 +648,7 @@ public class TestBlockReport {
   // Write file and start second data node.
   private ArrayList<Block> writeFile(final String METHOD_NAME,
                                                final long fileSize,
-                                               Path filePath)
-    throws IOException {
+                                               Path filePath) {
     ArrayList<Block> blocks = null;
     try {
       REPL_FACTOR = 2;
