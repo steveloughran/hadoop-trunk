@@ -35,7 +35,7 @@ import java.util.Map;
  */
 public class TestStaticMapping extends Assert {
   private static final Log LOG = LogFactory.getLog(TestStaticMapping.class);
-  
+
   /**
    * Reset the map then create a new instance of the {@link StaticMapping}
    * class with a null configuration
@@ -75,7 +75,7 @@ public class TestStaticMapping extends Assert {
     }
     return conf;
   }
-  
+
   private void assertSingleSwitch(DNSToSwitchMapping mapping) {
     assertEquals("Expected a single switch mapping "
                      + mapping,

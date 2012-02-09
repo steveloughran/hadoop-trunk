@@ -108,7 +108,7 @@ public abstract class AbstractDNSToSwitchMapping
    * the mapping for every known node and the number of nodes and 
    * unique switches known about -each entry to a separate line.
    * @return a string that can be presented to the ops team or used in
-   * debug messages. 
+   * debug messages.
    */
   public String dumpTopology() {
     Map<String, String> rack = getSwitchMap();
@@ -134,10 +134,10 @@ public abstract class AbstractDNSToSwitchMapping
   }
 
   protected boolean isSingleSwitchByScriptPolicy() {
-    return conf != null 
+    return conf != null
         && conf.get(CommonConfigurationKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY) == null;
   }
-  
+
   /**
    * Query for a {@link DNSToSwitchMapping} instance being on a single
    * switch.

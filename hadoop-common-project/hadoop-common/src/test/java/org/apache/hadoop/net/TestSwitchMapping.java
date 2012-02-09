@@ -91,7 +91,7 @@ public class TestSwitchMapping extends Assert {
   public void testCachingRelaysStringOperationsToNullScript() throws Throwable {
     Configuration conf = new Configuration();
     ScriptBasedMapping scriptMapping = new ScriptBasedMapping(conf);
-    assertTrue("Did not find " + ScriptBasedMapping.NO_SCRIPT 
+    assertTrue("Did not find " + ScriptBasedMapping.NO_SCRIPT
                    + " in " + scriptMapping,
                scriptMapping.toString().contains(ScriptBasedMapping.NO_SCRIPT));
     CachedDNSToSwitchMapping mapping =
