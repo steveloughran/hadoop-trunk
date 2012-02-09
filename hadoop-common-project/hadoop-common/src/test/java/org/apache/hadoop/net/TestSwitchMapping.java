@@ -100,7 +100,11 @@ public class TestSwitchMapping extends Assert {
                    + " in " + mapping,
                mapping.toString().contains(ScriptBasedMapping.NO_SCRIPT));
   }
-  
+
+  @Test
+  public void testNullMapping() {
+    assertFalse(AbstractDNSToSwitchMapping.isMappingSingleSwitch(null));
+  }
 
   /**
    * This class does not extend the abstract switch mapping, and verifies that
