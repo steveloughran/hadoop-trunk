@@ -61,6 +61,15 @@
       <item name="YARN Architecture" href="hadoop-yarn/hadoop-yarn-site/YARN.html"/>
       <item name="Writing Yarn Applications" href="hadoop-yarn/hadoop-yarn-site/WritingYarnApplications.html"/>
       <item name="Capacity Scheduler" href="hadoop-yarn/hadoop-yarn-site/CapacityScheduler.html"/>
+      <item name="Web Application Proxy" href="hadoop-yarn/hadoop-yarn-site/WebApplicationProxy.html"/>
+    </menu>
+
+    <menu name="YARN REST API's" inherit="top">
+      <item name="Introduction" href="hadoop-yarn/hadoop-yarn-site/WebServicesIntro.html"/>
+      <item name="Resource Manager" href="hadoop-yarn/hadoop-yarn-site/ResourceManagerRest.html"/>
+      <item name="Node Manager" href="hadoop-yarn/hadoop-yarn-site/NodeManagerRest.html"/>
+      <item name="Mapreduce Application Master" href="hadoop-yarn/hadoop-yarn-site/MapredAppMasterRest.html"/>
+      <item name="History Server" href="hadoop-yarn/hadoop-yarn-site/HistoryServerRest.html"/>
     </menu>
     
     <menu name="Auth" inherit="top">
@@ -81,7 +90,7 @@
     <menu name="Configuration" inherit="top">
       <item name="core-default.xml" href="hadoop-project-dist/hadoop-common/core-default.xml"/>
       <item name="hdfs-default.xml" href="hadoop-project-dist/hadoop-hdfs/hdfs-default.xml"/>
-      <item name="yarn-default.xml" href="hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-common/yarn-default.xml"/>
+      <item name="yarn-default.xml" href="hadoop-yarn/hadoop-yarn-common/src/main/resources/yarn-default.xml"/>
       <item name="mapred-default.xml" href="hadoop-mapreduce-client/hadoop-mapreduce-client-core/mapred-default.xml"/>
       <item name="Deprecated Properties" href="hadoop-project-dist/hadoop-common/DeprecatedProperties.html"/>
     </menu>

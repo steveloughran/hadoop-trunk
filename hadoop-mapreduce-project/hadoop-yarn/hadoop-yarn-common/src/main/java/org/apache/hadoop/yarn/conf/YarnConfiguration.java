@@ -20,8 +20,13 @@ package org.apache.hadoop.yarn.conf;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
+
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.Iterator;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.net.NetUtils;
 
 public class YarnConfiguration extends Configuration {
   private static final Splitter ADDR_SPLITTER = Splitter.on(':').trimResults();
@@ -90,7 +95,7 @@ public class YarnConfiguration extends Configuration {
   /** The number of threads used to handle applications manager requests.*/
   public static final String RM_CLIENT_THREAD_COUNT =
     RM_PREFIX + "client.thread-count";
-  public static final int DEFAULT_RM_CLIENT_THREAD_COUNT = 10;
+  public static final int DEFAULT_RM_CLIENT_THREAD_COUNT = 50;
 
   /** The Kerberos principal for the resource manager.*/
   public static final String RM_PRINCIPAL =
@@ -106,7 +111,7 @@ public class YarnConfiguration extends Configuration {
   /** Number of threads to handle scheduler interface.*/
   public static final String RM_SCHEDULER_CLIENT_THREAD_COUNT =
     RM_PREFIX + "scheduler.client.thread-count";
-  public static final int DEFAULT_RM_SCHEDULER_CLIENT_THREAD_COUNT = 10;
+  public static final int DEFAULT_RM_SCHEDULER_CLIENT_THREAD_COUNT = 50;
   
   /** The address of the RM web application.*/
   public static final String RM_WEBAPP_ADDRESS = 
@@ -184,7 +189,7 @@ public class YarnConfiguration extends Configuration {
   /** Number of threads to handle resource tracker calls.*/
   public static final String RM_RESOURCE_TRACKER_CLIENT_THREAD_COUNT =
     RM_PREFIX + "resource-tracker.client.thread-count";
-  public static final int DEFAULT_RM_RESOURCE_TRACKER_CLIENT_THREAD_COUNT = 10;
+  public static final int DEFAULT_RM_RESOURCE_TRACKER_CLIENT_THREAD_COUNT = 50;
   
   /** The class to use as the resource scheduler.*/
   public static final String RM_SCHEDULER = 
@@ -257,7 +262,7 @@ public class YarnConfiguration extends Configuration {
   /** Number of threads container manager uses.*/
   public static final String NM_CONTAINER_MGR_THREAD_COUNT =
     NM_PREFIX + "container-manager.thread-count";
-  public static final int DEFAULT_NM_CONTAINER_MGR_THREAD_COUNT = 5;
+  public static final int DEFAULT_NM_CONTAINER_MGR_THREAD_COUNT = 20;
   
   /** Number of threads used in cleanup.*/
   public static final String NM_DELETE_THREAD_COUNT = 
@@ -508,6 +513,13 @@ public class YarnConfiguration extends Configuration {
   public static final long DEFAULT_NM_PROCESS_KILL_WAIT_MS =
       2000;
 
+  /** Standard Hadoop classes */
+  public static final String YARN_APPLICATION_CLASSPATH = YARN_PREFIX
+      + "application.classpath";
+
+  /** Container temp directory */
+  public static final String DEFAULT_CONTAINER_TEMP_DIR = "./tmp";
+
   public YarnConfiguration() {
     super();
   }
@@ -536,7 +548,25 @@ public class YarnConfiguration extends Configuration {
     // Use apps manager address to figure out the host for webapp
     addr = conf.get(YarnConfiguration.RM_ADDRESS, YarnConfiguration.DEFAULT_RM_ADDRESS);
     String host = ADDR_SPLITTER.split(addr).iterator().next();
-    return JOINER.join(host, ":", port);
+    String rmAddress = JOINER.join(host, ":", port);
+    InetSocketAddress address = NetUtils.createSocketAddr(
+        rmAddress, DEFAULT_RM_WEBAPP_PORT, RM_WEBAPP_ADDRESS);
+    StringBuffer sb = new StringBuffer();
+    InetAddress resolved = address.getAddress();
+    if (resolved == null || resolved.isAnyLocalAddress() || 
+        resolved.isLoopbackAddress()) {
+      String lh = host;
+      try {
+        lh = InetAddress.getLocalHost().getCanonicalHostName();
+      } catch (UnknownHostException e) {
+        //Ignore and fallback.
+      }
+      sb.append(lh);
+    } else {
+      sb.append(address.getHostName());
+    }
+    sb.append(":").append(address.getPort());
+    return sb.toString();
   }
   
   public static String getRMWebAppURL(Configuration conf) {

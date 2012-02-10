@@ -13,6 +13,16 @@ Trunk (unreleased changes)
     (suresh)
 
   IMPROVEMENTS
+    HADOOP-8048. Allow merging of Credentials (Daryn Sharp via tgraves)
+ 
+    HADOOP-8032. mvn site:stage-deploy should be able to use the scp protocol
+    to stage documents (Ravi Prakash via tgraves)
+
+    HADOOP-8017. Configure hadoop-main pom to get rid of M2E plugin execution
+    not covered (Eric Charles via bobby)
+
+    HADOOP-8015. ChRootFileSystem should extend FilterFileSystem 
+    (Daryn Sharp via bobby)
 
     HADOOP-7595. Upgrade dependency to Avro 1.5.3. (Alejandro Abdelnur via atm)
 
@@ -34,11 +44,6 @@ Trunk (unreleased changes)
 
     HADOOP-7717. Move handling of concurrent client fail-overs to
     RetryInvocationHandler (atm)
-
-    HADOOP-6490. Use StringUtils over String#replace in Path#normalizePath.
-    (Uma Maheswara Rao G via harsh)
-
-    HADOOP-7736. Remove duplicate Path#normalizePath call. (harsh)
 
     HADOOP-7664. Remove warmings when overriding final parameter configuration
     if the override value is same as the final parameter value.
@@ -68,12 +73,6 @@ Trunk (unreleased changes)
 
     HADOOP-7899. Generate proto java files as part of the build. (tucu)
 
-    HADOOP-7574. Improve FSShell -stat, add user/group elements.
-    (XieXianshan via harsh)
-
-    HADOOP-7919. Remove the unused hadoop.logfile.* properties from the 
-    core-default.xml file. (harsh)
-
     HADOOP-7808. Port HADOOP-7510 - Add configurable option to use original 
     hostname in token instead of IP to allow server IP change. 
     (Daryn Sharp via suresh)
@@ -81,14 +80,28 @@ Trunk (unreleased changes)
     HADOOP-7957. Classes deriving GetGroupsBase should be able to override 
     proxy creation. (jitendra)
 
-    HADOOP-4515. Configuration#getBoolean must not be case sensitive. (Sho Shimauchi via harsh)
-
     HADOOP-7968. Errant println left in RPC.getHighestSupportedProtocol (Sho Shimauchi via harsh)
 
-  BUGS
+    HADOOP-7987. Support setting the run-as user in unsecure mode. (jitendra)
 
-    HADOOP-7851. Configuration.getClasses() never returns the default value. 
-                 (Uma Maheswara Rao G via amarrk)
+    HADOOP-7965. Support for protocol version and signature in PB. (jitendra)
+
+    HADOOP-7988. Upper case in hostname part of the principals doesn't work with 
+    kerberos. (jitendra)
+
+  BUG FIXES
+
+    HADOOP-8018.  Hudson auto test for HDFS has started throwing javadoc
+    (Jon Eagles via bobby)
+
+    HADOOP-8001  ChecksumFileSystem's rename doesn't correctly handle checksum
+    files. (Daryn Sharp via bobby)
+
+    HADOOP-8006  TestFSInputChecker is failing in trunk.
+    (Daryn Sharp via bobby)
+
+    HADOOP-7998. CheckFileSystem does not correctly honor setVerifyChecksum
+    (Daryn Sharp via bobby)
 
     HADOOP-7606. Upgrade Jackson to version 1.7.1 to match the version required
     by Jersey (Alejandro Abdelnur via atm)
@@ -141,7 +154,27 @@ Trunk (unreleased changes)
 
     HADOOP-7761. Improve the performance of raw comparisons. (todd)
 
-Release 0.23.1 - Unreleased
+Release 0.23.2 - UNRELEASED 
+
+  NEW FEATURES                                                                    
+  
+  IMPROVEMENTS
+
+    HADOOP-7923. Automate the updating of version numbers in the doc system.
+    (szetszwo)
+
+  OPTIMIZATIONS
+
+  BUG FIXES
+
+    HADOOP-8042  When copying a file out of HDFS, modifying it, and uploading
+    it back into HDFS, the put fails due to a CRC mismatch
+    (Daryn Sharp via bobby)
+
+    HADOOP-8035 Hadoop Maven site is inefficient and runs phases redundantly
+    (abayer via tucu)
+
+Release 0.23.1 - 2012-02-08 
 
   INCOMPATIBLE CHANGES
 
@@ -207,12 +240,46 @@ Release 0.23.1 - Unreleased
 
     HADOOP-7975. Add LZ4 as an entry in the default codec list, missed by HADOOP-7657 (harsh)
 
+    HADOOP-4515. Configuration#getBoolean must not be case sensitive. (Sho Shimauchi via harsh)
+
+    HADOOP-6490. Use StringUtils over String#replace in Path#normalizePath.
+    (Uma Maheswara Rao G via harsh)
+
+    HADOOP-7574. Improve FSShell -stat, add user/group elements.
+    (XieXianshan via harsh)
+
+    HADOOP-7736. Remove duplicate Path#normalizePath call. (harsh)
+
+    HADOOP-7919. Remove the unused hadoop.logfile.* properties from the 
+    core-default.xml file. (harsh)
+
+    HADOOP-7939. Improve Hadoop subcomponent integration in Hadoop 0.23. (rvs via tucu)
+
+    HADOOP-8002. SecurityUtil acquired token message should be a debug rather than info.
+    (Arpit Gupta via mahadev)
+
+    HADOOP-8009. Create hadoop-client and hadoop-minicluster artifacts for downstream 
+    projects. (tucu)
+
+    HADOOP-7470. Move up to Jackson 1.8.8.  (Enis Soztutar via szetszwo)
+
+    HADOOP-8027. Visiting /jmx on the daemon web interfaces may print
+    unnecessary error in logs. (atm)
+
   OPTIMIZATIONS
 
   BUG FIXES
    
    HADOOP-7811. TestUserGroupInformation#testGetServerSideGroups test fails in chroot.
    (Jonathan Eagles via mahadev)
+
+   HADOOP-7813. Fix test-patch to use proper numerical comparison when checking
+   javadoc and findbugs warning counts. (Jonathan Eagles via tlipcon)
+
+   HADOOP-7841. Run tests with non-secure random. (tlipcon)
+
+    HADOOP-7851. Configuration.getClasses() never returns the default value. 
+                 (Uma Maheswara Rao G via amarrk)
 
    HADOOP-7787. Make source tarball use conventional name.
    (Bruno Mahé via tomwhite)
@@ -278,6 +345,33 @@ Release 0.23.1 - Unreleased
 
    HADOOP-7971. Adding back job/pipes/queue commands to bin/hadoop for
    backward compatibility. (Prashath Sharma via acmurthy) 
+
+   HADOOP-7982. UserGroupInformation fails to login if thread's context
+   classloader can't load HadoopLoginModule. (todd)
+
+   HADOOP-7986. Adding config for MapReduce History Server protocol in
+   hadoop-policy.xml for service level authorization. (Mahadev Konar via vinodkv)
+
+   HADOOP-7981. Improve documentation for org.apache.hadoop.io.compress.
+   Decompressor.getRemaining (Jonathan Eagles via mahadev)
+
+   HADOOP-7997. SequenceFile.createWriter(...createParent...) no
+   longer works on existing file. (Gregory Chanan via eli)
+
+   HADOOP-7993. Hadoop ignores old-style config options for enabling compressed 
+   output. (Anupam Seth via mahadev)
+
+   HADOOP-8000. fetchdt command not available in bin/hadoop.
+   (Arpit Gupta via mahadev)
+
+   HADOOP-7999. "hadoop archive" fails with ClassNotFoundException.
+   (Jason Lowe via mahadev)
+
+   HADOOP-8012. hadoop-daemon.sh and yarn-daemon.sh are trying to mkdir
+   and chown log/pid dirs which can fail. (Roman Shaposhnik via eli)
+
+   HADOOP-8013. ViewFileSystem does not honor setVerifyChecksum
+   (Daryn Sharp via bobby)
 
 Release 0.23.0 - 2011-11-01 
 

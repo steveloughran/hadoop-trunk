@@ -373,11 +373,17 @@ public class DFSClient implements java.io.Closeable {
     return clientRunning;
   }
 
-  /** Renew leases */
-  void renewLease() throws IOException {
+  /**
+   * Renew leases.
+   * @return true if lease was renewed. May return false if this
+   * client has been closed or has no files open.
+   **/
+  boolean renewLease() throws IOException {
     if (clientRunning && !isFilesBeingWrittenEmpty()) {
       namenode.renewLease(clientName);
+      return true;
     }
+    return false;
   }
   
   /**
@@ -625,7 +631,7 @@ public class DFSClient implements java.io.Closeable {
                DelegationTokenIdentifier.stringifyToken(delToken));
       ClientProtocol nn = 
         DFSUtil.createNamenode
-           (NameNode.getAddress(token.getService().toString()),
+           (SecurityUtil.getTokenServiceAddr(delToken),
             conf, UserGroupInformation.getCurrentUser());
       try {
         return nn.renewDelegationToken(delToken);
@@ -643,7 +649,7 @@ public class DFSClient implements java.io.Closeable {
       LOG.info("Cancelling " + 
                DelegationTokenIdentifier.stringifyToken(delToken));
       ClientProtocol nn = DFSUtil.createNamenode(
-          NameNode.getAddress(token.getService().toString()), conf,
+          SecurityUtil.getTokenServiceAddr(delToken), conf,
           UserGroupInformation.getCurrentUser());
       try {
         nn.cancelDelegationToken(delToken);

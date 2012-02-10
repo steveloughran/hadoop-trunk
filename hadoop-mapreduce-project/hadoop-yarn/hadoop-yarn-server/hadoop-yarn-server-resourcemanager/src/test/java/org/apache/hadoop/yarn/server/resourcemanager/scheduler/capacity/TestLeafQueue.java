@@ -18,8 +18,18 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -30,7 +40,6 @@ import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.Container;
@@ -48,18 +57,19 @@ import org.apache.hadoop.yarn.server.resourcemanager.resource.Resources;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApp;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 public class TestLeafQueue {
+  
   private static final Log LOG = LogFactory.getLog(TestLeafQueue.class);
   
   private final RecordFactory recordFactory = 
@@ -83,6 +93,7 @@ public class TestLeafQueue {
     
     csConf = 
         new CapacitySchedulerConfiguration();
+    csConf.setBoolean("yarn.scheduler.capacity.user-metrics.enable", true);
     setupQueueConfiguration(csConf);
     
     
@@ -136,7 +147,6 @@ public class TestLeafQueue {
     final String Q_C1 = Q_C + "." + C1;
     conf.setCapacity(Q_C1, 100);
     
-    LOG.info("Setup top-level queues a and b");
   }
 
   static LeafQueue stubLeafQueue(LeafQueue queue) {
@@ -217,13 +227,15 @@ public class TestLeafQueue {
     final ApplicationAttemptId appAttemptId_0 = 
         TestUtils.getMockApplicationAttemptId(0, 0); 
     SchedulerApp app_0 = 
-        new SchedulerApp(appAttemptId_0, user_0, a, rmContext, null);
+        new SchedulerApp(appAttemptId_0, user_0, a, 
+            mock(ActiveUsersManager.class), rmContext, null);
     a.submitApplication(app_0, user_0, B);
 
     final ApplicationAttemptId appAttemptId_1 = 
         TestUtils.getMockApplicationAttemptId(1, 0); 
     SchedulerApp app_1 = 
-        new SchedulerApp(appAttemptId_1, user_0, a, rmContext, null);
+        new SchedulerApp(appAttemptId_1, user_0, a, 
+            mock(ActiveUsersManager.class), rmContext, null);
     a.submitApplication(app_1, user_0, B);  // same user
 
     
@@ -245,9 +257,38 @@ public class TestLeafQueue {
     
     // Only 1 container
     a.assignContainers(clusterResource, node_0);
-    assertEquals(7, a.getMetrics().getAvailableGB());
+    assertEquals(7*GB, a.getMetrics().getAvailableMB());
   }
 
+  @Test
+  public void testAppAttemptMetrics() throws Exception {
+
+    // Manipulate queue 'a'
+    LeafQueue a = stubLeafQueue((LeafQueue) queues.get(B));
+
+    // Users
+    final String user_0 = "user_0";
+
+    // Submit applications
+    final ApplicationAttemptId appAttemptId_0 = TestUtils
+        .getMockApplicationAttemptId(0, 1);
+    SchedulerApp app_0 = new SchedulerApp(appAttemptId_0, user_0, a, null,
+        rmContext, null);
+    a.submitApplication(app_0, user_0, B);
+
+    // Attempt the same application again
+    final ApplicationAttemptId appAttemptId_1 = TestUtils
+        .getMockApplicationAttemptId(0, 2);
+    SchedulerApp app_1 = new SchedulerApp(appAttemptId_1, user_0, a, null,
+        rmContext, null);
+    a.submitApplication(app_1, user_0, B); // same user
+
+    assertEquals(1, a.getMetrics().getAppsSubmitted());
+    assertEquals(1, a.getMetrics().getAppsPending());
+
+    QueueMetrics userMetrics = a.getMetrics().getUserMetrics(user_0);
+    assertEquals(1, userMetrics.getAppsSubmitted());
+  }
 
   @Test
   public void testSingleQueueWithOneUser() throws Exception {
@@ -255,7 +296,7 @@ public class TestLeafQueue {
     // Manipulate queue 'a'
     LeafQueue a = stubLeafQueue((LeafQueue)queues.get(A));
     //unset maxCapacity
-    a.setMaxCapacity(-0.01f);
+    a.setMaxCapacity(1.0f);
 
     // Users
     final String user_0 = "user_0";
@@ -264,13 +305,15 @@ public class TestLeafQueue {
     final ApplicationAttemptId appAttemptId_0 = 
         TestUtils.getMockApplicationAttemptId(0, 0); 
     SchedulerApp app_0 = 
-        new SchedulerApp(appAttemptId_0, user_0, a, rmContext, null);
+        new SchedulerApp(appAttemptId_0, user_0, a, 
+            mock(ActiveUsersManager.class), rmContext, null);
     a.submitApplication(app_0, user_0, A);
 
     final ApplicationAttemptId appAttemptId_1 = 
         TestUtils.getMockApplicationAttemptId(1, 0); 
     SchedulerApp app_1 = 
-        new SchedulerApp(appAttemptId_1, user_0, a, rmContext, null);
+        new SchedulerApp(appAttemptId_1, user_0, a, 
+            mock(ActiveUsersManager.class), rmContext, null);
     a.submitApplication(app_1, user_0, A);  // same user
 
     
@@ -299,9 +342,9 @@ public class TestLeafQueue {
     assertEquals(1*GB, a.getUsedResources().getMemory());
     assertEquals(1*GB, app_0.getCurrentConsumption().getMemory());
     assertEquals(0*GB, app_1.getCurrentConsumption().getMemory());
-    assertEquals(0, a.getMetrics().getReservedGB());
-    assertEquals(1, a.getMetrics().getAllocatedGB());
-    assertEquals(0, a.getMetrics().getAvailableGB());
+    assertEquals(0*GB, a.getMetrics().getReservedMB());
+    assertEquals(1*GB, a.getMetrics().getAllocatedMB());
+    assertEquals(0*GB, a.getMetrics().getAvailableMB());
 
     // Also 2nd -> minCapacity = 1024 since (.1 * 8G) < minAlloc, also
     // you can get one container more than user-limit
@@ -309,16 +352,16 @@ public class TestLeafQueue {
     assertEquals(2*GB, a.getUsedResources().getMemory());
     assertEquals(2*GB, app_0.getCurrentConsumption().getMemory());
     assertEquals(0*GB, app_1.getCurrentConsumption().getMemory());
-    assertEquals(0, a.getMetrics().getReservedGB());
-    assertEquals(2, a.getMetrics().getAllocatedGB());
+    assertEquals(0*GB, a.getMetrics().getReservedMB());
+    assertEquals(2*GB, a.getMetrics().getAllocatedMB());
     
     // Can't allocate 3rd due to user-limit
     a.assignContainers(clusterResource, node_0);
     assertEquals(2*GB, a.getUsedResources().getMemory());
     assertEquals(2*GB, app_0.getCurrentConsumption().getMemory());
     assertEquals(0*GB, app_1.getCurrentConsumption().getMemory());
-    assertEquals(0, a.getMetrics().getReservedGB());
-    assertEquals(2, a.getMetrics().getAllocatedGB());
+    assertEquals(0*GB, a.getMetrics().getReservedMB());
+    assertEquals(2*GB, a.getMetrics().getAllocatedMB());
     
     // Bump up user-limit-factor, now allocate should work
     a.setUserLimitFactor(10);
@@ -326,16 +369,16 @@ public class TestLeafQueue {
     assertEquals(3*GB, a.getUsedResources().getMemory());
     assertEquals(3*GB, app_0.getCurrentConsumption().getMemory());
     assertEquals(0*GB, app_1.getCurrentConsumption().getMemory());
-    assertEquals(0, a.getMetrics().getReservedGB());
-    assertEquals(3, a.getMetrics().getAllocatedGB());
+    assertEquals(0*GB, a.getMetrics().getReservedMB());
+    assertEquals(3*GB, a.getMetrics().getAllocatedMB());
 
     // One more should work, for app_1, due to user-limit-factor
     a.assignContainers(clusterResource, node_0);
     assertEquals(4*GB, a.getUsedResources().getMemory());
     assertEquals(3*GB, app_0.getCurrentConsumption().getMemory());
     assertEquals(1*GB, app_1.getCurrentConsumption().getMemory());
-    assertEquals(0, a.getMetrics().getReservedGB());
-    assertEquals(4, a.getMetrics().getAllocatedGB());
+    assertEquals(0*GB, a.getMetrics().getReservedMB());
+    assertEquals(4*GB, a.getMetrics().getAllocatedMB());
 
     // Test max-capacity
     // Now - no more allocs since we are at max-cap
@@ -344,8 +387,8 @@ public class TestLeafQueue {
     assertEquals(4*GB, a.getUsedResources().getMemory());
     assertEquals(3*GB, app_0.getCurrentConsumption().getMemory());
     assertEquals(1*GB, app_1.getCurrentConsumption().getMemory());
-    assertEquals(0, a.getMetrics().getReservedGB());
-    assertEquals(4, a.getMetrics().getAllocatedGB());
+    assertEquals(0*GB, a.getMetrics().getReservedMB());
+    assertEquals(4*GB, a.getMetrics().getAllocatedMB());
     
     // Release each container from app_0
     for (RMContainer rmContainer : app_0.getLiveContainers()) {
@@ -355,8 +398,8 @@ public class TestLeafQueue {
     assertEquals(1*GB, a.getUsedResources().getMemory());
     assertEquals(0*GB, app_0.getCurrentConsumption().getMemory());
     assertEquals(1*GB, app_1.getCurrentConsumption().getMemory());
-    assertEquals(0, a.getMetrics().getReservedGB());
-    assertEquals(1, a.getMetrics().getAllocatedGB());
+    assertEquals(0*GB, a.getMetrics().getReservedMB());
+    assertEquals(1*GB, a.getMetrics().getAllocatedMB());
     
     // Release each container from app_1
     for (RMContainer rmContainer : app_1.getLiveContainers()) {
@@ -366,18 +409,220 @@ public class TestLeafQueue {
     assertEquals(0*GB, a.getUsedResources().getMemory());
     assertEquals(0*GB, app_0.getCurrentConsumption().getMemory());
     assertEquals(0*GB, app_1.getCurrentConsumption().getMemory());
-    assertEquals(0, a.getMetrics().getReservedGB());
-    assertEquals(0, a.getMetrics().getAllocatedGB());
-    assertEquals(1, a.getMetrics().getAvailableGB());
+    assertEquals(0*GB, a.getMetrics().getReservedMB());
+    assertEquals(0*GB, a.getMetrics().getAllocatedMB());
+    assertEquals(1*GB, a.getMetrics().getAvailableMB());
   }
   
+  @Test
+  public void testUserLimits() throws Exception {
+    // Mock the queue
+    LeafQueue a = stubLeafQueue((LeafQueue)queues.get(A));
+    //unset maxCapacity
+    a.setMaxCapacity(1.0f);
+    
+    // Users
+    final String user_0 = "user_0";
+    final String user_1 = "user_1";
+
+    // Submit applications
+    final ApplicationAttemptId appAttemptId_0 = 
+        TestUtils.getMockApplicationAttemptId(0, 0); 
+    SchedulerApp app_0 = 
+        new SchedulerApp(appAttemptId_0, user_0, a, 
+            a.getActiveUsersManager(), rmContext, null);
+    a.submitApplication(app_0, user_0, A);
+
+    final ApplicationAttemptId appAttemptId_1 = 
+        TestUtils.getMockApplicationAttemptId(1, 0); 
+    SchedulerApp app_1 = 
+        new SchedulerApp(appAttemptId_1, user_0, a, 
+            a.getActiveUsersManager(), rmContext, null);
+    a.submitApplication(app_1, user_0, A);  // same user
+
+    final ApplicationAttemptId appAttemptId_2 = 
+        TestUtils.getMockApplicationAttemptId(2, 0); 
+    SchedulerApp app_2 = 
+        new SchedulerApp(appAttemptId_2, user_1, a, 
+            a.getActiveUsersManager(), rmContext, null);
+    a.submitApplication(app_2, user_1, A);
+
+    // Setup some nodes
+    String host_0 = "host_0";
+    SchedulerNode node_0 = TestUtils.getMockNode(host_0, DEFAULT_RACK, 0, 8*GB);
+    String host_1 = "host_1";
+    SchedulerNode node_1 = TestUtils.getMockNode(host_1, DEFAULT_RACK, 0, 8*GB);
+    
+    final int numNodes = 2;
+    Resource clusterResource = Resources.createResource(numNodes * (8*GB));
+    when(csContext.getNumClusterNodes()).thenReturn(numNodes);
+ 
+    // Setup resource-requests
+    Priority priority = TestUtils.createMockPriority(1);
+    app_0.updateResourceRequests(Collections.singletonList(
+            TestUtils.createResourceRequest(RMNodeImpl.ANY, 2*GB, 1, priority,
+                recordFactory))); 
+
+    app_1.updateResourceRequests(Collections.singletonList(
+        TestUtils.createResourceRequest(RMNodeImpl.ANY, 1*GB, 2, priority,
+            recordFactory))); 
+
+    /**
+     * Start testing...
+     */
+    
+    // Set user-limit
+    a.setUserLimit(50);
+    a.setUserLimitFactor(2);
+    
+    // Now, only user_0 should be active since he is the only one with
+    // outstanding requests
+    assertEquals("There should only be 1 active user!", 
+        1, a.getActiveUsersManager().getNumActiveUsers());
+
+    // This commented code is key to test 'activeUsers'. 
+    // It should fail the test if uncommented since
+    // it would increase 'activeUsers' to 2 and stop user_2
+    // Pre MAPREDUCE-3732 this test should fail without this block too
+//    app_2.updateResourceRequests(Collections.singletonList(
+//        TestUtils.createResourceRequest(RMNodeImpl.ANY, 1*GB, 1, priority,
+//            recordFactory))); 
+
+    // 1 container to user_0
+    a.assignContainers(clusterResource, node_0);
+    assertEquals(2*GB, a.getUsedResources().getMemory());
+    assertEquals(2*GB, app_0.getCurrentConsumption().getMemory());
+    assertEquals(0*GB, app_1.getCurrentConsumption().getMemory());
+
+    // Again one to user_0 since he hasn't exceeded user limit yet
+    a.assignContainers(clusterResource, node_0);
+    assertEquals(3*GB, a.getUsedResources().getMemory());
+    assertEquals(2*GB, app_0.getCurrentConsumption().getMemory());
+    assertEquals(1*GB, app_1.getCurrentConsumption().getMemory());
+
+    // One more to user_0 since he is the only active user
+    a.assignContainers(clusterResource, node_1);
+    assertEquals(4*GB, a.getUsedResources().getMemory());
+    assertEquals(2*GB, app_0.getCurrentConsumption().getMemory());
+    assertEquals(2*GB, app_1.getCurrentConsumption().getMemory());
+  }
+  
+  @Test
+  public void testHeadroomWithMaxCap() throws Exception {
+    // Mock the queue
+    LeafQueue a = stubLeafQueue((LeafQueue)queues.get(A));
+    //unset maxCapacity
+    a.setMaxCapacity(1.0f);
+    
+    // Users
+    final String user_0 = "user_0";
+    final String user_1 = "user_1";
+
+    // Submit applications
+    final ApplicationAttemptId appAttemptId_0 = 
+        TestUtils.getMockApplicationAttemptId(0, 0); 
+    SchedulerApp app_0 = 
+        new SchedulerApp(appAttemptId_0, user_0, a, 
+            a.getActiveUsersManager(), rmContext, null);
+    a.submitApplication(app_0, user_0, A);
+
+    final ApplicationAttemptId appAttemptId_1 = 
+        TestUtils.getMockApplicationAttemptId(1, 0); 
+    SchedulerApp app_1 = 
+        new SchedulerApp(appAttemptId_1, user_0, a, 
+            a.getActiveUsersManager(), rmContext, null);
+    a.submitApplication(app_1, user_0, A);  // same user
+
+    final ApplicationAttemptId appAttemptId_2 = 
+        TestUtils.getMockApplicationAttemptId(2, 0); 
+    SchedulerApp app_2 = 
+        new SchedulerApp(appAttemptId_2, user_1, a, 
+            a.getActiveUsersManager(), rmContext, null);
+    a.submitApplication(app_2, user_1, A);
+
+    // Setup some nodes
+    String host_0 = "host_0";
+    SchedulerNode node_0 = TestUtils.getMockNode(host_0, DEFAULT_RACK, 0, 8*GB);
+    String host_1 = "host_1";
+    SchedulerNode node_1 = TestUtils.getMockNode(host_1, DEFAULT_RACK, 0, 8*GB);
+    
+    final int numNodes = 2;
+    Resource clusterResource = Resources.createResource(numNodes * (8*GB));
+    when(csContext.getNumClusterNodes()).thenReturn(numNodes);
+ 
+    // Setup resource-requests
+    Priority priority = TestUtils.createMockPriority(1);
+    app_0.updateResourceRequests(Collections.singletonList(
+            TestUtils.createResourceRequest(RMNodeImpl.ANY, 2*GB, 1, priority,
+                recordFactory))); 
+
+    app_1.updateResourceRequests(Collections.singletonList(
+        TestUtils.createResourceRequest(RMNodeImpl.ANY, 1*GB, 2, priority,
+            recordFactory))); 
+
+    /**
+     * Start testing...
+     */
+    
+    // Set user-limit
+    a.setUserLimit(50);
+    a.setUserLimitFactor(2);
+    
+    // Now, only user_0 should be active since he is the only one with
+    // outstanding requests
+    assertEquals("There should only be 1 active user!", 
+        1, a.getActiveUsersManager().getNumActiveUsers());
+
+    // 1 container to user_0
+    a.assignContainers(clusterResource, node_0);
+    assertEquals(2*GB, a.getUsedResources().getMemory());
+    assertEquals(2*GB, app_0.getCurrentConsumption().getMemory());
+    assertEquals(0*GB, app_1.getCurrentConsumption().getMemory());
+    assertEquals(0*GB, app_0.getHeadroom().getMemory()); // User limit = 2G
+    assertEquals(0*GB, app_0.getHeadroom().getMemory()); // User limit = 2G
+
+    // Again one to user_0 since he hasn't exceeded user limit yet
+    a.assignContainers(clusterResource, node_0);
+    assertEquals(3*GB, a.getUsedResources().getMemory());
+    assertEquals(2*GB, app_0.getCurrentConsumption().getMemory());
+    assertEquals(1*GB, app_1.getCurrentConsumption().getMemory());
+    assertEquals(0*GB, app_0.getHeadroom().getMemory()); // 3G - 2G
+    assertEquals(0*GB, app_0.getHeadroom().getMemory()); // 3G - 2G
+    
+    // Submit requests for app_1 and set max-cap
+    a.setMaxCapacity(.1f);
+    app_2.updateResourceRequests(Collections.singletonList(
+        TestUtils.createResourceRequest(RMNodeImpl.ANY, 1*GB, 1, priority,
+            recordFactory))); 
+    assertEquals(2, a.getActiveUsersManager().getNumActiveUsers());
+
+    // No more to user_0 since he is already over user-limit
+    // and no more containers to queue since it's already at max-cap
+    a.assignContainers(clusterResource, node_1);
+    assertEquals(3*GB, a.getUsedResources().getMemory());
+    assertEquals(2*GB, app_0.getCurrentConsumption().getMemory());
+    assertEquals(1*GB, app_1.getCurrentConsumption().getMemory());
+    assertEquals(0*GB, app_2.getCurrentConsumption().getMemory());
+    assertEquals(0*GB, app_0.getHeadroom().getMemory());
+    assertEquals(0*GB, app_1.getHeadroom().getMemory());
+    
+    // Check headroom for app_2 
+    LOG.info("here");
+    app_1.updateResourceRequests(Collections.singletonList(     // unset
+        TestUtils.createResourceRequest(RMNodeImpl.ANY, 1*GB, 0, priority,
+            recordFactory))); 
+    assertEquals(1, a.getActiveUsersManager().getNumActiveUsers());
+    a.assignContainers(clusterResource, node_1);
+    assertEquals(1*GB, app_2.getHeadroom().getMemory());   // hit queue max-cap 
+  }
+
   @Test
   public void testSingleQueueWithMultipleUsers() throws Exception {
     
     // Mock the queue
     LeafQueue a = stubLeafQueue((LeafQueue)queues.get(A));
     //unset maxCapacity
-    a.setMaxCapacity(-0.01f);
+    a.setMaxCapacity(1.0f);
     
     // Users
     final String user_0 = "user_0";
@@ -388,15 +633,31 @@ public class TestLeafQueue {
     final ApplicationAttemptId appAttemptId_0 = 
         TestUtils.getMockApplicationAttemptId(0, 0); 
     SchedulerApp app_0 = 
-        new SchedulerApp(appAttemptId_0, user_0, a, rmContext, null);
+        new SchedulerApp(appAttemptId_0, user_0, a, 
+            a.getActiveUsersManager(), rmContext, null);
     a.submitApplication(app_0, user_0, A);
 
     final ApplicationAttemptId appAttemptId_1 = 
         TestUtils.getMockApplicationAttemptId(1, 0); 
     SchedulerApp app_1 = 
-        new SchedulerApp(appAttemptId_1, user_0, a, rmContext, null);
+        new SchedulerApp(appAttemptId_1, user_0, a, 
+            a.getActiveUsersManager(), rmContext, null);
     a.submitApplication(app_1, user_0, A);  // same user
 
+    final ApplicationAttemptId appAttemptId_2 = 
+        TestUtils.getMockApplicationAttemptId(2, 0); 
+    SchedulerApp app_2 = 
+        new SchedulerApp(appAttemptId_2, user_1, a, 
+            a.getActiveUsersManager(), rmContext, null);
+    a.submitApplication(app_2, user_1, A);
+
+    final ApplicationAttemptId appAttemptId_3 = 
+        TestUtils.getMockApplicationAttemptId(3, 0); 
+    SchedulerApp app_3 = 
+        new SchedulerApp(appAttemptId_3, user_2, a, 
+            a.getActiveUsersManager(), rmContext, null);
+    a.submitApplication(app_3, user_2, A);
+    
     // Setup some nodes
     String host_0 = "host_0";
     SchedulerNode node_0 = TestUtils.getMockNode(host_0, DEFAULT_RACK, 0, 8*GB);
@@ -438,19 +699,8 @@ public class TestLeafQueue {
     assertEquals(2*GB, a.getUsedResources().getMemory());
     assertEquals(2*GB, app_0.getCurrentConsumption().getMemory());
     assertEquals(0*GB, app_1.getCurrentConsumption().getMemory());
-
-    // Submit more apps
-    final ApplicationAttemptId appAttemptId_2 = 
-        TestUtils.getMockApplicationAttemptId(2, 0); 
-    SchedulerApp app_2 = 
-        new SchedulerApp(appAttemptId_2, user_1, a, rmContext, null);
-    a.submitApplication(app_2, user_1, A);
-
-    final ApplicationAttemptId appAttemptId_3 = 
-        TestUtils.getMockApplicationAttemptId(3, 0); 
-    SchedulerApp app_3 = 
-        new SchedulerApp(appAttemptId_3, user_2, a, rmContext, null);
-    a.submitApplication(app_3, user_2, A);
+    
+    // Submit resource requests for other apps now to 'activate' them
     
     app_2.updateResourceRequests(Collections.singletonList(
         TestUtils.createResourceRequest(RMNodeImpl.ANY, 3*GB, 1, priority,
@@ -491,7 +741,7 @@ public class TestLeafQueue {
     
     // Revert max-capacity and user-limit-factor
     // Now, allocations should goto app_3 since it's under user-limit 
-    a.setMaxCapacity(-0.01f);
+    a.setMaxCapacity(1.0f);
     a.setUserLimitFactor(1);
     a.assignContainers(clusterResource, node_0);
     assertEquals(7*GB, a.getUsedResources().getMemory()); 
@@ -548,7 +798,7 @@ public class TestLeafQueue {
     // Manipulate queue 'a'
     LeafQueue a = stubLeafQueue((LeafQueue)queues.get(A));
     //unset maxCapacity
-    a.setMaxCapacity(-0.01f);
+    a.setMaxCapacity(1.0f);
 
     // Users
     final String user_0 = "user_0";
@@ -558,20 +808,22 @@ public class TestLeafQueue {
     final ApplicationAttemptId appAttemptId_0 = 
         TestUtils.getMockApplicationAttemptId(0, 0); 
     SchedulerApp app_0 = 
-        new SchedulerApp(appAttemptId_0, user_0, a, rmContext, null);
+        new SchedulerApp(appAttemptId_0, user_0, a, 
+            mock(ActiveUsersManager.class), rmContext, null);
     a.submitApplication(app_0, user_0, A);
 
     final ApplicationAttemptId appAttemptId_1 = 
         TestUtils.getMockApplicationAttemptId(1, 0); 
     SchedulerApp app_1 = 
-        new SchedulerApp(appAttemptId_1, user_1, a, rmContext, null);
+        new SchedulerApp(appAttemptId_1, user_1, a, 
+            mock(ActiveUsersManager.class), rmContext, null);
     a.submitApplication(app_1, user_1, A);  
 
     // Setup some nodes
     String host_0 = "host_0";
     SchedulerNode node_0 = TestUtils.getMockNode(host_0, DEFAULT_RACK, 0, 4*GB);
     
-    final int numNodes = 1;
+    final int numNodes = 2;
     Resource clusterResource = Resources.createResource(numNodes * (4*GB));
     when(csContext.getNumClusterNodes()).thenReturn(numNodes);
     
@@ -592,9 +844,9 @@ public class TestLeafQueue {
     assertEquals(1*GB, a.getUsedResources().getMemory());
     assertEquals(1*GB, app_0.getCurrentConsumption().getMemory());
     assertEquals(0*GB, app_1.getCurrentConsumption().getMemory());
-    assertEquals(0, a.getMetrics().getReservedGB());
-    assertEquals(1, a.getMetrics().getAllocatedGB());
-    assertEquals(0, a.getMetrics().getAvailableGB());
+    assertEquals(0*GB, a.getMetrics().getReservedMB());
+    assertEquals(1*GB, a.getMetrics().getAllocatedMB());
+    assertEquals(0*GB, a.getMetrics().getAvailableMB());
 
     // Also 2nd -> minCapacity = 1024 since (.1 * 8G) < minAlloc, also
     // you can get one container more than user-limit
@@ -602,8 +854,8 @@ public class TestLeafQueue {
     assertEquals(2*GB, a.getUsedResources().getMemory());
     assertEquals(2*GB, app_0.getCurrentConsumption().getMemory());
     assertEquals(0*GB, app_1.getCurrentConsumption().getMemory());
-    assertEquals(0, a.getMetrics().getReservedGB());
-    assertEquals(2, a.getMetrics().getAllocatedGB());
+    assertEquals(0*GB, a.getMetrics().getReservedMB());
+    assertEquals(2*GB, a.getMetrics().getAllocatedMB());
     
     // Now, reservation should kick in for app_1
     a.assignContainers(clusterResource, node_0);
@@ -612,8 +864,8 @@ public class TestLeafQueue {
     assertEquals(0*GB, app_1.getCurrentConsumption().getMemory());
     assertEquals(4*GB, app_1.getCurrentReservation().getMemory());
     assertEquals(2*GB, node_0.getUsedResource().getMemory());
-    assertEquals(4, a.getMetrics().getReservedGB());
-    assertEquals(2, a.getMetrics().getAllocatedGB());
+    assertEquals(4*GB, a.getMetrics().getReservedMB());
+    assertEquals(2*GB, a.getMetrics().getAllocatedMB());
     
     // Now free 1 container from app_0 i.e. 1G
     a.completedContainer(clusterResource, app_0, node_0, 
@@ -624,8 +876,8 @@ public class TestLeafQueue {
     assertEquals(0*GB, app_1.getCurrentConsumption().getMemory());
     assertEquals(4*GB, app_1.getCurrentReservation().getMemory());
     assertEquals(1*GB, node_0.getUsedResource().getMemory());
-    assertEquals(4, a.getMetrics().getReservedGB());
-    assertEquals(1, a.getMetrics().getAllocatedGB());
+    assertEquals(4*GB, a.getMetrics().getReservedMB());
+    assertEquals(1*GB, a.getMetrics().getAllocatedMB());
 
     // Now finish another container from app_0 and fulfill the reservation
     a.completedContainer(clusterResource, app_0, node_0, 
@@ -636,8 +888,8 @@ public class TestLeafQueue {
     assertEquals(4*GB, app_1.getCurrentConsumption().getMemory());
     assertEquals(0*GB, app_1.getCurrentReservation().getMemory());
     assertEquals(4*GB, node_0.getUsedResource().getMemory());
-    assertEquals(0, a.getMetrics().getReservedGB());
-    assertEquals(4, a.getMetrics().getAllocatedGB());
+    assertEquals(0*GB, a.getMetrics().getReservedMB());
+    assertEquals(4*GB, a.getMetrics().getAllocatedMB());
   }
   
   @Test
@@ -646,7 +898,7 @@ public class TestLeafQueue {
     // Manipulate queue 'a'
     LeafQueue a = stubLeafQueue((LeafQueue)queues.get(A));
     //unset maxCapacity
-    a.setMaxCapacity(-0.01f);
+    a.setMaxCapacity(1.0f);
     a.setUserLimitFactor(10);
 
     // Users
@@ -657,13 +909,15 @@ public class TestLeafQueue {
     final ApplicationAttemptId appAttemptId_0 = 
         TestUtils.getMockApplicationAttemptId(0, 0); 
     SchedulerApp app_0 = 
-        new SchedulerApp(appAttemptId_0, user_0, a, rmContext, null);
+        new SchedulerApp(appAttemptId_0, user_0, a, 
+            mock(ActiveUsersManager.class), rmContext, null);
     a.submitApplication(app_0, user_0, A);
 
     final ApplicationAttemptId appAttemptId_1 = 
         TestUtils.getMockApplicationAttemptId(1, 0); 
     SchedulerApp app_1 = 
-        new SchedulerApp(appAttemptId_1, user_1, a, rmContext, null);
+        new SchedulerApp(appAttemptId_1, user_1, a, 
+            mock(ActiveUsersManager.class), rmContext, null);
     a.submitApplication(app_1, user_1, A);  
 
     // Setup some nodes
@@ -673,7 +927,7 @@ public class TestLeafQueue {
     String host_1 = "host_1";
     SchedulerNode node_1 = TestUtils.getMockNode(host_1, DEFAULT_RACK, 0, 4*GB);
     
-    final int numNodes = 2;
+    final int numNodes = 3;
     Resource clusterResource = Resources.createResource(numNodes * (4*GB));
     when(csContext.getNumClusterNodes()).thenReturn(numNodes);
     when(csContext.getMaximumResourceCapability()).thenReturn(
@@ -770,7 +1024,8 @@ public class TestLeafQueue {
     final ApplicationAttemptId appAttemptId_0 = 
         TestUtils.getMockApplicationAttemptId(0, 0); 
     SchedulerApp app_0 = 
-        spy(new SchedulerApp(appAttemptId_0, user_0, a, rmContext, null));
+        spy(new SchedulerApp(appAttemptId_0, user_0, a, 
+            mock(ActiveUsersManager.class), rmContext, null));
     a.submitApplication(app_0, user_0, A);
     
     // Setup some nodes and racks
@@ -899,7 +1154,8 @@ public class TestLeafQueue {
     final ApplicationAttemptId appAttemptId_0 = 
         TestUtils.getMockApplicationAttemptId(0, 0); 
     SchedulerApp app_0 = 
-        spy(new SchedulerApp(appAttemptId_0, user_0, a, rmContext, null));
+        spy(new SchedulerApp(appAttemptId_0, user_0, a, 
+            mock(ActiveUsersManager.class), rmContext, null));
     a.submitApplication(app_0, user_0, A);
     
     // Setup some nodes and racks
@@ -1028,7 +1284,8 @@ public class TestLeafQueue {
     final ApplicationAttemptId appAttemptId_0 = 
         TestUtils.getMockApplicationAttemptId(0, 0); 
     SchedulerApp app_0 = 
-        spy(new SchedulerApp(appAttemptId_0, user_0, a, rmContext, null));
+        spy(new SchedulerApp(appAttemptId_0, user_0, a, 
+            mock(ActiveUsersManager.class), rmContext, null));
     a.submitApplication(app_0, user_0, A);
     
     // Setup some nodes and racks

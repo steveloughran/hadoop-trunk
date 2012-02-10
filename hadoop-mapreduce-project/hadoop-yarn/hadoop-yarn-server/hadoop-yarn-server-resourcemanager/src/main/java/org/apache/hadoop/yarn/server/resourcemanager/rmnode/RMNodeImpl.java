@@ -64,6 +64,7 @@ import org.apache.hadoop.yarn.util.BuilderUtils.ContainerIdComparator;
  */
 @Private
 @Unstable
+@SuppressWarnings("unchecked")
 public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
   private static final Log LOG = LogFactory.getLog(RMNodeImpl.class);
@@ -116,11 +117,14 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
          EnumSet.of(RMNodeState.RUNNING, RMNodeState.UNHEALTHY),
          RMNodeEventType.STATUS_UPDATE, new StatusUpdateWhenHealthyTransition())
      .addTransition(RMNodeState.RUNNING, RMNodeState.DECOMMISSIONED,
-         RMNodeEventType.DECOMMISSION, new RemoveNodeTransition())
+         RMNodeEventType.DECOMMISSION,
+         new DeactivateNodeTransition(RMNodeState.DECOMMISSIONED))
      .addTransition(RMNodeState.RUNNING, RMNodeState.LOST,
-         RMNodeEventType.EXPIRE, new RemoveNodeTransition())
-     .addTransition(RMNodeState.RUNNING, RMNodeState.LOST,
-         RMNodeEventType.REBOOTING, new RemoveNodeTransition())
+         RMNodeEventType.EXPIRE,
+         new DeactivateNodeTransition(RMNodeState.LOST))
+     .addTransition(RMNodeState.RUNNING, RMNodeState.REBOOTED,
+         RMNodeEventType.REBOOTING,
+         new DeactivateNodeTransition(RMNodeState.REBOOTED))
      .addTransition(RMNodeState.RUNNING, RMNodeState.RUNNING,
          RMNodeEventType.CLEANUP_APP, new CleanUpAppTransition())
      .addTransition(RMNodeState.RUNNING, RMNodeState.RUNNING,
@@ -283,7 +287,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   }
 
   public void handle(RMNodeEvent event) {
-    LOG.info("Processing " + event.getNodeId() + " of type " + event.getType());
+    LOG.debug("Processing " + event.getNodeId() + " of type " + event.getType());
     try {
       writeLock.lock();
       RMNodeState oldState = getState();
@@ -304,19 +308,67 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       writeLock.unlock();
     }
   }
-  
+
+  private void updateMetricsForRejoinedNode(RMNodeState previousNodeState) {
+    ClusterMetrics metrics = ClusterMetrics.getMetrics();
+    metrics.incrNumActiveNodes();
+
+    switch (previousNodeState) {
+    case LOST:
+      metrics.decrNumLostNMs();
+      break;
+    case REBOOTED:
+      metrics.decrNumRebootedNMs();
+      break;
+    case DECOMMISSIONED:
+      metrics.decrDecommisionedNMs();
+      break;
+    case UNHEALTHY:
+      metrics.decrNumUnhealthyNMs();
+      break;
+    }
+  }
+
+  private void updateMetricsForDeactivatedNode(RMNodeState finalState) {
+    ClusterMetrics metrics = ClusterMetrics.getMetrics();
+    metrics.decrNumActiveNodes();
+
+    switch (finalState) {
+    case DECOMMISSIONED:
+      metrics.incrDecommisionedNMs();
+      break;
+    case LOST:
+      metrics.incrNumLostNMs();
+      break;
+    case REBOOTED:
+      metrics.incrNumRebootedNMs();
+      break;
+    case UNHEALTHY:
+      metrics.incrNumUnhealthyNMs();
+      break;
+    }
+  }
+
   public static class AddNodeTransition implements
       SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
-    @SuppressWarnings("unchecked")
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
       // Inform the scheduler
 
       rmNode.context.getDispatcher().getEventHandler().handle(
           new NodeAddedSchedulerEvent(rmNode));
-
-      ClusterMetrics.getMetrics().addNode();
+      
+      String host = rmNode.nodeId.getHost();
+      if (rmNode.context.getInactiveRMNodes().containsKey(host)) {
+        // Old node rejoining
+        RMNode previouRMNode = rmNode.context.getInactiveRMNodes().get(host);
+        rmNode.context.getInactiveRMNodes().remove(host);
+        rmNode.updateMetricsForRejoinedNode(previouRMNode.getState());
+      } else {
+        // Increment activeNodes explicitly because this is a new node.
+        ClusterMetrics.getMetrics().incrNumActiveNodes();
+      }
     }
   }
   
@@ -340,28 +392,33 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     }
   }
 
-  public static class RemoveNodeTransition
+  public static class DeactivateNodeTransition
     implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
-    @SuppressWarnings("unchecked")
+    private final RMNodeState finalState;
+    public DeactivateNodeTransition(RMNodeState finalState) {
+      this.finalState = finalState;
+    }
+
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
       // Inform the scheduler
       rmNode.context.getDispatcher().getEventHandler().handle(
           new NodeRemovedSchedulerEvent(rmNode));
 
-      // Remove the node from the system.
+      // Deactivate the node
       rmNode.context.getRMNodes().remove(rmNode.nodeId);
-      LOG.info("Removed Node " + rmNode.nodeId);
-      
-      //Update the metrics 
-      ClusterMetrics.getMetrics().removeNode(event.getType());
+      LOG.info("Deactivating Node " + rmNode.nodeId + " as it is now "
+          + finalState);
+      rmNode.context.getInactiveRMNodes().put(rmNode.nodeId.getHost(), rmNode);
+
+      //Update the metrics
+      rmNode.updateMetricsForDeactivatedNode(finalState);
     }
   }
 
   public static class StatusUpdateWhenHealthyTransition implements
       MultipleArcTransition<RMNodeImpl, RMNodeEvent, RMNodeState> {
-    @SuppressWarnings("unchecked")
     @Override
     public RMNodeState transition(RMNodeImpl rmNode, RMNodeEvent event) {
 
@@ -377,7 +434,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         // Inform the scheduler
         rmNode.context.getDispatcher().getEventHandler().handle(
             new NodeRemovedSchedulerEvent(rmNode));
-        ClusterMetrics.getMetrics().incrNumUnhealthyNMs();
+        // Update metrics
+        rmNode.updateMetricsForDeactivatedNode(RMNodeState.UNHEALTHY);
         return RMNodeState.UNHEALTHY;
       }
 
@@ -436,11 +494,9 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     }
   }
 
-  public static class StatusUpdateWhenUnHealthyTransition
- implements
+  public static class StatusUpdateWhenUnHealthyTransition implements
       MultipleArcTransition<RMNodeImpl, RMNodeEvent, RMNodeState> {
 
-    @SuppressWarnings("unchecked")
     @Override
     public RMNodeState transition(RMNodeImpl rmNode, RMNodeEvent event) {
       RMNodeStatusEvent statusEvent = (RMNodeStatusEvent) event;
@@ -452,7 +508,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       if (remoteNodeHealthStatus.getIsNodeHealthy()) {
         rmNode.context.getDispatcher().getEventHandler().handle(
             new NodeAddedSchedulerEvent(rmNode));
-        ClusterMetrics.getMetrics().decrNumUnhealthyNMs();
+        // Update metrics
+        rmNode.updateMetricsForRejoinedNode(RMNodeState.UNHEALTHY);
         return RMNodeState.RUNNING;
       }
 
