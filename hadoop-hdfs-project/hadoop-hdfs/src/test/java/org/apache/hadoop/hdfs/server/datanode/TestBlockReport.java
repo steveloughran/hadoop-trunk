@@ -40,7 +40,6 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.GenericTestUtils.DelayAnswer;
@@ -99,7 +98,6 @@ public class TestBlockReport {
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(REPL_FACTOR).build();
     fs = (DistributedFileSystem) cluster.getFileSystem();
     bpid = cluster.getNamesystem().getBlockPoolId();
-    StaticMapping.resetMap();
   }
 
   @After
@@ -704,9 +702,6 @@ public class TestBlockReport {
           getPendingReplicationBlocks());
       LOG.debug("Excess " + cluster.getNamesystem().getExcessBlocks());
       LOG.debug("Total " + cluster.getNamesystem().getBlocksTotal());
-      LOG.debug("Topology script: "
-                    + conf.get(DFSConfigKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY) );
-      LOG.debug("Static Mapper " + new StaticMapping().dumpTopology());
     }
   }
 
