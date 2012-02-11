@@ -13,9 +13,6 @@ Trunk (unreleased changes)
     (suresh)
 
   IMPROVEMENTS
-    HADOOP-8032. mvn site:stage-deploy should be able to use the scp protocol
-    to stage documents (Ravi Prakash via tgraves)
-
     HADOOP-8017. Configure hadoop-main pom to get rid of M2E plugin execution
     not covered (Eric Charles via bobby)
 
@@ -158,9 +155,26 @@ Release 0.23.2 - UNRELEASED
   
   IMPROVEMENTS
 
+    HADOOP-8048. Allow merging of Credentials (Daryn Sharp via tgraves)
+ 
+    HADOOP-8032. mvn site:stage-deploy should be able to use the scp protocol
+    to stage documents (Ravi Prakash via tgraves)
+
+    HADOOP-7923. Automate the updating of version numbers in the doc system.
+    (szetszwo)
+
   OPTIMIZATIONS
 
   BUG FIXES
+
+    HADOOP-8042  When copying a file out of HDFS, modifying it, and uploading
+    it back into HDFS, the put fails due to a CRC mismatch
+    (Daryn Sharp via bobby)
+
+    HADOOP-8035 Hadoop Maven site is inefficient and runs phases redundantly
+    (abayer via tucu)
+
+    HADOOP-8051 HttpFS documentation it is not wired to the generated site (tucu)
 
 Release 0.23.1 - 2012-02-08 
 
