@@ -18,6 +18,8 @@
 package org.apache.hadoop.mapreduce.v2.app.job.impl;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -25,7 +27,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -34,6 +36,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Task;
 import org.apache.hadoop.mapred.TaskUmbilicalProtocol;
 import org.apache.hadoop.mapreduce.OutputCommitter;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskInfo;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitMetaInfo;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
@@ -72,7 +75,7 @@ public class TestTaskImpl {
   private Path remoteJobConfFile;
   private Collection<Token<? extends TokenIdentifier>> fsTokens;
   private Clock clock;
-  private Set<TaskId> completedTasksFromPreviousRun;
+  private Map<TaskId, TaskInfo> completedTasksFromPreviousRun;
   private MRAppMetrics metrics;
   private TaskImpl mockTask;
   private ApplicationId appId;
@@ -96,7 +99,7 @@ public class TestTaskImpl {
         TaskAttemptListener taskAttemptListener, OutputCommitter committer,
         Token<JobTokenIdentifier> jobToken,
         Collection<Token<? extends TokenIdentifier>> fsTokens, Clock clock,
-        Set<TaskId> completedTasksFromPreviousRun, int startCount,
+        Map<TaskId, TaskInfo> completedTasksFromPreviousRun, int startCount,
         MRAppMetrics metrics) {
       super(jobId, taskType , partition, eventHandler,
           remoteJobConfFile, conf, taskAttemptListener, committer, 
@@ -260,6 +263,12 @@ public class TestTaskImpl {
     assertTaskRunningState();    
   }
   
+  private void commitTaskAttempt(TaskAttemptId attemptId) {
+    mockTask.handle(new TaskTAttemptEvent(attemptId, 
+        TaskEventType.T_ATTEMPT_COMMIT_PENDING));
+    assertTaskRunningState();    
+  }
+  
   private MockTaskAttemptImpl getLastAttempt() {
     return taskAttempts.get(taskAttempts.size()-1);
   }
@@ -278,32 +287,45 @@ public class TestTaskImpl {
     assertTaskRunningState();  
   }
   
+  private void failRunningTaskAttempt(TaskAttemptId attemptId) {
+    mockTask.handle(new TaskTAttemptEvent(attemptId, 
+        TaskEventType.T_ATTEMPT_FAILED));
+    assertTaskRunningState();
+  }
+  
   /**
    * {@link TaskState#NEW}
    */
   private void assertTaskNewState() {
-    assertEquals(mockTask.getState(), TaskState.NEW);
+    assertEquals(TaskState.NEW, mockTask.getState());
   }
   
   /**
    * {@link TaskState#SCHEDULED}
    */
   private void assertTaskScheduledState() {
-    assertEquals(mockTask.getState(), TaskState.SCHEDULED);
+    assertEquals(TaskState.SCHEDULED, mockTask.getState());
   }
 
   /**
    * {@link TaskState#RUNNING}
    */
   private void assertTaskRunningState() {
-    assertEquals(mockTask.getState(), TaskState.RUNNING);        
+    assertEquals(TaskState.RUNNING, mockTask.getState());
   }
     
   /**
    * {@link TaskState#KILL_WAIT}
    */
   private void assertTaskKillWaitState() {
-    assertEquals(mockTask.getState(), TaskState.KILL_WAIT);
+    assertEquals(TaskState.KILL_WAIT, mockTask.getState());
+  }
+  
+  /**
+   * {@link TaskState#SUCCEEDED}
+   */
+  private void assertTaskSucceededState() {
+    assertEquals(TaskState.SUCCEEDED, mockTask.getState());
   }
   
   @Test
@@ -407,6 +429,33 @@ public class TestTaskImpl {
     updateLastAttemptProgress(progress);
     assert(mockTask.getProgress() == progress);
         
+  }
+  
+  @Test
+  public void testFailureDuringTaskAttemptCommit() {
+    TaskId taskId = getNewTaskID();
+    scheduleTaskAttempt(taskId);
+    launchTaskAttempt(getLastAttempt().getAttemptId());
+    updateLastAttemptState(TaskAttemptState.COMMIT_PENDING);
+    commitTaskAttempt(getLastAttempt().getAttemptId());
+
+    // During the task attempt commit there is an exception which causes
+    // the attempt to fail
+    updateLastAttemptState(TaskAttemptState.FAILED);
+    failRunningTaskAttempt(getLastAttempt().getAttemptId());
+
+    assertEquals(2, taskAttempts.size());
+    updateLastAttemptState(TaskAttemptState.SUCCEEDED);
+    commitTaskAttempt(getLastAttempt().getAttemptId());
+    mockTask.handle(new TaskTAttemptEvent(getLastAttempt().getAttemptId(), 
+        TaskEventType.T_ATTEMPT_SUCCEEDED));
+    
+    assertFalse("First attempt should not commit",
+        mockTask.canCommit(taskAttempts.get(0).getAttemptId()));
+    assertTrue("Second attempt should commit",
+        mockTask.canCommit(getLastAttempt().getAttemptId()));
+
+    assertTaskSucceededState();
   }
 
 }

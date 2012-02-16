@@ -129,6 +129,9 @@ Trunk (unreleased changes)
     HDFS-2486. Remove unnecessary priority level checks in
     UnderReplicatedBlocks.  (Uma Maheswara Rao G via szetszwo)
 
+    HDFS-2878. Fix TestBlockRecovery and move it back into main test directory.
+    (todd)
+
   OPTIMIZATIONS
     HDFS-2477. Optimize computing the diff between a block report and the
     namenode state. (Tomasz Nykiel via hairong)
@@ -203,6 +206,13 @@ Trunk (unreleased changes)
     HDFS-2908. Add apache license header for StorageReport.java. (Brandon Li
     via jitendra)
 
+    HDFS-2944. Typo in hdfs-default.xml causes
+    dfs.client.block.write.replace-datanode-on-failure.enable to be mistakenly
+    disabled. (atm)
+
+    HDFS-2525. Race between BlockPoolSliceScanner and append. (Brandon Li
+    via jitendra)
+
 Release 0.23.2 - UNRELEASED 
 
   INCOMPATIBLE CHANGES
@@ -214,7 +224,13 @@ Release 0.23.2 - UNRELEASED
 
   NEW FEATURES
 
+    HDFS-2943. Expose last checkpoint time and transaction stats as JMX
+    metrics. (atm)
+
   IMPROVEMENTS
+
+    HDFS-2931. Switch DataNode's BlockVolumeChoosingPolicy to private-audience.
+    (harsh via szetszwo)
 
   OPTIMIZATIONS
 
@@ -223,6 +239,20 @@ Release 0.23.2 - UNRELEASED
     (todd)
 
     HDFS-2764. TestBackupNode is racy. (atm)
+
+    HDFS-2869. Fix an error in the webhdfs docs for the mkdir op (harsh)
+
+    HDFS-776.  Fix exception handling in Balancer.  (Uma Maheswara Rao G
+    via szetszwo)
+
+    HDFS-2815. Namenode sometimes oes not come out of safemode during 
+    NN crash + restart. (Uma Maheswara Rao via suresh)
+
+    HDFS-2950. Secondary NN HTTPS address should be listed as a
+    NAMESERVICE_SPECIFIC_KEY. (todd)
+
+    HDFS-2938. Recursive delete of a large directory make namenode
+    unresponsive. (Hari Mankude via suresh)
 
 Release 0.23.1 - 2012-02-08 
 
