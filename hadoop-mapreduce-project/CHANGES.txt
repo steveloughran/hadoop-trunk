@@ -55,6 +55,8 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
+    MAPREDUCE-3757. [Rumen] Fixed Rumen Folder to adjust shuffleFinished and
+                    sortFinished times when needed.
     MAPREDUCE-3194. "mapred mradmin" command is broken in mrv2
                      (Jason Lowe via bobby)
 
@@ -94,6 +96,12 @@ Release 0.23.2 - UNRELEASED
 
   IMPROVEMENTS
 
+    MAPREDUCE-3849. Change TokenCache's reading of the binary token file
+    (Daryn Sharp via bobby)
+
+    MAPREDUCE-3854. Fixed and reenabled tests related to MR child JVM's
+    environmental variables in TestMiniMRChildTask. (Tom White via vinodkv)
+
   OPTIMIZATIONS
 
   BUG FIXES
@@ -101,6 +109,19 @@ Release 0.23.2 - UNRELEASED
     MAPREDUCE-3680. FifoScheduler web service rest API can print out invalid 
     JSON. (B Anil Kumar via tgraves)
 
+    MAPREDUCE-3852. Test TestLinuxResourceCalculatorPlugin failing. (Thomas 
+    Graves via mahadev)
+
+    MAPREDUCE-3736. Variable substitution depth too large for fs.default.name 
+    causes jobs to fail (ahmed via tucu).
+
+    MAPREDUCE-3864. Fix cluster setup docs for correct SecondaryNameNode
+    HTTPS parameters. (todd)
+
+    MAPREDUCE-3856. Instances of RunningJob class givs incorrect job tracking
+    urls when mutiple jobs are submitted from same client jvm. (Eric Payne via
+    sseth)
+ 
 Release 0.23.1 - 2012-02-08 
 
   INCOMPATIBLE CHANGES
@@ -802,6 +823,15 @@ Release 0.23.1 - 2012-02-08
 
     MAPREDUCE-3843. Job summary log file found missing on the RM host 
     (Anupam Seth via tgraves)
+
+    MAPREDUCE-3846. Addressed MR AM hanging issues during AM restart and then
+    the recovery. (vinodkv)
+
+    MAPREDUCE-3802. Added test to validate that AM can crash multiple times and
+    still can recover successfully after MAPREDUCE-3846. (vinodkv)
+
+    MAPREDUCE-3858. Task attempt failure during commit results in task never completing.
+    (Tom White via mahadev)
 
 Release 0.23.0 - 2011-11-01 
 
@@ -2678,6 +2708,9 @@ Release 0.22.1 - Unreleased
   OPTIMIZATIONS
 
   BUG FIXES
+
+    MAPREDUCE-3837. Job tracker is not able to recover jobs after crash.
+    (Mayank Bansal via shv) 
 
 Release 0.22.0 - 2011-11-29
 
