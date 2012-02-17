@@ -105,7 +105,7 @@ public abstract class AbstractDNSToSwitchMapping
 
   /**
    * Generate a string listing the switch mapping implementation,
-   * the mapping for every known node and the number of nodes and 
+   * the mapping for every known node and the number of nodes and
    * unique switches known about -each entry to a separate line.
    * @return a string that can be presented to the ops team or used in
    * debug messages.
