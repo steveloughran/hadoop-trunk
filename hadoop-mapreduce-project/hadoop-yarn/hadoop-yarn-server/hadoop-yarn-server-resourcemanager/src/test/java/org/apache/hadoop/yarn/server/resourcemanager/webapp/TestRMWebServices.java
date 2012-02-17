@@ -361,6 +361,7 @@ public class TestRMWebServices extends JerseyTest {
 
       verifyClusterMetrics(
           WebServicesTestUtils.getXmlInt(element, "appsSubmitted"),
+          WebServicesTestUtils.getXmlInt(element, "appsCompleted"),
           WebServicesTestUtils.getXmlInt(element, "reservedMB"),
           WebServicesTestUtils.getXmlInt(element, "availableMB"),
           WebServicesTestUtils.getXmlInt(element, "allocatedMB"),
@@ -379,8 +380,9 @@ public class TestRMWebServices extends JerseyTest {
       Exception {
     assertEquals("incorrect number of elements", 1, json.length());
     JSONObject clusterinfo = json.getJSONObject("clusterMetrics");
-    assertEquals("incorrect number of elements", 12, clusterinfo.length());
-    verifyClusterMetrics(clusterinfo.getInt("appsSubmitted"),
+    assertEquals("incorrect number of elements", 19, clusterinfo.length());
+    verifyClusterMetrics(
+        clusterinfo.getInt("appsSubmitted"), clusterinfo.getInt("appsCompleted"),
         clusterinfo.getInt("reservedMB"), clusterinfo.getInt("availableMB"),
         clusterinfo.getInt("allocatedMB"),
         clusterinfo.getInt("containersAllocated"),
@@ -390,7 +392,8 @@ public class TestRMWebServices extends JerseyTest {
         clusterinfo.getInt("rebootedNodes"),clusterinfo.getInt("activeNodes"));
   }
 
-  public void verifyClusterMetrics(int sub, int reservedMB, int availableMB,
+  public void verifyClusterMetrics(int submittedApps, int completedApps,
+      int reservedMB, int availableMB,
       int allocMB, int containersAlloc, int totalMB, int totalNodes,
       int lostNodes, int unhealthyNodes, int decommissionedNodes,
       int rebootedNodes, int activeNodes) throws JSONException, Exception {
@@ -404,7 +407,9 @@ public class TestRMWebServices extends JerseyTest {
         + metrics.getAllocatedMB();
 
     assertEquals("appsSubmitted doesn't match", 
-        metrics.getAppsSubmitted(), sub);
+        metrics.getAppsSubmitted(), submittedApps);
+    assertEquals("appsCompleted doesn't match", 
+        metrics.getAppsCompleted(), completedApps);
     assertEquals("reservedMB doesn't match",
         metrics.getReservedMB(), reservedMB);
     assertEquals("availableMB doesn't match", 
@@ -534,7 +539,7 @@ public class TestRMWebServices extends JerseyTest {
     assertEquals("type doesn't match", "fifoScheduler", type);
     assertEquals("qstate doesn't match", QueueState.RUNNING.toString(), state);
     assertEquals("capacity doesn't match", 1.0, capacity, 0.0);
-    assertEquals("usedCapacity doesn't match", Float.NaN, usedCapacity, 0.0);
+    assertEquals("usedCapacity doesn't match", 0.0, usedCapacity, 0.0);
     assertEquals("minQueueMemoryCapacity doesn't match", 1024, minQueueCapacity);
     assertEquals("maxQueueMemoryCapacity doesn't match", 10240,
         maxQueueCapacity);

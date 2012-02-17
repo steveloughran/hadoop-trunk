@@ -1255,4 +1255,25 @@
     heartbeats to the ResourceManager</description>
 </property>
 
+<property>
+  <name>yarn.app.mapreduce.client-am.ipc.max-retries</name>
+  <value>1</value>
+  <description>The number of client retries to the AM - before reconnecting
+    to the RM to fetch Application Status.</description>
+</property>
+
+<!-- jobhistory properties -->
+
+<property>
+  <name>mapreduce.jobhistory.address</name>
+  <value>0.0.0.0:10020</value>
+  <description>MapReduce JobHistory Server host:port</description>
+</property>
+
+<property>
+  <name>mapreduce.jobhistory.webapp.address</name>
+  <value>0.0.0.0:19888</value>
+  <description>MapReduce JobHistory Server Web UI host:port</description>
+</property>
+
 </configuration>

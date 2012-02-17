@@ -30,7 +30,6 @@ import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
-import org.apache.hadoop.mapreduce.v2.api.records.JobReport;
 import org.apache.hadoop.mapreduce.v2.api.records.JobState;
 import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.client.ClientService;
@@ -46,9 +45,9 @@ import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
+import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -149,7 +148,7 @@ public abstract class RMCommunicator extends AbstractService  {
       LOG.info("minContainerCapability: " + minContainerCapability.getMemory());
       LOG.info("maxContainerCapability: " + maxContainerCapability.getMemory());
     } catch (Exception are) {
-      LOG.info("Exception while registering", are);
+      LOG.error("Exception while registering", are);
       throw new YarnException(are);
     }
   }
@@ -176,17 +175,17 @@ public abstract class RMCommunicator extends AbstractService  {
             context.getApplicationID());
         LOG.info("History url is " + historyUrl);
 
-        FinishApplicationMasterRequest request =
-            recordFactory.newRecordInstance(FinishApplicationMasterRequest.class);
-        request.setAppAttemptId(this.applicationAttemptId);
-        request.setFinishApplicationStatus(finishState);
-        request.setDiagnostics(sb.toString());
-        request.setTrackingUrl(historyUrl);
-        scheduler.finishApplicationMaster(request);
-      } catch(Exception are) {
-        LOG.info("Exception while unregistering ", are);
-      }
-      job = null;
+      FinishApplicationMasterRequest request =
+          recordFactory.newRecordInstance(FinishApplicationMasterRequest.class);
+      request.setAppAttemptId(this.applicationAttemptId);
+      request.setFinishApplicationStatus(finishState);
+      request.setDiagnostics(sb.toString());
+      request.setTrackingUrl(historyUrl);
+      scheduler.finishApplicationMaster(request);
+    } catch(Exception are) {
+      LOG.error("Exception while unregistering ", are);
+    }
+    job = null;
     }
   }
 
@@ -209,7 +208,7 @@ public abstract class RMCommunicator extends AbstractService  {
       try {
         allocatorThread.join();
       } catch (InterruptedException ie) {
-        LOG.info("InterruptedException while stopping", ie);
+        LOG.warn("InterruptedException while stopping", ie);
       }
       allocatorThread = null;
     }
@@ -234,7 +233,7 @@ public abstract class RMCommunicator extends AbstractService  {
               // TODO: for other exceptions
             }
           } catch (InterruptedException e) {
-            LOG.info("Allocated thread interrupted. Returning.");
+            LOG.warn("Allocated thread interrupted. Returning.");
             return;
           }
         }
@@ -261,7 +260,9 @@ public abstract class RMCommunicator extends AbstractService  {
     if (UserGroupInformation.isSecurityEnabled()) {
       String tokenURLEncodedStr = System.getenv().get(
           ApplicationConstants.APPLICATION_MASTER_TOKEN_ENV_NAME);
-      LOG.debug("AppMasterToken is " + tokenURLEncodedStr);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("AppMasterToken is " + tokenURLEncodedStr);
+      }
       Token<? extends TokenIdentifier> token = new Token<TokenIdentifier>();
 
       try {
