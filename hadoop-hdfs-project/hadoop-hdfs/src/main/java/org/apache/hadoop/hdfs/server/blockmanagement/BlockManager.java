@@ -231,7 +231,7 @@ public class BlockManager {
     LOG.info("minReplication     = " + minReplication);
     LOG.info("maxReplicationStreams      = " + maxReplicationStreams);
     LOG.info("shouldCheckForEnoughRacks  = " + shouldCheckForEnoughRacks);
-    LOG.info("mapping instance  = " + dnsMap);
+    LOG.info("topology mapper = " + dnsMap);
     LOG.info("replicationRecheckInterval = " + replicationRecheckInterval);
   }
 
