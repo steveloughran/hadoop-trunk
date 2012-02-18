@@ -231,14 +231,14 @@ public class TestNameNodeMetrics {
    * that's why the initial sleep is in there.
    * @param name gauge name
    * @param expected expected value
-   * @return the last metrics record polled 
+   * @return the last metrics record polled
    * @throws Exception if something went wrong.
    */
   private MetricsRecordBuilder waitForGaugeValue(String name, long expected)
       throws Exception {
     MetricsRecordBuilder rb;
     long gauge;
-    //initial wait. 
+    //initial wait.
     waitForDeletion();
     //lots of retries are allowed for slow systems; fast ones will still
     //exit early
@@ -249,7 +249,7 @@ public class TestNameNodeMetrics {
       Thread.sleep(DFS_REPLICATION_INTERVAL * 500);
       rb = getMetrics(NS_METRICS);
       gauge = MetricsAsserts.getLongGauge(name, rb);
-    } 
+    }
     //at this point the assertion is valid or the retry count ran out
     assertGauge(name, expected, rb);
     return rb;
