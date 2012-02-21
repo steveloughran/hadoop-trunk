@@ -34,7 +34,8 @@ public class TestRPCCallBenchmark {
       "--time", "5",
       "--serverReaderThreads", "4",
       "--messageSize", "1024",
-      "--engine", "writable"});
+      "--engine", "writable",
+      "--port", "12350"});
     assertEquals(0, rc);
   }
   
@@ -47,7 +48,8 @@ public class TestRPCCallBenchmark {
       "--time", "5",
       "--serverReaderThreads", "4",
       "--messageSize", "1024",
-      "--engine", "protobuf"});
+      "--engine", "protobuf",
+      "--port", "12351"});
     assertEquals(0, rc);
   }
 }
