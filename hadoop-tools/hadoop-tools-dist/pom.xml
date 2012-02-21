@@ -29,7 +29,6 @@
 
   <properties>
     <hadoop.component>tools</hadoop.component>
-    <is.hadoop.component>false</is.hadoop.component>
   </properties>
 
   <dependencies>
@@ -40,7 +39,22 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-distcp</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-archives</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-rumen</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-extras</artifactId>
       <scope>compile</scope>
     </dependency>
   </dependencies>

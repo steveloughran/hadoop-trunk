@@ -345,7 +345,17 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     }
     return name;
   }
-  
+ 
+  private void handleDeprecation() {
+    LOG.debug("Handling deprecation for all properties in config...");
+    Set<Object> keys = new HashSet<Object>();
+    keys.addAll(getProps().keySet());
+    for (Object item: keys) {
+      LOG.debug("Handling deprecation for " + (String)item);
+      handleDeprecation((String)item);
+    }
+  }
+ 
   static{
     //print deprecation warning if hadoop-site.xml is found in classpath
     ClassLoader cL = Thread.currentThread().getContextClassLoader();
@@ -1136,6 +1146,22 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    * @throws ClassNotFoundException if the class is not found.
    */
   public Class<?> getClassByName(String name) throws ClassNotFoundException {
+    Class<?> ret = getClassByNameOrNull(name);
+    if (ret == null) {
+      throw new ClassNotFoundException("Class " + name + " not found");
+    }
+    return ret;
+  }
+  
+  /**
+   * Load a class by name, returning null rather than throwing an exception
+   * if it couldn't be loaded. This is to avoid the overhead of creating
+   * an exception.
+   * 
+   * @param name the class name
+   * @return the class object, or null if it could not be found.
+   */
+  public Class<?> getClassByNameOrNull(String name) {
     Map<String, Class<?>> map;
     
     synchronized (CACHE_CLASSES) {
@@ -1147,12 +1173,20 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       }
     }
 
-    Class<?> clazz = map.get(name);
-    if (clazz == null) {
-      clazz = Class.forName(name, true, classLoader);
-      if (clazz != null) {
-        // two putters can race here, but they'll put the same class
-        map.put(name, clazz);
+    Class<?> clazz = null;
+    if (!map.containsKey(name)) {
+      try {
+        clazz = Class.forName(name, true, classLoader);
+      } catch (ClassNotFoundException e) {
+        map.put(name, null); //cache negative that class is not found
+        return null;
+      }
+      // two putters can race here, but they'll put the same class
+      map.put(name, clazz);
+    } else { // check already performed on this class name
+      clazz = map.get(name);
+      if (clazz == null) { // found the negative
+        return null;
       }
     }
 
@@ -1667,7 +1701,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     Element conf = doc.createElement("configuration");
     doc.appendChild(conf);
     conf.appendChild(doc.createTextNode("\n"));
-    getProps(); // ensure properties is set
+    handleDeprecation(); //ensure properties is set and deprecation is handled
     for (Enumeration e = properties.keys(); e.hasMoreElements();) {
       String name = (String)e.nextElement();
       Object object = properties.get(name);

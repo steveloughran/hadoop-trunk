@@ -66,6 +66,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanContainerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
@@ -124,10 +125,11 @@ public class FifoScheduler implements ResourceScheduler {
 
   private Map<ApplicationAttemptId, SchedulerApp> applications
       = new TreeMap<ApplicationAttemptId, SchedulerApp>();
+  
+  private final ActiveUsersManager activeUsersManager;
 
   private static final String DEFAULT_QUEUE_NAME = "default";
-  private final QueueMetrics metrics =
-    QueueMetrics.forQueue(DEFAULT_QUEUE_NAME, null, false);
+  private final QueueMetrics metrics;
 
   private final Queue DEFAULT_QUEUE = new Queue() {
     @Override
@@ -146,7 +148,12 @@ public class FifoScheduler implements ResourceScheduler {
       QueueInfo queueInfo = recordFactory.newRecordInstance(QueueInfo.class);
       queueInfo.setQueueName(DEFAULT_QUEUE.getQueueName());
       queueInfo.setCapacity(1.0f);
-      queueInfo.setCurrentCapacity((float)usedResource.getMemory() / clusterResource.getMemory());
+      if (clusterResource.getMemory() == 0) {
+        queueInfo.setCurrentCapacity(0.0f);
+      } else {
+        queueInfo.setCurrentCapacity((float) usedResource.getMemory()
+            / clusterResource.getMemory());
+      }
       queueInfo.setMaximumCapacity(1.0f);
       queueInfo.setChildQueues(new ArrayList<QueueInfo>());
       queueInfo.setQueueState(QueueState.RUNNING);
@@ -174,6 +181,11 @@ public class FifoScheduler implements ResourceScheduler {
     }
   };
 
+  public FifoScheduler() {
+    metrics = QueueMetrics.forQueue(DEFAULT_QUEUE_NAME, null, false);
+    activeUsersManager = new ActiveUsersManager(metrics);
+  }
+  
   @Override
   public Resource getMinimumResourceCapability() {
     return minimumAllocation;
@@ -223,7 +235,7 @@ public class FifoScheduler implements ResourceScheduler {
     }
 
     // Sanity check
-    SchedulerUtils.normalizeRequests(ask, MINIMUM_MEMORY);
+    SchedulerUtils.normalizeRequests(ask, minimumAllocation.getMemory());
 
     // Release containers
     for (ContainerId releasedContainer : release) {
@@ -288,10 +300,12 @@ public class FifoScheduler implements ResourceScheduler {
       String user) {
     // TODO: Fix store
     SchedulerApp schedulerApp = 
-        new SchedulerApp(appAttemptId, user, DEFAULT_QUEUE, 
+        new SchedulerApp(appAttemptId, user, DEFAULT_QUEUE, activeUsersManager,
             this.rmContext, null);
     applications.put(appAttemptId, schedulerApp);
-    metrics.submitApp(user);
+    if (appAttemptId.getAttemptId() == 1) {
+      metrics.submitApp(user);
+    }
     LOG.info("Application Submission: " + appAttemptId.getApplicationId() + 
         " from " + user + ", currently active: " + applications.size());
     rmContext.getDispatcher().getEventHandler().handle(
@@ -316,6 +330,12 @@ public class FifoScheduler implements ResourceScheduler {
               container.getContainerId(), 
               SchedulerUtils.COMPLETED_APPLICATION),
           RMContainerEventType.KILL);
+    }
+
+    // Inform the activeUsersManager
+    synchronized (application) {
+      activeUsersManager.deactivateApplication(
+          application.getUser(), application.getApplicationId());
     }
 
     // Clean up pending requests, metrics etc.
@@ -358,7 +378,7 @@ public class FifoScheduler implements ResourceScheduler {
         }
       }
       
-      application.setAvailableResourceLimit(clusterResource);
+      application.setHeadroom(clusterResource);
       
       LOG.debug("post-assignContainers");
       application.showRequests();
@@ -575,12 +595,12 @@ public class FifoScheduler implements ResourceScheduler {
 
     if (Resources.greaterThanOrEqual(node.getAvailableResource(),
         minimumAllocation)) {
-      LOG.info("Node heartbeat " + rmNode.getNodeID() + 
+      LOG.debug("Node heartbeat " + rmNode.getNodeID() + 
           " available resource = " + node.getAvailableResource());
-      
+
       assignContainers(node);
 
-      LOG.info("Node after allocation " + rmNode.getNodeID() + " resource = "
+      LOG.debug("Node after allocation " + rmNode.getNodeID() + " resource = "
           + node.getAvailableResource());
     }
     

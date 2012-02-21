@@ -126,7 +126,6 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.common.Util;
-import org.apache.hadoop.hdfs.server.datanode.FSDataset.VolumeInfo;
 import org.apache.hadoop.hdfs.server.datanode.SecureDataNodeStarter.SecureResources;
 import org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeMetrics;
 import org.apache.hadoop.hdfs.server.datanode.web.resources.DatanodeWebHdfsMethods;
@@ -580,11 +579,11 @@ public class DataNode extends Configured
     if (conf.getInt(DFS_DATANODE_SCAN_PERIOD_HOURS_KEY,
                     DFS_DATANODE_SCAN_PERIOD_HOURS_DEFAULT) < 0) {
       reason = "verification is turned off by configuration";
-    } else if (!(data instanceof FSDataset)) {
-      reason = "verifcation is supported only with FSDataset";
+    } else if ("SimulatedFSDataset".equals(data.getClass().getSimpleName())) {
+      reason = "verifcation is not supported by SimulatedFSDataset";
     } 
     if (reason == null) {
-      blockScanner = new DataBlockScanner(this, (FSDataset)data, conf);
+      blockScanner = new DataBlockScanner(this, data, conf);
       blockScanner.start();
     } else {
       LOG.info("Periodic Block Verification scan is disabled because " +
@@ -609,11 +608,11 @@ public class DataNode extends Configured
     if (conf.getInt(DFS_DATANODE_DIRECTORYSCAN_INTERVAL_KEY, 
                     DFS_DATANODE_DIRECTORYSCAN_INTERVAL_DEFAULT) < 0) {
       reason = "verification is turned off by configuration";
-    } else if (!(data instanceof FSDataset)) {
-      reason = "verification is supported only with FSDataset";
+    } else if ("SimulatedFSDataset".equals(data.getClass().getSimpleName())) {
+      reason = "verifcation is not supported by SimulatedFSDataset";
     } 
     if (reason == null) {
-      directoryScanner = new DirectoryScanner(this, (FSDataset) data, conf);
+      directoryScanner = new DirectoryScanner(this, data, conf);
       directoryScanner.start();
     } else {
       LOG.info("Periodic Directory Tree Verification scan is disabled because " +
@@ -1016,6 +1015,14 @@ public class DataNode extends Configured
            SocketChannel.open().socket() : new Socket();                                   
   }
 
+  /**
+   * Connect to the NN. This is separated out for easier testing.
+   */
+  DatanodeProtocolClientSideTranslatorPB connectToNN(
+      InetSocketAddress nnAddr) throws IOException {
+    return new DatanodeProtocolClientSideTranslatorPB(nnAddr, conf);
+  }
+
   public static InterDatanodeProtocol createInterDataNodeProtocolProxy(
       DatanodeID datanodeid, final Configuration conf, final int socketTimeout)
     throws IOException {
@@ -1295,7 +1302,8 @@ public class DataNode extends Configured
   }
     
   /** Number of concurrent xceivers per node. */
-  int getXceiverCount() {
+  @Override // DataNodeMXBean
+  public int getXceiverCount() {
     return threadGroup == null ? 0 : threadGroup.activeCount();
   }
     
@@ -1982,8 +1990,10 @@ public class DataNode extends Configured
   public DatanodeProtocolClientSideTranslatorPB getBPNamenode(String bpid)
       throws IOException {
     BPOfferService bpos = blockPoolManager.get(bpid);
-    if(bpos == null || bpos.bpNamenode == null) {
-      throw new IOException("cannot find a namnode proxy for bpid=" + bpid);
+    if (bpos == null) {
+      throw new IOException("No block pool offer service for bpid=" + bpid);
+    } else if (bpos.bpNamenode == null) {
+      throw new IOException("cannot find a namenode proxy for bpid=" + bpid);
     }
     return bpos.bpNamenode;
   }
@@ -2234,16 +2244,7 @@ public class DataNode extends Configured
    */
   @Override // DataNodeMXBean
   public String getVolumeInfo() {
-    final Map<String, Object> info = new HashMap<String, Object>();
-    Collection<VolumeInfo> volumes = ((FSDataset)this.data).getVolumeInfo();
-    for (VolumeInfo v : volumes) {
-      final Map<String, Object> innerInfo = new HashMap<String, Object>();
-      innerInfo.put("usedSpace", v.usedSpace);
-      innerInfo.put("freeSpace", v.freeSpace);
-      innerInfo.put("reservedSpace", v.reservedSpace);
-      info.put(v.directory, innerInfo);
-    }
-    return JSON.toString(info);
+    return JSON.toString(data.getVolumeInfoMap());
   }
   
   @Override // DataNodeMXBean
@@ -2334,5 +2335,4 @@ public class DataNode extends Configured
   boolean shouldRun() {
     return shouldRun;
   }
-
 }

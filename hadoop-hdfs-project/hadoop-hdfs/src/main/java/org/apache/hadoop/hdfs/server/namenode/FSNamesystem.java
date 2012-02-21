@@ -174,6 +174,8 @@ import org.mortbay.util.ajax.JSON;
 
 import com.google.common.base.Preconditions;
 
+import com.google.common.annotations.VisibleForTesting;
+
 /***************************************************
  * FSNamesystem does the actual bookkeeping work for the
  * DataNode.
@@ -1958,7 +1960,6 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
       boolean enforcePermission)
       throws AccessControlException, SafeModeException, UnresolvedLinkException,
              IOException {
-    boolean deleteNow = false;
     ArrayList<Block> collectedBlocks = new ArrayList<Block>();
 
     writeLock();
@@ -1976,24 +1977,11 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
       if (!dir.delete(src, collectedBlocks)) {
         return false;
       }
-      deleteNow = collectedBlocks.size() <= BLOCK_DELETION_INCREMENT;
-      if (deleteNow) { // Perform small deletes right away
-        removeBlocks(collectedBlocks);
-      }
     } finally {
       writeUnlock();
     }
-
-    getEditLog().logSync();
-
-    writeLock();
-    try {
-      if (!deleteNow) {
-        removeBlocks(collectedBlocks); // Incremental deletion of blocks
-      }
-    } finally {
-      writeUnlock();
-    }
+    getEditLog().logSync(); 
+    removeBlocks(collectedBlocks); // Incremental deletion of blocks
     collectedBlocks.clear();
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug("DIR* Namesystem.delete: "
@@ -2002,16 +1990,24 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     return true;
   }
 
-  /** From the given list, incrementally remove the blocks from blockManager */
+  /** 
+   * From the given list, incrementally remove the blocks from blockManager
+   * Writelock is dropped and reacquired every BLOCK_DELETION_INCREMENT to
+   * ensure that other waiters on the lock can get in. See HDFS-2938
+   */
   private void removeBlocks(List<Block> blocks) {
-    assert hasWriteLock();
     int start = 0;
     int end = 0;
     while (start < blocks.size()) {
       end = BLOCK_DELETION_INCREMENT + start;
       end = end > blocks.size() ? blocks.size() : end;
-      for (int i=start; i<end; i++) {
-        blockManager.removeBlock(blocks.get(i));
+      writeLock();
+      try {
+        for (int i = start; i < end; i++) {
+          blockManager.removeBlock(blocks.get(i));
+        }
+      } finally {
+        writeUnlock();
       }
       start = end;
     }
@@ -2685,6 +2681,31 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
   public int getExpiredHeartbeats() {
     return datanodeStatistics.getExpiredHeartbeats();
   }
+  
+  @Metric({"TransactionsSinceLastCheckpoint",
+      "Number of transactions since last checkpoint"})
+  public long getTransactionsSinceLastCheckpoint() {
+    return getEditLog().getLastWrittenTxId() -
+        getFSImage().getStorage().getMostRecentCheckpointTxId();
+  }
+  
+  @Metric({"TransactionsSinceLastLogRoll",
+      "Number of transactions since last edit log roll"})
+  public long getTransactionsSinceLastLogRoll() {
+    return (getEditLog().getLastWrittenTxId() -
+        getEditLog().getCurSegmentTxId()) + 1;
+  }
+  
+  @Metric({"LastWrittenTransactionId", "Transaction ID written to the edit log"})
+  public long getLastWrittenTransactionId() {
+    return getEditLog().getLastWrittenTxId();
+  }
+  
+  @Metric({"LastCheckpointTime",
+      "Time in milliseconds since the epoch of the last checkpoint"})
+  public long getLastCheckpointTime() {
+    return getFSImage().getStorage().getMostRecentCheckpointTime();
+  }
 
   /** @see ClientProtocol#getStats() */
   long[] getStats() {
@@ -2890,7 +2911,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     /** Total number of blocks. */
     int blockTotal; 
     /** Number of safe blocks. */
-    private int blockSafe;
+    int blockSafe;
     /** Number of blocks needed to satisfy safe mode threshold condition */
     private int blockThreshold;
     /** Number of blocks needed before populating replication queues */
@@ -2898,7 +2919,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     /** time of the last status printout */
     private long lastStatusReport = 0;
     /** flag indicating whether replication queues have been initialized */
-    private boolean initializedReplQueues = false;
+    boolean initializedReplQueues = false;
     /** Was safemode entered automatically because available resources were low. */
     private boolean resourcesLow = false;
     
@@ -3028,9 +3049,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
      */
     private synchronized void initializeReplQueues() {
       LOG.info("initializing replication queues");
-      if (isPopulatingReplQueues()) {
-        LOG.warn("Replication queues already initialized.");
-      }
+      assert !isPopulatingReplQueues() : "Already initialized repl queues";
       long startTimeMisReplicatedScan = now();
       blockManager.processMisReplicatedBlocks();
       initializedReplQueues = true;
@@ -3907,7 +3926,12 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
 
     if (destinationExisted && dinfo.isDir()) {
       Path spath = new Path(src);
-      overwrite = spath.getParent().toString() + Path.SEPARATOR;
+      Path parent = spath.getParent();
+      if (isRoot(parent)) {
+        overwrite = parent.toString();
+      } else {
+        overwrite = parent.toString() + Path.SEPARATOR;
+      }
       replaceBy = dst + Path.SEPARATOR;
     } else {
       overwrite = src;
@@ -3917,6 +3941,10 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     leaseManager.changeLease(src, dst, overwrite, replaceBy);
   }
            
+  private boolean isRoot(Path path) {
+    return path.getParent() == null;
+  }
+
   /**
    * Serializes leases. 
    */
@@ -4313,7 +4341,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
    */
   @Override // NameNodeMXBean
   public String getVersion() {
-    return VersionInfo.getVersion();
+    return VersionInfo.getVersion() + ", r" + VersionInfo.getRevision();
   }
 
   @Override // NameNodeMXBean
@@ -4483,5 +4511,10 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
   public synchronized void verifyToken(DelegationTokenIdentifier identifier,
       byte[] password) throws InvalidToken {
     getDelegationTokenSecretManager().verifyToken(identifier, password);
+  }
+
+  @VisibleForTesting
+  public SafeModeInfo getSafeModeInfoForTests() {
+    return safeMode;
   }
 }

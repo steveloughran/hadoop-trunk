@@ -361,6 +361,7 @@ public class TestRMWebServices extends JerseyTest {
 
       verifyClusterMetrics(
           WebServicesTestUtils.getXmlInt(element, "appsSubmitted"),
+          WebServicesTestUtils.getXmlInt(element, "appsCompleted"),
           WebServicesTestUtils.getXmlInt(element, "reservedMB"),
           WebServicesTestUtils.getXmlInt(element, "availableMB"),
           WebServicesTestUtils.getXmlInt(element, "allocatedMB"),
@@ -370,7 +371,8 @@ public class TestRMWebServices extends JerseyTest {
           WebServicesTestUtils.getXmlInt(element, "lostNodes"),
           WebServicesTestUtils.getXmlInt(element, "unhealthyNodes"),
           WebServicesTestUtils.getXmlInt(element, "decommissionedNodes"),
-          WebServicesTestUtils.getXmlInt(element, "rebootedNodes"));
+          WebServicesTestUtils.getXmlInt(element, "rebootedNodes"),
+          WebServicesTestUtils.getXmlInt(element, "activeNodes"));
     }
   }
 
@@ -378,42 +380,49 @@ public class TestRMWebServices extends JerseyTest {
       Exception {
     assertEquals("incorrect number of elements", 1, json.length());
     JSONObject clusterinfo = json.getJSONObject("clusterMetrics");
-    assertEquals("incorrect number of elements", 11, clusterinfo.length());
-    verifyClusterMetrics(clusterinfo.getInt("appsSubmitted"),
+    assertEquals("incorrect number of elements", 19, clusterinfo.length());
+    verifyClusterMetrics(
+        clusterinfo.getInt("appsSubmitted"), clusterinfo.getInt("appsCompleted"),
         clusterinfo.getInt("reservedMB"), clusterinfo.getInt("availableMB"),
         clusterinfo.getInt("allocatedMB"),
         clusterinfo.getInt("containersAllocated"),
         clusterinfo.getInt("totalMB"), clusterinfo.getInt("totalNodes"),
         clusterinfo.getInt("lostNodes"), clusterinfo.getInt("unhealthyNodes"),
         clusterinfo.getInt("decommissionedNodes"),
-        clusterinfo.getInt("rebootedNodes"));
+        clusterinfo.getInt("rebootedNodes"),clusterinfo.getInt("activeNodes"));
   }
 
-  public void verifyClusterMetrics(int sub, int reservedMB, int availableMB,
+  public void verifyClusterMetrics(int submittedApps, int completedApps,
+      int reservedMB, int availableMB,
       int allocMB, int containersAlloc, int totalMB, int totalNodes,
       int lostNodes, int unhealthyNodes, int decommissionedNodes,
-      int rebootedNodes) throws JSONException, Exception {
+      int rebootedNodes, int activeNodes) throws JSONException, Exception {
 
     ResourceScheduler rs = rm.getResourceScheduler();
     QueueMetrics metrics = rs.getRootQueueMetrics();
     ClusterMetrics clusterMetrics = ClusterMetrics.getMetrics();
-    final long MB_IN_GB = 1024;
 
-    long totalMBExpect = (metrics.getReservedGB() * MB_IN_GB)
-        + (metrics.getAvailableGB() * MB_IN_GB)
-        + (metrics.getAllocatedGB() * MB_IN_GB);
+    long totalMBExpect = 
+        metrics.getReservedMB()+ metrics.getAvailableMB() 
+        + metrics.getAllocatedMB();
 
-    assertEquals("appsSubmitted doesn't match", metrics.getAppsSubmitted(), sub);
+    assertEquals("appsSubmitted doesn't match", 
+        metrics.getAppsSubmitted(), submittedApps);
+    assertEquals("appsCompleted doesn't match", 
+        metrics.getAppsCompleted(), completedApps);
     assertEquals("reservedMB doesn't match",
-        metrics.getReservedGB() * MB_IN_GB, reservedMB);
-    assertEquals("availableMB doesn't match", metrics.getAvailableGB()
-        * MB_IN_GB, availableMB);
-    assertEquals("allocatedMB doesn't match", metrics.getAllocatedGB()
-        * MB_IN_GB, allocMB);
+        metrics.getReservedMB(), reservedMB);
+    assertEquals("availableMB doesn't match", 
+        metrics.getAvailableMB(), availableMB);
+    assertEquals("allocatedMB doesn't match", 
+        metrics.getAllocatedMB(), allocMB);
     assertEquals("containersAllocated doesn't match", 0, containersAlloc);
     assertEquals("totalMB doesn't match", totalMBExpect, totalMB);
-    assertEquals("totalNodes doesn't match", clusterMetrics.getNumNMs(),
-        totalNodes);
+    assertEquals(
+        "totalNodes doesn't match",
+        clusterMetrics.getNumActiveNMs() + clusterMetrics.getNumLostNMs()
+            + clusterMetrics.getNumDecommisionedNMs()
+            + clusterMetrics.getNumRebootedNMs(), totalNodes);
     assertEquals("lostNodes doesn't match", clusterMetrics.getNumLostNMs(),
         lostNodes);
     assertEquals("unhealthyNodes doesn't match",
@@ -422,6 +431,8 @@ public class TestRMWebServices extends JerseyTest {
         clusterMetrics.getNumDecommisionedNMs(), decommissionedNodes);
     assertEquals("rebootedNodes doesn't match",
         clusterMetrics.getNumRebootedNMs(), rebootedNodes);
+    assertEquals("activeNodes doesn't match", clusterMetrics.getNumActiveNMs(),
+        activeNodes);
   }
 
   @Test
@@ -528,7 +539,7 @@ public class TestRMWebServices extends JerseyTest {
     assertEquals("type doesn't match", "fifoScheduler", type);
     assertEquals("qstate doesn't match", QueueState.RUNNING.toString(), state);
     assertEquals("capacity doesn't match", 1.0, capacity, 0.0);
-    assertEquals("usedCapacity doesn't match", Float.NaN, usedCapacity, 0.0);
+    assertEquals("usedCapacity doesn't match", 0.0, usedCapacity, 0.0);
     assertEquals("minQueueMemoryCapacity doesn't match", 1024, minQueueCapacity);
     assertEquals("maxQueueMemoryCapacity doesn't match", 10240,
         maxQueueCapacity);

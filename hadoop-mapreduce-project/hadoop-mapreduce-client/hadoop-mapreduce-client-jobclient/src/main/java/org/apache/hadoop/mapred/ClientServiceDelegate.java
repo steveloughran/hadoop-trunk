@@ -81,8 +81,7 @@ public class ClientServiceDelegate {
   private static final Log LOG = LogFactory.getLog(ClientServiceDelegate.class);
 
   // Caches for per-user NotRunningJobs
-  private static HashMap<JobState, HashMap<String, NotRunningJob>> notRunningJobs =
-      new HashMap<JobState, HashMap<String, NotRunningJob>>();
+  private HashMap<JobState, HashMap<String, NotRunningJob>> notRunningJobs;
 
   private final Configuration conf;
   private final JobID jobId;
@@ -101,11 +100,14 @@ public class ClientServiceDelegate {
     this.conf = new Configuration(conf); // Cloning for modifying.
     // For faster redirects from AM to HS.
     this.conf.setInt(
-        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 3);
+        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
+        this.conf.getInt(MRJobConfig.MR_CLIENT_TO_AM_IPC_MAX_RETRIES,
+            MRJobConfig.DEFAULT_MR_CLIENT_TO_AM_IPC_MAX_RETRIES));
     this.rm = rm;
     this.jobId = jobId;
     this.historyServerProxy = historyServerProxy;
     this.appId = TypeConverter.toYarn(jobId).getAppId();
+    notRunningJobs = new HashMap<JobState, HashMap<String, NotRunningJob>>();
   }
 
   // Get the instance of the NotRunningJob corresponding to the specified
@@ -175,7 +177,6 @@ public class ClientServiceDelegate {
                 + ":" + addr.getPort()));
             newUgi.addToken(clientToken);
           }
-          LOG.info("The url to track the job: " + application.getTrackingUrl());
           LOG.debug("Connecting to " + serviceAddr);
           final String tempStr = serviceAddr;
           realProxy = newUgi.doAs(new PrivilegedExceptionAction<MRClientProtocol>() {

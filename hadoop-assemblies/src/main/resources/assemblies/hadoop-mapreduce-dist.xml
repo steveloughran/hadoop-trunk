@@ -72,6 +72,14 @@
       <fileMode>0755</fileMode>
     </fileSet>
     <fileSet>
+      <directory>bin</directory>
+      <outputDirectory>sbin</outputDirectory>
+      <includes>
+        <include>mr-jobhistory-daemon.sh</include>
+      </includes>
+      <fileMode>0755</fileMode>
+    </fileSet>
+    <fileSet>
       <directory>hadoop-yarn/conf</directory>
       <outputDirectory>etc/hadoop</outputDirectory>
       <includes>
@@ -122,6 +130,17 @@
         <exclude>org.apache.hadoop:hadoop-yarn-server-tests</exclude>
       </excludes>
       <binaries>
+        <outputDirectory>share/hadoop/${hadoop.component}</outputDirectory>
+        <includeDependencies>false</includeDependencies>
+        <unpack>false</unpack>
+      </binaries>
+    </moduleSet>
+    <moduleSet>
+      <includes>
+        <include>org.apache.hadoop:hadoop-mapreduce-client-jobclient</include>
+      </includes>
+      <binaries>
+        <attachmentClassifier>tests</attachmentClassifier>
         <outputDirectory>share/hadoop/${hadoop.component}</outputDirectory>
         <includeDependencies>false</includeDependencies>
         <unpack>false</unpack>

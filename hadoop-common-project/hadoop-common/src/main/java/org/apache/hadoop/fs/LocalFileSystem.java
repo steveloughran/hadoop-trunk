@@ -24,6 +24,7 @@ import java.util.*;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.conf.Configuration;
 
 /****************************************************************
  * Implement the FileSystem API for the checksumed local filesystem.
@@ -34,19 +35,17 @@ import org.apache.hadoop.classification.InterfaceStability;
 public class LocalFileSystem extends ChecksumFileSystem {
   static final URI NAME = URI.create("file:///");
   static private Random rand = new Random();
-  FileSystem rfs;
   
   public LocalFileSystem() {
     this(new RawLocalFileSystem());
   }
   
   public FileSystem getRaw() {
-    return rfs;
+    return getRawFileSystem();
   }
     
   public LocalFileSystem(FileSystem rawLocalFileSystem) {
     super(rawLocalFileSystem);
-    rfs = rawLocalFileSystem;
   }
     
   /** Convert a path to a File. */

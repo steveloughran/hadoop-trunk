@@ -31,13 +31,12 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.datanode.BlockMetadataHeader;
-import org.apache.hadoop.hdfs.server.datanode.FSDataset;
 import org.apache.hadoop.hdfs.util.DirectBufferPool;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.token.Token;
@@ -183,7 +182,7 @@ class BlockReaderLocal implements BlockReader {
         BlockMetadataHeader header = BlockMetadataHeader
             .readHeader(new DataInputStream(checksumIn));
         short version = header.getVersion();
-        if (version != FSDataset.METADATA_VERSION) {
+        if (version != BlockMetadataHeader.VERSION) {
           LOG.warn("Wrong version (" + version + ") for metadata file for "
               + blk + " ignoring ...");
         }
@@ -370,26 +369,68 @@ class BlockReaderLocal implements BlockReader {
     if (LOG.isDebugEnabled()) {
       LOG.debug("skip " + n);
     }
+    if (n <= 0) {
+      return 0;
+    }
     if (!verifyChecksum) {
       return dataIn.skip(n);
     }
-    // Skip by reading the data so we stay in sync with checksums.
-    // This could be implemented more efficiently in the future to
-    // skip to the beginning of the appropriate checksum chunk
-    // and then only read to the middle of that chunk.
+  
+    // caller made sure newPosition is not beyond EOF.
+    int remaining = dataBuff.remaining();
+    int position = dataBuff.position();
+    int newPosition = position + (int)n;
+  
+    // if the new offset is already read into dataBuff, just reposition
+    if (n <= remaining) {
+      assert offsetFromChunkBoundary == 0;
+      dataBuff.position(newPosition);
+      return n;
+    }
+  
+    // for small gap, read through to keep the data/checksum in sync
+    if (n - remaining <= bytesPerChecksum) {
+      dataBuff.position(position + remaining);
+      if (skipBuf == null) {
+        skipBuf = new byte[bytesPerChecksum];
+      }
+      int ret = read(skipBuf, 0, (int)(n - remaining));
+      return ret;
+    }
+  
+    // optimize for big gap: discard the current buffer, skip to
+    // the beginning of the appropriate checksum chunk and then
+    // read to the middle of that chunk to be in sync with checksums.
+    this.offsetFromChunkBoundary = newPosition % bytesPerChecksum;
+    long toskip = n - remaining - this.offsetFromChunkBoundary;
+  
+    dataBuff.clear();
+    checksumBuff.clear();
+  
+    long dataSkipped = dataIn.skip(toskip);
+    if (dataSkipped != toskip) {
+      throw new IOException("skip error in data input stream");
+    }
+    long checkSumOffset = (dataSkipped / bytesPerChecksum) * checksumSize;
+    if (checkSumOffset > 0) {
+      long skipped = checksumIn.skip(checkSumOffset);
+      if (skipped != checkSumOffset) {
+        throw new IOException("skip error in checksum input stream");
+      }
+    }
+
+    // read into the middle of the chunk
     if (skipBuf == null) {
       skipBuf = new byte[bytesPerChecksum];
     }
-    long nSkipped = 0;
-    while ( nSkipped < n ) {
-      int toSkip = (int)Math.min(n-nSkipped, skipBuf.length);
-      int ret = read(skipBuf, 0, toSkip);
-      if ( ret <= 0 ) {
-        return nSkipped;
-      }
-      nSkipped += ret;
+    assert skipBuf.length == bytesPerChecksum;
+    assert this.offsetFromChunkBoundary < bytesPerChecksum;
+    int ret = read(skipBuf, 0, this.offsetFromChunkBoundary);
+    if (ret == -1) {  // EOS
+      return toskip;
+    } else {
+      return (toskip + ret);
     }
-    return nSkipped;
   }
 
   @Override

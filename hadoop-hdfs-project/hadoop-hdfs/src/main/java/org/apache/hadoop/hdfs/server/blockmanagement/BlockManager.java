@@ -221,6 +221,7 @@ public class BlockManager {
     DNSToSwitchMapping dnsMap = datanodeManager.getDnsToSwitchMapping();
     this.shouldCheckForEnoughRacks = !AbstractDNSToSwitchMapping
         .isMappingSingleSwitch(dnsMap);
+    
 
     this.replicationRecheckInterval = 
       conf.getInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 
@@ -230,6 +231,7 @@ public class BlockManager {
     LOG.info("minReplication     = " + minReplication);
     LOG.info("maxReplicationStreams      = " + maxReplicationStreams);
     LOG.info("shouldCheckForEnoughRacks  = " + shouldCheckForEnoughRacks);
+    LOG.info("topology mapper = " + dnsMap);
     LOG.info("replicationRecheckInterval = " + replicationRecheckInterval);
   }
 
@@ -441,15 +443,23 @@ public class BlockManager {
    */
   private BlockInfo completeBlock(final INodeFile fileINode,
       final int blkIndex) throws IOException {
+    return completeBlock(fileINode, blkIndex, false);
+  }
+
+  public BlockInfo completeBlock(final INodeFile fileINode, 
+      final int blkIndex, final boolean force) throws IOException {
     if(blkIndex < 0)
       return null;
     BlockInfo curBlock = fileINode.getBlocks()[blkIndex];
     if(curBlock.isComplete())
       return curBlock;
     BlockInfoUnderConstruction ucBlock = (BlockInfoUnderConstruction)curBlock;
-    if(ucBlock.numNodes() < minReplication)
+    if(!force && ucBlock.numNodes() < minReplication)
       throw new IOException("Cannot complete block: " +
           "block does not satisfy minimal replication requirement.");
+    if(!force && ucBlock.getBlockUCState() != BlockUCState.COMMITTED)
+      throw new IOException(
+          "Cannot complete block: block has not been COMMITTED by the client");
     BlockInfo completeBlock = ucBlock.convertToCompleteBlock();
     // replace penultimate block in file
     fileINode.setBlock(blkIndex, completeBlock);
@@ -1540,7 +1550,24 @@ public class BlockManager {
       }
     case RBW:
     case RWR:
-      return storedBlock.isComplete();
+      if (!storedBlock.isComplete()) {
+        return false;
+      } else if (storedBlock.getGenerationStamp() != iblk.getGenerationStamp()) {
+        return true;
+      } else { // COMPLETE block, same genstamp
+        if (reportedState == ReplicaState.RBW) {
+          // If it's a RBW report for a COMPLETE block, it may just be that
+          // the block report got a little bit delayed after the pipeline
+          // closed. So, ignore this report, assuming we will get a
+          // FINALIZED replica later. See HDFS-2791
+          LOG.info("Received an RBW replica for block " + storedBlock +
+              " on " + dn.getName() + ": ignoring it, since the block is " +
+              "complete with the same generation stamp.");
+          return false;
+        } else {
+          return true;
+        }
+      }
     case RUR:       // should not be reported
     case TEMPORARY: // should not be reported
     default:
@@ -1762,7 +1789,8 @@ public class BlockManager {
   public void processMisReplicatedBlocks() {
     assert namesystem.hasWriteLock();
 
-    long nrInvalid = 0, nrOverReplicated = 0, nrUnderReplicated = 0;
+    long nrInvalid = 0, nrOverReplicated = 0, nrUnderReplicated = 0,
+         nrUnderConstruction = 0;
     neededReplications.clear();
     for (BlockInfo block : blocksMap.getBlocks()) {
       INodeFile fileINode = block.getINode();
@@ -1770,6 +1798,12 @@ public class BlockManager {
         // block does not belong to any file
         nrInvalid++;
         addToInvalidates(block);
+        continue;
+      }
+      if (!block.isComplete()) {
+        // Incomplete blocks are never considered mis-replicated --
+        // they'll be reached when they are completed or recovered.
+        nrUnderConstruction++;
         continue;
       }
       // calculate current replication
@@ -1795,6 +1829,7 @@ public class BlockManager {
     LOG.info("Number of invalid blocks          = " + nrInvalid);
     LOG.info("Number of under-replicated blocks = " + nrUnderReplicated);
     LOG.info("Number of  over-replicated blocks = " + nrOverReplicated);
+    LOG.info("Number of blocks being written    = " + nrUnderConstruction);
   }
 
   /** Set replication for the blocks. */
