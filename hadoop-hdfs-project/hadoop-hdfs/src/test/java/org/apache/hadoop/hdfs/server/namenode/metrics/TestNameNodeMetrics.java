@@ -151,8 +151,7 @@ public class TestNameNodeMetrics {
     fs.delete(file, true);
     filesTotal--; // reduce the filecount for deleted file
     
-    rb = waitForGaugeValue("FilesTotal", filesTotal);
-    assertGauge("FilesTotal", filesTotal, rb);
+    rb = waitForGaugeValue(NS_METRICS, "FilesTotal", filesTotal);
     assertGauge("BlocksTotal", 0L, rb);
     assertGauge("PendingDeletionBlocks", 0L, rb);
 
@@ -179,7 +178,7 @@ public class TestNameNodeMetrics {
     assertGauge("PendingReplicationBlocks", 1L, rb);
     assertGauge("ScheduledReplicationBlocks", 1L, rb);
     fs.delete(file, true);
-    rb = waitForGaugeValue("CorruptBlocks", 0L);
+    rb = waitForGaugeValue(NS_METRICS, "CorruptBlocks", 0L);
     assertGauge("PendingReplicationBlocks", 0L, rb);
     assertGauge("ScheduledReplicationBlocks", 0L, rb);
   }
@@ -215,7 +214,7 @@ public class TestNameNodeMetrics {
     assertGauge("UnderReplicatedBlocks", 1L, rb);
     assertGauge("MissingBlocks", 1L, rb);
     fs.delete(file, true);
-    waitForGaugeValue("UnderReplicatedBlocks", 0L);
+    waitForGaugeValue(NS_METRICS, "UnderReplicatedBlocks", 0L);
   }
 
   private void waitForDeletion() throws InterruptedException {
@@ -225,16 +224,22 @@ public class TestNameNodeMetrics {
   }
 
   /**
-   * Wait for the FSNamesystem gauge value to reach the desired state.
+   * Wait for the named gauge value from the metrics source to reach the
+   * desired value.
+   *
    * There's an initial delay then a spin cycle of sleep and poll. Because
    * all the tests use a shared FS instance, these tests are not independent;
    * that's why the initial sleep is in there.
+   *
+   * @param source metrics source
    * @param name gauge name
    * @param expected expected value
    * @return the last metrics record polled
    * @throws Exception if something went wrong.
    */
-  private MetricsRecordBuilder waitForGaugeValue(String name, long expected)
+  private MetricsRecordBuilder waitForGaugeValue(String source,
+                                                 String name,
+                                                 long expected)
       throws Exception {
     MetricsRecordBuilder rb;
     long gauge;
@@ -243,11 +248,11 @@ public class TestNameNodeMetrics {
     //lots of retries are allowed for slow systems; fast ones will still
     //exit early
     int retries = (DATANODE_COUNT + 1) * WAIT_GAUGE_VALUE_RETRIES;
-    rb = getMetrics(NS_METRICS);
+    rb = getMetrics(source);
     gauge = MetricsAsserts.getLongGauge(name, rb);
     while (gauge != expected && (--retries > 0)) {
       Thread.sleep(DFS_REPLICATION_INTERVAL * 500);
-      rb = getMetrics(NS_METRICS);
+      rb = getMetrics(source);
       gauge = MetricsAsserts.getLongGauge(name, rb);
     }
     //at this point the assertion is valid or the retry count ran out
