@@ -65,7 +65,7 @@ public interface Service {
    * Stop the service.
    *
    * This operation must be designed to complete regardless of the initial state
-   * of the service, including the state of all its internal fields. 
+   * of the service, including the state of all its internal fields.
    */
   void stop();
 
