@@ -105,12 +105,6 @@ public class TestNameNodeMetrics {
     DFSTestUtil.createFile(fs, file, fileLen, replicas, rand.nextLong());
   }
 
-  private void updateMetrics() throws Exception {
-    // Wait for metrics update (corresponds to dfs.namenode.replication.interval
-    // for some block related metrics to get updated)
-    Thread.sleep(1000);
-  }
-
   private void readFile(FileSystem fileSys,Path name) throws IOException {
     //Just read file so that getNumBlockLocations are incremented
     DataInputStream stm = fileSys.open(name);
@@ -127,7 +121,6 @@ public class TestNameNodeMetrics {
     createFile(file, 3200, (short)3);
     final long blockCount = 32;
     int blockCapacity = namesystem.getBlockCapacity();
-    updateMetrics();
     assertGauge("BlockCapacity", blockCapacity, getMetrics(NS_METRICS));
 
     MetricsRecordBuilder rb = getMetrics(NN_METRICS);
@@ -142,7 +135,6 @@ public class TestNameNodeMetrics {
     while (threshold < blockCount) {
       blockCapacity <<= 1;
     }
-    updateMetrics();
     long filesTotal = file.depth() + 1; // Add 1 for root
     rb = getMetrics(NS_METRICS);
     assertGauge("FilesTotal", filesTotal, rb);
@@ -150,8 +142,8 @@ public class TestNameNodeMetrics {
     assertGauge("BlockCapacity", blockCapacity, rb);
     fs.delete(file, true);
     filesTotal--; // reduce the filecount for deleted file
-    
-    rb = waitForGaugeValue(NS_METRICS, "FilesTotal", filesTotal);
+
+    rb = waitForDnMetricValue(NS_METRICS, "FilesTotal", filesTotal);
     assertGauge("BlocksTotal", 0L, rb);
     assertGauge("PendingDeletionBlocks", 0L, rb);
 
@@ -171,14 +163,20 @@ public class TestNameNodeMetrics {
     // Corrupt first replica of the block
     LocatedBlock block = NameNodeAdapter.getBlockLocations(
         cluster.getNameNode(), file.toString(), 0, 1).get(0);
-    bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[0]);
-    updateMetrics();
+    cluster.getNamesystem().writeLock();
+    try {
+      bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[0],
+          "TEST");
+    } finally {
+      cluster.getNamesystem().writeUnlock();
+    }
+    Thread.sleep(1000); // Wait for block to be marked corrupt
     MetricsRecordBuilder rb = getMetrics(NS_METRICS);
     assertGauge("CorruptBlocks", 1L, rb);
     assertGauge("PendingReplicationBlocks", 1L, rb);
     assertGauge("ScheduledReplicationBlocks", 1L, rb);
     fs.delete(file, true);
-    rb = waitForGaugeValue(NS_METRICS, "CorruptBlocks", 0L);
+    rb = waitForDnMetricValue(NS_METRICS, "CorruptBlocks", 0L);
     assertGauge("PendingReplicationBlocks", 0L, rb);
     assertGauge("ScheduledReplicationBlocks", 0L, rb);
   }
@@ -192,7 +190,6 @@ public class TestNameNodeMetrics {
     createFile(file, 100, (short)2);
     long totalBlocks = 1;
     NameNodeAdapter.setReplication(namesystem, file.toString(), (short)1);
-    updateMetrics();
     MetricsRecordBuilder rb = getMetrics(NS_METRICS);
     assertGauge("ExcessBlocks", totalBlocks, rb);
     fs.delete(file, true);
@@ -208,13 +205,19 @@ public class TestNameNodeMetrics {
     // Corrupt the only replica of the block to result in a missing block
     LocatedBlock block = NameNodeAdapter.getBlockLocations(
         cluster.getNameNode(), file.toString(), 0, 1).get(0);
-    bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[0]);
-    updateMetrics();
+    cluster.getNamesystem().writeLock();
+    try {
+      bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[0],
+          "TEST");
+    } finally {
+      cluster.getNamesystem().writeUnlock();
+    }
+    Thread.sleep(1000); // Wait for block to be marked corrupt
     MetricsRecordBuilder rb = getMetrics(NS_METRICS);
     assertGauge("UnderReplicatedBlocks", 1L, rb);
     assertGauge("MissingBlocks", 1L, rb);
     fs.delete(file, true);
-    waitForGaugeValue(NS_METRICS, "UnderReplicatedBlocks", 0L);
+    waitForDnMetricValue(NS_METRICS, "UnderReplicatedBlocks", 0L);
   }
 
   private void waitForDeletion() throws InterruptedException {
@@ -237,9 +240,9 @@ public class TestNameNodeMetrics {
    * @return the last metrics record polled
    * @throws Exception if something went wrong.
    */
-  private MetricsRecordBuilder waitForGaugeValue(String source,
-                                                 String name,
-                                                 long expected)
+  private MetricsRecordBuilder waitForDnMetricValue(String source,
+                                                    String name,
+                                                    long expected)
       throws Exception {
     MetricsRecordBuilder rb;
     long gauge;
@@ -267,7 +270,6 @@ public class TestNameNodeMetrics {
     Path target = getTestPath("target");
     createFile(target, 100, (short)1);
     fs.rename(src, target, Rename.OVERWRITE);
-    updateMetrics();
     MetricsRecordBuilder rb = getMetrics(NN_METRICS);
     assertCounter("FilesRenamed", 1L, rb);
     assertCounter("FilesDeleted", 1L, rb);
@@ -295,7 +297,6 @@ public class TestNameNodeMetrics {
 
     //Perform create file operation
     createFile(file1_Path,100,(short)2);
-    updateMetrics();
   
     //Create file does not change numGetBlockLocations metric
     //expect numGetBlockLocations = 0 for previous and current interval 
@@ -304,14 +305,12 @@ public class TestNameNodeMetrics {
     // Open and read file operation increments GetBlockLocations
     // Perform read file operation on earlier created file
     readFile(fs, file1_Path);
-    updateMetrics();
     // Verify read file operation has incremented numGetBlockLocations by 1
     assertCounter("GetBlockLocations", 1L, getMetrics(NN_METRICS));
 
     // opening and reading file  twice will increment numGetBlockLocations by 2
     readFile(fs, file1_Path);
     readFile(fs, file1_Path);
-    updateMetrics();
     assertCounter("GetBlockLocations", 3L, getMetrics(NN_METRICS));
   }
   
@@ -329,7 +328,6 @@ public class TestNameNodeMetrics {
     assertGauge("TransactionsSinceLastLogRoll", 1L, getMetrics(NS_METRICS));
     
     fs.mkdirs(new Path(TEST_ROOT_DIR_PATH, "/tmp"));
-    updateMetrics();
     
     assertGauge("LastCheckpointTime", lastCkptTime, getMetrics(NS_METRICS));
     assertGauge("LastWrittenTransactionId", 2L, getMetrics(NS_METRICS));
@@ -337,7 +335,6 @@ public class TestNameNodeMetrics {
     assertGauge("TransactionsSinceLastLogRoll", 2L, getMetrics(NS_METRICS));
     
     cluster.getNameNodeRpc().rollEditLog();
-    updateMetrics();
     
     assertGauge("LastCheckpointTime", lastCkptTime, getMetrics(NS_METRICS));
     assertGauge("LastWrittenTransactionId", 4L, getMetrics(NS_METRICS));
@@ -347,7 +344,6 @@ public class TestNameNodeMetrics {
     cluster.getNameNodeRpc().setSafeMode(SafeModeAction.SAFEMODE_ENTER);
     cluster.getNameNodeRpc().saveNamespace();
     cluster.getNameNodeRpc().setSafeMode(SafeModeAction.SAFEMODE_LEAVE);
-    updateMetrics();
     
     long newLastCkptTime = MetricsAsserts.getLongGauge("LastCheckpointTime",
         getMetrics(NS_METRICS));

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import java.util.zip.CheckedInputStream;
 import java.util.zip.Checksum;
+import java.util.Arrays;
 import java.util.EnumMap;
 
 import org.apache.hadoop.fs.ChecksumException;
@@ -100,6 +101,7 @@ public abstract class FSEditLogOp {
                       new LogSegmentOp(OP_START_LOG_SEGMENT));
         instances.put(OP_END_LOG_SEGMENT,
                       new LogSegmentOp(OP_END_LOG_SEGMENT));
+        instances.put(OP_UPDATE_BLOCKS, new UpdateBlocksOp());
         return instances;
       }
   };
@@ -127,8 +129,14 @@ public abstract class FSEditLogOp {
   abstract void writeFields(DataOutputStream out)
       throws IOException;
 
+  static interface BlockListUpdatingOp {
+    Block[] getBlocks();
+    String getPath();
+    boolean shouldCompleteLastBlock();
+  }
+  
   @SuppressWarnings("unchecked")
-  static abstract class AddCloseOp extends FSEditLogOp {
+  static abstract class AddCloseOp extends FSEditLogOp implements BlockListUpdatingOp {
     int length;
     String path;
     short replication;
@@ -149,6 +157,10 @@ public abstract class FSEditLogOp {
     <T extends AddCloseOp> T setPath(String path) {
       this.path = path;
       return (T)this;
+    }
+    
+    public String getPath() {
+      return path;
     }
 
     <T extends AddCloseOp> T setReplication(short replication) {
@@ -174,6 +186,10 @@ public abstract class FSEditLogOp {
     <T extends AddCloseOp> T setBlocks(Block[] blocks) {
       this.blocks = blocks;
       return (T)this;
+    }
+    
+    public Block[] getBlocks() {
+      return blocks;
     }
 
     <T extends AddCloseOp> T setPermissionStatus(PermissionStatus permissions) {
@@ -305,6 +321,36 @@ public abstract class FSEditLogOp {
       }
       return blocks;
     }
+
+    public String stringifyMembers() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("[length=");
+      builder.append(length);
+      builder.append(", path=");
+      builder.append(path);
+      builder.append(", replication=");
+      builder.append(replication);
+      builder.append(", mtime=");
+      builder.append(mtime);
+      builder.append(", atime=");
+      builder.append(atime);
+      builder.append(", blockSize=");
+      builder.append(blockSize);
+      builder.append(", blocks=");
+      builder.append(Arrays.toString(blocks));
+      builder.append(", permissions=");
+      builder.append(permissions);
+      builder.append(", clientName=");
+      builder.append(clientName);
+      builder.append(", clientMachine=");
+      builder.append(clientMachine);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
+    }
   }
 
   static class AddOp extends AddCloseOp {
@@ -315,6 +361,18 @@ public abstract class FSEditLogOp {
     static AddOp getInstance() {
       return (AddOp)opInstances.get().get(OP_ADD);
     }
+
+    public boolean shouldCompleteLastBlock() {
+      return false;
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("AddOp ");
+      builder.append(stringifyMembers());
+      return builder.toString();
+    }
   }
 
   static class CloseOp extends AddCloseOp {
@@ -324,6 +382,80 @@ public abstract class FSEditLogOp {
 
     static CloseOp getInstance() {
       return (CloseOp)opInstances.get().get(OP_CLOSE);
+    }
+
+    public boolean shouldCompleteLastBlock() {
+      return true;
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("CloseOp ");
+      builder.append(stringifyMembers());
+      return builder.toString();
+    }
+  }
+  
+  static class UpdateBlocksOp extends FSEditLogOp implements BlockListUpdatingOp {
+    String path;
+    Block[] blocks;
+    
+    private UpdateBlocksOp() {
+      super(OP_UPDATE_BLOCKS);
+    }
+    
+    static UpdateBlocksOp getInstance() {
+      return (UpdateBlocksOp)opInstances.get()
+        .get(OP_UPDATE_BLOCKS);
+    }
+    
+    
+    UpdateBlocksOp setPath(String path) {
+      this.path = path;
+      return this;
+    }
+    
+    public String getPath() {
+      return path;
+    }
+
+    UpdateBlocksOp setBlocks(Block[] blocks) {
+      this.blocks = blocks;
+      return this;
+    }
+    
+    public Block[] getBlocks() {
+      return blocks;
+    }
+
+    @Override
+    void writeFields(DataOutputStream out) throws IOException {
+      FSImageSerialization.writeString(path, out);
+      FSImageSerialization.writeCompactBlockArray(blocks, out);
+    }
+    
+    @Override
+    void readFields(DataInputStream in, int logVersion) throws IOException {
+      path = FSImageSerialization.readString(in);
+      this.blocks = FSImageSerialization.readCompactBlockArray(
+          in, logVersion);
+    }
+
+    @Override
+    public boolean shouldCompleteLastBlock() {
+      return false;
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("UpdateBlocksOp [path=")
+        .append(path)
+        .append(", blocks=")
+        .append(Arrays.toString(blocks))
+        .append("]");
+      return sb.toString();
     }
   }
 
@@ -365,6 +497,21 @@ public abstract class FSEditLogOp {
       } else {
         this.replication = readShort(in);
       }
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("SetReplicationOp [path=");
+      builder.append(path);
+      builder.append(", replication=");
+      builder.append(replication);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
     }
   }
 
@@ -440,6 +587,25 @@ public abstract class FSEditLogOp {
         this.timestamp = readLong(in);
       }
     }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("ConcatDeleteOp [length=");
+      builder.append(length);
+      builder.append(", trg=");
+      builder.append(trg);
+      builder.append(", srcs=");
+      builder.append(Arrays.toString(srcs));
+      builder.append(", timestamp=");
+      builder.append(timestamp);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
+    }
   }
 
   static class RenameOldOp extends FSEditLogOp {
@@ -497,6 +663,25 @@ public abstract class FSEditLogOp {
         this.timestamp = readLong(in);
       }
     }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("RenameOldOp [length=");
+      builder.append(length);
+      builder.append(", src=");
+      builder.append(src);
+      builder.append(", dst=");
+      builder.append(dst);
+      builder.append(", timestamp=");
+      builder.append(timestamp);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
+    }
   }
 
   static class DeleteOp extends FSEditLogOp {
@@ -544,6 +729,23 @@ public abstract class FSEditLogOp {
       } else {
         this.timestamp = readLong(in);
       }
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("DeleteOp [length=");
+      builder.append(length);
+      builder.append(", path=");
+      builder.append(path);
+      builder.append(", timestamp=");
+      builder.append(timestamp);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
     }
   }
 
@@ -623,6 +825,25 @@ public abstract class FSEditLogOp {
         this.permissions = null;
       }
     }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("MkdirOp [length=");
+      builder.append(length);
+      builder.append(", path=");
+      builder.append(path);
+      builder.append(", timestamp=");
+      builder.append(timestamp);
+      builder.append(", permissions=");
+      builder.append(permissions);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
+    }
   }
 
   static class SetGenstampOp extends FSEditLogOp {
@@ -652,6 +873,19 @@ public abstract class FSEditLogOp {
         throws IOException {
       this.genStamp = FSImageSerialization.readLong(in);
     }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("SetGenstampOp [genStamp=");
+      builder.append(genStamp);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
+    }
   }
 
   @SuppressWarnings("deprecation")
@@ -675,6 +909,17 @@ public abstract class FSEditLogOp {
         throws IOException {
       //Datanodes are not persistent any more.
       FSImageSerialization.DatanodeImage.skipOne(in);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("DatanodeAddOp [opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
     }
   }
 
@@ -700,6 +945,17 @@ public abstract class FSEditLogOp {
       DatanodeID nodeID = new DatanodeID();
       nodeID.readFields(in);
       //Datanodes are not persistent any more.
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("DatanodeRemoveOp [opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
     }
   }
 
@@ -737,6 +993,21 @@ public abstract class FSEditLogOp {
         throws IOException {
       this.src = FSImageSerialization.readString(in);
       this.permissions = FsPermission.read(in);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("SetPermissionsOp [src=");
+      builder.append(src);
+      builder.append(", permissions=");
+      builder.append(permissions);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
     }
   }
 
@@ -783,6 +1054,23 @@ public abstract class FSEditLogOp {
       this.username = FSImageSerialization.readString_EmptyAsNull(in);
       this.groupname = FSImageSerialization.readString_EmptyAsNull(in);
     }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("SetOwnerOp [src=");
+      builder.append(src);
+      builder.append(", username=");
+      builder.append(username);
+      builder.append(", groupname=");
+      builder.append(groupname);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
+    }
   }
 
   static class SetNSQuotaOp extends FSEditLogOp {
@@ -809,6 +1097,21 @@ public abstract class FSEditLogOp {
       this.src = FSImageSerialization.readString(in);
       this.nsQuota = FSImageSerialization.readLong(in);
     }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("SetNSQuotaOp [src=");
+      builder.append(src);
+      builder.append(", nsQuota=");
+      builder.append(nsQuota);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
+    }
   }
 
   static class ClearNSQuotaOp extends FSEditLogOp {
@@ -832,6 +1135,19 @@ public abstract class FSEditLogOp {
     void readFields(DataInputStream in, int logVersion)
         throws IOException {
       this.src = FSImageSerialization.readString(in);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("ClearNSQuotaOp [src=");
+      builder.append(src);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
     }
   }
 
@@ -877,6 +1193,23 @@ public abstract class FSEditLogOp {
       this.src = FSImageSerialization.readString(in);
       this.nsQuota = FSImageSerialization.readLong(in);
       this.dsQuota = FSImageSerialization.readLong(in);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("SetQuotaOp [src=");
+      builder.append(src);
+      builder.append(", nsQuota=");
+      builder.append(nsQuota);
+      builder.append(", dsQuota=");
+      builder.append(dsQuota);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
     }
   }
 
@@ -935,6 +1268,25 @@ public abstract class FSEditLogOp {
         this.mtime = readLong(in);
         this.atime = readLong(in);
       }
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("TimesOp [length=");
+      builder.append(length);
+      builder.append(", path=");
+      builder.append(path);
+      builder.append(", mtime=");
+      builder.append(mtime);
+      builder.append(", atime=");
+      builder.append(atime);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
     }
   }
 
@@ -1010,6 +1362,29 @@ public abstract class FSEditLogOp {
         this.atime = readLong(in);
       }
       this.permissionStatus = PermissionStatus.read(in);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("SymlinkOp [length=");
+      builder.append(length);
+      builder.append(", path=");
+      builder.append(path);
+      builder.append(", value=");
+      builder.append(value);
+      builder.append(", mtime=");
+      builder.append(mtime);
+      builder.append(", atime=");
+      builder.append(atime);
+      builder.append(", permissionStatus=");
+      builder.append(permissionStatus);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
     }
   }
 
@@ -1097,6 +1472,27 @@ public abstract class FSEditLogOp {
       }
       return new BytesWritable(bytes);
     }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("RenameOp [length=");
+      builder.append(length);
+      builder.append(", src=");
+      builder.append(src);
+      builder.append(", dst=");
+      builder.append(dst);
+      builder.append(", timestamp=");
+      builder.append(timestamp);
+      builder.append(", options=");
+      builder.append(Arrays.toString(options));
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
+    }
   }
 
   static class ReassignLeaseOp extends FSEditLogOp {
@@ -1142,6 +1538,23 @@ public abstract class FSEditLogOp {
       this.path = FSImageSerialization.readString(in);
       this.newHolder = FSImageSerialization.readString(in);
     }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("ReassignLeaseOp [leaseHolder=");
+      builder.append(leaseHolder);
+      builder.append(", path=");
+      builder.append(path);
+      builder.append(", newHolder=");
+      builder.append(newHolder);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
+    }
   }
 
   static class GetDelegationTokenOp extends FSEditLogOp {
@@ -1184,6 +1597,21 @@ public abstract class FSEditLogOp {
       } else {
         this.expiryTime = readLong(in);
       }
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("GetDelegationTokenOp [token=");
+      builder.append(token);
+      builder.append(", expiryTime=");
+      builder.append(expiryTime);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
     }
   }
 
@@ -1228,6 +1656,21 @@ public abstract class FSEditLogOp {
         this.expiryTime = readLong(in);
       }
     }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("RenewDelegationTokenOp [token=");
+      builder.append(token);
+      builder.append(", expiryTime=");
+      builder.append(expiryTime);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
+    }
   }
 
   static class CancelDelegationTokenOp extends FSEditLogOp {
@@ -1259,6 +1702,19 @@ public abstract class FSEditLogOp {
       this.token = new DelegationTokenIdentifier();
       this.token.readFields(in);
     }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("CancelDelegationTokenOp [token=");
+      builder.append(token);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
+    }
   }
 
   static class UpdateMasterKeyOp extends FSEditLogOp {
@@ -1289,6 +1745,19 @@ public abstract class FSEditLogOp {
       this.key = new DelegationKey();
       this.key.readFields(in);
     }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("UpdateMasterKeyOp [key=");
+      builder.append(key);
+      builder.append(", opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
+    }
   }
   
   static class LogSegmentOp extends FSEditLogOp {
@@ -1311,6 +1780,17 @@ public abstract class FSEditLogOp {
     void writeFields(DataOutputStream out) throws IOException {
       // no data stored
     }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("LogSegmentOp [opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
+    }
   }
 
   static class InvalidOp extends FSEditLogOp {
@@ -1330,6 +1810,17 @@ public abstract class FSEditLogOp {
     void readFields(DataInputStream in, int logVersion)
         throws IOException {
       // nothing to read
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      builder.append("InvalidOp [opCode=");
+      builder.append(opCode);
+      builder.append(", txid=");
+      builder.append(txid);
+      builder.append("]");
+      return builder.toString();
     }
   }
 
