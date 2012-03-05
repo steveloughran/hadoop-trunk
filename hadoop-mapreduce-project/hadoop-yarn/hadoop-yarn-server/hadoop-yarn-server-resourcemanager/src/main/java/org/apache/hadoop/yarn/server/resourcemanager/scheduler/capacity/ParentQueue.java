@@ -67,9 +67,9 @@ public class ParentQueue implements CSQueue {
   private float maximumCapacity;
   private float absoluteCapacity;
   private float absoluteMaxCapacity;
+  private float absoluteUsedCapacity = 0.0f;
 
   private float usedCapacity = 0.0f;
-  private float utilization = 0.0f;
 
   private final Set<CSQueue> childQueues;
   private final Comparator<CSQueue> queueComparator;
@@ -158,9 +158,11 @@ public class ParentQueue implements CSQueue {
   ) {
     // Sanity check
     CSQueueUtils.checkMaxCapacity(getQueueName(), capacity, maximumCapacity);
+    CSQueueUtils.checkAbsoluteCapacities(getQueueName(), absoluteCapacity, absoluteMaxCapacity);
 
     this.capacity = capacity;
     this.absoluteCapacity = absoluteCapacity;
+
     this.maximumCapacity = maximumCapacity;
     this.absoluteMaxCapacity = absoluteMaxCapacity;
 
@@ -244,6 +246,11 @@ public class ParentQueue implements CSQueue {
   }
 
   @Override
+  public synchronized float getAbsoluteUsedCapacity() {
+    return absoluteUsedCapacity;
+  }
+
+  @Override
   public float getMaximumCapacity() {
     return maximumCapacity;
   }
@@ -264,11 +271,6 @@ public class ParentQueue implements CSQueue {
     return usedResources;
   }
   
-  @Override
-  public synchronized float getUtilization() {
-    return utilization;
-  }
-
   @Override
   public synchronized List<CSQueue> getChildQueues() {
     return new ArrayList<CSQueue>(childQueues);
@@ -315,15 +317,12 @@ public class ParentQueue implements CSQueue {
     QueueUserACLInfo userAclInfo = 
       recordFactory.newRecordInstance(QueueUserACLInfo.class);
     List<QueueACL> operations = new ArrayList<QueueACL>();
-    for (Map.Entry<QueueACL, AccessControlList> e : acls.entrySet()) {
-      QueueACL operation = e.getKey();
-      AccessControlList acl = e.getValue();
-      
-      if (acl.isUserAllowed(user)) {
+    for (QueueACL operation : QueueACL.values()) {
+      if (hasAccess(operation, user)) {
         operations.add(operation);
-      }
+      } 
     }
-    
+
     userAclInfo.setQueueName(getQueueName());
     userAclInfo.setUserAcls(operations);
     return userAclInfo;
@@ -341,6 +340,7 @@ public class ParentQueue implements CSQueue {
     for (CSQueue child : childQueues) {
       userAcls.addAll(child.getQueueUserAclInfo(user));
     }
+ 
     return userAcls;
   }
 
@@ -351,7 +351,6 @@ public class ParentQueue implements CSQueue {
         "absoluteCapacity=" + absoluteCapacity + ", " +
         "usedResources=" + usedResources.getMemory() + "MB, " + 
         "usedCapacity=" + getUsedCapacity() + ", " + 
-        "utilization=" + getUtilization() + ", " +
         "numApps=" + getNumApplications() + ", " + 
         "numContainers=" + getNumContainers();
   }
@@ -490,12 +489,14 @@ public class ParentQueue implements CSQueue {
         " #applications: " + getNumApplications());
   }
   
+  @Override
   public synchronized void setUsedCapacity(float usedCapacity) {
     this.usedCapacity = usedCapacity;
   }
   
-  public synchronized void setUtilization(float utilization) {
-    this.utilization = utilization;
+  @Override
+  public synchronized void setAbsoluteUsedCapacity(float absUsedCapacity) {
+    this.absoluteUsedCapacity = absUsedCapacity;
   }
 
   /**
@@ -505,10 +506,11 @@ public class ParentQueue implements CSQueue {
   synchronized void setMaxCapacity(float maximumCapacity) {
     // Sanity check
     CSQueueUtils.checkMaxCapacity(getQueueName(), capacity, maximumCapacity);
+    float absMaxCapacity = CSQueueUtils.computeAbsoluteMaximumCapacity(maximumCapacity, parent);
+    CSQueueUtils.checkAbsoluteCapacities(getQueueName(), absoluteCapacity, absMaxCapacity);
     
     this.maximumCapacity = maximumCapacity;
-    this.absoluteMaxCapacity = 
-        CSQueueUtils.computeAbsoluteMaximumCapacity(maximumCapacity, parent);
+    this.absoluteMaxCapacity = absMaxCapacity;
   }
 
   @Override
@@ -545,7 +547,8 @@ public class ParentQueue implements CSQueue {
         
         LOG.info("assignedContainer" +
             " queue=" + getQueueName() + 
-            " util=" + getUtilization() + 
+            " usedCapacity=" + getUsedCapacity() +
+            " absoluteUsedCapacity=" + getAbsoluteUsedCapacity() +
             " used=" + usedResources + 
             " cluster=" + clusterResource);
 
@@ -556,7 +559,8 @@ public class ParentQueue implements CSQueue {
       if (LOG.isDebugEnabled()) {
         LOG.debug("ParentQ=" + getQueueName()
           + " assignedSoFarInThisIteration=" + assignment.getResource()
-          + " utilization=" + getUtilization());
+          + " usedCapacity=" + getUsedCapacity()
+          + " absoluteUsedCapacity=" + getAbsoluteUsedCapacity());
       }
 
       // Do not assign more than one container if this isn't the root queue
@@ -639,7 +643,7 @@ public class ParentQueue implements CSQueue {
   String getChildQueuesToPrint() {
     StringBuilder sb = new StringBuilder();
     for (CSQueue q : childQueues) {
-      sb.append(q.getQueuePath() + "(" + q.getUtilization() + "), ");
+      sb.append(q.getQueuePath() + "(" + q.getUsedCapacity() + "), ");
     }
     return sb.toString();
   }
@@ -663,7 +667,8 @@ public class ParentQueue implements CSQueue {
 
         LOG.info("completedContainer" +
             " queue=" + getQueueName() + 
-            " util=" + getUtilization() + 
+            " usedCapacity=" + getUsedCapacity() +
+            " absoluteUsedCapacity=" + getAbsoluteUsedCapacity() +
             " used=" + usedResources + 
             " cluster=" + clusterResource);
       }
