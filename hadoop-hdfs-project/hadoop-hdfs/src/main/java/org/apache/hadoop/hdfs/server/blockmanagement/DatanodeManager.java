@@ -923,7 +923,7 @@ public class DatanodeManager {
       }
     }
 
-    return null;
+    return new DatanodeCommand[0];
   }
 
   /**
@@ -948,11 +948,33 @@ public class DatanodeManager {
     }
   }
 
-  /**
-   * Get the DNS to switch mapper; valid after initialization.
-   * @return the DNS to switch mapper
-   */
-  public DNSToSwitchMapping getDnsToSwitchMapping() {
-    return dnsToSwitchMapping;
+  public void markAllDatanodesStale() {
+    LOG.info("Marking all datandoes as stale");
+    synchronized (datanodeMap) {
+      for (DatanodeDescriptor dn : datanodeMap.values()) {
+        dn.markStaleAfterFailover();
+      }
+    }
   }
+
+  /**
+   * Clear any actions that are queued up to be sent to the DNs
+   * on their next heartbeats. This includes block invalidations,
+   * recoveries, and replication requests.
+   */
+  public void clearPendingQueues() {
+    synchronized (datanodeMap) {
+      for (DatanodeDescriptor dn : datanodeMap.values()) {
+        dn.clearBlockQueues();
+      }
+    }
+  }
+
+    /**
+     * Get the DNS to switch mapper; valid after initialization.
+     * @return the DNS to switch mapper
+     */
+    public DNSToSwitchMapping getDnsToSwitchMapping() {
+        return dnsToSwitchMapping;
+    }
 }
