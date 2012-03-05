@@ -47,19 +47,17 @@ import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DatanodeIDProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.LocatedBlockProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.VersionRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.VersionResponseProto;
-import org.apache.hadoop.hdfs.protocolR23Compatible.ProtocolSignatureWritable;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
+import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo;
 import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
 import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.hdfs.server.protocol.UpgradeCommand;
-import org.apache.hadoop.ipc.ProtocolSignature;
-import org.apache.hadoop.ipc.RPC;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -106,7 +104,7 @@ public class DatanodeProtocolServerSideTranslatorPB implements
   @Override
   public HeartbeatResponseProto sendHeartbeat(RpcController controller,
       HeartbeatRequestProto request) throws ServiceException {
-    DatanodeCommand[] cmds = null;
+    HeartbeatResponse response;
     try {
       List<StorageReportProto> list = request.getReportsList();
       StorageReport[] report = new StorageReport[list.size()];
@@ -116,7 +114,7 @@ public class DatanodeProtocolServerSideTranslatorPB implements
             p.getCapacity(), p.getDfsUsed(), p.getRemaining(),
             p.getBlockPoolUsed());
       }
-      cmds = impl.sendHeartbeat(PBHelper.convert(request.getRegistration()),
+      response = impl.sendHeartbeat(PBHelper.convert(request.getRegistration()),
           report, request.getXmitsInProgress(), request.getXceiverCount(),
           request.getFailedVolumes());
     } catch (IOException e) {
@@ -124,6 +122,7 @@ public class DatanodeProtocolServerSideTranslatorPB implements
     }
     HeartbeatResponseProto.Builder builder = HeartbeatResponseProto
         .newBuilder();
+    DatanodeCommand[] cmds = response.getCommands();
     if (cmds != null) {
       for (int i = 0; i < cmds.length; i++) {
         if (cmds[i] != null) {
@@ -131,6 +130,7 @@ public class DatanodeProtocolServerSideTranslatorPB implements
         }
       }
     }
+    builder.setHaStatus(PBHelper.convert(response.getNameNodeHaState()));
     return builder.build();
   }
 
@@ -268,40 +268,4 @@ public class DatanodeProtocolServerSideTranslatorPB implements
     }
     return COMMIT_BLOCK_SYNCHRONIZATION_RESPONSE_PROTO;
   }
-
-  @Override
-  public long getProtocolVersion(String protocol, long clientVersion)
-      throws IOException {
-    return RPC.getProtocolVersion(DatanodeProtocolPB.class);
-  }
-
-  @Override
-  public ProtocolSignature getProtocolSignature(String protocol,
-      long clientVersion, int clientMethodsHash) throws IOException {
-    /**
-     * Don't forward this to the server. The protocol version and signature is
-     * that of {@link DatanodeProtocol}
-     */
-    if (!protocol.equals(RPC.getProtocolName(DatanodeProtocolPB.class))) {
-      throw new IOException("Namenode Serverside implements " +
-          RPC.getProtocolName(DatanodeProtocolPB.class) +
-          ". The following requested protocol is unknown: " + protocol);
-    }
-
-    return ProtocolSignature.getProtocolSignature(clientMethodsHash,
-        RPC.getProtocolVersion(DatanodeProtocolPB.class),
-        DatanodeProtocolPB.class);
-  }
-
-  @Override
-  public ProtocolSignatureWritable getProtocolSignature2(String protocol,
-      long clientVersion, int clientMethodsHash) throws IOException {
-    /**
-     * Don't forward this to the server. The protocol version and signature is
-     * that of {@link DatanodeProtocolPB}
-     */
-    return ProtocolSignatureWritable.convert(
-        this.getProtocolSignature(protocol, clientVersion, clientMethodsHash));
-  }
-
 }

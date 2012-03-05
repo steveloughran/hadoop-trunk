@@ -81,6 +81,8 @@ public abstract class RMCommunicator extends AbstractService  {
 
   private final AppContext context;
   private Job job;
+  // Has a signal (SIGTERM etc) been issued?
+  protected volatile boolean isSignalled = false;
 
   public RMCommunicator(ClientService clientService, AppContext context) {
     super("RMCommunicator");
@@ -154,26 +156,26 @@ public abstract class RMCommunicator extends AbstractService  {
   }
 
   protected void unregister() {
-    if (job != null) {
-      try {
-        FinalApplicationStatus finishState = FinalApplicationStatus.UNDEFINED;
-        if (job.getState() == JobState.SUCCEEDED) {
-          finishState = FinalApplicationStatus.SUCCEEDED;
-        } else if (job.getState() == JobState.KILLED) {
-          finishState = FinalApplicationStatus.KILLED;
-        } else if (job.getState() == JobState.FAILED
-            || job.getState() == JobState.ERROR) {
-          finishState = FinalApplicationStatus.FAILED;
-        }
-        StringBuffer sb = new StringBuffer();
-        for (String s : job.getDiagnostics()) {
-          sb.append(s).append("\n");
-        }
-        LOG.info("Setting job diagnostics to " + sb.toString());
+    try {
+      FinalApplicationStatus finishState = FinalApplicationStatus.UNDEFINED;
+      if (job.getState() == JobState.SUCCEEDED) {
+        finishState = FinalApplicationStatus.SUCCEEDED;
+      } else if (job.getState() == JobState.KILLED
+          || (job.getState() == JobState.RUNNING && isSignalled)) {
+        finishState = FinalApplicationStatus.KILLED;
+      } else if (job.getState() == JobState.FAILED
+          || job.getState() == JobState.ERROR) {
+        finishState = FinalApplicationStatus.FAILED;
+      }
+      StringBuffer sb = new StringBuffer();
+      for (String s : job.getDiagnostics()) {
+        sb.append(s).append("\n");
+      }
+      LOG.info("Setting job diagnostics to " + sb.toString());
 
-        String historyUrl = JobHistoryUtils.getHistoryUrl(getConfig(),
-            context.getApplicationID());
-        LOG.info("History url is " + historyUrl);
+      String historyUrl = JobHistoryUtils.getHistoryUrl(getConfig(),
+          context.getApplicationID());
+      LOG.info("History url is " + historyUrl);
 
       FinishApplicationMasterRequest request =
           recordFactory.newRecordInstance(FinishApplicationMasterRequest.class);
@@ -184,8 +186,6 @@ public abstract class RMCommunicator extends AbstractService  {
       scheduler.finishApplicationMaster(request);
     } catch(Exception are) {
       LOG.error("Exception while unregistering ", are);
-    }
-    job = null;
     }
   }
 
@@ -203,14 +203,11 @@ public abstract class RMCommunicator extends AbstractService  {
       // return if already stopped
       return;
     }
-    if (allocatorThread != null) {
-      allocatorThread.interrupt();
-      try {
-        allocatorThread.join();
-      } catch (InterruptedException ie) {
-        LOG.warn("InterruptedException while stopping", ie);
-      }
-      allocatorThread = null;
+    allocatorThread.interrupt();
+    try {
+      allocatorThread.join();
+    } catch (InterruptedException ie) {
+      LOG.warn("InterruptedException while stopping", ie);
     }
     unregister();
     super.stop();
@@ -284,4 +281,9 @@ public abstract class RMCommunicator extends AbstractService  {
   }
 
   protected abstract void heartbeat() throws Exception;
+
+  public void setSignalled(boolean isSignalled) {
+    this.isSignalled = isSignalled;
+    LOG.info("RMCommunicator notified that iSignalled was : " + isSignalled);
+  }
 }

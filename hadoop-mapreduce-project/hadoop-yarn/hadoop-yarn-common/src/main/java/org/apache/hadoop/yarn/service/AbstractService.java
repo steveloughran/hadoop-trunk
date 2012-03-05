@@ -54,7 +54,7 @@ public abstract class AbstractService implements Service {
    * List of state change listeners; it is final to ensure
    * that it will never be null.
    */
-  private final List<ServiceStateChangeListener> listeners =
+  private List<ServiceStateChangeListener> listeners =
     new ArrayList<ServiceStateChangeListener>();
 
   /**
