@@ -22,6 +22,7 @@ import java.io.IOException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.MRConfig;
@@ -30,6 +31,7 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.YarnException;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.service.CompositeService;
 
 /******************************************************************
@@ -51,6 +53,9 @@ public class JobHistoryServer extends CompositeService {
   @Override
   public synchronized void init(Configuration conf) {
     Configuration config = new YarnConfiguration(conf);
+
+    config.setBoolean(Dispatcher.DISPATCHER_EXIT_ON_ERROR_KEY, true);
+
     try {
       doSecureLogin(conf);
     } catch(IOException ie) {
@@ -103,7 +108,12 @@ public class JobHistoryServer extends CompositeService {
     jhsDTSecretManager.stopThreads();
     super.stop();
   }
-  
+
+  @Private
+  public HistoryClientService getClientService() {
+    return this.clientService;
+  }
+
   public static void main(String[] args) {
     StringUtils.startupShutdownMessage(JobHistoryServer.class, args, LOG);
     try {

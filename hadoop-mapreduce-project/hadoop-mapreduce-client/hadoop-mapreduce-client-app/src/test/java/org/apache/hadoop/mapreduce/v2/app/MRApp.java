@@ -78,6 +78,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
@@ -103,7 +104,7 @@ public class MRApp extends MRAppMaster {
   
   public static String NM_HOST = "localhost";
   public static int NM_PORT = 1234;
-  public static int NM_HTTP_PORT = 9999;
+  public static int NM_HTTP_PORT = 8042;
 
   private static final RecordFactory recordFactory =
       RecordFactoryProvider.getRecordFactory(null);

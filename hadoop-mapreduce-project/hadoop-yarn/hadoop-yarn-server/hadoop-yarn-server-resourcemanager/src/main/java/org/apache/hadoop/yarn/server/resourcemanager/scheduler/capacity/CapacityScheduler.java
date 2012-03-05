@@ -91,9 +91,9 @@ implements ResourceScheduler, CapacitySchedulerContext {
   static final Comparator<CSQueue> queueComparator = new Comparator<CSQueue>() {
     @Override
     public int compare(CSQueue q1, CSQueue q2) {
-      if (q1.getUtilization() < q2.getUtilization()) {
+      if (q1.getUsedCapacity() < q2.getUsedCapacity()) {
         return -1;
-      } else if (q1.getUtilization() > q2.getUtilization()) {
+      } else if (q1.getUsedCapacity() > q2.getUsedCapacity()) {
         return 1;
       }
 
@@ -666,7 +666,10 @@ implements ResourceScheduler, CapacitySchedulerContext {
 
   private synchronized void removeNode(RMNode nodeInfo) {
     SchedulerNode node = this.nodes.get(nodeInfo.getNodeID());
-    Resources.subtractFrom(clusterResource, nodeInfo.getTotalCapability());
+    if (node == null) {
+      return;
+    }
+    Resources.subtractFrom(clusterResource, node.getRMNode().getTotalCapability());
     root.updateClusterResource(clusterResource);
     --numNodeManagers;
 
