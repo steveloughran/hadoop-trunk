@@ -26,6 +26,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,14 +34,18 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirType;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
 import org.apache.hadoop.hdfs.server.namenode.FileJournalManager.EditLogFile;
 import org.apache.hadoop.hdfs.server.namenode.FSImageStorageInspector.FSImageFile;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeDirType;
+import org.apache.hadoop.hdfs.util.Holder;
 import org.apache.hadoop.hdfs.util.MD5FileUtils;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -185,10 +190,63 @@ public abstract class FSImageTestUtil {
     Mockito.doReturn(sd).when(storage)
       .getStorageDirectory(Matchers.<URI>anyObject());
 
-    return new FSEditLog(new Configuration(), 
+    FSEditLog editLog = new FSEditLog(new Configuration(), 
                          storage,
                          ImmutableList.of(logDir.toURI()));
+    editLog.initJournalsForWrite();
+    return editLog;
   }
+  
+
+  /**
+   * Create an aborted in-progress log in the given directory, containing
+   * only a specified number of "mkdirs" operations.
+   */
+  public static void createAbortedLogWithMkdirs(File editsLogDir, int numDirs,
+      long firstTxId) throws IOException {
+    FSEditLog editLog = FSImageTestUtil.createStandaloneEditLog(editsLogDir);
+    editLog.setNextTxId(firstTxId);
+    editLog.openForWrite();
+    
+    PermissionStatus perms = PermissionStatus.createImmutable("fakeuser", "fakegroup",
+        FsPermission.createImmutable((short)0755));
+    for (int i = 1; i <= numDirs; i++) {
+      String dirName = "dir" + i;
+      INodeDirectory dir = new INodeDirectory(dirName, perms);
+      editLog.logMkDir("/" + dirName, dir);
+    }
+    editLog.logSync();
+    editLog.abortCurrentLogSegment();
+  }
+
+  /**
+   * @param editLog a path of an edit log file
+   * @return the count of each type of operation in the log file
+   * @throws Exception if there is an error reading it
+   */
+  public static EnumMap<FSEditLogOpCodes,Holder<Integer>> countEditLogOpTypes(
+      File editLog) throws Exception {
+    EnumMap<FSEditLogOpCodes, Holder<Integer>> opCounts =
+      new EnumMap<FSEditLogOpCodes, Holder<Integer>>(FSEditLogOpCodes.class);
+
+    EditLogInputStream elis = new EditLogFileInputStream(editLog);
+    try {
+      FSEditLogOp op;
+      while ((op = elis.readOp()) != null) {
+        Holder<Integer> i = opCounts.get(op.opCode);
+        if (i == null) {
+          i = new Holder<Integer>(0);
+          opCounts.put(op.opCode, i);
+        }
+        i.held++;
+      }
+    } finally {
+      IOUtils.closeStream(elis);
+    }
+    
+    return opCounts;
+  }
+
   
   /**
    * Assert that all of the given directories have the same newest filename
@@ -378,13 +436,20 @@ public abstract class FSImageTestUtil {
    * Assert that the NameNode has checkpoints at the expected
    * transaction IDs.
    */
-  static void assertNNHasCheckpoints(MiniDFSCluster cluster,
+  public static void assertNNHasCheckpoints(MiniDFSCluster cluster,
       List<Integer> txids) {
+    assertNNHasCheckpoints(cluster, 0, txids);
+  }
+  
+  public static void assertNNHasCheckpoints(MiniDFSCluster cluster,
+      int nnIdx, List<Integer> txids) {
 
-    for (File nameDir : getNameNodeCurrentDirs(cluster)) {
+    for (File nameDir : getNameNodeCurrentDirs(cluster, nnIdx)) {
       LOG.info("examining name dir with files: " +
           Joiner.on(",").join(nameDir.listFiles()));
       // Should have fsimage_N for the three checkpoints
+      LOG.info("Examining storage dir " + nameDir + " with contents: "
+          + StringUtils.join(nameDir.listFiles(), ", "));
       for (long checkpointTxId : txids) {
         File image = new File(nameDir,
                               NNStorage.getImageFileName(checkpointTxId));
@@ -393,9 +458,9 @@ public abstract class FSImageTestUtil {
     }
   }
 
-  static List<File> getNameNodeCurrentDirs(MiniDFSCluster cluster) {
+  public static List<File> getNameNodeCurrentDirs(MiniDFSCluster cluster, int nnIdx) {
     List<File> nameDirs = Lists.newArrayList();
-    for (URI u : cluster.getNameDirs(0)) {
+    for (URI u : cluster.getNameDirs(nnIdx)) {
       nameDirs.add(new File(u.getPath(), "current"));
     }
     return nameDirs;
@@ -409,7 +474,7 @@ public abstract class FSImageTestUtil {
   throws IOException {
     File currentDir = sd.getCurrentDir();
     List<EditLogFile> foundEditLogs 
-      = Lists.newArrayList(FileJournalManager.matchEditLogs(currentDir.listFiles()));
+      = Lists.newArrayList(FileJournalManager.matchEditLogs(currentDir));
     return Collections.max(foundEditLogs, EditLogFile.COMPARE_BY_START_TXID);
   }
 

@@ -36,7 +36,7 @@ import org.apache.hadoop.security.KerberosInfo;
     serverPrincipal = DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY,
     clientPrincipal = DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY)
 @InterfaceAudience.Private
-public interface NamenodeProtocol extends VersionedProtocol {
+public interface NamenodeProtocol {
   /**
    * Until version 6L, this class served as both
    * the client interface to the NN AND the RPC protocol used to 
@@ -101,10 +101,7 @@ public interface NamenodeProtocol extends VersionedProtocol {
    * call fails if the file system is in SafeMode.
    * @throws IOException
    * @return a unique token to identify this transaction.
-   * @deprecated 
-   *    See {@link org.apache.hadoop.hdfs.server.namenode.SecondaryNameNode}
    */
-  @Deprecated
   public CheckpointSignature rollEditLog() throws IOException;
 
   /**
