@@ -45,6 +45,15 @@ import org.apache.hadoop.classification.InterfaceAudience;
 public class LayoutVersion {
  
   /**
+   * Version in which HDFS-2991 was fixed. This bug caused OP_ADD to
+   * sometimes be skipped for append() calls. If we see such a case when
+   * loading the edits, but the version is known to have that bug, we
+   * workaround the issue. Otherwise we should consider it a corruption
+   * and bail.
+   */
+  public static final int BUGFIX_HDFS_2991_VERSION = -40;
+
+  /**
    * Enums for features that change the layout version.
    * <br><br>
    * To add a new layout version:
@@ -82,7 +91,10 @@ public class LayoutVersion {
     STORED_TXIDS(-37, "Transaction IDs are stored in edits log and image files"),
     TXID_BASED_LAYOUT(-38, "File names in NN Storage are based on transaction IDs"), 
     EDITLOG_OP_OPTIMIZATION(-39,
-        "Use LongWritable and ShortWritable directly instead of ArrayWritable of UTF8");
+        "Use LongWritable and ShortWritable directly instead of ArrayWritable of UTF8"),
+    OPTIMIZE_PERSIST_BLOCKS(-40,
+        "Serialize block lists with delta-encoded variable length ints, " +
+        "add OP_UPDATE_BLOCKS");
     
     final int lv;
     final int ancestorLV;

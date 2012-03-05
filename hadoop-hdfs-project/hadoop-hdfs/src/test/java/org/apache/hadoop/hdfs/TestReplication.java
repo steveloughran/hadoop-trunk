@@ -75,7 +75,8 @@ public class TestReplication extends TestCase {
   private void checkFile(FileSystem fileSys, Path name, int repl)
     throws IOException {
     Configuration conf = fileSys.getConf();
-    ClientProtocol namenode = DFSUtil.createNamenode(conf);
+    ClientProtocol namenode = NameNodeProxies.createProxy(conf, fileSys.getUri(),
+        ClientProtocol.class).getProxy();
       
     waitForBlockReplication(name.toString(), namenode, 
                             Math.min(numDatanodes, repl), -1);
@@ -200,7 +201,7 @@ public class TestReplication extends TestCase {
     Configuration conf = new HdfsConfiguration();
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_REPLICATION_CONSIDERLOAD_KEY, false);
     if (simulated) {
-      conf.setBoolean(SimulatedFSDataset.CONFIG_PROPERTY_SIMULATED, true);
+      SimulatedFSDataset.setFactory(conf);
     }
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
                                                .numDataNodes(numDatanodes)

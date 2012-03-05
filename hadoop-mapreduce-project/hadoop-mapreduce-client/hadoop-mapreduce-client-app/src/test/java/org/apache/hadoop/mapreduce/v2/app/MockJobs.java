@@ -98,7 +98,7 @@ public class MockJobs extends MockApps {
 
   public static final String NM_HOST = "localhost";
   public static final int NM_PORT = 1234;
-  public static final int NM_HTTP_PORT = 9999;
+  public static final int NM_HTTP_PORT = 8042;
 
   static final int DT = 1000000; // ms
 
@@ -106,6 +106,20 @@ public class MockJobs extends MockApps {
     return newAppName();
   }
 
+  /**
+   * Create numJobs in a map with jobs having appId==jobId
+   */
+  public static Map<JobId, Job> newJobs(int numJobs, int numTasksPerJob,
+      int numAttemptsPerTask) {
+    Map<JobId, Job> map = Maps.newHashMap();
+    for (int j = 0; j < numJobs; ++j) {
+      ApplicationId appID = MockJobs.newAppID(j);
+      Job job = newJob(appID, j, numTasksPerJob, numAttemptsPerTask);
+      map.put(job.getID(), job);
+    }
+    return map;
+  }
+  
   public static Map<JobId, Job> newJobs(ApplicationId appID, int numJobsPerApp,
       int numTasksPerJob, int numAttemptsPerTask) {
     Map<JobId, Job> map = Maps.newHashMap();
@@ -270,7 +284,7 @@ public class MockJobs extends MockApps {
 
       @Override
       public String getNodeHttpAddress() {
-        return "localhost:9999";
+        return "localhost:8042";
       }
 
       @Override
