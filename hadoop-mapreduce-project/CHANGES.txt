@@ -52,8 +52,12 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
+    MAPREDUCE-2722. [Gridmix] Gridmix simulated job's map's hdfsBytesRead
+                    counter is wrong when compressed input is used.(ravigummadi)
+
     MAPREDUCE-3757. [Rumen] Fixed Rumen Folder to adjust shuffleFinished and
-                    sortFinished times when needed.
+                    sortFinished times when needed.(ravigummadi)
+
     MAPREDUCE-3194. "mapred mradmin" command is broken in mrv2
                      (Jason Lowe via bobby)
 
@@ -80,6 +84,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-3664. Federation Documentation has incorrect configuration example.
     (Brandon Li via jitendra)
+
+    MAPREDUCE-3974. TestSubmitJob in MR1 tests doesn't compile after HDFS-162
+    merge. (atm)
 
 Release 0.23.3 - UNRELEASED
 
@@ -124,6 +131,9 @@ Release 0.23.3 - UNRELEASED
     MAPREDUCE-3728. ShuffleHandler can't access results when configured in a
     secure mode (ahmed via tucu)
 
+    MAPREDUCE-3952. In MR2, when Total input paths to process == 1,
+    CombinefileInputFormat.getSplits() returns 0 split. (zhenxiao via tucu)
+
 Release 0.23.2 - UNRELEASED
 
   INCOMPATIBLE CHANGES
@@ -155,6 +165,9 @@ Release 0.23.2 - UNRELEASED
 
     MAPREDUCE-3497. Added docs for YARN CLI. (tgraves via acmurthy) 
 
+    MAPREDUCE-3954. Added new envs to separate heap size for different daemons
+    started via bin scripts. (Robert Joseph Evans via vinodkv)
+
   OPTIMIZATIONS
 
     MAPREDUCE-3901. Modified JobHistory records in YARN to lazily load job and
@@ -162,6 +175,10 @@ Release 0.23.2 - UNRELEASED
 
     MAPREDUCE-2855. Passing a cached class-loader to ResourceBundle creator to
     minimize counter names lookup time. (Siddarth Seth via vinodkv)
+
+    MAPREDUCE-3944. Change the history jobs/ webservice to return partial job 
+    info for a significant performance improvement. (Robert Joseph Evans via
+    sseth)
 
   BUG FIXES
     MAPREDUCE-3918  proc_historyserver no longer in command line arguments for
@@ -258,6 +275,26 @@ Release 0.23.2 - UNRELEASED
     MAPREDUCE-3897. Fixed computation of maxActiveAppsPerUser for queues by
     using capacity and not max-capacity since we are already scaling it by
     userLimitFactor. (Eric Payne via acmurthy) 
+
+    MAPREDUCE-3009. Fixed node link on JobHistory webapp. (chackaravarthy via 
+    vinodkv)
+
+    MAPREDUCE-3964. ResourceManager does not have JVM metrics (Jason Lowe via
+    bobby)
+
+    MAPREDUCE-3034. Ensure NodeManager reboots itself on direction from
+    ResourceManager. (Devaraj K & Eric Payne via acmurthy) 
+
+    MAPREDUCE-3976. TestRMContainerAllocator failing (Jason Lowe via bobby)
+
+    MAPREDUCE-3961. Map/ReduceSlotMillis computation incorrect (Siddharth Seth
+    via bobby)
+
+    MAPREDUCE-3977. LogAggregationService leaks log aggregator objects
+    (Jason Lowe via bobby)
+
+    MAPREDUCE-3975. Default value not set for Configuration parameter
+    mapreduce.job.local.dir (Eric Payne via bobby)
 
 Release 0.23.1 - 2012-02-17
 
