@@ -20,7 +20,6 @@ package org.apache.hadoop.yarn.service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -59,7 +58,7 @@ public abstract class AbstractService implements Service {
   /**
    * List of static state change listeners.
    */
-  private List<ServiceStateChangeListener> globalListeners =
+  private static final List<ServiceStateChangeListener> globalListeners =
       new ArrayList<ServiceStateChangeListener>();
 
   /**
@@ -121,16 +120,24 @@ public abstract class AbstractService implements Service {
   }
 
   @Override
-  public void register(ServiceStateChangeListener l) {
-    synchronized (listeners) {
-      listeners.add(l);
-    }
+  public synchronized void register(ServiceStateChangeListener l) {
+    listeners.add(l);
   }
 
   @Override
   public synchronized void unregister(ServiceStateChangeListener l) {
-    synchronized (listeners) {
-      listeners.remove(l);
+    listeners.remove(l);
+  }
+
+  private static synchronized void registerGlobalListener(ServiceStateChangeListener l) {
+    synchronized (globalListeners) {
+      globalListeners.add(l);
+    }
+  }
+
+  private static synchronized void unregisterGlobalListener(ServiceStateChangeListener l) {
+    synchronized (globalListeners) {
+      globalListeners.remove(l);
     }
   }
 
@@ -176,13 +183,15 @@ public abstract class AbstractService implements Service {
     for (ServiceStateChangeListener l : listeners) {
       l.stateChanged(this);
     }
+    notifyStaticListeners(this);
   }
 
-  private static synchronized void addStaticStateChangeListener(StaticStateChangeListener listener) {
-    
+  private static void notifyStaticListeners(AbstractService service) {
+    synchronized (globalListeners) {
+      for (ServiceStateChangeListener l : globalListeners) {
+        l.stateChanged(service);
+      }
+    }
   }
-  
-  private static void notifyStaticListeners(AbstractService service, STATE newState) {
-    
-  }
+
 }
