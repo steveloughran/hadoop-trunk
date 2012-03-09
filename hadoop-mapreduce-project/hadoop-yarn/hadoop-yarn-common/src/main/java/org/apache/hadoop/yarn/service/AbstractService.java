@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -52,8 +53,14 @@ public abstract class AbstractService implements Service {
    * List of state change listeners; it is final to ensure
    * that it will never be null.
    */
-  private List<ServiceStateChangeListener> listeners =
+  private final List<ServiceStateChangeListener> listeners =
     new ArrayList<ServiceStateChangeListener>();
+
+  /**
+   * List of static state change listeners.
+   */
+  private List<ServiceStateChangeListener> globalListeners =
+      new ArrayList<ServiceStateChangeListener>();
 
   /**
    * Construct the service.
@@ -114,13 +121,17 @@ public abstract class AbstractService implements Service {
   }
 
   @Override
-  public synchronized void register(ServiceStateChangeListener l) {
-    listeners.add(l);
+  public void register(ServiceStateChangeListener l) {
+    synchronized (listeners) {
+      listeners.add(l);
+    }
   }
 
   @Override
   public synchronized void unregister(ServiceStateChangeListener l) {
-    listeners.remove(l);
+    synchronized (listeners) {
+      listeners.remove(l);
+    }
   }
 
   @Override
@@ -165,5 +176,13 @@ public abstract class AbstractService implements Service {
     for (ServiceStateChangeListener l : listeners) {
       l.stateChanged(this);
     }
+  }
+
+  private static synchronized void addStaticStateChangeListener(StaticStateChangeListener listener) {
+    
+  }
+  
+  private static void notifyStaticListeners(AbstractService service, STATE newState) {
+    
   }
 }
