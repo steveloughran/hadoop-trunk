@@ -81,6 +81,8 @@ public abstract class RMCommunicator extends AbstractService  {
 
   private final AppContext context;
   private Job job;
+  // Has a signal (SIGTERM etc) been issued?
+  protected volatile boolean isSignalled = false;
 
   public RMCommunicator(ClientService clientService, AppContext context) {
     super("RMCommunicator");
@@ -144,6 +146,10 @@ public abstract class RMCommunicator extends AbstractService  {
         scheduler.registerApplicationMaster(request);
       minContainerCapability = response.getMinimumResourceCapability();
       maxContainerCapability = response.getMaximumResourceCapability();
+      this.context.getClusterInfo().setMinContainerCapability(
+          minContainerCapability);
+      this.context.getClusterInfo().setMaxContainerCapability(
+          maxContainerCapability);
       this.applicationACLs = response.getApplicationACLs();
       LOG.info("minContainerCapability: " + minContainerCapability.getMemory());
       LOG.info("maxContainerCapability: " + maxContainerCapability.getMemory());
@@ -158,7 +164,8 @@ public abstract class RMCommunicator extends AbstractService  {
       FinalApplicationStatus finishState = FinalApplicationStatus.UNDEFINED;
       if (job.getState() == JobState.SUCCEEDED) {
         finishState = FinalApplicationStatus.SUCCEEDED;
-      } else if (job.getState() == JobState.KILLED) {
+      } else if (job.getState() == JobState.KILLED
+          || (job.getState() == JobState.RUNNING && isSignalled)) {
         finishState = FinalApplicationStatus.KILLED;
       } else if (job.getState() == JobState.FAILED
           || job.getState() == JobState.ERROR) {
@@ -278,4 +285,9 @@ public abstract class RMCommunicator extends AbstractService  {
   }
 
   protected abstract void heartbeat() throws Exception;
+
+  public void setSignalled(boolean isSignalled) {
+    this.isSignalled = isSignalled;
+    LOG.info("RMCommunicator notified that iSignalled was : " + isSignalled);
+  }
 }

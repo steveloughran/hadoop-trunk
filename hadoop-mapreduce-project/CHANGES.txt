@@ -4,8 +4,6 @@ Trunk (unreleased changes)
 
   INCOMPATIBLE CHANGES
 
-    MAPREDUCE-3545. Remove Avro RPC. (suresh)
-
   NEW FEATURES
 
     MAPREDUCE-778. Rumen Anonymizer. (Amar Kamat and Chris Douglas via amarrk)
@@ -32,12 +30,6 @@ Trunk (unreleased changes)
     MAPREDUCE-3008. Improvements to cumulative CPU emulation for short running
                     tasks in Gridmix. (amarrk)
 
-    MAPREDUCE-2887 due to HADOOP-7524 Change RPC to allow multiple protocols
-                   including multuple versions of the same protocol (sanjay Radia)
-
-    MAPREDUCE-2934. MR portion of HADOOP-7607 - Simplify the RPC proxy cleanup
-                    process (atm)
-
     MAPREDUCE-2836. Provide option to fail jobs when submitted to non-existent
     fair scheduler pools. (Ahmed Radwan via todd)
 
@@ -50,18 +42,22 @@ Trunk (unreleased changes)
     MAPREDUCE-3169. Create a new MiniMRCluster equivalent which only provides
     client APIs cross MR1 and MR2 (Ahmed via tucu)
 
-    HADOOP-7862   MR changes to work with HADOOP 7862:
-    Move the support for multiple protocols to lower layer so that Writable,
-    PB and Avro can all use it (Sanjay)
-
     MAPREDUCE-2944. Improve checking of input for JobClient.displayTasks() (XieXianshan via harsh)
 
-    MAPREDUCE-3909 Javadoc the Service interfaces (stevel)
+    MAPREDUCE-3956. Remove the use of the deprecated Syncable.sync() method from
+    TeraOutputFormat in the terasort example.  (szetszwo)
+
+    MAPREDUCE-3935. Annotate Counters.Counter and Counters.Group as @Public.
+    (tomwhite)
 
   BUG FIXES
 
+    MAPREDUCE-2722. [Gridmix] Gridmix simulated job's map's hdfsBytesRead
+                    counter is wrong when compressed input is used.(ravigummadi)
+
     MAPREDUCE-3757. [Rumen] Fixed Rumen Folder to adjust shuffleFinished and
-                    sortFinished times when needed.
+                    sortFinished times when needed.(ravigummadi)
+
     MAPREDUCE-3194. "mapred mradmin" command is broken in mrv2
                      (Jason Lowe via bobby)
 
@@ -89,23 +85,54 @@ Trunk (unreleased changes)
     MAPREDUCE-3664. Federation Documentation has incorrect configuration example.
     (Brandon Li via jitendra)
 
-    MAPREDUCE-3740. Fixed broken mapreduce compilation after the patch for
-    HADOOP-7965. (Devaraj K via vinodkv)
-
-    MAPREDUCE-3818. Fixed broken compilation in TestSubmitJob after the patch
-    for HDFS-2895. (Suresh Srinivas via vinodkv)
+    MAPREDUCE-3974. TestSubmitJob in MR1 tests doesn't compile after HDFS-162
+    merge. (atm)
 
 Release 0.23.3 - UNRELEASED
 
   INCOMPATIBLE CHANGES
 
+    MAPREDUCE-3545. Remove Avro RPC. (suresh)
+
   NEW FEATURES
 
   IMPROVEMENTS
 
+    MAPREDUCE-2887. Due to HADOOP-7524, change RPC to allow multiple protocols
+    including multuple versions of the same protocol (Sanjay Radia)
+
+    MAPREDUCE-2934. MR portion of HADOOP-7607 - Simplify the RPC proxy cleanup
+    process (atm)
+
+    HADOOP-7862. MR changes to work with HADOOP 7862: Move the support for
+    multiple protocols to lower layer so that Writable, PB and Avro can all
+    use it (Sanjay Radia)
+
+    MAPREDUCE-3909 Javadoc the Service interfaces (stevel)
+
+    MAPREDUCE-3885. Avoid an unnecessary copy for all requests/responses in 
+    MRs ProtoOverHadoopRpcEngine. (Devaraj Das via sseth)
+
   OPTIMIZATIONS
 
   BUG FIXES
+
+    MAPREDUCE-3740. Fixed broken mapreduce compilation after the patch for
+    HADOOP-7965. (Devaraj K via vinodkv) 
+
+    MAPREDUCE-3818. Fixed broken compilation in TestSubmitJob after the patch
+    for HDFS-2895. (Suresh Srinivas via vinodkv)
+
+    MAPREDUCE-2942. TestNMAuditLogger.testNMAuditLoggerWithIP failing (Thomas
+    Graves via mahadev)
+
+    MAPREDUCE-3933. Failures because MALLOC_ARENA_MAX is not set (ahmed via tucu)
+
+    MAPREDUCE-3728. ShuffleHandler can't access results when configured in a
+    secure mode (ahmed via tucu)
+
+    MAPREDUCE-3952. In MR2, when Total input paths to process == 1,
+    CombinefileInputFormat.getSplits() returns 0 split. (zhenxiao via tucu)
 
 Release 0.23.2 - UNRELEASED
 
@@ -133,7 +160,25 @@ Release 0.23.2 - UNRELEASED
     MAPREDUCE-2793. Corrected AppIDs, JobIDs, TaskAttemptIDs to be of correct
     format on the web pages. (Bikas Saha via vinodkv)
 
+    MAPREDUCE-3614. Fixed MR AM to close history file quickly and send a correct
+    final state to the RM when it is killed. (Ravi Prakash via vinodkv)
+
+    MAPREDUCE-3497. Added docs for YARN CLI. (tgraves via acmurthy) 
+
+    MAPREDUCE-3954. Added new envs to separate heap size for different daemons
+    started via bin scripts. (Robert Joseph Evans via vinodkv)
+
   OPTIMIZATIONS
+
+    MAPREDUCE-3901. Modified JobHistory records in YARN to lazily load job and
+    task reports so as to improve UI response times. (Siddarth Seth via vinodkv)
+
+    MAPREDUCE-2855. Passing a cached class-loader to ResourceBundle creator to
+    minimize counter names lookup time. (Siddarth Seth via vinodkv)
+
+    MAPREDUCE-3944. Change the history jobs/ webservice to return partial job 
+    info for a significant performance improvement. (Robert Joseph Evans via
+    sseth)
 
   BUG FIXES
     MAPREDUCE-3918  proc_historyserver no longer in command line arguments for
@@ -184,6 +229,72 @@ Release 0.23.2 - UNRELEASED
 
     MAPREDUCE-3913. RM application webpage is unresponsive after 2000 jobs
     (Jason Lowe via tgraves)
+
+    MAPREDUCE-3922. Fixed build to not compile 32bit container-executor binary
+    by default on all platforms. (Hitesh Shah via vinodkv)
+
+    MAPREDUCE-3790. Broken pipe on streaming job can lead to truncated output for
+    a successful job (Jason Lowe via bobby)
+
+    MAPREDUCE-3816. capacity scheduler web ui bar graphs for used capacity wrong
+    (tgraves via bobby)
+
+    MAPREDUCE-3930. Fixed an NPE while accessing the AM page/webservice for a 
+    task attempt without an assigned container. (Robert Joseph Evans via
+    sseth)
+
+    MAPREDUCE-3931. Changed PB implementation of LocalResource to take locks
+    so that race conditions don't fail tasks by inadvertantly changing the
+    timestamps. (Siddarth Seth via vinodkv)
+
+    MAPREDUCE-3687.  If AM dies before it returns new tracking URL, proxy
+    redirects to http://N/A/ and doesn't return error code (Ravi Prakash via
+    bobby)
+ 
+    MAPREDUCE-3920. Revise yarn default port number selection 
+    (Dave Thompson via tgraves)
+
+    MAPREDUCE-3903. Add support for mapreduce admin users. (Thomas Graves via
+    sseth)
+
+    MAPREDUCE-3706. Fix circular redirect error in job-attempts page. (bobby
+    via acmurthy)
+
+    MAPREDUCE-3896. Add user information to the delegation token issued by the
+    history server. (Vinod Kumar Vavilapalli via sseth)
+
+    MAPREDUCE-3792. Fix "bin/mapred job -list" to display all jobs instead of
+    only the jobs owned by the user. (Jason Lowe via vinodkv)
+
+    MAPREDUCE-3929. Fixed output of 'bin/mapred queue -showacl' command to 
+    clarify ACLs for users. (John George via acmurthy) 
+
+    MAPREDUCE-3960. Fix web-proxy to forward request to AM with configured
+    hostname or IP. (tgraves via acmurthy) 
+
+    MAPREDUCE-3897. Fixed computation of maxActiveAppsPerUser for queues by
+    using capacity and not max-capacity since we are already scaling it by
+    userLimitFactor. (Eric Payne via acmurthy) 
+
+    MAPREDUCE-3009. Fixed node link on JobHistory webapp. (chackaravarthy via 
+    vinodkv)
+
+    MAPREDUCE-3964. ResourceManager does not have JVM metrics (Jason Lowe via
+    bobby)
+
+    MAPREDUCE-3034. Ensure NodeManager reboots itself on direction from
+    ResourceManager. (Devaraj K & Eric Payne via acmurthy) 
+
+    MAPREDUCE-3976. TestRMContainerAllocator failing (Jason Lowe via bobby)
+
+    MAPREDUCE-3961. Map/ReduceSlotMillis computation incorrect (Siddharth Seth
+    via bobby)
+
+    MAPREDUCE-3977. LogAggregationService leaks log aggregator objects
+    (Jason Lowe via bobby)
+
+    MAPREDUCE-3975. Default value not set for Configuration parameter
+    mapreduce.job.local.dir (Eric Payne via bobby)
 
 Release 0.23.1 - 2012-02-17
 
@@ -2269,9 +2380,6 @@ Release 0.23.0 - 2011-11-01
     MAPREDUCE-2948. Hadoop streaming test failure, post MR-2767 (mahadev)
 
     MAPREDUCE-2908. Fix all findbugs warnings. (vinodkv via acmurthy)
-
-    MAPREDUCE-2942. TestNMAuditLogger.testNMAuditLoggerWithIP failing (Thomas Graves
-    via mahadev)
 
     MAPREDUCE-2947. Fixed race condition in AuxiliaryServices. (vinodkv via
     acmurthy)

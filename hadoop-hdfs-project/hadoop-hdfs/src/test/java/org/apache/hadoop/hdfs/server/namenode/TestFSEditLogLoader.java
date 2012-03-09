@@ -90,15 +90,17 @@ public class TestFSEditLogLoader {
     }
     rwf.close();
     
-    String expectedErrorMessage = "^Error replaying edit log at offset \\d+\n";
-    expectedErrorMessage += "Recent opcode offsets: (\\d+\\s*){4}$";
+    StringBuilder bld = new StringBuilder();
+    bld.append("^Error replaying edit log at offset \\d+");
+    bld.append(" on transaction ID \\d+\n");
+    bld.append("Recent opcode offsets: (\\d+\\s*){4}$");
     try {
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(NUM_DATA_NODES)
           .format(false).build();
       fail("should not be able to start");
     } catch (IOException e) {
       assertTrue("error message contains opcodes message",
-          e.getMessage().matches(expectedErrorMessage));
+          e.getMessage().matches(bld.toString()));
     }
   }
   
@@ -165,7 +167,7 @@ public class TestFSEditLogLoader {
     SortedMap<Long, Long> offsetToTxId = Maps.newTreeMap();
     try {
       fsel = FSImageTestUtil.createStandaloneEditLog(testDir);
-      fsel.open();
+      fsel.openForWrite();
       assertTrue("should exist: " + logFile, logFile.exists());
       
       for (int i = 0; i < NUM_TXNS; i++) {
@@ -243,7 +245,9 @@ public class TestFSEditLogLoader {
       Files.copy(logFileBak, logFile);
       corruptByteInFile(logFile, offset);
       EditLogValidation val = EditLogFileInputStream.validateEditLog(logFile);
-      assertTrue(val.getNumTransactions() >= prevNumValid);
+      assertTrue(String.format("%d should have been >= %d",
+          val.getNumTransactions(), prevNumValid),
+          val.getNumTransactions() >= prevNumValid);
       prevNumValid = val.getNumTransactions();
     }
   }
