@@ -64,7 +64,7 @@ public class TestGlobalStateChangeListener extends ServiceAssert {
   public void assertListenerEventCount(BreakableStateChangeListener l,
                                        int count) {
     assertEquals("Wrong event count in " + l, count, l.getEventCount());
-  }  
+  }
 
   @Test
   public void testRegisterListener() {
@@ -170,7 +170,7 @@ public class TestGlobalStateChangeListener extends ServiceAssert {
       //this is the listener that is not expected to have been invoked
       assertListenerState(l3, Service.STATE.INITED);
       assertListenerEventCount(l3, 1);
-      
+
       //stop the service
       service.stop();
       //listeners are all updated
@@ -186,7 +186,7 @@ public class TestGlobalStateChangeListener extends ServiceAssert {
 
 
     //for completeness, check that the listeners are all unregistered, even
-    //though they were registered in a different order. 
+    //though they were registered in a different order.
     //rather than do this by doing unregister checks, a new service is created
     BreakableService service = new BreakableService();
     //this service is initialized

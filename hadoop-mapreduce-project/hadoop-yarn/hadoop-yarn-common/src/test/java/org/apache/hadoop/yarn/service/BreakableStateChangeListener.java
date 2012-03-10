@@ -48,12 +48,12 @@ public class BreakableStateChangeListener
     lastState = service.getServiceState();
     if (lastState == failingState) {
       throw new BreakableService.BrokenLifecycleEvent("Failure entering "
-                  + lastState 
-                  + " for " 
+                  + lastState
+                  + " for "
                   + service.getName());
     }
   }
-  
+
   public synchronized int getEventCount() {
     return eventCount;
   }

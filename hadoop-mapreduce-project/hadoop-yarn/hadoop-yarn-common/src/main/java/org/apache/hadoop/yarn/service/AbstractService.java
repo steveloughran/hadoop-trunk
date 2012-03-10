@@ -145,7 +145,7 @@ public abstract class AbstractService implements Service {
   /**
    * Unregister a global listener, returning true if it was in the current list
    * of listeners.
-   * @param l the listener 
+   * @param l the listener
    * @return true if and only if the listener was in the list of global listeners.
    */
   public static synchronized boolean unregisterGlobalListener(ServiceStateChangeListener l) {
