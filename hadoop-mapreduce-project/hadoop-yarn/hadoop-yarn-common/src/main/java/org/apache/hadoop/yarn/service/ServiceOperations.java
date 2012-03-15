@@ -34,11 +34,11 @@ public final class ServiceOperations {
   /**
    * The list of static state change listeners.
    * This field is deliberately not downgraded to List<> to ensure that the
-   * clone operation is a public shallow copy. 
+   * clone operation is a public shallow copy.
    */
   private static final ArrayList<ServiceStateChangeListener> globalListeners =
       new ArrayList<ServiceStateChangeListener>();
-  
+
   private ServiceOperations() {
   }
 
@@ -191,7 +191,7 @@ public final class ServiceOperations {
     //shallow-clone to list so the iterator does not get confused
     //by changes to the list during notification processing.
     synchronized (globalListeners) {
-      listenerList = (ArrayList<ServiceStateChangeListener>) 
+      listenerList = (ArrayList<ServiceStateChangeListener>)
                       (globalListeners.clone());
     }
     //notify the listeners

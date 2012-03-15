@@ -21,7 +21,7 @@ package org.apache.hadoop.yarn.service;
 /**
  * A state change listener that logs the number of state change events received,
  * and the last state invoked.
- * 
+ *
  * It can be configured to fail during a state change event
  */
 public class BreakableStateChangeListener

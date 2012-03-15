@@ -30,7 +30,7 @@ public class LoggingStateChangeListener implements ServiceStateChangeListener {
 
   @Override
   public void stateChanged(Service service) {
-    LOG.info("Entry to state "  + service.getServiceState() 
+    LOG.info("Entry to state "  + service.getServiceState()
                  + " for " + service.getName());
   }
 }

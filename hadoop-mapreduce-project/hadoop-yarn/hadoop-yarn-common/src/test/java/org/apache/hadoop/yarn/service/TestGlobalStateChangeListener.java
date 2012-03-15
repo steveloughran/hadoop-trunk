@@ -60,7 +60,7 @@ public class TestGlobalStateChangeListener extends ServiceAssert {
   }
 
   /**
-   * Assert that the last state of the listener is that the test expected. 
+   * Assert that the last state of the listener is that the test expected.
    * @param breakable a breakable listener
    * @param state the expected state
    */
@@ -183,7 +183,7 @@ public class TestGlobalStateChangeListener extends ServiceAssert {
     } catch (BreakableService.BrokenLifecycleEvent e) {
       //expected
     }
-    //expect that listener l1 and the failing listener are in start, but 
+    //expect that listener l1 and the failing listener are in start, but
     //not the final one
     assertServiceStateStarted(service);
     assertListenerState(l0, Service.STATE.STARTED);
