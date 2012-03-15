@@ -22,6 +22,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 
+import java.util.ArrayList;
+
 /**
  * This class contains a set of methods to work with services, especially
  * to walk them through their lifecycle.
@@ -29,6 +31,14 @@ import org.apache.hadoop.conf.Configuration;
 public final class ServiceOperations {
   private static final Log LOG = LogFactory.getLog(AbstractService.class);
 
+  /**
+   * The list of static state change listeners.
+   * This field is deliberately not downgraded to List<> to ensure that the
+   * clone operation is a public shallow copy. 
+   */
+  private static final ArrayList<ServiceStateChangeListener> globalListeners =
+      new ArrayList<ServiceStateChangeListener>();
+  
   private ServiceOperations() {
   }
 
@@ -136,5 +146,65 @@ public final class ServiceOperations {
       return e;
     }
     return null;
+  }
+
+  /**
+   * Register a global listener at the end of the list of listeners.
+   * If a listener is added more than once, the previous entry is removed
+   * and the new listener appended to the current list.
+   * @param l the listener
+   */
+  public static synchronized void registerGlobalListener(ServiceStateChangeListener l) {
+    if (l == null) {
+      throw new IllegalArgumentException();
+    }
+    synchronized (globalListeners) {
+      unregisterGlobalListener(l);
+      globalListeners.add(l);
+    }
+  }
+
+  /**
+   * Unregister a global listener, returning true if it was in the current list
+   * of listeners.
+   * @param l the listener
+   * @return true if and only if the listener was in the list of global listeners.
+   */
+  public static synchronized boolean unregisterGlobalListener(ServiceStateChangeListener l) {
+    synchronized (globalListeners) {
+      return globalListeners.remove(l);
+    }
+  }
+
+  /**
+   * Notify the global listener list of a state change in a service.
+   * This is invoked by {@link AbstractService}; subclasses of that class
+   * do not need to invoke this method.
+   * @param service the service that has changed state.
+   */
+  public static void notifyGlobalListeners(Service service) {
+    if (service == null) {
+      throw new IllegalArgumentException();
+    }
+    ArrayList<ServiceStateChangeListener> listenerList;
+    //shallow-clone to list so the iterator does not get confused
+    //by changes to the list during notification processing.
+    synchronized (globalListeners) {
+      listenerList = (ArrayList<ServiceStateChangeListener>) 
+                      (globalListeners.clone());
+    }
+    //notify the listeners
+    for (ServiceStateChangeListener l : listenerList) {
+      l.stateChanged(service);
+    }
+  }
+
+  /**
+   * Package-scoped method for testing -resets the listener list.
+   */
+  static void resetGlobalListeners() {
+    synchronized (globalListeners) {
+      globalListeners.clear();
+    }
   }
 }

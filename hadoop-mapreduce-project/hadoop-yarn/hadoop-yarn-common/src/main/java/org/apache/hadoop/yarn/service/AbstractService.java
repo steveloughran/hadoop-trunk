@@ -56,12 +56,6 @@ public abstract class AbstractService implements Service {
     new ArrayList<ServiceStateChangeListener>();
 
   /**
-   * List of static state change listeners.
-   */
-  private static final List<ServiceStateChangeListener> globalListeners =
-      new ArrayList<ServiceStateChangeListener>();
-
-  /**
    * Construct the service.
    * @param name service name
    */
@@ -129,31 +123,6 @@ public abstract class AbstractService implements Service {
     listeners.remove(l);
   }
 
-  /**
-   * Register a global listener at the end of the list of listeners.
-   * If a listener is added more than once, the previous entry is removed
-   * and the new listener appended to the current list.
-   * @param l the listener
-   */
-  public static synchronized void registerGlobalListener(ServiceStateChangeListener l) {
-    synchronized (globalListeners) {
-      unregisterGlobalListener(l);
-      globalListeners.add(l);
-    }
-  }
-
-  /**
-   * Unregister a global listener, returning true if it was in the current list
-   * of listeners.
-   * @param l the listener
-   * @return true if and only if the listener was in the list of global listeners.
-   */
-  public static synchronized boolean unregisterGlobalListener(ServiceStateChangeListener l) {
-    synchronized (globalListeners) {
-      return globalListeners.remove(l);
-    }
-  }
-
   @Override
   public String getName() {
     return name;
@@ -193,15 +162,7 @@ public abstract class AbstractService implements Service {
     for (ServiceStateChangeListener l : listeners) {
       l.stateChanged(this);
     }
-    notifyStaticListeners(this);
+    //notify the global listeners
+    ServiceOperations.notifyGlobalListeners(this);
   }
-
-  private static void notifyStaticListeners(AbstractService service) {
-    synchronized (globalListeners) {
-      for (ServiceStateChangeListener l : globalListeners) {
-        l.stateChanged(service);
-      }
-    }
-  }
-
 }

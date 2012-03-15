@@ -44,34 +44,54 @@ public class TestGlobalStateChangeListener extends ServiceAssert {
   }
 
   private void register(ServiceStateChangeListener l) {
-    AbstractService.registerGlobalListener(l);
+    ServiceOperations.registerGlobalListener(l);
   }
 
   private boolean unregister(ServiceStateChangeListener l) {
-    return AbstractService.unregisterGlobalListener(l);
+    return ServiceOperations.unregisterGlobalListener(l);
   }
 
+  /**
+   * After every test case reset the list of global listeners.
+   */
   @After
   public void cleanup() {
-    unregister();
+    ServiceOperations.resetGlobalListeners();
   }
 
-  public void assertListenerState(BreakableStateChangeListener l,
+  /**
+   * Assert that the last state of the listener is that the test expected. 
+   * @param breakable a breakable listener
+   * @param state the expected state
+   */
+  public void assertListenerState(BreakableStateChangeListener breakable,
                                   Service.STATE state) {
-    assertEquals("Wrong state in " + l, state, l.getLastState());
+    assertEquals("Wrong state in " + breakable, state, breakable.getLastState());
   }
 
-  public void assertListenerEventCount(BreakableStateChangeListener l,
+  /**
+   * Assert that the number of state change notifications matches expectations.
+   * @param breakable the listener
+   * @param count the expected count.
+   */
+  public void assertListenerEventCount(BreakableStateChangeListener breakable,
                                        int count) {
-    assertEquals("Wrong event count in " + l, count, l.getEventCount());
+    assertEquals("Wrong event count in " + breakable, count,
+                 breakable.getEventCount());
   }
 
+  /**
+   * Test that register/unregister works
+   */
   @Test
   public void testRegisterListener() {
     register();
     assertTrue("listener not registered", unregister());
   }
 
+  /**
+   * Test that double registration results in one registration only.
+   */
   @Test
   public void testRegisterListenerTwice() {
     register();
@@ -81,6 +101,10 @@ public class TestGlobalStateChangeListener extends ServiceAssert {
     assertFalse("listener double registered", unregister());
   }
 
+  /**
+   * Test that the {@link BreakableStateChangeListener} is picking up
+   * the state changes and that its last event field is as expected.
+   */
   @Test
   public void testEventHistory() {
     register();
@@ -106,7 +130,6 @@ public class TestGlobalStateChangeListener extends ServiceAssert {
    * service has already reached it's desired state, purely because the
    * notifications take place afterwards.
    *
-   * @if thrown
    */
   @Test
   public void testListenerFailure() {
@@ -135,6 +158,7 @@ public class TestGlobalStateChangeListener extends ServiceAssert {
   @Test
   public void testListenerChain() {
 
+    //create and register the listeners
     LoggingStateChangeListener logListener = new LoggingStateChangeListener();
     register(logListener);
     BreakableStateChangeListener l0 = new BreakableStateChangeListener("l0");
@@ -144,51 +168,47 @@ public class TestGlobalStateChangeListener extends ServiceAssert {
     BreakableStateChangeListener l3 = new BreakableStateChangeListener("l3");
     register(l3);
 
+    //create and init a service.
+    BreakableService service = new BreakableService();
+    service.init(new Configuration());
+    assertServiceStateInited(service);
+    assertListenerState(l0, Service.STATE.INITED);
+    assertListenerState(listener, Service.STATE.INITED);
+    assertListenerState(l3, Service.STATE.INITED);
+
     try {
-      //create and init a service.
-      BreakableService service = new BreakableService();
-      service.init(new Configuration());
-      assertServiceStateInited(service);
-      assertListenerState(l0, Service.STATE.INITED);
-      assertListenerState(listener, Service.STATE.INITED);
-      assertListenerState(l3, Service.STATE.INITED);
-
-      try {
-        //now start and expect that to fail
-        service.start();
-        fail("expected service start to fail");
-      } catch (BreakableService.BrokenLifecycleEvent e) {
-        //expected
-      }
-      //expect that listener l1 and the failing listener are in start, but 
-      //not the final one
-      assertServiceStateStarted(service);
-      assertListenerState(l0, Service.STATE.STARTED);
-      assertListenerEventCount(l0, 2);
-      assertListenerState(listener, Service.STATE.STARTED);
-      assertListenerEventCount(listener, 2);
-      //this is the listener that is not expected to have been invoked
-      assertListenerState(l3, Service.STATE.INITED);
-      assertListenerEventCount(l3, 1);
-
-      //stop the service
-      service.stop();
-      //listeners are all updated
-      assertListenerEventCount(l0, 3);
-      assertListenerEventCount(listener, 3);
-      assertListenerEventCount(l3, 2);
-    } finally {
-      //can all be unregistered in any order
-      unregister(logListener);
-      unregister(l0);
-      unregister(l3);
+      //now start and expect that to fail
+      service.start();
+      fail("expected service start to fail");
+    } catch (BreakableService.BrokenLifecycleEvent e) {
+      //expected
     }
+    //expect that listener l1 and the failing listener are in start, but 
+    //not the final one
+    assertServiceStateStarted(service);
+    assertListenerState(l0, Service.STATE.STARTED);
+    assertListenerEventCount(l0, 2);
+    assertListenerState(listener, Service.STATE.STARTED);
+    assertListenerEventCount(listener, 2);
+    //this is the listener that is not expected to have been invoked
+    assertListenerState(l3, Service.STATE.INITED);
+    assertListenerEventCount(l3, 1);
 
+    //stop the service
+    service.stop();
+    //listeners are all updated
+    assertListenerEventCount(l0, 3);
+    assertListenerEventCount(listener, 3);
+    assertListenerEventCount(l3, 2);
+    //can all be unregistered in any order
+    unregister(logListener);
+    unregister(l0);
+    unregister(l3);
 
-    //for completeness, check that the listeners are all unregistered, even
+    //check that the listeners are all unregistered, even
     //though they were registered in a different order.
     //rather than do this by doing unregister checks, a new service is created
-    BreakableService service = new BreakableService();
+    service = new BreakableService();
     //this service is initialized
     service.init(new Configuration());
     //it is asserted that the event count has not changed for the unregistered
@@ -199,6 +219,5 @@ public class TestGlobalStateChangeListener extends ServiceAssert {
     //has incremented by one
     assertListenerEventCount(listener, 4);
   }
-
 
 }
