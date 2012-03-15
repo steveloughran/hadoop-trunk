@@ -182,6 +182,7 @@ public final class ServiceOperations {
    * do not need to invoke this method.
    * @param service the service that has changed state.
    */
+  @SuppressWarnings("unchecked")
   public static void notifyGlobalListeners(Service service) {
     if (service == null) {
       throw new IllegalArgumentException();
