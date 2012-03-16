@@ -114,21 +114,14 @@ public class DelegationTokenRenewer extends AbstractService {
   public synchronized void stop() {
     if (renewalTimer != null) {
       renewalTimer.cancel();
-      renewalTimer = null;
     }
-    if (delegationTokens != null) {
-      delegationTokens.clear();
-      delegationTokens = null;
-    }
+    delegationTokens.clear();
 
-    if (dtCancelThread != null) {
-      dtCancelThread.interrupt();
-      try {
-        dtCancelThread.join(1000);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-      dtCancelThread = null;
+    dtCancelThread.interrupt();
+    try {
+      dtCancelThread.join(1000);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
     }
     if (tokenKeepAliveEnabled && delayedRemovalThread != null) {
       delayedRemovalThread.interrupt();
@@ -138,6 +131,7 @@ public class DelegationTokenRenewer extends AbstractService {
         LOG.info("Interrupted while joining on delayed removal thread.", e);
       }
     }
+    
     super.stop();
   }
 
