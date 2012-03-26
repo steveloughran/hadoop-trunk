@@ -52,6 +52,10 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
+    MAPREDUCE-3953. [Gridmix] Gridmix throws NPE and does not simulate a
+                    job if the trace contains null taskStatus for a task.
+                    (ravigummadi)
+
     MAPREDUCE-3829. [Gridmix] Gridmix should give better error message when
                     input data directory already exists and -generate opton is
                     given.(ravigummadi)
@@ -89,6 +93,9 @@ Trunk (unreleased changes)
     MAPREDUCE-3664. Federation Documentation has incorrect configuration example.
     (Brandon Li via jitendra)
 
+    MAPREDUCE-1740. NPE in getMatchingLevelForNodes when node locations are 
+    variable depth (ahmed via tucu) [IMPORTANT: this is dead code in trunk]
+
 Release 0.23.3 - UNRELEASED
 
   INCOMPATIBLE CHANGES
@@ -120,8 +127,11 @@ Release 0.23.3 - UNRELEASED
     MAPREDUCE-3773. Add queue metrics with buckets for job run times. (omalley
     via acmurthy)
 
-    MAPREDUCE-3970 Add ServiceOperations class to aid working with Services
+    MAPREDUCE-3970. Add ServiceOperations class to aid working with Services
     (stevel)
+
+    MAPREDUCE-3533. Add a channel between RM and AM to get information on
+    nodes. (Bikas Saha via acmurthy) 
 
   OPTIMIZATIONS
 
@@ -158,6 +168,11 @@ Release 0.23.3 - UNRELEASED
 
     MAPREDUCE-3431 NPE in Resource Manager shutdown. (stevel)
 
+    MAPREDUCE-4010.  TestWritableJobConf fails on trunk (tucu via bobby)
+
+    MAPREDUCE-3992. Reduce fetcher doesn't verify HTTP status code of response
+    (todd)
+
 Release 0.23.2 - UNRELEASED
 
   INCOMPATIBLE CHANGES
@@ -191,6 +206,15 @@ Release 0.23.2 - UNRELEASED
 
     MAPREDUCE-3954. Added new envs to separate heap size for different daemons
     started via bin scripts. (Robert Joseph Evans via vinodkv)
+
+    MAPREDUCE-4025. AM can crash if task attempt reports bogus progress value
+    (Jason Lowe via bobby)
+
+    MAPREDUCE-4034. Unable to view task logs on history server with
+    mapreduce.job.acl-view-job=* (Jason Lowe and Siddarth Seth via bobby)
+
+    MAPREDUCE-4043. Secret keys set in Credentials are not seen by tasks
+    (Jason Lowe via bobby) 
 
   OPTIMIZATIONS
 
@@ -322,6 +346,12 @@ Release 0.23.2 - UNRELEASED
 
     MAPREDUCE-3982. Fixed FileOutputCommitter to not err out for an 'empty-job'
     whose tasks don't write any outputs. (Robert Joseph Evans via vinodkv)
+
+    MAPREDUCE-4005. Fixes broken AM container logs URL on ResourceManager
+    Application Info page. (Jason Lowe via sseth)
+
+    MAPREDUCE-4006. History server container log web UI sometimes combines
+    stderr/stdout/syslog contents together (Siddharth Seth via tgraves)
 
 Release 0.23.1 - 2012-02-17
 

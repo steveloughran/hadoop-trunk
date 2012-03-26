@@ -18,6 +18,27 @@
 
 package org.apache.hadoop.hdfs.server.datanode;
 
+import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Matchers.anyListOf;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyObject;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -34,21 +55,19 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
-import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNode.BlockRecord;
-import org.apache.hadoop.hdfs.server.datanode.FSDatasetInterface.BlockWriteStreams;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaOutputStreams;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.InterDatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NNHAStatusHeartbeat;
+import org.apache.hadoop.hdfs.server.protocol.NNHAStatusHeartbeat.State;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
-import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
-import org.apache.hadoop.hdfs.server.protocol.NNHAStatusHeartbeat.State;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Daemon;
@@ -61,16 +80,6 @@ import org.junit.Test;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-
-import static org.junit.Assert.fail;
-import static org.mockito.Mockito.*;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 
 /**
  * This tests if sync all replicas in block recovery works correctly
@@ -128,8 +137,7 @@ public class TestBlockRecovery {
         return (DatanodeRegistration) invocation.getArguments()[0];
       }
     }).when(namenode).registerDatanode(
-        Mockito.any(DatanodeRegistration.class),
-        Mockito.any(DatanodeStorage[].class));
+        Mockito.any(DatanodeRegistration.class));
 
     when(namenode.versionRequest()).thenReturn(new NamespaceInfo
         (1, CLUSTER_ID, POOL_ID, 1L, 1));
@@ -196,11 +204,9 @@ public class TestBlockRecovery {
     syncList.add(record2);
     
     when(dn1.updateReplicaUnderRecovery((ExtendedBlock)anyObject(), anyLong(), 
-        anyLong())).thenReturn(new ExtendedBlock(block.getBlockPoolId(), 
-            block.getBlockId(), expectLen, block.getGenerationStamp()));
+        anyLong())).thenReturn("storage1");
     when(dn2.updateReplicaUnderRecovery((ExtendedBlock)anyObject(), anyLong(), 
-        anyLong())).thenReturn(new ExtendedBlock(block.getBlockPoolId(), 
-            block.getBlockId(), expectLen, block.getGenerationStamp()));
+        anyLong())).thenReturn("storage2");
     dn.syncBlock(rBlock, syncList);
   }
   
@@ -463,7 +469,7 @@ public class TestBlockRecovery {
     d.join();
     DatanodeProtocol dnP = dn.getActiveNamenodeForBP(POOL_ID);
     verify(dnP).commitBlockSynchronization(
-        block, RECOVERY_ID, 0, true, true, DatanodeID.EMPTY_ARRAY);
+        block, RECOVERY_ID, 0, true, true, DatanodeID.EMPTY_ARRAY, null);
   }
 
   private List<BlockRecord> initBlockRecords(DataNode spyDN) throws IOException {
@@ -521,7 +527,7 @@ public class TestBlockRecovery {
     DatanodeProtocol namenode = dn.getActiveNamenodeForBP(POOL_ID);
     verify(namenode, never()).commitBlockSynchronization(
         any(ExtendedBlock.class), anyLong(), anyLong(), anyBoolean(),
-        anyBoolean(), any(DatanodeID[].class));
+        anyBoolean(), any(DatanodeID[].class), any(String[].class));
   }
 
   /**
@@ -535,11 +541,11 @@ public class TestBlockRecovery {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
     ReplicaInPipelineInterface replicaInfo = dn.data.createRbw(block);
-    BlockWriteStreams streams = null;
+    ReplicaOutputStreams streams = null;
     try {
       streams = replicaInfo.createStreams(true,
           DataChecksum.newDataChecksum(DataChecksum.CHECKSUM_CRC32, 512));
-      streams.checksumOut.write('a');
+      streams.getChecksumOut().write('a');
       dn.data.initReplicaRecovery(new RecoveringBlock(block, null, RECOVERY_ID+1));
       try {
         dn.syncBlock(rBlock, initBlockRecords(dn));
@@ -550,7 +556,7 @@ public class TestBlockRecovery {
       DatanodeProtocol namenode = dn.getActiveNamenodeForBP(POOL_ID);
       verify(namenode, never()).commitBlockSynchronization(
           any(ExtendedBlock.class), anyLong(), anyLong(), anyBoolean(),
-          anyBoolean(), any(DatanodeID[].class));
+          anyBoolean(), any(DatanodeID[].class), any(String[].class));
     } finally {
       streams.close();
     }

@@ -26,18 +26,20 @@ import java.io.PrintStream;
 
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.Log;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
+import org.apache.hadoop.ha.HAServiceStatus;
+import org.apache.hadoop.ha.HAServiceTarget;
 import org.apache.hadoop.ha.HealthCheckFailedException;
 import org.apache.hadoop.ha.NodeFencer;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
-import static org.mockito.Mockito.when;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
@@ -51,6 +53,11 @@ public class TestDFSHAAdmin {
   private HAServiceProtocol mockProtocol;
   
   private static final String NSID = "ns1";
+
+  private static final HAServiceStatus STANDBY_READY_RESULT =
+    new HAServiceStatus(HAServiceState.STANDBY)
+    .setReadyToBecomeActive();
+  
   private static String HOST_A = "1.2.3.1";
   private static String HOST_B = "1.2.3.2";
 
@@ -73,12 +80,20 @@ public class TestDFSHAAdmin {
   @Before
   public void setup() throws IOException {
     mockProtocol = Mockito.mock(HAServiceProtocol.class);
-    when(mockProtocol.readyToBecomeActive()).thenReturn(true);
     tool = new DFSHAAdmin() {
+
       @Override
-      protected HAServiceProtocol getProtocol(String serviceId) throws IOException {
-        getServiceAddr(serviceId);
-        return mockProtocol;
+      protected HAServiceTarget resolveTarget(String nnId) {
+        HAServiceTarget target = super.resolveTarget(nnId);
+        HAServiceTarget spy = Mockito.spy(target);
+        // OVerride the target to return our mock protocol
+        try {
+          Mockito.doReturn(mockProtocol).when(spy).getProxy(
+              Mockito.<Configuration>any(), Mockito.anyInt()); 
+        } catch (IOException e) {
+          throw new AssertionError(e); // mock setup doesn't really throw
+        }
+        return spy;
       }
     };
     tool.setConf(getHAConf());
@@ -105,8 +120,9 @@ public class TestDFSHAAdmin {
 
   @Test
   public void testNamenodeResolution() throws Exception {
+    Mockito.doReturn(STANDBY_READY_RESULT).when(mockProtocol).getServiceStatus();
     assertEquals(0, runTool("-getServiceState", "nn1"));
-    Mockito.verify(mockProtocol).getServiceState();
+    Mockito.verify(mockProtocol).getServiceStatus();
     assertEquals(-1, runTool("-getServiceState", "undefined"));
     assertOutputContains(
         "Unable to determine service address for namenode 'undefined'");
@@ -133,13 +149,13 @@ public class TestDFSHAAdmin {
 
   @Test
   public void testFailoverWithNoFencerConfigured() throws Exception {
-    Mockito.doReturn(HAServiceState.STANDBY).when(mockProtocol).getServiceState();
+    Mockito.doReturn(STANDBY_READY_RESULT).when(mockProtocol).getServiceStatus();
     assertEquals(-1, runTool("-failover", "nn1", "nn2"));
   }
 
   @Test
   public void testFailoverWithFencerConfigured() throws Exception {
-    Mockito.doReturn(HAServiceState.STANDBY).when(mockProtocol).getServiceState();
+    Mockito.doReturn(STANDBY_READY_RESULT).when(mockProtocol).getServiceStatus();
     HdfsConfiguration conf = getHAConf();
     conf.set(NodeFencer.CONF_METHODS_KEY, "shell(true)");
     tool.setConf(conf);
@@ -148,7 +164,7 @@ public class TestDFSHAAdmin {
 
   @Test
   public void testFailoverWithFencerAndNameservice() throws Exception {
-    Mockito.doReturn(HAServiceState.STANDBY).when(mockProtocol).getServiceState();
+    Mockito.doReturn(STANDBY_READY_RESULT).when(mockProtocol).getServiceStatus();
     HdfsConfiguration conf = getHAConf();
     conf.set(NodeFencer.CONF_METHODS_KEY, "shell(true)");
     tool.setConf(conf);
@@ -157,7 +173,7 @@ public class TestDFSHAAdmin {
 
   @Test
   public void testFailoverWithFencerConfiguredAndForce() throws Exception {
-    Mockito.doReturn(HAServiceState.STANDBY).when(mockProtocol).getServiceState();
+    Mockito.doReturn(STANDBY_READY_RESULT).when(mockProtocol).getServiceStatus();
     HdfsConfiguration conf = getHAConf();
     conf.set(NodeFencer.CONF_METHODS_KEY, "shell(true)");
     tool.setConf(conf);
@@ -166,7 +182,7 @@ public class TestDFSHAAdmin {
 
   @Test
   public void testFailoverWithForceActive() throws Exception {
-    Mockito.doReturn(HAServiceState.STANDBY).when(mockProtocol).getServiceState();
+    Mockito.doReturn(STANDBY_READY_RESULT).when(mockProtocol).getServiceStatus();
     HdfsConfiguration conf = getHAConf();
     conf.set(NodeFencer.CONF_METHODS_KEY, "shell(true)");
     tool.setConf(conf);
@@ -175,7 +191,7 @@ public class TestDFSHAAdmin {
 
   @Test
   public void testFailoverWithInvalidFenceArg() throws Exception {
-    Mockito.doReturn(HAServiceState.STANDBY).when(mockProtocol).getServiceState();
+    Mockito.doReturn(STANDBY_READY_RESULT).when(mockProtocol).getServiceStatus();
     HdfsConfiguration conf = getHAConf();
     conf.set(NodeFencer.CONF_METHODS_KEY, "shell(true)");
     tool.setConf(conf);
@@ -184,13 +200,13 @@ public class TestDFSHAAdmin {
 
   @Test
   public void testFailoverWithFenceButNoFencer() throws Exception {
-    Mockito.doReturn(HAServiceState.STANDBY).when(mockProtocol).getServiceState();
+    Mockito.doReturn(STANDBY_READY_RESULT).when(mockProtocol).getServiceStatus();
     assertEquals(-1, runTool("-failover", "nn1", "nn2", "--forcefence"));
   }
 
   @Test
   public void testFailoverWithFenceAndBadFencer() throws Exception {
-    Mockito.doReturn(HAServiceState.STANDBY).when(mockProtocol).getServiceState();
+    Mockito.doReturn(STANDBY_READY_RESULT).when(mockProtocol).getServiceStatus();
     HdfsConfiguration conf = getHAConf();
     conf.set(NodeFencer.CONF_METHODS_KEY, "foobar!");
     tool.setConf(conf);
@@ -199,7 +215,7 @@ public class TestDFSHAAdmin {
 
   @Test
   public void testForceFenceOptionListedBeforeArgs() throws Exception {
-    Mockito.doReturn(HAServiceState.STANDBY).when(mockProtocol).getServiceState();
+    Mockito.doReturn(STANDBY_READY_RESULT).when(mockProtocol).getServiceStatus();
     HdfsConfiguration conf = getHAConf();
     conf.set(NodeFencer.CONF_METHODS_KEY, "shell(true)");
     tool.setConf(conf);
@@ -207,9 +223,10 @@ public class TestDFSHAAdmin {
   }
 
   @Test
-  public void testGetServiceState() throws Exception {
+  public void testGetServiceStatus() throws Exception {
+    Mockito.doReturn(STANDBY_READY_RESULT).when(mockProtocol).getServiceStatus();
     assertEquals(0, runTool("-getServiceState", "nn1"));
-    Mockito.verify(mockProtocol).getServiceState();
+    Mockito.verify(mockProtocol).getServiceStatus();
   }
 
   @Test

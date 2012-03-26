@@ -80,14 +80,12 @@ public interface DatanodeProtocol {
    *
    * @see org.apache.hadoop.hdfs.server.namenode.FSNamesystem#registerDatanode(DatanodeRegistration)
    * @param registration datanode registration information
-   * @param storages list of storages on the datanode``
    * @return updated {@link org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration}, which contains 
    * new storageID if the datanode did not have one and
    * registration ID for further communication.
    */
-  public DatanodeRegistration registerDatanode(
-      DatanodeRegistration registration, DatanodeStorage[] storages)
-      throws IOException;
+  public DatanodeRegistration registerDatanode(DatanodeRegistration registration
+      ) throws IOException;
   
   /**
    * sendHeartbeat() tells the NameNode that the DataNode is still
@@ -176,6 +174,6 @@ public interface DatanodeProtocol {
    */
   public void commitBlockSynchronization(ExtendedBlock block,
       long newgenerationstamp, long newlength,
-      boolean closeFile, boolean deleteblock, DatanodeID[] newtargets
-      ) throws IOException;
+      boolean closeFile, boolean deleteblock, DatanodeID[] newtargets,
+      String[] newtargetstorages) throws IOException;
 }

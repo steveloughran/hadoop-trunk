@@ -1131,6 +1131,7 @@ public abstract class Server {
                 throw new AccessControlException(
                     "Server is not configured to do DIGEST authentication.");
               }
+              secretManager.checkAvailableForRead();
               saslServer = Sasl.createSaslServer(AuthMethod.DIGEST
                   .getMechanismName(), null, SaslRpcServer.SASL_DEFAULT_REALM,
                   SaslRpcServer.SASL_PROPS, new SaslDigestCallbackHandler(
@@ -1951,13 +1952,13 @@ public abstract class Server {
    *  Writable, long)} instead
    */
   @Deprecated
-  public Writable call(Writable param, long receiveTime) throws IOException {
+  public Writable call(Writable param, long receiveTime) throws Exception {
     return call(RpcKind.RPC_BUILTIN, null, param, receiveTime);
   }
   
   /** Called for each call. */
   public abstract Writable call(RpcKind rpcKind, String protocol,
-      Writable param, long receiveTime) throws IOException;
+      Writable param, long receiveTime) throws Exception;
   
   /**
    * Authorize the incoming client connection.

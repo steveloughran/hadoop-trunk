@@ -52,7 +52,11 @@ Trunk (unreleased changes)
     HADOOP-7994. Remove getProtocolVersion and getProtocolSignature from the 
     client side translator and server side implementation. (jitendra)
 
+
   BUG FIXES
+
+    HADOOP-8177. MBeans shouldn't try to register when it fails to create MBeanName.
+    (Devaraj K via umamahesh)
 
     HADOOP-7900. LocalDirAllocator confChanged() accesses conf.get() twice
     (Ravi Gummadi via Uma Maheswara Rao G)
@@ -103,6 +107,8 @@ Trunk (unreleased changes)
     HADOOP-8141. Add method to SecurityUtil to init krb5 cipher suites.
     (todd)
 
+    HADOOP-7788. Add simple HealthMonitor class to watch an HAService (todd)
+
   OPTIMIZATIONS
 
     HADOOP-7761. Improve the performance of raw comparisons. (todd)
@@ -125,6 +131,12 @@ Release 0.23.3 - UNRELEASED
     Contributed by Todd Lipcon, Aaron T. Myers, Eli Collins, Uma Maheswara Rao G,
     Bikas Saha, Suresh Srinivas, Jitendra Nath Pandey, Hari Mankude, Brandon Li,
     Sanjay Radia, Mingjie Lai, and Gregory Chanan
+
+    HADOOP-8121. Active Directory Group Mapping Service. (Jonathan Natkins via
+    atm)
+
+    HADOOP-7030. Add TableMapping topology implementation to read host to rack
+    mapping from a file. (Patrick Angeles and tomwhite via tomwhite)
 
   IMPROVEMENTS
 
@@ -193,6 +205,24 @@ Release 0.23.3 - UNRELEASED
     HADOOP-6941. Adds support for building Hadoop with IBM's JDK 
     (Stephen Watt, Eli and ddas)
 
+    HADOOP-8183. Stop using "mapred.used.genericoptions.parser" (harsh)
+
+    HADOOP-6924. Adds a directory to the list of directories to search
+    for the libjvm.so file. The new directory is found by running a 'find'
+    command and the first output is taken. This was done to handle the 
+    build of Hadoop with IBM's JDK. (Stephen Watt, Guillermo Cabrera and ddas)
+
+    HADOOP-8200. Remove HADOOP_[JOBTRACKER|TASKTRACKER]_OPTS. (eli)
+
+    HADOOP-8184.  ProtoBuf RPC engine uses the IPC layer reply packet.
+    (Sanjay Radia via szetszwo)
+
+    HADOOP-8163. Improve ActiveStandbyElector to provide hooks for
+    fencing old active. (todd)
+
+    HADOOP-8193. Refactor FailoverController/HAAdmin code to add an abstract
+    class for "target" services. (todd)
+
   OPTIMIZATIONS
 
   BUG FIXES
@@ -236,6 +266,20 @@ Release 0.23.3 - UNRELEASED
     Java heap space (tgraves via bobby)
 
     HADOOP-8167. Configuration deprecation logic breaks backwards compatibility (tucu)
+
+    HADOOP-8189. LdapGroupsMapping shouldn't throw away IOException. (Jonathan Natkins via atm)
+
+    HADOOP-8191. SshFenceByTcpPort uses netcat incorrectly (todd)
+
+    HADOOP-8157. Fix race condition in Configuration that could cause spurious
+    ClassNotFoundExceptions after a GC. (todd)
+
+    HADOOP-8197. Configuration logs WARNs on every use of a deprecated key (tucu)
+
+    HADOOP-8159. NetworkTopology: getLeaf should check for invalid topologies.
+    (Colin Patrick McCabe via eli)
+
+    HADOOP-8204. TestHealthMonitor fails occasionally (todd)
 
   BREAKDOWN OF HADOOP-7454 SUBTASKS
 
@@ -380,6 +424,12 @@ Release 0.23.2 - UNRELEASED
     szetszwo)
 
     HADOOP-8175. Add -p option to mkdir in FsShell.  (Daryn Sharp via szetszwo)
+
+    HADOOP-8176.  Disambiguate the destination of FsShell copies (Daryn Sharp
+    via bobby)
+
+    HADOOP-8088. User-group mapping cache incorrectly does negative caching on
+    transient failures (Khiwal Lee via bobby)
 
 Release 0.23.1 - 2012-02-17 
 

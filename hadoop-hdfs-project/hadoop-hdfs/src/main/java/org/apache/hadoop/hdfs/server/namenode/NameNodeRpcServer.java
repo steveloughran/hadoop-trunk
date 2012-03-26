@@ -41,12 +41,12 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
+import org.apache.hadoop.ha.HAServiceStatus;
 import org.apache.hadoop.ha.HealthCheckFailedException;
 import org.apache.hadoop.ha.ServiceFailedException;
 import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.HAServiceProtocolService;
 import org.apache.hadoop.ha.protocolPB.HAServiceProtocolPB;
 import org.apache.hadoop.ha.protocolPB.HAServiceProtocolServerSideTranslatorPB;
-
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HDFSPolicyProvider;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -95,7 +95,6 @@ import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.FinalizeCommand;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeCommand;
@@ -546,10 +545,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // DatanodeProtocol
   public void commitBlockSynchronization(ExtendedBlock block,
       long newgenerationstamp, long newlength,
-      boolean closeFile, boolean deleteblock, DatanodeID[] newtargets)
+      boolean closeFile, boolean deleteblock, DatanodeID[] newtargets,
+      String[] newtargetstorages)
       throws IOException {
-    namesystem.commitBlockSynchronization(block,
-        newgenerationstamp, newlength, closeFile, deleteblock, newtargets);
+    namesystem.commitBlockSynchronization(block, newgenerationstamp,
+        newlength, closeFile, deleteblock, newtargets, newtargetstorages);
   }
   
   @Override // ClientProtocol
@@ -829,11 +829,10 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
 
   @Override // DatanodeProtocol
-  public DatanodeRegistration registerDatanode(DatanodeRegistration nodeReg,
-      DatanodeStorage[] storages) throws IOException {
+  public DatanodeRegistration registerDatanode(DatanodeRegistration nodeReg
+      ) throws IOException {
     verifyVersion(nodeReg.getVersion());
     namesystem.registerDatanode(nodeReg);
-      
     return nodeReg;
   }
 
@@ -981,15 +980,9 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override // HAServiceProtocol
-  public synchronized HAServiceState getServiceState() 
-      throws AccessControlException {
-    return nn.getServiceState();
-  }
-
-  @Override // HAServiceProtocol
-  public synchronized boolean readyToBecomeActive() 
-      throws ServiceFailedException, AccessControlException {
-    return nn.readyToBecomeActive();
+  public synchronized HAServiceStatus getServiceStatus() 
+      throws AccessControlException, ServiceFailedException {
+    return nn.getServiceStatus();
   }
 
   /**

@@ -646,7 +646,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
   }
   
   
-  void checkOperation(OperationCategory op) throws StandbyException {
+  public void checkOperation(OperationCategory op) throws StandbyException {
     if (haContext != null) {
       // null in some unit tests
       haContext.checkOperation(op);
@@ -2830,7 +2830,8 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
 
   void commitBlockSynchronization(ExtendedBlock lastblock,
       long newgenerationstamp, long newlength,
-      boolean closeFile, boolean deleteblock, DatanodeID[] newtargets)
+      boolean closeFile, boolean deleteblock, DatanodeID[] newtargets,
+      String[] newtargetstorages)
       throws IOException, UnresolvedLinkException {
     String src = "";
     writeLock();

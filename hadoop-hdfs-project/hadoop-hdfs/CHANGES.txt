@@ -50,7 +50,18 @@ Trunk (unreleased changes)
 
     HDFS-2976. Remove unnecessary method (tokenRefetchNeeded) in DFSClient.
 
+    HDFS-3111. Missing license headers in trunk. (umamahesh)
+
+    HDFS-3091. Update the usage limitations of ReplaceDatanodeOnFailure policy in
+    the config description for the smaller clusters. (szetszwo via umamahesh)
+
+    HDFS-309. FSEditLog should log progress during replay. (Sho Shimauchi
+    via todd)
+
   OPTIMIZATIONS
+
+    HDFS-2834. Add a ByteBuffer-based read API to DFSInputStream.
+    (Henry Robinson via todd)
 
   BUG FIXES
 
@@ -91,6 +102,8 @@ Trunk (unreleased changes)
 
     HDFS-3067. NPE in DFSInputStream.readBuffer if read is repeated on
     corrupted block. (Henry Robinson via atm)
+
+    HDFS-3116. Typo in fetchdt error message. (AOE Takashi via atm)
 
 Release 0.23.3 - UNRELEASED 
 
@@ -234,6 +247,19 @@ Release 0.23.3 - UNRELEASED
     HDFS-3057. httpfs and hdfs launcher scripts should honor CATALINA_HOME 
     and HADOOP_LIBEXEC_DIR (rvs via tucu)
 
+    HDFS-3088. Move FSDatasetInterface inner classes to a package.  (szetszwo)
+
+    HDFS-3105. Add DatanodeStorage information to block recovery.  (szetszwo)
+
+    HDFS-3086. Change Datanode not to send storage list in registration.
+    (szetszwo)
+
+    HDFS-3044. fsck move should be non-destructive by default.
+    (Colin Patrick McCabe via eli)
+
+    HDFS-3071. haadmin failover command does not provide enough detail when
+    target NN is not ready to be active. (todd)
+
   OPTIMIZATIONS
 
     HDFS-3024. Improve performance of stringification in addStoredBlock (todd)
@@ -308,6 +334,14 @@ Release 0.23.3 - UNRELEASED
 
     HDFS-3062. Fix bug which prevented MR job submission from creating
     delegation tokens on an HA cluster. (Mingjie Lai via todd)
+
+    HDFS-3083. Cannot run an MR job with HA and security enabled when
+    second-listed NN active. (atm)
+
+    HDFS-3100. In BlockSender, throw an exception when it needs to verify
+    checksum but the meta data does not exist.  (Brandon Li via szetszwo)
+
+    HDFS-3132. Fix findbugs warning on HDFS trunk. (todd)
 
   BREAKDOWN OF HDFS-1623 SUBTASKS
 
@@ -653,6 +687,8 @@ Release 0.23.2 - UNRELEASED
     HDFS-2985. Improve logging when replicas are marked as corrupt. (todd)
 
     HDFS-3098. Update and add tests for HADOOP-8173. (Daryn Sharp via szetszwo)
+
+    HDFS-3104. Add tests for HADOOP-8175. (Daryn Sharp via szetszwo)
 
   OPTIMIZATIONS
 
