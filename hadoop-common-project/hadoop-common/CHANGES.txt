@@ -113,7 +113,7 @@ Trunk (unreleased changes)
 
     HADOOP-7761. Improve the performance of raw comparisons. (todd)
 
-Release 0.23.3 - UNRELEASED 
+Release 2.0.0 - UNRELEASED 
 
   INCOMPATIBLE CHANGES
 
@@ -137,6 +137,8 @@ Release 0.23.3 - UNRELEASED
 
     HADOOP-7030. Add TableMapping topology implementation to read host to rack
     mapping from a file. (Patrick Angeles and tomwhite via tomwhite)
+
+    HADOOP-8206. Common portion of a ZK-based failover controller (todd)
 
   IMPROVEMENTS
 
@@ -223,6 +225,15 @@ Release 0.23.3 - UNRELEASED
     HADOOP-8193. Refactor FailoverController/HAAdmin code to add an abstract
     class for "target" services. (todd)
 
+    HADOOP-8212. Improve ActiveStandbyElector's behavior when session expires
+    (todd)
+
+    HADOOP-8216. Address log4j.properties inconsistencies btw main and
+    template dirs. (Patrick Hunt via eli)
+
+    HADOOP-8149. Cap space usage of default log4j rolling policy.
+    (Patrick Hunt via eli)
+
   OPTIMIZATIONS
 
   BUG FIXES
@@ -280,6 +291,12 @@ Release 0.23.3 - UNRELEASED
     (Colin Patrick McCabe via eli)
 
     HADOOP-8204. TestHealthMonitor fails occasionally (todd)
+
+    HADOOP-8202. RPC stopProxy() does not close the proxy correctly.
+    (Hari Mankude via suresh)
+
+    HADOOP-8218. RPC.closeProxy shouldn't throw error when closing a mock
+    (todd)
 
   BREAKDOWN OF HADOOP-7454 SUBTASKS
 
@@ -430,6 +447,8 @@ Release 0.23.2 - UNRELEASED
 
     HADOOP-8088. User-group mapping cache incorrectly does negative caching on
     transient failures (Khiwal Lee via bobby)
+
+    HADOOP-8208. Disallow self failover. (eli)
 
 Release 0.23.1 - 2012-02-17 
 

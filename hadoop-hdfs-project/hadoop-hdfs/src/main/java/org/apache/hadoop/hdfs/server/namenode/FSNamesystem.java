@@ -878,14 +878,6 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
           DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_DEFAULT);
   }
 
-  /**
-   * Return the default path permission when upgrading from releases with no
-   * permissions (<=0.15) to releases with permissions (>=0.16)
-   */
-  protected PermissionStatus getUpgradePermission() {
-    return defaultPermission;
-  }
-  
   NamespaceInfo getNamespaceInfo() {
     readLock();
     try {
@@ -5072,6 +5064,8 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
       innerinfo.put("lastContact", getLastContact(node));
       innerinfo.put("usedSpace", getDfsUsed(node));
       innerinfo.put("adminState", node.getAdminState().toString());
+      innerinfo.put("nonDfsUsedSpace", node.getNonDfsUsed());
+      innerinfo.put("capacity", node.getCapacity());
       info.put(node.getHostName(), innerinfo);
     }
     return JSON.toString(info);

@@ -122,6 +122,7 @@ import org.apache.hadoop.hdfs.server.common.JspHelper;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.common.Util;
 import org.apache.hadoop.hdfs.server.datanode.SecureDataNodeStarter.SecureResources;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeMetrics;
 import org.apache.hadoop.hdfs.server.datanode.web.resources.DatanodeWebHdfsMethods;
@@ -231,7 +232,7 @@ public class DataNode extends Configured
   
   volatile boolean shouldRun = true;
   private BlockPoolManager blockPoolManager;
-  volatile FSDatasetInterface<? extends FsVolumeSpi> data = null;
+  volatile FsDatasetSpi<? extends FsVolumeSpi> data = null;
   private String clusterId = null;
 
   public final static String EMPTY_DEL_HINT = "";
@@ -329,9 +330,7 @@ public class DataNode extends Configured
        : new HttpServer("datanode", infoHost, tmpInfoPort, tmpInfoPort == 0,
            conf, new AccessControlList(conf.get(DFS_ADMIN, " ")),
            secureResources.getListener());
-    if(LOG.isDebugEnabled()) {
-      LOG.debug("Datanode listening on " + infoHost + ":" + tmpInfoPort);
-    }
+    LOG.info("Opened info server at " + infoHost + ":" + tmpInfoPort);
     if (conf.getBoolean(DFS_HTTPS_ENABLE_KEY, false)) {
       boolean needClientAuth = conf.getBoolean(DFS_CLIENT_HTTPS_NEED_AUTH_KEY,
                                                DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT);
@@ -397,7 +396,8 @@ public class DataNode extends Configured
         .newReflectiveBlockingService(interDatanodeProtocolXlator);
     DFSUtil.addPBProtocol(conf, InterDatanodeProtocolPB.class, service,
         ipcServer);
-    
+    LOG.info("Opened IPC server at " + ipcServer.getListenerAddress());
+
     // set service-level authorization security policy
     if (conf.getBoolean(
         CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION, false)) {
@@ -485,14 +485,14 @@ public class DataNode extends Configured
   }
   
   private void initDataXceiver(Configuration conf) throws IOException {
-    InetSocketAddress socAddr = DataNode.getStreamingAddr(conf);
+    InetSocketAddress streamingAddr = DataNode.getStreamingAddr(conf);
 
     // find free port or use privileged port provided
     ServerSocket ss;
     if(secureResources == null) {
       ss = (dnConf.socketWriteTimeout > 0) ? 
           ServerSocketChannel.open().socket() : new ServerSocket();
-          Server.bind(ss, socAddr, 0);
+          Server.bind(ss, streamingAddr, 0);
     } else {
       ss = secureResources.getStreamingSocket();
     }
@@ -501,8 +501,7 @@ public class DataNode extends Configured
     int tmpPort = ss.getLocalPort();
     selfAddr = new InetSocketAddress(ss.getInetAddress().getHostAddress(),
                                      tmpPort);
-    LOG.info("Opened info server at " + tmpPort);
-      
+    LOG.info("Opened streaming server at " + selfAddr);
     this.threadGroup = new ThreadGroup("dataXceiverServer");
     this.dataXceiverServer = new Daemon(threadGroup, 
         new DataXceiverServer(ss, conf, this));
@@ -809,8 +808,8 @@ public class DataNode extends Configured
    * handshake with the the first namenode is completed.
    */
   private void initStorage(final NamespaceInfo nsInfo) throws IOException {
-    final FSDatasetInterface.Factory<? extends FSDatasetInterface<?>> factory
-        = FSDatasetInterface.Factory.getFactory(conf);
+    final FsDatasetSpi.Factory<? extends FsDatasetSpi<?>> factory
+        = FsDatasetSpi.Factory.getFactory(conf);
     
     if (!factory.isSimulated()) {
       final StartupOption startOpt = getStartupOption(conf);
@@ -828,7 +827,7 @@ public class DataNode extends Configured
 
     synchronized(this)  {
       if (data == null) {
-        data = factory.createFSDatasetInterface(this, storage, conf);
+        data = factory.newInstance(this, storage, conf);
       }
     }
   }
@@ -1695,7 +1694,7 @@ public class DataNode extends Configured
    * 
    * @return the fsdataset that stores the blocks
    */
-  FSDatasetInterface<?> getFSDataset() {
+  FsDatasetSpi<?> getFSDataset() {
     return data;
   }
 

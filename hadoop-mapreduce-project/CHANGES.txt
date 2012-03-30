@@ -96,7 +96,7 @@ Trunk (unreleased changes)
     MAPREDUCE-1740. NPE in getMatchingLevelForNodes when node locations are 
     variable depth (ahmed via tucu) [IMPORTANT: this is dead code in trunk]
 
-Release 0.23.3 - UNRELEASED
+Release 2.0.0 - UNRELEASED
 
   INCOMPATIBLE CHANGES
 
@@ -130,8 +130,11 @@ Release 0.23.3 - UNRELEASED
     MAPREDUCE-3970. Add ServiceOperations class to aid working with Services
     (stevel)
 
-    MAPREDUCE-3533. Add a channel between RM and AM to get information on
+    MAPREDUCE-3353. Add a channel between RM and AM to get information on
     nodes. (Bikas Saha via acmurthy) 
+
+    MAPREDUCE-3955. Change MR to use ProtobufRpcEngine from hadoop-common
+    instead of ProtoOverHadoopRpcEngine. (Jitendra Nath Pandey via sseth)
 
   OPTIMIZATIONS
 
@@ -172,6 +175,18 @@ Release 0.23.3 - UNRELEASED
 
     MAPREDUCE-3992. Reduce fetcher doesn't verify HTTP status code of response
     (todd)
+
+    MAPREDUCE-4066. Use default value when fetching MR_AM_STAGING_DIR
+    (xieguiming via harsh)
+
+    MAPREDUCE-3377. Added a unit test to ensure OutputCommitter.checkOutputSpecs 
+    is called prior to copying job.xml. (Jane Chen via acmurthy) 
+
+    MAPREDUCE-4081. TestMROutputFormat.java does not compile (Jason Lowe via
+    bobby)
+
+    MAPREDUCE-4082. hadoop-mapreduce-client-app's mrapp-generated-classpath 
+    file should not be in the module JAR (tucu)
 
 Release 0.23.2 - UNRELEASED
 
@@ -215,6 +230,9 @@ Release 0.23.2 - UNRELEASED
 
     MAPREDUCE-4043. Secret keys set in Credentials are not seen by tasks
     (Jason Lowe via bobby) 
+
+    MAPREDUCE-3989. Cap space usage of default log4j rolling policy.
+    (Patrick Hunt via eli)
 
   OPTIMIZATIONS
 
@@ -352,6 +370,8 @@ Release 0.23.2 - UNRELEASED
 
     MAPREDUCE-4006. History server container log web UI sometimes combines
     stderr/stdout/syslog contents together (Siddharth Seth via tgraves)
+
+    MAPREDUCE-4061. RM only has 1 AM launcher thread (tgraves via bobby)
 
 Release 0.23.1 - 2012-02-17
 

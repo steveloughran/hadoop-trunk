@@ -11,6 +11,8 @@ Trunk (unreleased changes)
     HDFS-234. Integration with BookKeeper logging system. (Ivan Kelly 
     via jitendra)
 
+    HDFS-3125. Add JournalService to enable Journal Daemon. (suresh)
+
   IMPROVEMENTS
 
     HDFS-1620. Rename HdfsConstants -> HdfsServerConstants, FSConstants ->
@@ -57,6 +59,8 @@ Trunk (unreleased changes)
 
     HDFS-309. FSEditLog should log progress during replay. (Sho Shimauchi
     via todd)
+
+    HDFS-3131. Improve TestStorageRestore. (Brandon Li via atm)
 
   OPTIMIZATIONS
 
@@ -105,13 +109,15 @@ Trunk (unreleased changes)
 
     HDFS-3116. Typo in fetchdt error message. (AOE Takashi via atm)
 
-Release 0.23.3 - UNRELEASED 
+Release 2.0.0 - UNRELEASED 
 
   INCOMPATIBLE CHANGES
 
     HDFS-2676. Remove Avro RPC. (suresh)
 
     HDFS-2303. Unbundle jsvc. (Roman Shaposhnik and Mingjie Lai via eli)
+
+    HDFS-3137. Bump LAST_UPGRADABLE_LAYOUT_VERSION to -16. (eli)
 
   NEW FEATURES
 
@@ -159,6 +165,13 @@ Release 0.23.3 - UNRELEASED
     Lipcon, Aaron T. Myers, Eli Collins, Uma Maheswara Rao G, Bikas Saha,
     Suresh Srinivas, Jitendra Nath Pandey, Hari Mankude, Brandon Li, Sanjay
     Radia, Mingjie Lai, and Gregory Chanan
+
+    HDFS-2941. Add an administrative command to download a copy of the fsimage
+    from the NN. (atm)
+
+    HDFS-2413. Add an API DistributedFileSystem.isInSafeMode() and change
+    DistributedFileSystem to @InterfaceAudience.LimitedPrivate.
+    (harsh via szetszwo)
 
   IMPROVEMENTS
 
@@ -260,6 +273,17 @@ Release 0.23.3 - UNRELEASED
     HDFS-3071. haadmin failover command does not provide enough detail when
     target NN is not ready to be active. (todd)
 
+    HDFS-3089. Move FSDatasetInterface and the related classes to a package.
+    (szetszwo)
+
+    HDFS-3129. NetworkTopology: add test that getLeaf should check for
+    invalid topologies (Colin Patrick McCabe via eli)
+
+    HDFS-3155. Clean up FSDataset implemenation related code.  (szetszwo)
+
+    HDFS-3158. LiveNodes member of NameNodeMXBean should list non-DFS used
+    space and capacity per DN. (atm)
+
   OPTIMIZATIONS
 
     HDFS-3024. Improve performance of stringification in addStoredBlock (todd)
@@ -342,6 +366,12 @@ Release 0.23.3 - UNRELEASED
     checksum but the meta data does not exist.  (Brandon Li via szetszwo)
 
     HDFS-3132. Fix findbugs warning on HDFS trunk. (todd)
+
+    HDFS-3156. TestDFSHAAdmin is failing post HADOOP-8202. (atm)
+
+    HDFS-3143. TestGetBlocks.testGetBlocks is failing. (Arpit Gupta via atm)
+
+    HDFS-3142. TestHDFSCLI.testAll is failing. (Brandon Li via atm)
 
   BREAKDOWN OF HDFS-1623 SUBTASKS
 
@@ -690,6 +720,9 @@ Release 0.23.2 - UNRELEASED
 
     HDFS-3104. Add tests for HADOOP-8175. (Daryn Sharp via szetszwo)
 
+    HDFS-3066. Cap space usage of default log4j rolling policy.
+    (Patrick Hunt via eli)
+
   OPTIMIZATIONS
 
   BUG FIXES
@@ -740,6 +773,9 @@ Release 0.23.2 - UNRELEASED
     (Kihwal Lee via szetszwo)
 
     HDFS-3101. Cannot read empty file using WebHDFS.  (szetszwo)
+
+    HDFS-3160. httpfs should exec catalina instead of forking it.
+    (Roman Shaposhnik via eli)
 
 Release 0.23.1 - 2012-02-17 
 
@@ -851,6 +887,8 @@ Release 0.23.1 - 2012-02-17
     (Robert Joseph Evans via jitendra)
 
     HDFS-2868. Expose xceiver counts via the DataNode MXBean. (harsh)
+
+    HDFS-3139. Minor Datanode logging improvement. (eli)
 
   OPTIMIZATIONS
 

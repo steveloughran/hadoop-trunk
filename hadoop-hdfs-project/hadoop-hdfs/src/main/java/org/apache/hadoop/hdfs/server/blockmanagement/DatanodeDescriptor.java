@@ -34,16 +34,13 @@ import org.apache.hadoop.hdfs.util.LightWeightHashSet;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableUtils;
 
-/**************************************************
- * DatanodeDescriptor tracks stats on a given DataNode, such as
- * available storage capacity, last update time, etc., and maintains a
- * set of blocks stored on the datanode.
- *
- * This data structure is internal to the namenode. It is *not* sent
- * over-the-wire to the Client or the Datanodes. Neither is it stored
- * persistently in the fsImage.
- **************************************************/
+/**
+ * This class extends the DatanodeInfo class with ephemeral information (eg
+ * health, capacity, what blocks are associated with the Datanode) that is
+ * private to the Namenode, ie this class is not exposed to clients.
+ */
 @InterfaceAudience.Private
+@InterfaceStability.Evolving
 public class DatanodeDescriptor extends DatanodeInfo {
   
   // Stores status of decommissioning.
@@ -439,23 +436,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
     }
   }
 
-  /** Serialization for FSEditLog */
-  public void readFieldsFromFSEditLog(DataInput in) throws IOException {
-    this.name = DeprecatedUTF8.readString(in);
-    this.storageID = DeprecatedUTF8.readString(in);
-    this.infoPort = in.readShort() & 0x0000ffff;
-
-    this.capacity = in.readLong();
-    this.dfsUsed = in.readLong();
-    this.remaining = in.readLong();
-    this.blockPoolUsed = in.readLong();
-    this.lastUpdate = in.readLong();
-    this.xceiverCount = in.readInt();
-    this.location = Text.readString(in);
-    this.hostName = Text.readString(in);
-    setAdminState(WritableUtils.readEnum(in, AdminStates.class));
-  }
-  
   /**
    * @return Approximate number of blocks currently scheduled to be written 
    * to this datanode.
@@ -586,14 +566,14 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }
 
   /**
-   * @return Blanacer bandwidth in bytes per second for this datanode.
+   * @return balancer bandwidth in bytes per second for this datanode
    */
   public long getBalancerBandwidth() {
     return this.bandwidth;
   }
 
   /**
-   * @param bandwidth Blanacer bandwidth in bytes per second for this datanode.
+   * @param bandwidth balancer bandwidth in bytes per second for this datanode
    */
   public void setBalancerBandwidth(long bandwidth) {
     this.bandwidth = bandwidth;

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ha;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
@@ -33,7 +34,6 @@ import org.apache.hadoop.security.AccessControlException;
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.mockito.internal.stubbing.answers.ThrowsException;
-import org.mockito.stubbing.Answer;
 
 import static org.junit.Assert.*;
 
@@ -228,7 +228,10 @@ public class TestFailoverController {
     // Getting a proxy to a dead server will throw IOException on call,
     // not on creation of the proxy.
     HAServiceProtocol errorThrowingProxy = Mockito.mock(HAServiceProtocol.class,
-        new ThrowsException(new IOException("Could not connect to host")));
+        Mockito.withSettings()
+          .defaultAnswer(new ThrowsException(
+              new IOException("Could not connect to host")))
+          .extraInterfaces(Closeable.class));
     Mockito.doReturn(errorThrowingProxy).when(svc1).getProxy();
     DummyHAService svc2 = new DummyHAService(HAServiceState.STANDBY, svc2Addr);
     svc1.fencer = svc2.fencer = setupFencer(AlwaysSucceedFencer.class.getName());
@@ -374,4 +377,31 @@ public class TestFailoverController {
     assertEquals(HAServiceState.STANDBY, svc1.state);
     assertEquals(HAServiceState.STANDBY, svc2.state);
   }
+
+  @Test
+  public void testSelfFailoverFails() throws Exception {
+    DummyHAService svc1 = new DummyHAService(HAServiceState.ACTIVE, svc1Addr);
+    DummyHAService svc2 = new DummyHAService(HAServiceState.STANDBY, svc2Addr);
+    svc1.fencer = svc2.fencer = setupFencer(AlwaysSucceedFencer.class.getName());
+    AlwaysSucceedFencer.fenceCalled = 0;
+
+    try {
+      FailoverController.failover(svc1, svc1, false, false);
+      fail("Can't failover to yourself");
+    } catch (FailoverFailedException ffe) {
+      // Expected
+    }
+    assertEquals(0, TestNodeFencer.AlwaysSucceedFencer.fenceCalled);
+    assertEquals(HAServiceState.ACTIVE, svc1.state);
+
+    try {
+      FailoverController.failover(svc2, svc2, false, false);
+      fail("Can't failover to yourself");
+    } catch (FailoverFailedException ffe) {
+      // Expected
+    }
+    assertEquals(0, TestNodeFencer.AlwaysSucceedFencer.fenceCalled);
+    assertEquals(HAServiceState.STANDBY, svc2.state);
+  }
+
 }
