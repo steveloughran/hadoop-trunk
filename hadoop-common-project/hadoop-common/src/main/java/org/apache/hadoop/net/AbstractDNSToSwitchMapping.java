@@ -23,6 +23,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.util.ReflectionUtils;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -115,7 +116,7 @@ public abstract class AbstractDNSToSwitchMapping
     StringBuilder builder = new StringBuilder();
     builder.append("Mapping: ").append(toString()).append("\n");
     if (rack != null) {
-      builder.append("Map:\n");
+      builder.append("Known mappings:\n");
       Set<String> switches = new HashSet<String>();
       for (Map.Entry<String, String> entry : rack.entrySet()) {
         builder.append("  ")
@@ -153,4 +154,24 @@ public abstract class AbstractDNSToSwitchMapping
         && ((AbstractDNSToSwitchMapping) mapping).isSingleSwitch();
   }
 
+  /**
+   * Create a mapping from the configuration that is guaranteed to be caching.
+   * That means either it is wrapped in a caching mapper, or that it it
+   * does not need to be.
+   * @param conf configuration
+   * @return an AbstractDNSToSwitchMapping which caches hostname to rack mappings
+   * @throws RuntimeException on any problems loading the class.
+   */
+  public static AbstractDNSToSwitchMapping createCachingDNSToSwitchMapping(Configuration conf) {
+    DNSToSwitchMapping rawMapping = ReflectionUtils.newInstance(
+        conf.getClass(
+            CommonConfigurationKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            ScriptBasedMapping.class, 
+            DNSToSwitchMapping.class), conf);
+    AbstractDNSToSwitchMapping mapping;
+    mapping = (rawMapping instanceof CachedDNSToSwitchMapping) ? 
+         (CachedDNSToSwitchMapping)rawMapping
+        : new CachedDNSToSwitchMapping(rawMapping);
+    return mapping;
+  }
 }

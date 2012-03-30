@@ -20,6 +20,7 @@ package org.apache.hadoop.net;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -142,6 +143,25 @@ public class TableMapping extends CachedDNSToSwitchMapping {
       }
       return results;
     }
-    
+
+    /**
+     * String method provides information about the chosen table file
+     * and the current mapping
+     * @return some details about the mapping.
+     */
+    @Override
+    public String toString() {
+      String filename =
+          getConf().get(NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY, "");
+      StringBuilder builder = new StringBuilder();
+      builder.append("TableMapping with table \"").append(filename)
+          .append("\"\n");
+      if(!filename.isEmpty()) {
+        File file = new File(filename);
+        builder.append("Path: ").append(file.getAbsolutePath()).append("\n");
+      }
+      builder.append("Map size: ").append(map.size());
+      return builder.toString();
+    }
   }
 }
