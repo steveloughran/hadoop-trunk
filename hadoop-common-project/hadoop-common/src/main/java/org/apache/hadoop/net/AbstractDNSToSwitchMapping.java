@@ -166,10 +166,10 @@ public abstract class AbstractDNSToSwitchMapping
     DNSToSwitchMapping rawMapping = ReflectionUtils.newInstance(
         conf.getClass(
             CommonConfigurationKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-            ScriptBasedMapping.class, 
+            ScriptBasedMapping.class,
             DNSToSwitchMapping.class), conf);
     AbstractDNSToSwitchMapping mapping;
-    mapping = (rawMapping instanceof CachedDNSToSwitchMapping) ? 
+    mapping = (rawMapping instanceof CachedDNSToSwitchMapping) ?
          (CachedDNSToSwitchMapping)rawMapping
         : new CachedDNSToSwitchMapping(rawMapping);
     return mapping;

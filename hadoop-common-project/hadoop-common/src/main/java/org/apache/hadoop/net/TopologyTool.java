@@ -74,7 +74,7 @@ public class TopologyTool extends Configured implements Tool {
           createCachingDNSToSwitchMapping(conf);
     } catch (Exception e) {
       //classloader failures. Bail out and provide a hint of the cause
-      LOG.error("Failed to load the DNS mapping " + mapclass 
+      LOG.error("Failed to load the DNS mapping " + mapclass
             +  ": " + e, e);
       LOG.error("The configuration option is wrong, or the classpath is incomplete");
       return -1;
@@ -216,12 +216,11 @@ public class TopologyTool extends Configured implements Tool {
   }
 
   /**
-   * main() has some simple utility methods
+   * Entry point
    *
    * @param argv the command and its arguments
-   * @throws Exception upon error
    */
-  public static void main(String argv[]) throws Exception {
+  public static void main(String argv[]) {
     TopologyTool topo = new TopologyTool();
     int res;
     try {
