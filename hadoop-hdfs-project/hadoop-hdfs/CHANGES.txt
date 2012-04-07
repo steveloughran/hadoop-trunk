@@ -22,9 +22,6 @@ Trunk (unreleased changes)
 
     HDFS-2572. Remove unnecessary double-check in DN#getHostName. (harsh)
 
-    HDFS-2564. Cleanup unnecessary exceptions thrown and unnecessary casts.
-    (Hari Mankude via eli)
-
     HDFS-2857. Cleanup BlockInfo class. (suresh)
 
     HDFS-2786. Fix host-based token incompatibilities in DFSUtil. (Kihwal Lee
@@ -62,10 +59,16 @@ Trunk (unreleased changes)
 
     HDFS-3131. Improve TestStorageRestore. (Brandon Li via atm)
 
+    HDFS-3178. Add states and state handler for journal synchronization in
+    JournalService.  (szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-2834. Add a ByteBuffer-based read API to DFSInputStream.
     (Henry Robinson via todd)
+
+    HDFS-3110. Use directRead API to reduce the number of buffer copies in
+    libhdfs (Henry Robinson via todd)
 
   BUG FIXES
 
@@ -109,6 +112,12 @@ Trunk (unreleased changes)
 
     HDFS-3116. Typo in fetchdt error message. (AOE Takashi via atm)
 
+    HDFS-3126. Journal stream from Namenode to BackupNode needs to have 
+    timeout. (Hari Mankude via suresh)
+
+    HDFS-3121. Add HDFS tests for HADOOP-8014 change. (John George via
+    suresh)
+    
 Release 2.0.0 - UNRELEASED 
 
   INCOMPATIBLE CHANGES
@@ -118,6 +127,10 @@ Release 2.0.0 - UNRELEASED
     HDFS-2303. Unbundle jsvc. (Roman Shaposhnik and Mingjie Lai via eli)
 
     HDFS-3137. Bump LAST_UPGRADABLE_LAYOUT_VERSION to -16. (eli)
+    
+    HDFS-3138. Move DatanodeInfo#ipcPort to DatanodeID. (eli)
+
+    HDFS-3164. Move DatanodeInfo#hostName to DatanodeID. (eli)
 
   NEW FEATURES
 
@@ -172,6 +185,15 @@ Release 2.0.0 - UNRELEASED
     HDFS-2413. Add an API DistributedFileSystem.isInSafeMode() and change
     DistributedFileSystem to @InterfaceAudience.LimitedPrivate.
     (harsh via szetszwo)
+
+    HDFS-3167. CLI-based driver for MiniDFSCluster. (Henry Robinson via atm)
+
+    HDFS-3148. The client should be able to use multiple local interfaces
+    for data transfer. (eli)
+
+    HDFS-3000. Add a public API for setting quotas. (atm)
+
+    HDFS-3102. Add CLI tool to initialize the shared-edits dir. (atm)
 
   IMPROVEMENTS
 
@@ -284,6 +306,41 @@ Release 2.0.0 - UNRELEASED
     HDFS-3158. LiveNodes member of NameNodeMXBean should list non-DFS used
     space and capacity per DN. (atm)
 
+    HDFS-3172. dfs.upgrade.permission is dead code. (eli)
+
+    HDFS-3171. The DatanodeID "name" field is overloaded. (eli)
+
+    HDFS-3144. Refactor DatanodeID#getName by use. (eli)
+
+    HDFS-3130. Move fsdataset implementation to a package.  (szetszwo)
+
+    HDFS-3120. Enable hsync and hflush by default. (eli)
+
+    HDFS-3187. Upgrade guava to 11.0.2 (todd)
+
+    HDFS-3168. Remove unnecessary "throw IOException" and change fields to
+    final in FSNamesystem and BlockManager.  (szetszwo)
+
+    HDFS-2564. Cleanup unnecessary exceptions thrown and unnecessary casts.
+    (Hari Mankude via eli)
+
+    HDFS-3084. FenceMethod.tryFence() and ShellCommandFencer should pass
+    namenodeId as well as host:port (todd)
+
+    HDFS-3050. rework OEV to share more code with the NameNode.
+    (Colin Patrick McCabe via eli)
+
+    HDFS-3226. Allow GetConf tool to print arbitrary keys (todd)
+
+    HDFS-3204. Minor modification to JournalProtocol.proto to make
+    it generic. (suresh)
+
+    HDFS-2505. Add a test to verify getFileChecksum(..) with ViewFS.  (Ravi
+    Prakash via szetszwo)
+
+    HDFS-3211. Add fence(..) and replace NamenodeRegistration with JournalInfo
+    and epoch in JournalProtocol. (suresh via szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-3024. Improve performance of stringification in addStoredBlock (todd)
@@ -372,6 +429,29 @@ Release 2.0.0 - UNRELEASED
     HDFS-3143. TestGetBlocks.testGetBlocks is failing. (Arpit Gupta via atm)
 
     HDFS-3142. TestHDFSCLI.testAll is failing. (Brandon Li via atm)
+
+    HDFS-3070. HDFS balancer doesn't ensure that hdfs-site.xml is loaded. (atm)
+
+    HDFS-2995. start-dfs.sh should only start the 2NN for namenodes
+    with dfs.namenode.secondary.http-address configured. (eli)
+
+    HDFS-3174. Fix assert in TestPendingDataNodeMessages. (eli)
+
+    HDFS-3199. TestValidateConfigurationSettings is failing. (todd via eli)
+
+    HDFS-3202. NamespaceInfo PB translation drops build version. (atm)
+
+    HDFS-3109. Remove hsqldf exclusions from pom.xml. (Ravi Prakash
+    via suresh)
+
+    HDFS-3210. JsonUtil#toJsonMap for for a DatanodeInfo should use
+    "ipAddr" instead of "name". (eli)
+
+    HDFS-3208. Bogus entries in hosts files are incorrectly displayed
+    in the report. (eli)
+
+    HDFS-3136. Remove SLF4J dependency as HDFS does not need it to fix
+    unnecessary warnings. (Jason Lowe via suresh)
 
   BREAKDOWN OF HDFS-1623 SUBTASKS
 
@@ -689,7 +769,24 @@ Release 2.0.0 - UNRELEASED
     
     HDFS-3039. Address findbugs and javadoc warnings on branch. (todd via atm)
 
-Release 0.23.2 - UNRELEASED 
+Release 0.23.3 - UNRELEASED
+
+  INCOMPATIBLE CHANGES
+
+  NEW FEATURES
+
+  IMPROVEMENTS
+
+  OPTIMIZATIONS
+
+  BUG FIXES
+
+    HDFS-3166. Add timeout to Hftp connections.  (Daryn Sharp via szetszwo)
+
+    HDFS-3176. Use MD5MD5CRC32FileChecksum.readFields() in JsonUtil .  (Kihwal
+    Lee via szetszwo)
+
+Release 0.23.2 - UNRELEASED
 
   INCOMPATIBLE CHANGES
 

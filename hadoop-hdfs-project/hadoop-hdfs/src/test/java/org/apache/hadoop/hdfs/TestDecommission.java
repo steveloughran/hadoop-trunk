@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo.AdminStates;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
@@ -151,27 +152,27 @@ public class TestDecommission {
       int hasdown = 0;
       DatanodeInfo[] nodes = blk.getLocations();
       for (int j = 0; j < nodes.length; j++) { // for each replica
-        if (isNodeDown && nodes[j].getName().equals(downnode)) {
+        if (isNodeDown && nodes[j].getXferAddr().equals(downnode)) {
           hasdown++;
           //Downnode must actually be decommissioned
           if (!nodes[j].isDecommissioned()) {
             return "For block " + blk.getBlock() + " replica on " +
-              nodes[j].getName() + " is given as downnode, " +
+              nodes[j] + " is given as downnode, " +
               "but is not decommissioned";
           }
           //Decommissioned node (if any) should only be last node in list.
           if (j != nodes.length - 1) {
             return "For block " + blk.getBlock() + " decommissioned node "
-              + nodes[j].getName() + " was not last node in list: "
+              + nodes[j] + " was not last node in list: "
               + (j + 1) + " of " + nodes.length;
           }
           LOG.info("Block " + blk.getBlock() + " replica on " +
-            nodes[j].getName() + " is decommissioned.");
+            nodes[j] + " is decommissioned.");
         } else {
           //Non-downnodes must not be decommissioned
           if (nodes[j].isDecommissioned()) {
             return "For block " + blk.getBlock() + " replica on " +
-              nodes[j].getName() + " is unexpectedly decommissioned";
+              nodes[j] + " is unexpectedly decommissioned";
           }
         }
       }
@@ -215,7 +216,7 @@ public class TestDecommission {
         found = true;
       }
     }
-    String nodename = info[index].getName();
+    String nodename = info[index].getXferAddr();
     LOG.info("Decommissioning node: " + nodename);
 
     // write nodename into the exclude file.
@@ -236,7 +237,7 @@ public class TestDecommission {
 
   /* stop decommission of the datanode and wait for each to reach the NORMAL state */
   private void recomissionNode(DatanodeInfo decommissionedNode) throws IOException {
-    LOG.info("Recommissioning node: " + decommissionedNode.getName());
+    LOG.info("Recommissioning node: " + decommissionedNode);
     writeConfigFile(excludeFile, null);
     refreshNodes(cluster.getNamesystem(), conf);
     waitNodeState(decommissionedNode, AdminStates.NORMAL);
@@ -373,7 +374,7 @@ public class TestDecommission {
         DFSClient client = getDfsClient(cluster.getNameNode(i), conf);
         assertEquals("All datanodes must be alive", numDatanodes, 
             client.datanodeReport(DatanodeReportType.LIVE).length);
-        assertNull(checkFile(fileSys, file1, replicas, decomNode.getName(), numDatanodes));
+        assertNull(checkFile(fileSys, file1, replicas, decomNode.getXferAddr(), numDatanodes));
         cleanupFile(fileSys, file1);
       }
     }
@@ -414,7 +415,7 @@ public class TestDecommission {
       DFSClient client = getDfsClient(cluster.getNameNode(i), conf);
       assertEquals("All datanodes must be alive", numDatanodes, 
           client.datanodeReport(DatanodeReportType.LIVE).length);
-      assertNull(checkFile(fileSys, file1, replicas, decomNode.getName(), numDatanodes));
+      assertNull(checkFile(fileSys, file1, replicas, decomNode.getXferAddr(), numDatanodes));
 
       // stop decommission and check if the new replicas are removed
       recomissionNode(decomNode);
@@ -516,7 +517,8 @@ public class TestDecommission {
     // Now empty hosts file and ensure the datanode is disallowed
     // from talking to namenode, resulting in it's shutdown.
     ArrayList<String>list = new ArrayList<String>();
-    list.add("invalidhost");
+    final String badHostname = "BOGUSHOST";
+    list.add(badHostname);
     writeConfigFile(hostsFile, list);
     
     for (int j = 0; j < numNameNodes; j++) {
@@ -530,6 +532,17 @@ public class TestDecommission {
         info = client.datanodeReport(DatanodeReportType.LIVE);
       }
       assertEquals("Number of live nodes should be 0", 0, info.length);
+      
+      // Test that non-live and bogus hostnames are considered "dead".
+      // The dead report should have an entry for (1) the DN  that is
+      // now considered dead because it is no longer allowed to connect
+      // and (2) the bogus entry in the hosts file (these entries are
+      // always added last)
+      info = client.datanodeReport(DatanodeReportType.DEAD);
+      assertEquals("There should be 2 dead nodes", 2, info.length);
+      DatanodeID id = cluster.getDataNodes().get(0).getDatanodeId();
+      assertEquals(id.getHostName(), info[0].getHostName());
+      assertEquals(badHostname, info[1].getHostName());
     }
   }
 }
