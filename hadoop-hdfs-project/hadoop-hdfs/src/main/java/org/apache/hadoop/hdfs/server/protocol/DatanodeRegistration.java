@@ -24,6 +24,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.server.common.Storage;
@@ -49,21 +50,12 @@ implements Writable, NodeRegistration {
        });
   }
 
-  public StorageInfo storageInfo;
-  public ExportedBlockKeys exportedKeys;
+  private StorageInfo storageInfo;
+  private ExportedBlockKeys exportedKeys;
 
-  /**
-   * Default constructor.
-   */
   public DatanodeRegistration() {
-    this("");
-  }
-  
-  /**
-   * Create DatanodeRegistration
-   */
-  public DatanodeRegistration(String nodeName) {
-    this(nodeName, new StorageInfo(), new ExportedBlockKeys());
+    this("", DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+        new StorageInfo(), new ExportedBlockKeys());
   }
   
   public DatanodeRegistration(DatanodeID dn, StorageInfo info,
@@ -72,10 +64,14 @@ implements Writable, NodeRegistration {
     this.storageInfo = info;
     this.exportedKeys = keys;
   }
-  
-  public DatanodeRegistration(String nodeName, StorageInfo info,
+
+  public DatanodeRegistration(String ipAddr, int xferPort) {
+    this(ipAddr, xferPort, new StorageInfo(), new ExportedBlockKeys());
+  }
+
+  public DatanodeRegistration(String ipAddr, int xferPort, StorageInfo info,
       ExportedBlockKeys keys) {
-    super(nodeName);
+    super(ipAddr, xferPort);
     this.storageInfo = info;
     this.exportedKeys = keys;
   }
@@ -83,7 +79,19 @@ implements Writable, NodeRegistration {
   public void setStorageInfo(StorageInfo storage) {
     this.storageInfo = new StorageInfo(storage);
   }
-  
+
+  public StorageInfo getStorageInfo() {
+    return storageInfo;
+  }
+
+  public void setExportedKeys(ExportedBlockKeys keys) {
+    this.exportedKeys = keys;
+  }
+
+  public ExportedBlockKeys getExportedKeys() {
+    return exportedKeys;
+  }
+
   @Override // NodeRegistration
   public int getVersion() {
     return storageInfo.getLayoutVersion();
@@ -96,13 +104,13 @@ implements Writable, NodeRegistration {
 
   @Override // NodeRegistration
   public String getAddress() {
-    return getName();
+    return getXferAddr();
   }
 
   @Override
   public String toString() {
     return getClass().getSimpleName()
-      + "(" + name
+      + "(" + getIpAddr()
       + ", storageID=" + storageID
       + ", infoPort=" + infoPort
       + ", ipcPort=" + ipcPort

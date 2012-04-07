@@ -95,6 +95,7 @@ import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.NamenodeRegistrationProt
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.ReplicaStateProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageInfoProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.UpgradeStatusReportProto;
+import org.apache.hadoop.hdfs.protocol.proto.JournalProtocolProtos.JournalInfoProto;
 import org.apache.hadoop.hdfs.security.token.block.BlockKey;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
@@ -109,6 +110,7 @@ import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
+import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.CheckpointCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
@@ -116,6 +118,7 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage.State;
 import org.apache.hadoop.hdfs.server.protocol.FinalizeCommand;
+import org.apache.hadoop.hdfs.server.protocol.JournalInfo;
 import org.apache.hadoop.hdfs.server.protocol.KeyUpdateCommand;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
@@ -126,8 +129,6 @@ import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo.BlockStat
 import org.apache.hadoop.hdfs.server.protocol.RegisterCommand;
 import org.apache.hadoop.hdfs.server.protocol.RemoteEditLog;
 import org.apache.hadoop.hdfs.server.protocol.RemoteEditLogManifest;
-import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
-import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.hdfs.server.protocol.UpgradeCommand;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
@@ -204,14 +205,18 @@ public class PBHelper {
 
   // DatanodeId
   public static DatanodeID convert(DatanodeIDProto dn) {
-    return new DatanodeID(dn.getName(), dn.getStorageID(), dn.getInfoPort(),
-        dn.getIpcPort());
+    return new DatanodeID(dn.getIpAddr(), dn.getHostName(), dn.getStorageID(),
+        dn.getXferPort(), dn.getInfoPort(), dn.getIpcPort());
   }
 
   public static DatanodeIDProto convert(DatanodeID dn) {
-    return DatanodeIDProto.newBuilder().setName(dn.getName())
-        .setInfoPort(dn.getInfoPort()).setIpcPort(dn.getIpcPort())
-        .setStorageID(dn.getStorageID()).build();
+    return DatanodeIDProto.newBuilder()
+        .setIpAddr(dn.getIpAddr())
+        .setHostName(dn.getHostName())
+        .setStorageID(dn.getStorageID())
+        .setXferPort(dn.getXferPort())
+        .setInfoPort(dn.getInfoPort())
+        .setIpcPort(dn.getIpcPort()).build();
   }
 
   // Arrays of DatanodeId
@@ -380,7 +385,8 @@ public class PBHelper {
   public static NamespaceInfo convert(NamespaceInfoProto info) {
     StorageInfoProto storage = info.getStorageInfo();
     return new NamespaceInfo(storage.getNamespceID(), storage.getClusterID(),
-        info.getBlockPoolID(), storage.getCTime(), info.getDistUpgradeVersion());
+        info.getBlockPoolID(), storage.getCTime(), info.getDistUpgradeVersion(),
+        info.getBuildVersion());
   }
 
   public static NamenodeCommand convert(NamenodeCommandProto cmd) {
@@ -442,7 +448,6 @@ public class PBHelper {
     return new DatanodeInfo(
         PBHelper.convert(di.getId()),
         di.hasLocation() ? di.getLocation() : null , 
-        di.hasHostName() ? di.getHostName() : null,
         di.getCapacity(),  di.getDfsUsed(),  di.getRemaining(),
         di.getBlockPoolUsed()  ,  di.getLastUpdate() , di.getXceiverCount() ,
         PBHelper.convert(di.getAdminState())); 
@@ -451,9 +456,6 @@ public class PBHelper {
   static public DatanodeInfoProto convertDatanodeInfo(DatanodeInfo di) {
     if (di == null) return null;
     DatanodeInfoProto.Builder builder = DatanodeInfoProto.newBuilder();
-    if (di.getHostName() != null) {
-      builder.setHostName(di.getHostName());
-    }
     if (di.getNetworkLocation() != null) {
       builder.setLocation(di.getNetworkLocation());
     }
@@ -503,7 +505,6 @@ public class PBHelper {
     builder.setAdminState(PBHelper.convert(info.getAdminState()));
     builder.setCapacity(info.getCapacity())
         .setDfsUsed(info.getDfsUsed())
-        .setHostName(info.getHostName())
         .setId(PBHelper.convert((DatanodeID)info))
         .setLastUpdate(info.getLastUpdate())
         .setLocation(info.getNetworkLocation())
@@ -610,8 +611,8 @@ public class PBHelper {
     DatanodeRegistrationProto.Builder builder = DatanodeRegistrationProto
         .newBuilder();
     return builder.setDatanodeID(PBHelper.convert((DatanodeID) registration))
-        .setStorageInfo(PBHelper.convert(registration.storageInfo))
-        .setKeys(PBHelper.convert(registration.exportedKeys)).build();
+        .setStorageInfo(PBHelper.convert(registration.getStorageInfo()))
+        .setKeys(PBHelper.convert(registration.getExportedKeys())).build();
   }
 
   public static DatanodeRegistration convert(DatanodeRegistrationProto proto) {
@@ -1345,5 +1346,21 @@ public class PBHelper {
         .setBlockPoolUsed(r.getBlockPoolUsed()).setCapacity(r.getCapacity())
         .setDfsUsed(r.getDfsUsed()).setRemaining(r.getRemaining())
         .setStorageID(r.getStorageID()).build();
+  }
+
+  public static JournalInfo convert(JournalInfoProto info) {
+    int lv = info.hasLayoutVersion() ? info.getLayoutVersion() : 0;
+    int nsID = info.hasNamespaceID() ? info.getNamespaceID() : 0;
+    return new JournalInfo(lv, info.getClusterID(), nsID);
+  }
+
+  /**
+   * Method used for converting {@link JournalInfoProto} sent from Namenode
+   * to Journal receivers to {@link NamenodeRegistration}.
+   */
+  public static JournalInfoProto convert(JournalInfo j) {
+    return JournalInfoProto.newBuilder().setClusterID(j.getClusterId())
+        .setLayoutVersion(j.getLayoutVersion())
+        .setNamespaceID(j.getNamespaceId()).build();
   }
 }

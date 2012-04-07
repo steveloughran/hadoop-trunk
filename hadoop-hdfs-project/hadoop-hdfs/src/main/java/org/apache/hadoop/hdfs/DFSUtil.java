@@ -295,16 +295,16 @@ public class DFSUtil {
       assert idx < nrBlocks : "Incorrect index";
       DatanodeInfo[] locations = blk.getLocations();
       String[] hosts = new String[locations.length];
-      String[] names = new String[locations.length];
+      String[] xferAddrs = new String[locations.length];
       String[] racks = new String[locations.length];
       for (int hCnt = 0; hCnt < locations.length; hCnt++) {
         hosts[hCnt] = locations[hCnt].getHostName();
-        names[hCnt] = locations[hCnt].getName();
-        NodeBase node = new NodeBase(names[hCnt], 
+        xferAddrs[hCnt] = locations[hCnt].getXferAddr();
+        NodeBase node = new NodeBase(xferAddrs[hCnt], 
                                      locations[hCnt].getNetworkLocation());
         racks[hCnt] = node.toString();
       }
-      blkLocations[idx] = new BlockLocation(names, hosts, racks,
+      blkLocations[idx] = new BlockLocation(xferAddrs, hosts, racks,
                                             blk.getStartOffset(),
                                             blk.getBlockSize(),
                                             blk.isCorrupt());
@@ -1026,13 +1026,7 @@ public class DFSUtil {
       String nsId, String nnId) {
 
     if (nsId == null) {
-      Collection<String> nsIds = getNameServiceIds(conf);
-      if (1 == nsIds.size()) {
-        nsId = nsIds.toArray(new String[1])[0];
-      } else {
-        // No nameservice ID was given and more than one is configured
-        return null;
-      }
+      nsId = getOnlyNameServiceIdOrNull(conf);
     }
 
     String serviceAddrKey = concatSuffixes(
@@ -1046,5 +1040,19 @@ public class DFSUtil {
       serviceRpcAddr = conf.get(addrKey);
     }
     return serviceRpcAddr;
+  }
+
+  /**
+   * If the configuration refers to only a single nameservice, return the
+   * name of that nameservice. If it refers to 0 or more than 1, return null.
+   */
+  public static String getOnlyNameServiceIdOrNull(Configuration conf) {
+    Collection<String> nsIds = getNameServiceIds(conf);
+    if (1 == nsIds.size()) {
+      return nsIds.toArray(new String[1])[0];
+    } else {
+      // No nameservice ID was given and more than one is configured
+      return null;
+    }
   }
 }

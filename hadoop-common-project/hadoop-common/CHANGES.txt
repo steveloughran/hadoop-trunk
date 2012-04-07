@@ -52,6 +52,11 @@ Trunk (unreleased changes)
     HADOOP-7994. Remove getProtocolVersion and getProtocolSignature from the 
     client side translator and server side implementation. (jitendra)
 
+    HADOOP-8244. Improve comments on ByteBufferReadable.read. (Henry Robinson
+    via atm)
+
+    HADOOP-7757. Test file reference count is at least 3x actual value (Jon
+    Eagles via bobby)
 
   BUG FIXES
 
@@ -139,6 +144,9 @@ Release 2.0.0 - UNRELEASED
     mapping from a file. (Patrick Angeles and tomwhite via tomwhite)
 
     HADOOP-8206. Common portion of a ZK-based failover controller (todd)
+
+    HADOOP-8210. Common side of HDFS-3148: The client should be able
+    to use multiple local interfaces for data transfer. (eli)
 
   IMPROVEMENTS
 
@@ -234,10 +242,28 @@ Release 2.0.0 - UNRELEASED
     HADOOP-8149. Cap space usage of default log4j rolling policy.
     (Patrick Hunt via eli)
 
+    HADOOP-8211. Update commons-net version to 3.1. (eli)
+
+    HADOOP-8236. haadmin should have configurable timeouts for failover
+    commands. (todd)
+
+    HADOOP-8242. AbstractDelegationTokenIdentifier: add getter methods
+    for owner and realuser. (Colin Patrick McCabe via eli)
+
+    HADOOP-8007. Use substitution tokens for fencing argument (todd)
+
+    HADOOP-8077. HA: fencing method should be able to be configured on
+    a per-NN or per-NS basis (todd)
+
+    HADOOP-8086. KerberosName silently sets defaultRealm to "" if the 
+    Kerberos config is not found, it should log a WARN (tucu)
+
   OPTIMIZATIONS
 
   BUG FIXES
 
+    HADOOP-8199. Fix issues in start-all.sh and stop-all.sh (Devaraj K via umamahesh)
+    
     HADOOP-7635. RetryInvocationHandler should release underlying resources on
     close. (atm)
 
@@ -298,6 +324,17 @@ Release 2.0.0 - UNRELEASED
     HADOOP-8218. RPC.closeProxy shouldn't throw error when closing a mock
     (todd)
 
+    HADOOP-8238. NetUtils#getHostNameOfIP blows up if given ip:port
+    string w/o port. (eli)
+
+    HADOOP-8243. Security support broken in CLI (manual) failover controller
+    (todd)
+
+    HADOOP-8251. Fix SecurityUtil.fetchServiceTicket after HADOOP-6941 (todd)
+
+    HADOOP-8249. invalid hadoop-auth cookies should trigger authentication 
+    if info is avail before returning HTTP 401 (tucu)
+
   BREAKDOWN OF HADOOP-7454 SUBTASKS
 
     HADOOP-7455. HA: Introduce HA Service Protocol Interface. (suresh)
@@ -349,6 +386,33 @@ Release 2.0.0 - UNRELEASED
     
     HADOOP-8116. RetriableCommand is using RetryPolicy incorrectly after
     HADOOP-7896. (atm)
+
+Release 0.23.3 - UNRELEASED
+
+  INCOMPATIBLE CHANGES
+
+  NEW FEATURES
+
+  IMPROVEMENTS
+
+  OPTIMIZATIONS
+
+  BUG FIXES
+
+    HADOOP-8088. User-group mapping cache incorrectly does negative caching on
+    transient failures (Khiwal Lee via bobby)
+
+    HADOOP-8179. risk of NPE in CopyCommands processArguments() (Daryn Sharp
+    via bobby)
+
+    HADOOP-6963. In FileUtil.getDU(..), neither include the size of directories
+    nor follow symbolic links.  (Ravi Prakash via szetszwo)
+
+    HADOOP-8180. Remove hsqldb since its not needed from pom.xml (Ravi Prakash
+    via tgraves)
+
+    HADOOP-8014. ViewFileSystem does not correctly implement getDefaultBlockSize,
+    getDefaultReplication, getContentSummary (John George via bobby)
 
 Release 0.23.2 - UNRELEASED 
 
@@ -444,9 +508,6 @@ Release 0.23.2 - UNRELEASED
 
     HADOOP-8176.  Disambiguate the destination of FsShell copies (Daryn Sharp
     via bobby)
-
-    HADOOP-8088. User-group mapping cache incorrectly does negative caching on
-    transient failures (Khiwal Lee via bobby)
 
     HADOOP-8208. Disallow self failover. (eli)
 

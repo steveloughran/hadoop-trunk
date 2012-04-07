@@ -37,6 +37,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -270,7 +271,7 @@ public class TestDataNodeVolumeFailure {
     Socket s = null;
     ExtendedBlock block = lblock.getBlock(); 
    
-    targetAddr = NetUtils.createSocketAddr(datanode.getName());
+    targetAddr = NetUtils.createSocketAddr(datanode.getXferAddr());
       
     s = NetUtils.getDefaultSocketFactory(conf).createSocket();
     s.connect(targetAddr, HdfsServerConstants.READ_TIMEOUT);
@@ -376,7 +377,7 @@ public class TestDataNodeVolumeFailure {
         new FilenameFilter() {
           public boolean accept(File dir, String name) {
             return name.startsWith("blk_") &&
-            name.endsWith(DatanodeUtil.METADATA_EXTENSION);
+            name.endsWith(Block.METADATA_EXTENSION);
           }
         }
     );

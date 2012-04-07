@@ -280,10 +280,11 @@ public class JsonUtil {
     }
 
     final Map<String, Object> m = new TreeMap<String, Object>();
-    m.put("name", datanodeinfo.getName());
+    m.put("ipAddr", datanodeinfo.getIpAddr());
+    m.put("hostName", datanodeinfo.getHostName());
     m.put("storageID", datanodeinfo.getStorageID());
+    m.put("xferPort", datanodeinfo.getXferPort());
     m.put("infoPort", datanodeinfo.getInfoPort());
-
     m.put("ipcPort", datanodeinfo.getIpcPort());
 
     m.put("capacity", datanodeinfo.getCapacity());
@@ -293,7 +294,6 @@ public class JsonUtil {
     m.put("lastUpdate", datanodeinfo.getLastUpdate());
     m.put("xceiverCount", datanodeinfo.getXceiverCount());
     m.put("networkLocation", datanodeinfo.getNetworkLocation());
-    m.put("hostName", datanodeinfo.getHostName());
     m.put("adminState", datanodeinfo.getAdminState().name());
     return m;
   }
@@ -305,8 +305,10 @@ public class JsonUtil {
     }
 
     return new DatanodeInfo(
-        (String)m.get("name"),
+        (String)m.get("ipAddr"),
+        (String)m.get("hostName"),
         (String)m.get("storageID"),
+        (int)(long)(Long)m.get("xferPort"),
         (int)(long)(Long)m.get("infoPort"),
         (int)(long)(Long)m.get("ipcPort"),
 
@@ -317,7 +319,6 @@ public class JsonUtil {
         (Long)m.get("lastUpdate"),
         (int)(long)(Long)m.get("xceiverCount"),
         (String)m.get("networkLocation"),
-        (String)m.get("hostName"),
         AdminStates.valueOf((String)m.get("adminState")));
   }
 
@@ -512,18 +513,13 @@ public class JsonUtil {
     final byte[] bytes = StringUtils.hexStringToByte((String)m.get("bytes"));
 
     final DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-    final int bytesPerCRC = in.readInt();
-    final long crcPerBlock = in.readLong();
-    final MD5Hash md5 = MD5Hash.read(in);
-    final MD5MD5CRC32FileChecksum checksum = new MD5MD5CRC32FileChecksum(
-        bytesPerCRC, crcPerBlock, md5);
+    final MD5MD5CRC32FileChecksum checksum = new MD5MD5CRC32FileChecksum();
+    checksum.readFields(in);
 
     //check algorithm name
-    final String alg = "MD5-of-" + crcPerBlock + "MD5-of-" + bytesPerCRC + "CRC32";
-    if (!alg.equals(algorithm)) {
-      throw new IOException("Algorithm not matched: algorithm=" + algorithm
-          + ", crcPerBlock=" + crcPerBlock
-          + ", bytesPerCRC=" + bytesPerCRC);
+    if (!checksum.getAlgorithmName().equals(algorithm)) {
+      throw new IOException("Algorithm not matched. Expected " + algorithm
+          + ", Received " + checksum.getAlgorithmName());
     }
     //check length
     if (length != checksum.getLength()) {

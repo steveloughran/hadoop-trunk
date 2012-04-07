@@ -71,8 +71,7 @@ public class TestShellCommandFencer {
   public void testCheckNoArgs() {
     try {
       Configuration conf = new Configuration();
-      conf.set(NodeFencer.CONF_METHODS_KEY, "shell");
-      new NodeFencer(conf);
+      new NodeFencer(conf, "shell");
       fail("Didn't throw when passing no args to shell");
     } catch (BadFencingConfigurationException confe) {
       assertTrue(
@@ -85,8 +84,7 @@ public class TestShellCommandFencer {
   public void testCheckParensNoArgs() {
     try {
       Configuration conf = new Configuration();
-      conf.set(NodeFencer.CONF_METHODS_KEY, "shell()");
-      new NodeFencer(conf);
+      new NodeFencer(conf, "shell()");
       fail("Didn't throw when passing no args to shell");
     } catch (BadFencingConfigurationException confe) {
       assertTrue(
@@ -103,7 +101,7 @@ public class TestShellCommandFencer {
   public void testStdoutLogging() {
     assertTrue(fencer.tryFence(TEST_TARGET, "echo hello"));
     Mockito.verify(ShellCommandFencer.LOG).info(
-        Mockito.endsWith("echo hello: host:1234 hello"));
+        Mockito.endsWith("echo hello: hello"));
   }
    
   /**
@@ -114,7 +112,7 @@ public class TestShellCommandFencer {
   public void testStderrLogging() {
     assertTrue(fencer.tryFence(TEST_TARGET, "echo hello >&2"));
     Mockito.verify(ShellCommandFencer.LOG).warn(
-        Mockito.endsWith("echo hello >&2: host:1234 hello"));
+        Mockito.endsWith("echo hello >&2: hello"));
   }
 
   /**
@@ -125,8 +123,20 @@ public class TestShellCommandFencer {
   public void testConfAsEnvironment() {
     fencer.tryFence(TEST_TARGET, "echo $in_fencing_tests");
     Mockito.verify(ShellCommandFencer.LOG).info(
-        Mockito.endsWith("echo $in...ing_tests: host:1234 yessir"));
+        Mockito.endsWith("echo $in...ing_tests: yessir"));
   }
+  
+  /**
+   * Verify that information about the fencing target gets passed as
+   * environment variables to the fencer.
+   */
+  @Test
+  public void testTargetAsEnvironment() {
+    fencer.tryFence(TEST_TARGET, "echo $target_host $target_port $target_address");
+    Mockito.verify(ShellCommandFencer.LOG).info(
+        Mockito.endsWith("echo $ta...t_address: host 1234 host:1234"));
+  }
+
 
   /**
    * Test that we properly close off our input to the subprocess
