@@ -149,4 +149,18 @@ public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
   public boolean isSingleSwitch() {
     return isMappingSingleSwitch(rawMapping);
   }
+
+  /** 
+   * Dump the topology of the cache, and if possible, that of the inner
+   * topology.
+   * @return a string containing topology information about the cache and
+   * any nested topology
+   */
+  @Override
+  public String dumpTopology() {
+    StringBuilder cacheTopology = new StringBuilder(super.dumpTopology());
+    cacheTopology.append("\n");
+    cacheTopology.append(AbstractDNSToSwitchMapping.dumpTopology(rawMapping));
+    return cacheTopology.toString();
+  }
 }

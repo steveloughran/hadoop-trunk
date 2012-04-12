@@ -77,16 +77,18 @@ public class TableMapping extends CachedDNSToSwitchMapping {
     getRawMapping().setConf(conf);
   }
   
-  private static final class RawTableMapping extends Configured
+  private static final class RawTableMapping extends AbstractDNSToSwitchMapping
       implements DNSToSwitchMapping {
     
     private final Map<String, String> map = new HashMap<String, String>();
     private boolean initialized = false;
-  
+    private Exception loadException;
+    protected String filename;
+
     private synchronized void load() {
       map.clear();
-  
-      String filename = getConf().get(NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY, null);
+
+      filename = getConf().get(NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY, null);
       if (StringUtils.isBlank(filename)) {
         LOG.warn(NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY + " not configured. "
             + NetworkTopology.DEFAULT_RACK + " will be returned.");
@@ -112,6 +114,7 @@ public class TableMapping extends CachedDNSToSwitchMapping {
       } catch (Exception e) {
         LOG.warn(filename + " cannot be read. " + NetworkTopology.DEFAULT_RACK
             + " will be returned.", e);
+        loadException = e;
         map.clear();
       } finally {
         if (reader != null) {
@@ -127,11 +130,7 @@ public class TableMapping extends CachedDNSToSwitchMapping {
     }
   
     public synchronized List<String> resolve(List<String> names) {
-      if (!initialized) {
-        initialized = true;
-        load();
-      }
-  
+      init();
       List<String> results = new ArrayList<String>(names.size());
       for (String name : names) {
         String result = map.get(name);
@@ -144,6 +143,13 @@ public class TableMapping extends CachedDNSToSwitchMapping {
       return results;
     }
 
+    private synchronized void init() {
+      if (!initialized) {
+        initialized = true;
+        load();
+      }
+    }
+
     /**
      * String method provides information about the chosen table file
      * and the current mapping
@@ -151,8 +157,7 @@ public class TableMapping extends CachedDNSToSwitchMapping {
      */
     @Override
     public String toString() {
-      String filename =
-          getConf().get(NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY, "");
+      init();
       StringBuilder builder = new StringBuilder();
       builder.append("TableMapping with table \"").append(filename)
           .append("\"\n");
@@ -160,8 +165,40 @@ public class TableMapping extends CachedDNSToSwitchMapping {
         File file = new File(filename);
         builder.append("Path: ").append(file.getAbsolutePath()).append("\n");
       }
-      builder.append("Map size: ").append(map.size());
+      builder.append("Table size: ").append(map.size()).append("\n");
       return builder.toString();
+    }
+
+    /**
+     * If the topology can load -dump it. If it failed to load, print the exception
+     * @return the topology information or a stack trace.
+     */
+    @Override
+    public String dumpTopology() {
+      init();
+      if (loadException != null) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("Table failed to load: ");
+        builder.append(loadException.toString()).append("\n");
+        //use full package name as a class with the same name from commons-lang
+        // is imported 
+        builder.append(org.apache.hadoop.util.StringUtils
+                           .stringifyException(loadException));
+        return builder.toString();
+      } else {
+        return super.dumpTopology();
+      }
+    }
+
+    /**
+     * Get the (host x switch) map.
+     * @return a copy of the table map
+     */
+    @Override
+    public Map<String, String> getSwitchMap() {
+      init();
+      Map<String, String > switchMap = new HashMap<String, String>(map);
+      return switchMap;
     }
   }
 }

@@ -127,7 +127,12 @@ public abstract class AbstractDNSToSwitchMapping
         switches.add(entry.getValue());
       }
       builder.append("Nodes: ").append(rack.size()).append("\n");
-      builder.append("Switches: ").append(switches.size()).append("\n");
+      int switchCount = switches.size();
+      builder.append("Switches: ").append(switchCount).append("\n");
+      if ( switchCount > 1 && switches.contains(NetworkTopology.DEFAULT_RACK)) {
+        builder.append("WARNING: some hosts have been mapped to the default rack\n"
+                     + " - the topology may be misconfigured or incomplete\n");
+      }
     } else {
       builder.append("No topology information");
     }
@@ -173,5 +178,20 @@ public abstract class AbstractDNSToSwitchMapping
          (CachedDNSToSwitchMapping)rawMapping
         : new CachedDNSToSwitchMapping(rawMapping);
     return mapping;
+  }
+
+  /**
+   * Dump the topology of a supplied mapping -where possible
+   * @param mapping the mapping to dump
+   * @return a string containing topology information or a message
+   * stating that it could not be extracted.
+   */
+  public static String dumpTopology(DNSToSwitchMapping mapping) {
+    if (mapping instanceof AbstractDNSToSwitchMapping) {
+      return ((AbstractDNSToSwitchMapping)mapping).dumpTopology();
+    } else {
+      return "Unpublished topology for " + mapping.getClass() 
+          + "instance details "+ mapping; 
+    }
   }
 }
