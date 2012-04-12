@@ -190,8 +190,8 @@ public abstract class AbstractDNSToSwitchMapping
     if (mapping instanceof AbstractDNSToSwitchMapping) {
       return ((AbstractDNSToSwitchMapping)mapping).dumpTopology();
     } else {
-      return "Unpublished topology for " + mapping.getClass() 
-          + "instance details "+ mapping; 
+      return "Unpublished topology for " + mapping.getClass()
+          + "instance details "+ mapping;
     }
   }
 }

@@ -150,7 +150,7 @@ public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
     return isMappingSingleSwitch(rawMapping);
   }
 
-  /** 
+  /**
    * Dump the topology of the cache, and if possible, that of the inner
    * topology.
    * @return a string containing topology information about the cache and

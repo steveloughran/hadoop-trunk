@@ -181,7 +181,7 @@ public class TableMapping extends CachedDNSToSwitchMapping {
         builder.append("Table failed to load: ");
         builder.append(loadException.toString()).append("\n");
         //use full package name as a class with the same name from commons-lang
-        // is imported 
+        // is imported
         builder.append(org.apache.hadoop.util.StringUtils
                            .stringifyException(loadException));
         return builder.toString();

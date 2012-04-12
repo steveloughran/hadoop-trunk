@@ -35,6 +35,12 @@ import java.util.List;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 
+/**
+ * Provides an entry point for command line topology operations.
+ * The initial operations allow callers to test different topology
+ * implementations and configurations  -and to see the results of
+ * resolving hostnames/IP addresses against them.
+ */
 public class TopologyTool extends Configured implements Tool {
 
   private static final Log LOG = LogFactory.getLog(TopologyTool.class);
@@ -46,10 +52,18 @@ public class TopologyTool extends Configured implements Tool {
     super(conf);
   }
 
-  private void println(CharSequence text) {
+
+  /**
+   * Print a line of text out.
+   * @param text text to print
+   */
+  protected void println(CharSequence text) {
     System.out.println(text);
   }
 
+  /**
+   * Print the usage messages
+   */
   private void usage() {
     println("usage: hadoop topo test [hostname] [hostname] ...");
     println("usage: hadoop topo testfile filename");
