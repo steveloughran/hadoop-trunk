@@ -39,12 +39,10 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.GetBlo
 import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.GetBlockLocalPathInfoResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.GetReplicaVisibleLengthRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.RefreshNamenodesRequestProto;
-import org.apache.hadoop.hdfs.protocolR23Compatible.ProtocolSignatureWritable;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.ProtocolMetaInterface;
-import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RpcClientUtil;
@@ -97,8 +95,7 @@ public class ClientDatanodeProtocolTranslatorPB implements
    */
   public ClientDatanodeProtocolTranslatorPB(DatanodeID datanodeid,
       Configuration conf, int socketTimeout) throws IOException {
-    InetSocketAddress addr = NetUtils.createSocketAddr(datanodeid.getHost()
-        + ":" + datanodeid.getIpcPort());
+    InetSocketAddress addr = NetUtils.createSocketAddr(datanodeid.getIpcAddr());
     rpcProxy = createClientDatanodeProtocolProxy(addr,
         UserGroupInformation.getCurrentUser(), conf,
         NetUtils.getDefaultSocketFactory(conf), socketTimeout);
@@ -107,8 +104,7 @@ public class ClientDatanodeProtocolTranslatorPB implements
   static ClientDatanodeProtocolPB createClientDatanodeProtocolProxy(
       DatanodeID datanodeid, Configuration conf, int socketTimeout,
       LocatedBlock locatedBlock) throws IOException {
-    InetSocketAddress addr = NetUtils.createSocketAddr(
-      datanodeid.getHost() + ":" + datanodeid.getIpcPort());
+    InetSocketAddress addr = NetUtils.createSocketAddr(datanodeid.getIpcAddr());
     if (LOG.isDebugEnabled()) {
       LOG.debug("ClientDatanodeProtocol addr=" + addr);
     }

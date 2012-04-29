@@ -128,8 +128,7 @@ public class TestDataTransferProtocol extends TestCase {
       
       if (eofExpected) {
         throw new IOException("Did not recieve IOException when an exception " +
-                              "is expected while reading from " + 
-                              datanode.getName());
+                              "is expected while reading from " + datanode); 
       }
       
       byte[] needed = recvBuf.toByteArray();
@@ -208,14 +207,13 @@ public class TestDataTransferProtocol extends TestCase {
   @Test public void testOpWrite() throws IOException {
     int numDataNodes = 1;
     Configuration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.DFS_SUPPORT_APPEND_KEY, true);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
     try {
       cluster.waitActive();
       String poolId = cluster.getNamesystem().getBlockPoolId(); 
       datanode = DataNodeTestUtils.getDNRegistrationForBP(
           cluster.getDataNodes().get(0), poolId);
-      dnAddr = NetUtils.createSocketAddr(datanode.getName());
+      dnAddr = NetUtils.createSocketAddr(datanode.getXferAddr());
       FileSystem fileSys = cluster.getFileSystem();
 
       /* Test writing to finalized replicas */
@@ -349,7 +347,7 @@ public class TestDataTransferProtocol extends TestCase {
                  new InetSocketAddress("localhost", cluster.getNameNodePort()),
                  conf);                
     datanode = dfsClient.datanodeReport(DatanodeReportType.LIVE)[0];
-    dnAddr = NetUtils.createSocketAddr(datanode.getName());
+    dnAddr = NetUtils.createSocketAddr(datanode.getXferAddr());
     FileSystem fileSys = cluster.getFileSystem();
     
     int fileLen = Math.min(conf.getInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 4096), 4096);

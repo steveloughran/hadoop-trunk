@@ -21,20 +21,25 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import javax.net.SocketFactory;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol;
-import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.GetServiceStateRequestProto;
+import org.apache.hadoop.ha.HAServiceStatus;
+import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.GetServiceStatusRequestProto;
+import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.GetServiceStatusResponseProto;
 import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.HAServiceStateProto;
 import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.MonitorHealthRequestProto;
-import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.ReadyToBecomeActiveRequestProto;
 import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.TransitionToActiveRequestProto;
 import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.TransitionToStandbyRequestProto;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.ProtocolSignature;
+import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -47,7 +52,7 @@ import com.google.protobuf.ServiceException;
 @InterfaceAudience.Private
 @InterfaceStability.Stable
 public class HAServiceProtocolClientSideTranslatorPB implements
-    HAServiceProtocol, Closeable {
+    HAServiceProtocol, Closeable, ProtocolTranslator {
   /** RpcController is not used and hence is set to null */
   private final static RpcController NULL_CONTROLLER = null;
   private final static MonitorHealthRequestProto MONITOR_HEALTH_REQ = 
@@ -56,10 +61,8 @@ public class HAServiceProtocolClientSideTranslatorPB implements
       TransitionToActiveRequestProto.newBuilder().build();
   private final static TransitionToStandbyRequestProto TRANSITION_TO_STANDBY_REQ = 
       TransitionToStandbyRequestProto.newBuilder().build();
-  private final static GetServiceStateRequestProto GET_SERVICE_STATE_REQ = 
-      GetServiceStateRequestProto.newBuilder().build();
-  private final static ReadyToBecomeActiveRequestProto ACTIVE_READY_REQ = 
-      ReadyToBecomeActiveRequestProto.newBuilder().build();
+  private final static GetServiceStatusRequestProto GET_SERVICE_STATUS_REQ = 
+      GetServiceStatusRequestProto.newBuilder().build();
   
   private final HAServiceProtocolPB rpcProxy;
 
@@ -71,6 +74,16 @@ public class HAServiceProtocolClientSideTranslatorPB implements
         RPC.getProtocolVersion(HAServiceProtocolPB.class), addr, conf);
   }
   
+  public HAServiceProtocolClientSideTranslatorPB(
+      InetSocketAddress addr, Configuration conf,
+      SocketFactory socketFactory, int timeout) throws IOException {
+    RPC.setProtocolEngine(conf, HAServiceProtocolPB.class,
+        ProtobufRpcEngine.class);
+    rpcProxy = RPC.getProxy(HAServiceProtocolPB.class,
+        RPC.getProtocolVersion(HAServiceProtocolPB.class), addr,
+        UserGroupInformation.getCurrentUser(), conf, socketFactory, timeout);
+  }
+
   @Override
   public void monitorHealth() throws IOException {
     try {
@@ -99,14 +112,26 @@ public class HAServiceProtocolClientSideTranslatorPB implements
   }
 
   @Override
-  public HAServiceState getServiceState() throws IOException {
-    HAServiceStateProto state;
+  public HAServiceStatus getServiceStatus() throws IOException {
+    GetServiceStatusResponseProto status;
     try {
-      state = rpcProxy.getServiceState(NULL_CONTROLLER,
-          GET_SERVICE_STATE_REQ).getState();
+      status = rpcProxy.getServiceStatus(NULL_CONTROLLER,
+          GET_SERVICE_STATUS_REQ);
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
+    
+    HAServiceStatus ret = new HAServiceStatus(
+        convert(status.getState()));
+    if (status.getReadyToBecomeActive()) {
+      ret.setReadyToBecomeActive();
+    } else {
+      ret.setNotReadyToBecomeActive(status.getNotReadyReason());
+    }
+    return ret;
+  }
+  
+  private HAServiceState convert(HAServiceStateProto state) {
     switch(state) {
     case ACTIVE:
       return HAServiceState.ACTIVE;
@@ -124,12 +149,7 @@ public class HAServiceProtocolClientSideTranslatorPB implements
   }
 
   @Override
-  public boolean readyToBecomeActive() throws IOException {
-    try {
-      return rpcProxy.readyToBecomeActive(NULL_CONTROLLER, ACTIVE_READY_REQ)
-          .getReadyToBecomeActive();
-    } catch (ServiceException e) {
-      throw ProtobufHelper.getRemoteException(e);
-    }
+  public Object getUnderlyingProxyObject() {
+    return rpcProxy;
   }
 }

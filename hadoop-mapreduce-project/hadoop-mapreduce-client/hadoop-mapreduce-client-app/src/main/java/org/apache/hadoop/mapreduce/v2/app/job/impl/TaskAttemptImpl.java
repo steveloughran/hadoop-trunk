@@ -24,7 +24,6 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -73,6 +72,7 @@ import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptReport;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptState;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskType;
+import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.TaskAttemptListener;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobCounterUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobDiagnosticsUpdateEvent;
@@ -101,7 +101,6 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.Clock;
 import org.apache.hadoop.yarn.YarnException;
@@ -128,7 +127,6 @@ import org.apache.hadoop.yarn.util.BuilderUtils;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.RackResolver;
 
-
 /**
  * Implementation of TaskAttempt interface.
  */
@@ -140,8 +138,6 @@ public abstract class TaskAttemptImpl implements
   static final Counters EMPTY_COUNTERS = new Counters();
   private static final Log LOG = LogFactory.getLog(TaskAttemptImpl.class);
   private static final long MEMORY_SPLITS_RESOLUTION = 1024; //TODO Make configurable?
-  private static final int MAP_MEMORY_MB_DEFAULT = 1024;
-  private static final int REDUCE_MEMORY_MB_DEFAULT = 1024;
   private final static RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
 
   protected final JobConf conf;
@@ -158,7 +154,8 @@ public abstract class TaskAttemptImpl implements
   private final List<String> diagnostics = new ArrayList<String>();
   private final Lock readLock;
   private final Lock writeLock;
-  private Collection<Token<? extends TokenIdentifier>> fsTokens;
+  private final AppContext appContext;
+  private Credentials credentials;
   private Token<JobTokenIdentifier> jobToken;
   private static AtomicBoolean initialClasspathFlag = new AtomicBoolean();
   private static String initialClasspath = null;
@@ -319,7 +316,9 @@ public abstract class TaskAttemptImpl implements
              TaskAttemptEventType.TA_CONTAINER_COMPLETED,
              TaskAttemptEventType.TA_UPDATE,
              TaskAttemptEventType.TA_COMMIT_PENDING,
+             // Container launch events can arrive late
              TaskAttemptEventType.TA_CONTAINER_LAUNCHED,
+             TaskAttemptEventType.TA_CONTAINER_LAUNCH_FAILED,
              TaskAttemptEventType.TA_DONE,
              TaskAttemptEventType.TA_FAILMSG,
              TaskAttemptEventType.TA_TIMED_OUT))
@@ -341,6 +340,7 @@ public abstract class TaskAttemptImpl implements
              TaskAttemptEventType.TA_UPDATE,
              TaskAttemptEventType.TA_COMMIT_PENDING,
              TaskAttemptEventType.TA_CONTAINER_LAUNCHED,
+             TaskAttemptEventType.TA_CONTAINER_LAUNCH_FAILED,
              TaskAttemptEventType.TA_DONE,
              TaskAttemptEventType.TA_FAILMSG,
              TaskAttemptEventType.TA_TIMED_OUT))
@@ -362,7 +362,10 @@ public abstract class TaskAttemptImpl implements
              TaskAttemptEventType.TA_UPDATE,
              TaskAttemptEventType.TA_COMMIT_PENDING,
              TaskAttemptEventType.TA_DONE,
-             TaskAttemptEventType.TA_FAILMSG))
+             TaskAttemptEventType.TA_FAILMSG,
+             // Container launch events can arrive late
+             TaskAttemptEventType.TA_CONTAINER_LAUNCHED,
+             TaskAttemptEventType.TA_CONTAINER_LAUNCH_FAILED))
 
      // Transitions from KILL_TASK_CLEANUP
      .addTransition(TaskAttemptState.KILL_TASK_CLEANUP,
@@ -380,7 +383,10 @@ public abstract class TaskAttemptImpl implements
              TaskAttemptEventType.TA_UPDATE,
              TaskAttemptEventType.TA_COMMIT_PENDING,
              TaskAttemptEventType.TA_DONE,
-             TaskAttemptEventType.TA_FAILMSG))
+             TaskAttemptEventType.TA_FAILMSG,
+             // Container launch events can arrive late
+             TaskAttemptEventType.TA_CONTAINER_LAUNCHED,
+             TaskAttemptEventType.TA_CONTAINER_LAUNCH_FAILED))
 
       // Transitions from SUCCEEDED
      .addTransition(TaskAttemptState.SUCCEEDED, //only possible for map attempts
@@ -408,7 +414,9 @@ public abstract class TaskAttemptImpl implements
              TaskAttemptEventType.TA_ASSIGNED,
              TaskAttemptEventType.TA_CONTAINER_COMPLETED,
              TaskAttemptEventType.TA_UPDATE,
+             // Container launch events can arrive late
              TaskAttemptEventType.TA_CONTAINER_LAUNCHED,
+             TaskAttemptEventType.TA_CONTAINER_LAUNCH_FAILED,
              TaskAttemptEventType.TA_COMMIT_PENDING,
              TaskAttemptEventType.TA_DONE,
              TaskAttemptEventType.TA_FAILMSG))
@@ -423,7 +431,9 @@ public abstract class TaskAttemptImpl implements
              TaskAttemptEventType.TA_ASSIGNED,
              TaskAttemptEventType.TA_CONTAINER_COMPLETED,
              TaskAttemptEventType.TA_UPDATE,
+             // Container launch events can arrive late
              TaskAttemptEventType.TA_CONTAINER_LAUNCHED,
+             TaskAttemptEventType.TA_CONTAINER_LAUNCH_FAILED,
              TaskAttemptEventType.TA_COMMIT_PENDING,
              TaskAttemptEventType.TA_DONE,
              TaskAttemptEventType.TA_FAILMSG))
@@ -459,7 +469,8 @@ public abstract class TaskAttemptImpl implements
       TaskAttemptListener taskAttemptListener, Path jobFile, int partition,
       JobConf conf, String[] dataLocalHosts, OutputCommitter committer,
       Token<JobTokenIdentifier> jobToken,
-      Collection<Token<? extends TokenIdentifier>> fsTokens, Clock clock) {
+      Credentials credentials, Clock clock,
+      AppContext appContext) {
     oldJobId = TypeConverter.fromYarn(taskId.getJobId());
     this.conf = conf;
     this.clock = clock;
@@ -467,6 +478,7 @@ public abstract class TaskAttemptImpl implements
     attemptId.setTaskId(taskId);
     attemptId.setId(i);
     this.taskAttemptListener = taskAttemptListener;
+    this.appContext = appContext;
 
     // Initialize reportedStatus
     reportedStatus = new TaskAttemptStatus();
@@ -476,7 +488,7 @@ public abstract class TaskAttemptImpl implements
     readLock = readWriteLock.readLock();
     writeLock = readWriteLock.writeLock();
 
-    this.fsTokens = fsTokens;
+    this.credentials = credentials;
     this.jobToken = jobToken;
     this.eventHandler = eventHandler;
     this.committer = committer;
@@ -497,9 +509,13 @@ public abstract class TaskAttemptImpl implements
   private int getMemoryRequired(Configuration conf, TaskType taskType) {
     int memory = 1024;
     if (taskType == TaskType.MAP)  {
-      memory = conf.getInt(MRJobConfig.MAP_MEMORY_MB, MAP_MEMORY_MB_DEFAULT);
+      memory =
+          conf.getInt(MRJobConfig.MAP_MEMORY_MB,
+              MRJobConfig.DEFAULT_MAP_MEMORY_MB);
     } else if (taskType == TaskType.REDUCE) {
-      memory = conf.getInt(MRJobConfig.REDUCE_MEMORY_MB, REDUCE_MEMORY_MB_DEFAULT);
+      memory =
+          conf.getInt(MRJobConfig.REDUCE_MEMORY_MB,
+              MRJobConfig.DEFAULT_REDUCE_MEMORY_MB);
     }
     
     return memory;
@@ -549,7 +565,7 @@ public abstract class TaskAttemptImpl implements
       Map<ApplicationAccessType, String> applicationACLs, Configuration conf,
       Token<JobTokenIdentifier> jobToken,
       final org.apache.hadoop.mapred.JobID oldJobId,
-      Collection<Token<? extends TokenIdentifier>> fsTokens) {
+      Credentials credentials) {
 
     // Application resources
     Map<String, LocalResource> localResources = 
@@ -562,7 +578,7 @@ public abstract class TaskAttemptImpl implements
     Map<String, ByteBuffer> serviceData = new HashMap<String, ByteBuffer>();
 
     // Tokens
-    ByteBuffer tokens = ByteBuffer.wrap(new byte[]{});
+    ByteBuffer taskCredentialsBuffer = ByteBuffer.wrap(new byte[]{});
     try {
       FileSystem remoteFS = FileSystem.get(conf);
 
@@ -604,16 +620,14 @@ public abstract class TaskAttemptImpl implements
       // Setup DistributedCache
       MRApps.setupDistributedCache(conf, localResources);
 
-      // Setup up tokens
+      // Setup up task credentials buffer
       Credentials taskCredentials = new Credentials();
 
       if (UserGroupInformation.isSecurityEnabled()) {
-        // Add file-system tokens
-        for (Token<? extends TokenIdentifier> token : fsTokens) {
-          LOG.info("Putting fs-token for NM use for launching container : "
-              + token.toString());
-          taskCredentials.addToken(token.getService(), token);
-        }
+        LOG.info("Adding #" + credentials.numberOfTokens()
+            + " tokens and #" + credentials.numberOfSecretKeys()
+            + " secret keys for NM use for launching container");
+        taskCredentials.addAll(credentials);
       }
 
       // LocalStorageToken is needed irrespective of whether security is enabled
@@ -624,7 +638,7 @@ public abstract class TaskAttemptImpl implements
       LOG.info("Size of containertokens_dob is "
           + taskCredentials.numberOfTokens());
       taskCredentials.writeTokenStorageToStream(containerTokens_dob);
-      tokens = 
+      taskCredentialsBuffer =
           ByteBuffer.wrap(containerTokens_dob.getData(), 0,
               containerTokens_dob.getLength());
 
@@ -669,7 +683,8 @@ public abstract class TaskAttemptImpl implements
     ContainerLaunchContext container = BuilderUtils
         .newContainerLaunchContext(null, conf
             .get(MRJobConfig.USER_NAME), null, localResources,
-            environment, null, serviceData, tokens, applicationACLs);
+            environment, null, serviceData, taskCredentialsBuffer,
+            applicationACLs);
 
     return container;
   }
@@ -681,12 +696,12 @@ public abstract class TaskAttemptImpl implements
       final org.apache.hadoop.mapred.JobID oldJobId,
       Resource assignedCapability, WrappedJvmID jvmID,
       TaskAttemptListener taskAttemptListener,
-      Collection<Token<? extends TokenIdentifier>> fsTokens) {
+      Credentials credentials) {
 
     synchronized (commonContainerSpecLock) {
       if (commonContainerSpec == null) {
         commonContainerSpec = createCommonContainerLaunchContext(
-            applicationACLs, conf, jobToken, oldJobId, fsTokens);
+            applicationACLs, conf, jobToken, oldJobId, credentials);
       }
     }
 
@@ -950,26 +965,26 @@ public abstract class TaskAttemptImpl implements
       finishTime = clock.getTime();
     }
   }
-  
+
   private static long computeSlotMillis(TaskAttemptImpl taskAttempt) {
     TaskType taskType = taskAttempt.getID().getTaskId().getTaskType();
     int slotMemoryReq =
-       taskAttempt.getMemoryRequired(taskAttempt.conf, taskType);
+        taskAttempt.getMemoryRequired(taskAttempt.conf, taskType);
+
+    int minSlotMemSize =
+        taskAttempt.appContext.getClusterInfo().getMinContainerCapability()
+            .getMemory();
+
     int simSlotsRequired =
-        slotMemoryReq
-            / (taskType == TaskType.MAP ? MAP_MEMORY_MB_DEFAULT
-                : REDUCE_MEMORY_MB_DEFAULT);
-    // Simulating MRv1 slots for counters by assuming *_MEMORY_MB_DEFAULT
-    // corresponds to a MrV1 slot.
-    // Fallow slot millis is not applicable in MRv2 - since a container is
-    // either assigned with the required memory or is not. No partial
-    // reserveations
+        minSlotMemSize == 0 ? 0 : (int) Math.ceil((float) slotMemoryReq
+            / minSlotMemSize);
+
     long slotMillisIncrement =
         simSlotsRequired
             * (taskAttempt.getFinishTime() - taskAttempt.getLaunchTime());
     return slotMillisIncrement;
   }
-  
+
   private static JobCounterUpdateEvent createJobCounterUpdateEventTAFailed(
       TaskAttemptImpl taskAttempt) {
     TaskType taskType = taskAttempt.getID().getTaskId().getTaskType();
@@ -986,6 +1001,23 @@ public abstract class TaskAttemptImpl implements
     }
     return jce;
   }
+  
+  private static JobCounterUpdateEvent createJobCounterUpdateEventTAKilled(
+      TaskAttemptImpl taskAttempt) {
+    TaskType taskType = taskAttempt.getID().getTaskId().getTaskType();
+    JobCounterUpdateEvent jce = new JobCounterUpdateEvent(taskAttempt.getID().getTaskId().getJobId());
+    
+    long slotMillisIncrement = computeSlotMillis(taskAttempt);
+    
+    if (taskType == TaskType.MAP) {
+      jce.addCounterUpdate(JobCounter.NUM_KILLED_MAPS, 1);
+      jce.addCounterUpdate(JobCounter.SLOTS_MILLIS_MAPS, slotMillisIncrement);
+    } else {
+      jce.addCounterUpdate(JobCounter.NUM_KILLED_REDUCES, 1);
+      jce.addCounterUpdate(JobCounter.SLOTS_MILLIS_REDUCES, slotMillisIncrement);
+    }
+    return jce;
+  }  
 
   private static
       TaskAttemptUnsuccessfulCompletionEvent
@@ -1025,6 +1057,7 @@ public abstract class TaskAttemptImpl implements
   
   private void updateProgressSplits() {
     double newProgress = reportedStatus.progress;
+    newProgress = Math.max(Math.min(newProgress, 1.0D), 0.0D);
     Counters counters = reportedStatus.counters;
     if (counters == null)
       return;
@@ -1156,7 +1189,7 @@ public abstract class TaskAttemptImpl implements
           taskAttempt.conf, taskAttempt.jobToken, taskAttempt.remoteTask,
           taskAttempt.oldJobId, taskAttempt.assignedCapability,
           taskAttempt.jvmID, taskAttempt.taskAttemptListener,
-          taskAttempt.fsTokens);
+          taskAttempt.credentials);
       taskAttempt.eventHandler.handle(new ContainerRemoteLaunchEvent(
           taskAttempt.attemptId, taskAttempt.containerID,
           taskAttempt.containerMgrAddress, taskAttempt.containerToken,
@@ -1211,13 +1244,18 @@ public abstract class TaskAttemptImpl implements
         TaskAttemptUnsuccessfulCompletionEvent tauce =
             createTaskAttemptUnsuccessfulCompletionEvent(taskAttempt,
                 finalState);
-        taskAttempt.eventHandler
+        if(finalState == TaskAttemptState.FAILED) {
+          taskAttempt.eventHandler
             .handle(createJobCounterUpdateEventTAFailed(taskAttempt));
+        } else if(finalState == TaskAttemptState.KILLED) {
+          taskAttempt.eventHandler
+          .handle(createJobCounterUpdateEventTAKilled(taskAttempt));
+        }
         taskAttempt.eventHandler.handle(new JobHistoryEvent(
             taskAttempt.attemptId.getTaskId().getJobId(), tauce));
       } else {
-        LOG.debug("Not generating HistoryFinish event since start event not generated for taskAttempt: "
-            + taskAttempt.getID());
+        LOG.debug("Not generating HistoryFinish event since start event not " +
+        		"generated for taskAttempt: " + taskAttempt.getID());
       }
     }
   }
@@ -1352,8 +1390,8 @@ public abstract class TaskAttemptImpl implements
         // taskAttempt.logAttemptFinishedEvent(TaskAttemptState.FAILED); Not
         // handling failed map/reduce events.
       }else {
-        LOG.debug("Not generating HistoryFinish event since start event not generated for taskAttempt: "
-            + taskAttempt.getID());
+        LOG.debug("Not generating HistoryFinish event since start event not " +
+        		"generated for taskAttempt: " + taskAttempt.getID());
       }
       taskAttempt.eventHandler.handle(new TaskTAttemptEvent(
           taskAttempt.attemptId, TaskEventType.T_ATTEMPT_FAILED));
@@ -1419,8 +1457,8 @@ public abstract class TaskAttemptImpl implements
         taskAttempt.eventHandler.handle(new JobHistoryEvent(
             taskAttempt.attemptId.getTaskId().getJobId(), tauce));
       }else {
-        LOG.debug("Not generating HistoryFinish event since start event not generated for taskAttempt: "
-            + taskAttempt.getID());
+        LOG.debug("Not generating HistoryFinish event since start event not " +
+        		"generated for taskAttempt: " + taskAttempt.getID());
       }
       taskAttempt.eventHandler.handle(new TaskTAttemptEvent(
           taskAttempt.attemptId, TaskEventType.T_ATTEMPT_FAILED));
@@ -1438,15 +1476,15 @@ public abstract class TaskAttemptImpl implements
       taskAttempt.setFinishTime();
       if (taskAttempt.getLaunchTime() != 0) {
         taskAttempt.eventHandler
-            .handle(createJobCounterUpdateEventTAFailed(taskAttempt));
+            .handle(createJobCounterUpdateEventTAKilled(taskAttempt));
         TaskAttemptUnsuccessfulCompletionEvent tauce =
             createTaskAttemptUnsuccessfulCompletionEvent(taskAttempt,
                 TaskAttemptState.KILLED);
         taskAttempt.eventHandler.handle(new JobHistoryEvent(
             taskAttempt.attemptId.getTaskId().getJobId(), tauce));
       }else {
-        LOG.debug("Not generating HistoryFinish event since start event not generated for taskAttempt: "
-            + taskAttempt.getID());
+        LOG.debug("Not generating HistoryFinish event since start event not " +
+        		"generated for taskAttempt: " + taskAttempt.getID());
       }
 //      taskAttempt.logAttemptFinishedEvent(TaskAttemptState.KILLED); Not logging Map/Reduce attempts in case of failure.
       taskAttempt.eventHandler.handle(new TaskTAttemptEvent(

@@ -22,15 +22,15 @@ import static org.junit.Assert.*;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.net.InetSocketAddress;
 
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
-import static org.mockito.Mockito.when;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
@@ -41,16 +41,14 @@ public class TestHAAdmin {
   private HAAdmin tool;
   private ByteArrayOutputStream errOutBytes = new ByteArrayOutputStream();
   private String errOutput;
-  private HAServiceProtocol mockProtocol;
-  
+
   @Before
   public void setup() throws IOException {
-    mockProtocol = Mockito.mock(HAServiceProtocol.class);
-    when(mockProtocol.readyToBecomeActive()).thenReturn(true);
     tool = new HAAdmin() {
       @Override
-      protected HAServiceProtocol getProtocol(String target) throws IOException {
-        return mockProtocol;
+      protected HAServiceTarget resolveTarget(String target) {
+        return new DummyHAService(HAServiceState.STANDBY,
+            new InetSocketAddress("dummy", 12345));
       }
     };
     tool.setConf(new Configuration());

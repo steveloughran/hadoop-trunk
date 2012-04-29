@@ -19,12 +19,15 @@
 package org.apache.hadoop.yarn.api.impl.pb.client;
 
 import java.io.IOException;
-import java.lang.reflect.UndeclaredThrowableException;
 import java.net.InetSocketAddress;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.ContainerManager;
+import org.apache.hadoop.yarn.api.ContainerManagerPB;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
@@ -37,9 +40,9 @@ import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.StartContainerRequestP
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.StartContainerResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.StopContainerRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.StopContainerResponsePBImpl;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRemoteException;
-import org.apache.hadoop.yarn.ipc.ProtoOverHadoopRpcEngine;
-import org.apache.hadoop.yarn.proto.ContainerManager.ContainerManagerService;
+import org.apache.hadoop.yarn.exceptions.impl.pb.YarnRemoteExceptionPBImpl;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainerStatusRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.StartContainerRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.StopContainerRequestProto;
@@ -48,12 +51,25 @@ import com.google.protobuf.ServiceException;
 
 public class ContainerManagerPBClientImpl implements ContainerManager {
 
-  private ContainerManagerService.BlockingInterface proxy;
+  // Not a documented config. Only used for tests
+  static final String NM_COMMAND_TIMEOUT = YarnConfiguration.YARN_PREFIX
+      + "rpc.nm-command-timeout";
+
+  /**
+   *  Maximum of 1 minute timeout for a Node to react to the command
+   */
+  static final int DEFAULT_COMMAND_TIMEOUT = 60000;
+
+  private ContainerManagerPB proxy;
   
   public ContainerManagerPBClientImpl(long clientVersion, InetSocketAddress addr, Configuration conf) throws IOException {
-    RPC.setProtocolEngine(conf, ContainerManagerService.BlockingInterface.class, ProtoOverHadoopRpcEngine.class);
-    proxy = (ContainerManagerService.BlockingInterface)RPC.getProxy(
-        ContainerManagerService.BlockingInterface.class, clientVersion, addr, conf);
+    RPC.setProtocolEngine(conf, ContainerManagerPB.class, ProtobufRpcEngine.class);
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+
+    int expireIntvl = conf.getInt(NM_COMMAND_TIMEOUT, DEFAULT_COMMAND_TIMEOUT);
+    proxy = (ContainerManagerPB)RPC.getProxy(
+        ContainerManagerPB.class, clientVersion, addr, ugi, conf,
+        NetUtils.getDefaultSocketFactory(conf), expireIntvl);
   }
 
   public void close() {
@@ -69,13 +85,7 @@ public class ContainerManagerPBClientImpl implements ContainerManager {
     try {
       return new GetContainerStatusResponsePBImpl(proxy.getContainerStatus(null, requestProto));
     } catch (ServiceException e) {
-      if (e.getCause() instanceof YarnRemoteException) {
-        throw (YarnRemoteException)e.getCause();
-      } else if (e.getCause() instanceof UndeclaredThrowableException) {
-        throw (UndeclaredThrowableException)e.getCause();
-      } else {
-        throw new UndeclaredThrowableException(e);
-      }
+      throw YarnRemoteExceptionPBImpl.unwrapAndThrowException(e);
     }
   }
 
@@ -86,31 +96,20 @@ public class ContainerManagerPBClientImpl implements ContainerManager {
     try {
       return new StartContainerResponsePBImpl(proxy.startContainer(null, requestProto));
     } catch (ServiceException e) {
-      if (e.getCause() instanceof YarnRemoteException) {
-        throw (YarnRemoteException)e.getCause();
-      } else if (e.getCause() instanceof UndeclaredThrowableException) {
-        throw (UndeclaredThrowableException)e.getCause();
-      } else {
-        throw new UndeclaredThrowableException(e);
-      }
+      throw YarnRemoteExceptionPBImpl.unwrapAndThrowException(e);
     }
   }
 
   @Override
   public StopContainerResponse stopContainer(StopContainerRequest request)
       throws YarnRemoteException {
-    StopContainerRequestProto requestProto = ((StopContainerRequestPBImpl)request).getProto();
+    StopContainerRequestProto requestProto = ((StopContainerRequestPBImpl) request)
+        .getProto();
     try {
-      return new StopContainerResponsePBImpl(proxy.stopContainer(null, requestProto));
+      return new StopContainerResponsePBImpl(proxy.stopContainer(null,
+          requestProto));
     } catch (ServiceException e) {
-      if (e.getCause() instanceof YarnRemoteException) {
-        throw (YarnRemoteException)e.getCause();
-      } else if (e.getCause() instanceof UndeclaredThrowableException) {
-        throw (UndeclaredThrowableException)e.getCause();
-      } else {
-        throw new UndeclaredThrowableException(e);
-      }
+      throw YarnRemoteExceptionPBImpl.unwrapAndThrowException(e);
     }
   }
-
 }

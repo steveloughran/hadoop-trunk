@@ -19,7 +19,6 @@
 package org.apache.hadoop.mapreduce.v2.app.job.impl;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -54,6 +53,7 @@ import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskReport;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskState;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskType;
+import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.TaskAttemptListener;
 import org.apache.hadoop.mapreduce.v2.app.job.Task;
 import org.apache.hadoop.mapreduce.v2.app.job.TaskAttempt;
@@ -71,8 +71,8 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskTAttemptEvent;
 import org.apache.hadoop.mapreduce.v2.app.metrics.MRAppMetrics;
 import org.apache.hadoop.mapreduce.v2.app.rm.ContainerFailedEvent;
 import org.apache.hadoop.mapreduce.v2.util.MRBuilderUtils;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.yarn.Clock;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.factories.RecordFactory;
@@ -104,11 +104,12 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
   private final Lock readLock;
   private final Lock writeLock;
   private final MRAppMetrics metrics;
+  protected final AppContext appContext;
   private long scheduledTime;
   
   private final RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
   
-  protected Collection<Token<? extends TokenIdentifier>> fsTokens;
+  protected Credentials credentials;
   protected Token<JobTokenIdentifier> jobToken;
   
   // counts the number of attempts that are either running or in a state where
@@ -249,9 +250,9 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
       EventHandler eventHandler, Path remoteJobConfFile, JobConf conf,
       TaskAttemptListener taskAttemptListener, OutputCommitter committer,
       Token<JobTokenIdentifier> jobToken,
-      Collection<Token<? extends TokenIdentifier>> fsTokens, Clock clock,
+      Credentials credentials, Clock clock,
       Map<TaskId, TaskInfo> completedTasksFromPreviousRun, int startCount,
-      MRAppMetrics metrics) {
+      MRAppMetrics metrics, AppContext appContext) {
     this.conf = conf;
     this.clock = clock;
     this.jobFile = remoteJobConfFile;
@@ -268,9 +269,10 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
     this.taskAttemptListener = taskAttemptListener;
     this.eventHandler = eventHandler;
     this.committer = committer;
-    this.fsTokens = fsTokens;
+    this.credentials = credentials;
     this.jobToken = jobToken;
     this.metrics = metrics;
+    this.appContext = appContext;
 
     // See if this is from a previous generation.
     if (completedTasksFromPreviousRun != null
@@ -654,6 +656,7 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
   private static TaskFinishedEvent createTaskFinishedEvent(TaskImpl task, TaskState taskState) {
     TaskFinishedEvent tfe =
       new TaskFinishedEvent(TypeConverter.fromYarn(task.taskId),
+        TypeConverter.fromYarn(task.successfulAttempt),
         task.getFinishTime(task.successfulAttempt),
         TypeConverter.fromYarn(task.taskId.getTaskType()),
         taskState.toString(),

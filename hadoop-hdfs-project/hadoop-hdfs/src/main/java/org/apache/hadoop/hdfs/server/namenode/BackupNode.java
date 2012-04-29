@@ -27,17 +27,17 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.NameNodeProxies;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.UnregisteredNodeException;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.proto.JournalProtocolProtos.JournalProtocolService;
 import org.apache.hadoop.hdfs.protocolPB.JournalProtocolPB;
 import org.apache.hadoop.hdfs.protocolPB.JournalProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.Storage;
-import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
+import org.apache.hadoop.hdfs.server.protocol.FenceResponse;
+import org.apache.hadoop.hdfs.server.protocol.JournalInfo;
 import org.apache.hadoop.hdfs.server.protocol.JournalProtocol;
-import org.apache.hadoop.hdfs.server.protocol.NamenodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
@@ -46,6 +46,7 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.BlockingService;
 
 /**
@@ -171,6 +172,12 @@ public class BackupNode extends NameNode {
 
   @Override // NameNode
   public void stop() {
+    stop(true);
+  }
+  
+  @VisibleForTesting
+  void stop(boolean reportError) {
+   
     if(checkpointManager != null) {
       // Prevent from starting a new checkpoint.
       // Checkpoints that has already been started may proceed until 
@@ -180,7 +187,10 @@ public class BackupNode extends NameNode {
       // ClosedByInterruptException.
       checkpointManager.shouldRun = false;
     }
-    if(namenode != null && getRegistration() != null) {
+    
+    // reportError is a test hook to simulate backupnode crashing and not
+    // doing a clean exit w.r.t active namenode
+    if (reportError && namenode != null && getRegistration() != null) {
       // Exclude this node from the list of backup streams on the name-node
       try {
         namenode.errorReport(getRegistration(), NamenodeProtocol.FATAL,
@@ -209,14 +219,13 @@ public class BackupNode extends NameNode {
   }
   
   /* @Override */// NameNode
-  public boolean setSafeMode(SafeModeAction action) throws IOException {
+  public boolean setSafeMode(@SuppressWarnings("unused") SafeModeAction action)
+      throws IOException {
     throw new UnsupportedActionException("setSafeMode");
   }
   
   static class BackupNodeRpcServer extends NameNodeRpcServer implements
       JournalProtocol {
-    private final String nnRpcAddress;
-    
     private BackupNodeRpcServer(Configuration conf, BackupNode nn)
         throws IOException {
       super(conf, nn);
@@ -226,35 +235,59 @@ public class BackupNode extends NameNode {
           .newReflectiveBlockingService(journalProtocolTranslator);
       DFSUtil.addPBProtocol(conf, JournalProtocolPB.class, service,
           this.clientRpcServer);
-      nnRpcAddress = nn.nnRpcAddress;
+    }
+    
+    /** 
+     * Verifies a journal request
+     */
+    private void verifyJournalRequest(JournalInfo journalInfo)
+        throws IOException {
+      verifyLayoutVersion(journalInfo.getLayoutVersion());
+      String errorMsg = null;
+      int expectedNamespaceID = namesystem.getNamespaceInfo().getNamespaceID();
+      if (journalInfo.getNamespaceId() != expectedNamespaceID) {
+        errorMsg = "Invalid namespaceID in journal request - expected " + expectedNamespaceID
+            + " actual " + journalInfo.getNamespaceId();
+        LOG.warn(errorMsg);
+        throw new UnregisteredNodeException(journalInfo);
+      } 
+      if (!journalInfo.getClusterId().equals(namesystem.getClusterId())) {
+        errorMsg = "Invalid clusterId in journal request - expected "
+            + journalInfo.getClusterId() + " actual " + namesystem.getClusterId();
+        LOG.warn(errorMsg);
+        throw new UnregisteredNodeException(journalInfo);
+      }
     }
 
     /////////////////////////////////////////////////////
-    // BackupNodeProtocol implementation for backup node.
+    // JournalProtocol implementation for backup node.
     /////////////////////////////////////////////////////
     @Override
-    public void startLogSegment(NamenodeRegistration registration, long txid)
-        throws IOException {
+    public void startLogSegment(JournalInfo journalInfo, long epoch,
+        long txid) throws IOException {
       namesystem.checkOperation(OperationCategory.JOURNAL);
-      verifyRequest(registration);
-      
+      verifyJournalRequest(journalInfo);
       getBNImage().namenodeStartedLogSegment(txid);
     }
     
     @Override
-    public void journal(NamenodeRegistration nnReg,
-        long firstTxId, int numTxns,
-        byte[] records) throws IOException {
+    public void journal(JournalInfo journalInfo, long epoch, long firstTxId,
+        int numTxns, byte[] records) throws IOException {
       namesystem.checkOperation(OperationCategory.JOURNAL);
-      verifyRequest(nnReg);
-      if(!nnRpcAddress.equals(nnReg.getAddress()))
-        throw new IOException("Journal request from unexpected name-node: "
-            + nnReg.getAddress() + " expecting " + nnRpcAddress);
+      verifyJournalRequest(journalInfo);
       getBNImage().journal(firstTxId, numTxns, records);
     }
 
     private BackupImage getBNImage() {
       return (BackupImage)nn.getFSImage();
+    }
+
+    @Override
+    public FenceResponse fence(JournalInfo journalInfo, long epoch,
+        String fencerInfo) throws IOException {
+      LOG.info("Fenced by " + fencerInfo + " with epoch " + epoch);
+      throw new UnsupportedOperationException(
+          "BackupNode does not support fence");
     }
   }
   

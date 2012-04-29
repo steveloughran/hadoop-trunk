@@ -73,7 +73,7 @@ public class TestNMExpiry {
     // Dispatcher that processes events inline
     Dispatcher dispatcher = new InlineDispatcher();
     RMContext context = new RMContextImpl(new MemStore(), dispatcher, null,
-        null, null);
+        null, null, null);
     dispatcher.register(SchedulerEventType.class,
         new InlineDispatcher.EmptyEventHandler());
     dispatcher.register(RMNodeEventType.class,
@@ -82,7 +82,7 @@ public class TestNMExpiry {
         dispatcher);
     nmLivelinessMonitor.init(conf);
     nmLivelinessMonitor.start();
-    NodesListManager nodesListManager = new NodesListManager();
+    NodesListManager nodesListManager = new NodesListManager(context);
     nodesListManager.init(conf);
     resourceTrackerService = new ResourceTrackerService(context,
         nodesListManager, nmLivelinessMonitor, containerTokenSecretManager);

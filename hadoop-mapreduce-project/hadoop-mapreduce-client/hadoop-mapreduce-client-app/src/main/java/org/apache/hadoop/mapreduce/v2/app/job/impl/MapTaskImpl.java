@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.mapreduce.v2.app.job.impl;
 
-import java.util.Collection;
 import java.util.Map;
 
 import org.apache.hadoop.fs.Path;
@@ -32,10 +31,11 @@ import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitMetaInfo;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskType;
+import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.TaskAttemptListener;
 import org.apache.hadoop.mapreduce.v2.app.metrics.MRAppMetrics;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.yarn.Clock;
 import org.apache.hadoop.yarn.event.EventHandler;
 
@@ -49,12 +49,12 @@ public class MapTaskImpl extends TaskImpl {
       TaskSplitMetaInfo taskSplitMetaInfo,
       TaskAttemptListener taskAttemptListener, OutputCommitter committer,
       Token<JobTokenIdentifier> jobToken,
-      Collection<Token<? extends TokenIdentifier>> fsTokens, Clock clock, 
+      Credentials credentials, Clock clock,
       Map<TaskId, TaskInfo> completedTasksFromPreviousRun, int startCount,
-      MRAppMetrics metrics) {
+      MRAppMetrics metrics, AppContext appContext) {
     super(jobId, TaskType.MAP, partition, eventHandler, remoteJobConfFile,
-        conf, taskAttemptListener, committer, jobToken, fsTokens, clock, 
-        completedTasksFromPreviousRun, startCount, metrics);
+        conf, taskAttemptListener, committer, jobToken, credentials, clock,
+        completedTasksFromPreviousRun, startCount, metrics, appContext);
     this.taskSplitMetaInfo = taskSplitMetaInfo;
   }
 
@@ -68,7 +68,7 @@ public class MapTaskImpl extends TaskImpl {
     return new MapTaskAttemptImpl(getID(), nextAttemptNumber,
         eventHandler, jobFile,
         partition, taskSplitMetaInfo, conf, taskAttemptListener,
-        committer, jobToken, fsTokens, clock);
+        committer, jobToken, credentials, clock, appContext);
   }
 
   @Override

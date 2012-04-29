@@ -61,6 +61,7 @@ import org.apache.hadoop.mapreduce.v2.app.speculate.TaskRuntimeEstimator;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.yarn.Clock;
+import org.apache.hadoop.yarn.ClusterInfo;
 import org.apache.hadoop.yarn.SystemClock;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -488,6 +489,11 @@ public class TestRuntimeEstimators {
     public List<AMInfo> getAMInfos() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+    
+    @Override
+    public Configuration loadConfFile() {
+      throw new UnsupportedOperationException();
+    }
   }
 
   /*
@@ -824,6 +830,11 @@ public class TestRuntimeEstimators {
     @Override
     public long getStartTime() {
       return 0;
+    }
+
+    @Override
+    public ClusterInfo getClusterInfo() {
+      return new ClusterInfo();
     }
   }
 }

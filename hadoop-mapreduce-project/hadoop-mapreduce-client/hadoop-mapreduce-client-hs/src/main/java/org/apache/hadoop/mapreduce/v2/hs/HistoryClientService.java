@@ -36,6 +36,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.mapreduce.JobACL;
 import org.apache.hadoop.mapreduce.TypeConverter;
+import org.apache.hadoop.mapreduce.v2.api.HSClientProtocol;
 import org.apache.hadoop.mapreduce.v2.api.MRClientProtocol;
 import org.apache.hadoop.mapreduce.v2.api.MRDelegationTokenIdentifier;
 import org.apache.hadoop.mapreduce.v2.api.protocolrecords.FailTaskAttemptRequest;
@@ -96,7 +97,7 @@ public class HistoryClientService extends AbstractService {
 
   private static final Log LOG = LogFactory.getLog(HistoryClientService.class);
 
-  private MRClientProtocol protocolHandler;
+  private HSClientProtocol protocolHandler;
   private Server server;
   private WebApp webApp;
   private InetSocketAddress bindAddress;
@@ -107,7 +108,7 @@ public class HistoryClientService extends AbstractService {
       JHSDelegationTokenSecretManager jhsDTSecretManager) {
     super("HistoryClientService");
     this.history = history;
-    this.protocolHandler = new MRClientProtocolHandler();
+    this.protocolHandler = new HSClientProtocolHandler();
     this.jhsDTSecretManager = jhsDTSecretManager;
   }
 
@@ -128,7 +129,7 @@ public class HistoryClientService extends AbstractService {
     }
 
     server =
-        rpc.getServer(MRClientProtocol.class, protocolHandler, address,
+        rpc.getServer(HSClientProtocol.class, protocolHandler, address,
             conf, jhsDTSecretManager,
             conf.getInt(JHAdminConfig.MR_HISTORY_CLIENT_THREAD_COUNT,
                 JHAdminConfig.DEFAULT_MR_HISTORY_CLIENT_THREAD_COUNT));
@@ -177,7 +178,7 @@ public class HistoryClientService extends AbstractService {
     return this.bindAddress;
   }
 
-  private class MRClientProtocolHandler implements MRClientProtocol {
+  private class HSClientProtocolHandler implements HSClientProtocol {
 
     private RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
 
@@ -199,11 +200,10 @@ public class HistoryClientService extends AbstractService {
       } catch (InterruptedException e) {
         throw RPCUtil.getRemoteException(e);
       }
-      if (job == null) {
-        throw RPCUtil.getRemoteException("Unknown job " + jobID);
+      if (job != null) {
+        JobACL operation = JobACL.VIEW_JOB;
+        checkAccess(job, operation);
       }
-      JobACL operation = JobACL.VIEW_JOB;
-      checkAccess(job, operation);
       return job;
     }
 
@@ -221,7 +221,12 @@ public class HistoryClientService extends AbstractService {
       JobId jobId = request.getJobId();
       Job job = verifyAndGetJob(jobId);
       GetJobReportResponse response = recordFactory.newRecordInstance(GetJobReportResponse.class);
-      response.setJobReport(job.getReport());
+      if (job != null) {
+        response.setJobReport(job.getReport());
+      }
+      else {
+        response.setJobReport(null);
+      }
       return response;
     }
 

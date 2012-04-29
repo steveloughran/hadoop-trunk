@@ -121,5 +121,45 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
       "hadoop.security.token.service.use_ip";
   public static final boolean HADOOP_SECURITY_TOKEN_SERVICE_USE_IP_DEFAULT =
       true;
+  
+  /**
+   * HA health monitor and failover controller.
+   */
+ 
+  /** How often to retry connecting to the service. */
+  public static final String HA_HM_CONNECT_RETRY_INTERVAL_KEY =
+    "ha.health-monitor.connect-retry-interval.ms";
+  public static final long HA_HM_CONNECT_RETRY_INTERVAL_DEFAULT = 1000;
+ 
+  /* How often to check the service. */
+  public static final String HA_HM_CHECK_INTERVAL_KEY =
+    "ha.health-monitor.check-interval.ms";  
+  public static final long HA_HM_CHECK_INTERVAL_DEFAULT = 1000;
+ 
+  /* How long to sleep after an unexpected RPC error. */
+  public static final String HA_HM_SLEEP_AFTER_DISCONNECT_KEY =
+    "ha.health-monitor.sleep-after-disconnect.ms";
+  public static final long HA_HM_SLEEP_AFTER_DISCONNECT_DEFAULT = 1000;
+ 
+  /* Timeout for the actual monitorHealth() calls. */
+  public static final String HA_HM_RPC_TIMEOUT_KEY =
+    "ha.health-monitor.rpc-timeout.ms";
+  public static final int HA_HM_RPC_TIMEOUT_DEFAULT = 45000;
+  
+  /* Timeout that the FC waits for the new active to become active */
+  public static final String HA_FC_NEW_ACTIVE_TIMEOUT_KEY =
+    "ha.failover-controller.new-active.rpc-timeout.ms";
+  public static final int HA_FC_NEW_ACTIVE_TIMEOUT_DEFAULT = 60000;
+  
+  /* Timeout that the FC waits for the old active to go to standby */
+  public static final String HA_FC_GRACEFUL_FENCE_TIMEOUT_KEY =
+    "ha.failover-controller.graceful-fence.rpc-timeout.ms";
+  public static final int HA_FC_GRACEFUL_FENCE_TIMEOUT_DEFAULT = 5000;
+  
+  /* Timeout that the CLI (manual) FC waits for monitorHealth, getServiceState */
+  public static final String HA_FC_CLI_CHECK_TIMEOUT_KEY =
+    "ha.failover-controller.cli-check.rpc-timeout.ms";
+  public static final int HA_FC_CLI_CHECK_TIMEOUT_DEFAULT = 20000;
+
 }
 

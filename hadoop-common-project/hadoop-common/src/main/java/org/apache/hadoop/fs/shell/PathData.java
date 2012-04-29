@@ -23,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -43,7 +44,7 @@ import org.apache.hadoop.fs.shell.PathExceptions.PathNotFoundException;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 
-public class PathData {
+public class PathData implements Comparable<PathData> {
   protected final URI uri;
   public final FileSystem fs;
   public final Path path;
@@ -187,12 +188,21 @@ public class PathData {
    * @throws IOException upon unexpected error
    */
   public boolean parentExists() throws IOException {
+    return representsDirectory()
+        ? fs.exists(path) : fs.exists(path.getParent());
+  }
+
+  /**
+   * Check if the path represents a directory as determined by the basename
+   * being "." or "..", or the path ending with a directory separator 
+   * @return boolean if this represents a directory
+   */
+  public boolean representsDirectory() {
     String uriPath = uri.getPath();
     String name = uriPath.substring(uriPath.lastIndexOf("/")+1);
     // Path will munch off the chars that indicate a dir, so there's no way
     // to perform this test except by examining the raw basename we maintain
-    return (name.isEmpty() || name.equals(".") || name.equals(".."))
-        ? fs.exists(path) : fs.exists(path.getParent());
+    return (name.isEmpty() || name.equals(".") || name.equals(".."));
   }
   
   /**
@@ -210,6 +220,7 @@ public class PathData {
       String child = getStringForChildPath(stats[i].getPath());
       items[i] = new PathData(fs, child, stats[i]);
     }
+    Arrays.sort(items);
     return items;
   }
 
@@ -264,6 +275,8 @@ public class PathData {
     PathData[] items = null;
     
     if (stats == null) {
+      // remove any quoting in the glob pattern
+      pattern = pattern.replaceAll("\\\\(.)", "$1");
       // not a glob & file not found, so add the path with a null stat
       items = new PathData[]{ new PathData(fs, pattern, null) };
     } else {
@@ -303,6 +316,7 @@ public class PathData {
         items[i++] = new PathData(fs, globMatch, stat);
       }
     }
+    Arrays.sort(items);
     return items;
   }
 
@@ -446,4 +460,20 @@ public class PathData {
     }
   }
 
+  @Override
+  public int compareTo(PathData o) {
+    return path.compareTo(((PathData)o).path);
+  }
+  
+  @Override
+  public boolean equals(Object o) {
+    return (o != null) &&
+           (o instanceof PathData) &&
+           path.equals(((PathData)o).path);
+  }
+  
+  @Override
+  public int hashCode() {
+    return path.hashCode();
+  }
 }

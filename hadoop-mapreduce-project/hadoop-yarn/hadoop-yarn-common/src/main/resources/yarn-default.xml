@@ -215,6 +215,14 @@
     <value>30000</value>
   </property>
 
+  <property>
+    <description>Interval for the roll over for the master key used to generate
+        application tokens
+    </description>
+    <name>yarn.resourcemanager.application-tokens.master-key-rolling-interval-secs</name>
+    <value>86400</value>
+  </property>
+
   <!-- Node Manager Configs -->
   <property>
     <description>address of node manager IPC.</description>
@@ -477,8 +485,7 @@
   
   <property>
     <description>The address for the web proxy as HOST:PORT, if this is not
-     given or if it matches yarn.resourcemanager.address then the proxy will
-     run as part of the RM</description>
+     given then the proxy will run as part of the RM</description>
      <name>yarn.web-proxy.address</name>
      <value/>
   </property>

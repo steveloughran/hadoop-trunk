@@ -19,7 +19,6 @@ package org.apache.hadoop.ha;
 
 import java.io.IOException;
 import java.io.PrintStream;
-import java.net.InetSocketAddress;
 import java.util.Map;
 
 import org.apache.commons.cli.Options;
@@ -27,13 +26,13 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.ParseException;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.ha.protocolPB.HAServiceProtocolClientSideTranslatorPB;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -50,7 +49,10 @@ public abstract class HAAdmin extends Configured implements Tool {
   
   private static final String FORCEFENCE  = "forcefence";
   private static final String FORCEACTIVE = "forceactive";
+  private static final Log LOG = LogFactory.getLog(HAAdmin.class);
 
+  private int rpcTimeoutForChecks = -1;
+  
   private static Map<String, UsageInfo> USAGE =
     ImmutableMap.<String, UsageInfo>builder()
     .put("-transitionToActive",
@@ -77,6 +79,8 @@ public abstract class HAAdmin extends Configured implements Tool {
   /** Output stream for errors, for use in tests */
   protected PrintStream errOut = System.err;
   PrintStream out = System.out;
+
+  protected abstract HAServiceTarget resolveTarget(String string);
 
   protected String getUsageString() {
     return "Usage: HAAdmin";
@@ -110,7 +114,8 @@ public abstract class HAAdmin extends Configured implements Tool {
       return -1;
     }
     
-    HAServiceProtocol proto = getProtocol(argv[1]);
+    HAServiceProtocol proto = resolveTarget(argv[1]).getProxy(
+        getConf(), 0);
     HAServiceProtocolHelper.transitionToActive(proto);
     return 0;
   }
@@ -123,14 +128,14 @@ public abstract class HAAdmin extends Configured implements Tool {
       return -1;
     }
     
-    HAServiceProtocol proto = getProtocol(argv[1]);
+    HAServiceProtocol proto = resolveTarget(argv[1]).getProxy(
+        getConf(), 0);
     HAServiceProtocolHelper.transitionToStandby(proto);
     return 0;
   }
 
   private int failover(final String[] argv)
       throws IOException, ServiceFailedException {
-    Configuration conf = getConf();
     boolean forceFence = false;
     boolean forceActive = false;
 
@@ -163,29 +168,13 @@ public abstract class HAAdmin extends Configured implements Tool {
       return -1;
     }
 
-    NodeFencer fencer;
+    HAServiceTarget fromNode = resolveTarget(args[0]);
+    HAServiceTarget toNode = resolveTarget(args[1]);
+    
+    FailoverController fc = new FailoverController(getConf());
+    
     try {
-      fencer = NodeFencer.create(conf);
-    } catch (BadFencingConfigurationException bfce) {
-      errOut.println("failover: incorrect fencing configuration: " + 
-          bfce.getLocalizedMessage());
-      return -1;
-    }
-    if (fencer == null) {
-      errOut.println("failover: no fencer configured");
-      return -1;
-    }
-
-    InetSocketAddress addr1 = 
-      NetUtils.createSocketAddr(getServiceAddr(args[0]));
-    InetSocketAddress addr2 = 
-      NetUtils.createSocketAddr(getServiceAddr(args[1]));
-    HAServiceProtocol proto1 = getProtocol(args[0]);
-    HAServiceProtocol proto2 = getProtocol(args[1]);
-
-    try {
-      FailoverController.failover(proto1, addr1, proto2, addr2,
-          fencer, forceFence, forceActive); 
+      fc.failover(fromNode, toNode, forceFence, forceActive); 
       out.println("Failover from "+args[0]+" to "+args[1]+" successful");
     } catch (FailoverFailedException ffe) {
       errOut.println("Failover failed: " + ffe.getLocalizedMessage());
@@ -202,7 +191,8 @@ public abstract class HAAdmin extends Configured implements Tool {
       return -1;
     }
     
-    HAServiceProtocol proto = getProtocol(argv[1]);
+    HAServiceProtocol proto = resolveTarget(argv[1]).getProxy(
+        getConf(), rpcTimeoutForChecks);
     try {
       HAServiceProtocolHelper.monitorHealth(proto);
     } catch (HealthCheckFailedException e) {
@@ -220,8 +210,9 @@ public abstract class HAAdmin extends Configured implements Tool {
       return -1;
     }
 
-    HAServiceProtocol proto = getProtocol(argv[1]);
-    out.println(proto.getServiceState());
+    HAServiceProtocol proto = resolveTarget(argv[1]).getProxy(
+        getConf(), rpcTimeoutForChecks);
+    out.println(proto.getServiceStatus().getState());
     return 0;
   }
 
@@ -233,14 +224,14 @@ public abstract class HAAdmin extends Configured implements Tool {
     return serviceId;
   }
 
-  /**
-   * Return a proxy to the specified target service.
-   */
-  protected HAServiceProtocol getProtocol(String serviceId)
-      throws IOException {
-    String serviceAddr = getServiceAddr(serviceId);
-    InetSocketAddress addr = NetUtils.createSocketAddr(serviceAddr);
-    return new HAServiceProtocolClientSideTranslatorPB(addr, getConf());
+  @Override
+  public void setConf(Configuration conf) {
+    super.setConf(conf);
+    if (conf != null) {
+      rpcTimeoutForChecks = conf.getInt(
+          CommonConfigurationKeys.HA_FC_CLI_CHECK_TIMEOUT_KEY,
+          CommonConfigurationKeys.HA_FC_CLI_CHECK_TIMEOUT_DEFAULT);
+    }
   }
 
   @Override
@@ -252,6 +243,9 @@ public abstract class HAAdmin extends Configured implements Tool {
       return -1;
     } catch (IOException ioe) {
       errOut.println("Operation failed: " + ioe.getLocalizedMessage());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Operation failed", ioe);
+      }
       return -1;
     }
   }

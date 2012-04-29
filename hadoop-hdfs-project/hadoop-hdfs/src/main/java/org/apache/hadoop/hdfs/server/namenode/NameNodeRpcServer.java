@@ -41,13 +41,13 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
-import org.apache.hadoop.ha.HAServiceProtocol;
+import org.apache.hadoop.ha.HAServiceStatus;
 import org.apache.hadoop.ha.HealthCheckFailedException;
 import org.apache.hadoop.ha.ServiceFailedException;
 import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.HAServiceProtocolService;
 import org.apache.hadoop.ha.protocolPB.HAServiceProtocolPB;
 import org.apache.hadoop.ha.protocolPB.HAServiceProtocolServerSideTranslatorPB;
-
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HDFSPolicyProvider;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -96,7 +96,6 @@ import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.FinalizeCommand;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeCommand;
@@ -113,7 +112,6 @@ import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.RpcPayloadHeader.RpcKind;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.WritableRpcEngine;
 import org.apache.hadoop.net.Node;
@@ -124,6 +122,8 @@ import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.VersionInfo;
+import org.apache.hadoop.util.VersionUtil;
 
 import com.google.protobuf.BlockingService;
 
@@ -150,6 +150,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
   /** The RPC server that listens to requests from clients */
   protected final RPC.Server clientRpcServer;
   protected final InetSocketAddress clientRpcAddress;
+  
+  private final String minimumDataNodeVersion;
 
   public NameNodeRpcServer(Configuration conf, NameNode nn)
       throws IOException {
@@ -264,6 +266,10 @@ class NameNodeRpcServer implements NamenodeProtocols {
     // The rpc-server port can be ephemeral... ensure we have the correct info
     this.clientRpcAddress = this.clientRpcServer.getListenerAddress(); 
     nn.setRpcServerAddress(conf, clientRpcAddress);
+    
+    this.minimumDataNodeVersion = conf.get(
+        DFSConfigKeys.DFS_NAMENODE_MIN_SUPPORTED_DATANODE_VERSION_KEY,
+        DFSConfigKeys.DFS_NAMENODE_MIN_SUPPORTED_DATANODE_VERSION_DEFAULT);
   }
   
   /**
@@ -329,7 +335,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // NamenodeProtocol
   public NamenodeRegistration register(NamenodeRegistration registration)
   throws IOException {
-    verifyVersion(registration.getVersion());
+    verifyLayoutVersion(registration.getVersion());
     NamenodeRegistration myRegistration = nn.setRegistration();
     namesystem.registerBackupNode(registration, myRegistration);
     return myRegistration;
@@ -548,10 +554,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // DatanodeProtocol
   public void commitBlockSynchronization(ExtendedBlock block,
       long newgenerationstamp, long newlength,
-      boolean closeFile, boolean deleteblock, DatanodeID[] newtargets)
+      boolean closeFile, boolean deleteblock, DatanodeID[] newtargets,
+      String[] newtargetstorages)
       throws IOException {
-    namesystem.commitBlockSynchronization(block,
-        newgenerationstamp, newlength, closeFile, deleteblock, newtargets);
+    namesystem.commitBlockSynchronization(block, newgenerationstamp,
+        newlength, closeFile, deleteblock, newtargets, newtargetstorages);
   }
   
   @Override // ClientProtocol
@@ -831,11 +838,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
 
   @Override // DatanodeProtocol
-  public DatanodeRegistration registerDatanode(DatanodeRegistration nodeReg,
-      DatanodeStorage[] storages) throws IOException {
-    verifyVersion(nodeReg.getVersion());
+  public DatanodeRegistration registerDatanode(DatanodeRegistration nodeReg)
+      throws IOException {
+    verifyLayoutVersion(nodeReg.getVersion());
+    verifySoftwareVersion(nodeReg);
     namesystem.registerDatanode(nodeReg);
-      
     return nodeReg;
   }
 
@@ -857,7 +864,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     BlockListAsLongs blist = new BlockListAsLongs(reports[0].getBlocks());
     if(stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug("*BLOCK* NameNode.blockReport: "
-           + "from " + nodeReg.getName() + " " + blist.getNumberOfBlocks()
+           + "from " + nodeReg + " " + blist.getNumberOfBlocks()
            + " blocks");
     }
 
@@ -873,7 +880,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     verifyRequest(nodeReg);
     if(stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug("*BLOCK* NameNode.blockReceivedAndDeleted: "
-          +"from "+nodeReg.getName()+" "+receivedAndDeletedBlocks.length
+          +"from "+nodeReg+" "+receivedAndDeletedBlocks.length
           +" blocks.");
     }
     namesystem.getBlockManager().processIncrementalBlockReport(
@@ -883,7 +890,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // DatanodeProtocol
   public void errorReport(DatanodeRegistration nodeReg,
                           int errorCode, String msg) throws IOException { 
-    String dnName = (nodeReg == null ? "unknown DataNode" : nodeReg.getName());
+    String dnName = 
+       (nodeReg == null) ? "Unknown DataNode" : nodeReg.toString();
 
     if (errorCode == DatanodeProtocol.NOTIFY) {
       LOG.info("Error report from " + dnName + ": " + msg);
@@ -912,16 +920,13 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   /** 
-   * Verify request.
+   * Verifies the given registration.
    * 
-   * Verifies correctness of the datanode version, registration ID, and 
-   * if the datanode does not need to be shutdown.
-   * 
-   * @param nodeReg data node registration
-   * @throws IOException
+   * @param nodeReg node registration
+   * @throws UnregisteredNodeException if the registration is invalid
    */
   void verifyRequest(NodeRegistration nodeReg) throws IOException {
-    verifyVersion(nodeReg.getVersion());
+    verifyLayoutVersion(nodeReg.getVersion());
     if (!namesystem.getRegistrationID().equals(nodeReg.getRegistrationID())) {
       LOG.warn("Invalid registrationID - expected: "
           + namesystem.getRegistrationID() + " received: "
@@ -983,15 +988,9 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override // HAServiceProtocol
-  public synchronized HAServiceState getServiceState() 
-      throws AccessControlException {
-    return nn.getServiceState();
-  }
-
-  @Override // HAServiceProtocol
-  public synchronized boolean readyToBecomeActive() 
-      throws ServiceFailedException, AccessControlException {
-    return nn.readyToBecomeActive();
+  public synchronized HAServiceStatus getServiceStatus() 
+      throws AccessControlException, ServiceFailedException {
+    return nn.getServiceStatus();
   }
 
   /**
@@ -1000,9 +999,38 @@ class NameNodeRpcServer implements NamenodeProtocols {
    * @param version
    * @throws IOException
    */
-  void verifyVersion(int version) throws IOException {
+  void verifyLayoutVersion(int version) throws IOException {
     if (version != HdfsConstants.LAYOUT_VERSION)
       throw new IncorrectVersionException(version, "data node");
+  }
+  
+  private void verifySoftwareVersion(DatanodeRegistration dnReg)
+      throws IncorrectVersionException {
+    String dnVersion = dnReg.getSoftwareVersion();
+    if (VersionUtil.compareVersions(dnVersion, minimumDataNodeVersion) < 0) {
+      IncorrectVersionException ive = new IncorrectVersionException(
+          minimumDataNodeVersion, dnVersion, "DataNode", "NameNode");
+      LOG.warn(ive.getMessage() + " DN: " + dnReg);
+      throw ive;
+    }
+    String nnVersion = VersionInfo.getVersion();
+    if (!dnVersion.equals(nnVersion)) {
+      String messagePrefix = "Reported DataNode version '" + dnVersion +
+          "' of DN " + dnReg + " does not match NameNode version '" +
+          nnVersion + "'";
+      long nnCTime = nn.getFSImage().getStorage().getCTime();
+      long dnCTime = dnReg.getStorageInfo().getCTime();
+      if (nnCTime != dnCTime) {
+        IncorrectVersionException ive = new IncorrectVersionException(
+            messagePrefix + " and CTime of DN ('" + dnCTime +
+            "') does not match CTime of NN ('" + nnCTime + "')");
+        LOG.warn(ive);
+        throw ive;
+      } else {
+        LOG.info(messagePrefix +
+            ". Note: This is normal during a rolling upgrade.");
+      }
+    }
   }
 
   private static String getClientMachine() {

@@ -38,6 +38,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.EnumSet;
 
 import org.apache.commons.logging.LogFactory;
@@ -60,13 +61,14 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
-import org.apache.hadoop.hdfs.server.datanode.FSDatasetInterface;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.LeaseManager;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.log4j.Level;
 
+import static org.junit.Assume.assumeTrue;
 
 /**
  * This class tests various cases during file creation.
@@ -140,11 +142,34 @@ public class TestFileCreation extends junit.framework.TestCase {
     }
   }
 
+  public void testFileCreation() throws IOException {
+    checkFileCreation(null);
+  }
+
+  /** Same test but the client should bind to a local interface */
+  public void testFileCreationSetLocalInterface() throws IOException {
+    assumeTrue(System.getProperty("os.name").startsWith("Linux"));
+
+    // The mini cluster listens on the loopback so we can use it here
+    checkFileCreation("lo");
+
+    try {
+      checkFileCreation("bogus-interface");
+      fail("Able to specify a bogus interface");
+    } catch (UnknownHostException e) {
+      assertEquals("No such interface bogus-interface", e.getMessage());
+    }
+  }
+
   /**
    * Test if file creation and disk space consumption works right
+   * @param netIf the local interface, if any, clients should use to access DNs
    */
-  public void testFileCreation() throws IOException {
+  public void checkFileCreation(String netIf) throws IOException {
     Configuration conf = new HdfsConfiguration();
+    if (netIf != null) {
+      conf.set(DFSConfigKeys.DFS_CLIENT_LOCAL_INTERFACES, netIf);
+    }
     if (simulatedStorage) {
       SimulatedFSDataset.setFactory(conf);
     }
@@ -211,7 +236,7 @@ public class TestFileCreation extends junit.framework.TestCase {
       // can't check capacities for real storage since the OS file system may be changing under us.
       if (simulatedStorage) {
         DataNode dn = cluster.getDataNodes().get(0);
-        FSDatasetInterface<?> dataset = DataNodeTestUtils.getFSDataset(dn);
+        FsDatasetSpi<?> dataset = DataNodeTestUtils.getFSDataset(dn);
         assertEquals(fileSize, dataset.getDfsUsed());
         assertEquals(SimulatedFSDataset.DEFAULT_CAPACITY-fileSize,
             dataset.getRemaining());
@@ -844,9 +869,10 @@ public class TestFileCreation extends junit.framework.TestCase {
       LocatedBlock locatedblock = locations.getLocatedBlocks().get(0);
       int successcount = 0;
       for(DatanodeInfo datanodeinfo: locatedblock.getLocations()) {
-        DataNode datanode = cluster.getDataNode(datanodeinfo.ipcPort);
+        DataNode datanode = cluster.getDataNode(datanodeinfo.getIpcPort());
         ExtendedBlock blk = locatedblock.getBlock();
-        Block b = datanode.data.getStoredBlock(blk.getBlockPoolId(), blk.getBlockId());
+        Block b = DataNodeTestUtils.getFSDataset(datanode).getStoredBlock(
+            blk.getBlockPoolId(), blk.getBlockId());
         final File blockfile = DataNodeTestUtils.getFile(datanode,
             blk.getBlockPoolId(), b.getBlockId());
         System.out.println("blockfile=" + blockfile);

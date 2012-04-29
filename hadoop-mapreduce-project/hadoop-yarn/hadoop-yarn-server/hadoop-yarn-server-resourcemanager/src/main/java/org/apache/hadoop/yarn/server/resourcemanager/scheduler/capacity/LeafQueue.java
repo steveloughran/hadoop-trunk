@@ -135,7 +135,8 @@ public class LeafQueue implements CSQueue {
     // must be after parent and queueName are initialized
     this.metrics = old != null ? old.getMetrics() :
         QueueMetrics.forQueue(getQueuePath(), parent,
-        cs.getConfiguration().getEnableUserMetrics());
+			      cs.getConfiguration().getEnableUserMetrics(),
+			      cs.getConf());
     this.activeUsersManager = new ActiveUsersManager(metrics);
     this.minimumAllocation = cs.getMinimumResourceCapability();
     this.maximumAllocation = cs.getMaximumResourceCapability();
@@ -1117,13 +1118,12 @@ public class LeafQueue implements CSQueue {
   boolean canAssign(SchedulerApp application, Priority priority, 
       SchedulerNode node, NodeType type, RMContainer reservedContainer) {
 
-    // Reserved... 
-    if (reservedContainer != null) {
-      return true;
-    }
-    
     // Clearly we need containers for this application...
     if (type == NodeType.OFF_SWITCH) {
+      if (reservedContainer != null) {
+        return true;
+      }
+
       // 'Delay' off-switch
       ResourceRequest offSwitchRequest = 
           application.getResourceRequest(priority, RMNode.ANY);

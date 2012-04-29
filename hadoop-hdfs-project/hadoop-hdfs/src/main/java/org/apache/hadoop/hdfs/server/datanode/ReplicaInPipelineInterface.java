@@ -19,13 +19,13 @@ package org.apache.hadoop.hdfs.server.datanode;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hdfs.server.datanode.FSDatasetInterface.BlockWriteStreams;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaOutputStreams;
 import org.apache.hadoop.util.DataChecksum;
 
 /** 
  * This defines the interface of a replica in Pipeline that's being written to
  */
-interface ReplicaInPipelineInterface extends Replica {
+public interface ReplicaInPipelineInterface extends Replica {
   /**
    * Set the number of bytes received
    * @param bytesReceived number of bytes received
@@ -66,6 +66,6 @@ interface ReplicaInPipelineInterface extends Replica {
    * @return output streams for writing
    * @throws IOException if any error occurs
    */
-  public BlockWriteStreams createStreams(boolean isCreate,
+  public ReplicaOutputStreams createStreams(boolean isCreate,
       DataChecksum requestedChecksum) throws IOException;
 }

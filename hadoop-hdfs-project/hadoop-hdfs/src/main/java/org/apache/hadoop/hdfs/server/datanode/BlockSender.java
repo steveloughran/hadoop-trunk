@@ -22,6 +22,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -110,10 +111,6 @@ class BlockSender implements java.io.Closeable {
   
   /** the block to read from */
   private final ExtendedBlock block;
-  /** the replica to read from */
-  private final Replica replica;
-  /** The visible length of a replica. */
-  private final long replicaVisibleLength;
   /** Stream to read block data from */
   private InputStream blockIn;
   /** updated while using transferTo() */
@@ -188,17 +185,18 @@ class BlockSender implements java.io.Closeable {
       this.readaheadLength = datanode.getDnConf().readaheadLength;
       this.shouldDropCacheBehindRead = datanode.getDnConf().dropCacheBehindReads;
       
+      final Replica replica;
+      final long replicaVisibleLength;
       synchronized(datanode.data) { 
-        this.replica = getReplica(block, datanode);
-        this.replicaVisibleLength = replica.getVisibleLength();
+        replica = getReplica(block, datanode);
+        replicaVisibleLength = replica.getVisibleLength();
       }
       // if there is a write in progress
       ChunkChecksum chunkChecksum = null;
       if (replica instanceof ReplicaBeingWritten) {
-        long minEndOffset = startOffset + length;
-        waitForMinLength((ReplicaBeingWritten)replica, minEndOffset);
-        ReplicaInPipeline rip = (ReplicaInPipeline) replica;
-        chunkChecksum = rip.getLastChecksumAndDataLen();
+        final ReplicaBeingWritten rbw = (ReplicaBeingWritten)replica;
+        waitForMinLength(rbw, startOffset + length);
+        chunkChecksum = rbw.getLastChecksumAndDataLen();
       }
 
       if (replica.getGenerationStamp() < block.getGenerationStamp()) {
@@ -218,10 +216,23 @@ class BlockSender implements java.io.Closeable {
       this.transferToAllowed = datanode.getDnConf().transferToAllowed &&
         (!is32Bit || length <= Integer.MAX_VALUE);
 
+      /* 
+       * (corruptChecksumOK, meta_file_exist): operation
+       * True,   True: will verify checksum  
+       * True,  False: No verify, e.g., need to read data from a corrupted file 
+       * False,  True: will verify checksum
+       * False, False: throws IOException file not found
+       */
       DataChecksum csum;
-      if (!corruptChecksumOk || datanode.data.metaFileExists(block)) {
-        checksumIn = new DataInputStream(new BufferedInputStream(datanode.data
-            .getMetaDataInputStream(block), HdfsConstants.IO_FILE_BUFFER_SIZE));
+      final InputStream metaIn = datanode.data.getMetaDataInputStream(block);
+      if (!corruptChecksumOk || metaIn != null) {
+      	if (metaIn == null) {
+          //need checksum but meta-data not found
+          throw new FileNotFoundException("Meta-data not found for " + block);
+        } 
+      	
+        checksumIn = new DataInputStream(
+            new BufferedInputStream(metaIn, HdfsConstants.IO_FILE_BUFFER_SIZE));
 
         // read and handle the common header here. For now just a version
         BlockMetadataHeader header = BlockMetadataHeader.readHeader(checksumIn);

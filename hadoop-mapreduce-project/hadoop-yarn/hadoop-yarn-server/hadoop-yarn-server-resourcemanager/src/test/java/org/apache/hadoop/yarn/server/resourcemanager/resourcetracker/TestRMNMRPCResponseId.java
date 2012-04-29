@@ -67,10 +67,10 @@ public class TestRMNMRPCResponseId {
       }
     });
     RMContext context = 
-        new RMContextImpl(new MemStore(), dispatcher, null, null, null);
+        new RMContextImpl(new MemStore(), dispatcher, null, null, null, null);
     dispatcher.register(RMNodeEventType.class,
         new ResourceManager.NodeEventDispatcher(context));
-    NodesListManager nodesListManager = new NodesListManager();
+    NodesListManager nodesListManager = new NodesListManager(context);
     Configuration conf = new Configuration();
     nodesListManager.init(conf);
     resourceTrackerService = new ResourceTrackerService(context,

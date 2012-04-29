@@ -31,9 +31,9 @@ import javax.ws.rs.core.UriInfo;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.v2.api.records.AMInfo;
+import org.apache.hadoop.mapreduce.v2.api.records.JobState;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskType;
-import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.job.Job;
 import org.apache.hadoop.mapreduce.v2.app.job.Task;
 import org.apache.hadoop.mapreduce.v2.app.job.TaskAttempt;
@@ -47,6 +47,7 @@ import org.apache.hadoop.mapreduce.v2.app.webapp.dao.TaskAttemptInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.TaskAttemptsInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.TaskInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.TasksInfo;
+import org.apache.hadoop.mapreduce.v2.hs.HistoryContext;
 import org.apache.hadoop.mapreduce.v2.hs.webapp.dao.AMAttemptInfo;
 import org.apache.hadoop.mapreduce.v2.hs.webapp.dao.AMAttemptsInfo;
 import org.apache.hadoop.mapreduce.v2.hs.webapp.dao.HistoryInfo;
@@ -62,18 +63,16 @@ import com.google.inject.Inject;
 
 @Path("/ws/v1/history")
 public class HsWebServices {
-  private final AppContext appCtx;
+  private final HistoryContext ctx;
   private WebApp webapp;
-  private final Configuration conf;
 
   @Context
   UriInfo uriInfo;
 
   @Inject
-  public HsWebServices(final AppContext appCtx, final Configuration conf,
+  public HsWebServices(final HistoryContext ctx, final Configuration conf,
       final WebApp webapp) {
-    this.appCtx = appCtx;
-    this.conf = conf;
+    this.ctx = ctx;
     this.webapp = webapp;
   }
 
@@ -95,38 +94,28 @@ public class HsWebServices {
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   public JobsInfo getJobs(@QueryParam("user") String userQuery,
       @QueryParam("limit") String count,
+      @QueryParam("state") String stateQuery,
       @QueryParam("queue") String queueQuery,
       @QueryParam("startedTimeBegin") String startedBegin,
       @QueryParam("startedTimeEnd") String startedEnd,
       @QueryParam("finishedTimeBegin") String finishBegin,
       @QueryParam("finishedTimeEnd") String finishEnd) {
-    JobsInfo allJobs = new JobsInfo();
-    long num = 0;
-    boolean checkCount = false;
-    boolean checkStart = false;
-    boolean checkEnd = false;
-    long countNum = 0;
 
-    // set values suitable in case both of begin/end not specified
-    long sBegin = 0;
-    long sEnd = Long.MAX_VALUE;
-    long fBegin = 0;
-    long fEnd = Long.MAX_VALUE;
-
+    Long countParam = null;
+    
     if (count != null && !count.isEmpty()) {
-      checkCount = true;
       try {
-        countNum = Long.parseLong(count);
+        countParam = Long.parseLong(count);
       } catch (NumberFormatException e) {
         throw new BadRequestException(e.getMessage());
       }
-      if (countNum <= 0) {
+      if (countParam <= 0) {
         throw new BadRequestException("limit value must be greater then 0");
       }
     }
 
+    Long sBegin = null;
     if (startedBegin != null && !startedBegin.isEmpty()) {
-      checkStart = true;
       try {
         sBegin = Long.parseLong(startedBegin);
       } catch (NumberFormatException e) {
@@ -136,8 +125,9 @@ public class HsWebServices {
         throw new BadRequestException("startedTimeBegin must be greater than 0");
       }
     }
+    
+    Long sEnd = null;
     if (startedEnd != null && !startedEnd.isEmpty()) {
-      checkStart = true;
       try {
         sEnd = Long.parseLong(startedEnd);
       } catch (NumberFormatException e) {
@@ -147,13 +137,13 @@ public class HsWebServices {
         throw new BadRequestException("startedTimeEnd must be greater than 0");
       }
     }
-    if (sBegin > sEnd) {
+    if (sBegin != null && sEnd != null && sBegin > sEnd) {
       throw new BadRequestException(
           "startedTimeEnd must be greater than startTimeBegin");
     }
 
+    Long fBegin = null;
     if (finishBegin != null && !finishBegin.isEmpty()) {
-      checkEnd = true;
       try {
         fBegin = Long.parseLong(finishBegin);
       } catch (NumberFormatException e) {
@@ -163,8 +153,8 @@ public class HsWebServices {
         throw new BadRequestException("finishedTimeBegin must be greater than 0");
       }
     }
+    Long fEnd = null;
     if (finishEnd != null && !finishEnd.isEmpty()) {
-      checkEnd = true;
       try {
         fEnd = Long.parseLong(finishEnd);
       } catch (NumberFormatException e) {
@@ -174,49 +164,18 @@ public class HsWebServices {
         throw new BadRequestException("finishedTimeEnd must be greater than 0");
       }
     }
-    if (fBegin > fEnd) {
+    if (fBegin != null && fEnd != null && fBegin > fEnd) {
       throw new BadRequestException(
           "finishedTimeEnd must be greater than finishedTimeBegin");
     }
-
-    for (Job job : appCtx.getAllJobs().values()) {
-      if (checkCount && num == countNum) {
-        break;
-      }
-
-      // getAllJobs only gives you a partial we want a full
-      Job fullJob = appCtx.getJob(job.getID());
-      if (fullJob == null) {
-        continue;
-      }
-
-      JobInfo jobInfo = new JobInfo(fullJob);
-      // can't really validate queue is a valid one since queues could change
-      if (queueQuery != null && !queueQuery.isEmpty()) {
-        if (!jobInfo.getQueueName().equals(queueQuery)) {
-          continue;
-        }
-      }
-
-      if (userQuery != null && !userQuery.isEmpty()) {
-        if (!jobInfo.getUserName().equals(userQuery)) {
-          continue;
-        }
-      }
-
-      if (checkStart
-          && (jobInfo.getStartTime() < sBegin || jobInfo.getStartTime() > sEnd)) {
-        continue;
-      }
-      if (checkEnd
-          && (jobInfo.getFinishTime() < fBegin || jobInfo.getFinishTime() > fEnd)) {
-        continue;
-      }
-
-      allJobs.add(jobInfo);
-      num++;
+    
+    JobState jobState = null;
+    if (stateQuery != null) {
+      jobState = JobState.valueOf(stateQuery);
     }
-    return allJobs;
+
+    return ctx.getPartialJobs(0l, countParam, userQuery, queueQuery, 
+        sBegin, sEnd, fBegin, fEnd, jobState);
   }
 
   @GET
@@ -224,7 +183,7 @@ public class HsWebServices {
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   public JobInfo getJob(@PathParam("jobid") String jid) {
 
-    Job job = AMWebServices.getJobFromJobIdString(jid, appCtx);
+    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
     return new JobInfo(job);
   }
 
@@ -233,7 +192,7 @@ public class HsWebServices {
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   public AMAttemptsInfo getJobAttempts(@PathParam("jobid") String jid) {
 
-    Job job = AMWebServices.getJobFromJobIdString(jid, appCtx);
+    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
     AMAttemptsInfo amAttempts = new AMAttemptsInfo();
     for (AMInfo amInfo : job.getAMInfos()) {
       AMAttemptInfo attempt = new AMAttemptInfo(amInfo, MRApps.toString(job
@@ -249,8 +208,8 @@ public class HsWebServices {
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   public JobCounterInfo getJobCounters(@PathParam("jobid") String jid) {
 
-    Job job = AMWebServices.getJobFromJobIdString(jid, appCtx);
-    return new JobCounterInfo(this.appCtx, job);
+    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
+    return new JobCounterInfo(this.ctx, job);
   }
 
   @GET
@@ -258,10 +217,10 @@ public class HsWebServices {
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   public ConfInfo getJobConf(@PathParam("jobid") String jid) {
 
-    Job job = AMWebServices.getJobFromJobIdString(jid, appCtx);
+    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
     ConfInfo info;
     try {
-      info = new ConfInfo(job, this.conf);
+      info = new ConfInfo(job);
     } catch (IOException e) {
       throw new NotFoundException("unable to load configuration for job: "
           + jid);
@@ -275,7 +234,7 @@ public class HsWebServices {
   public TasksInfo getJobTasks(@PathParam("jobid") String jid,
       @QueryParam("type") String type) {
 
-    Job job = AMWebServices.getJobFromJobIdString(jid, appCtx);
+    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
     TasksInfo allTasks = new TasksInfo();
     for (Task task : job.getTasks().values()) {
       TaskType ttype = null;
@@ -300,7 +259,7 @@ public class HsWebServices {
   public TaskInfo getJobTask(@PathParam("jobid") String jid,
       @PathParam("taskid") String tid) {
 
-    Job job = AMWebServices.getJobFromJobIdString(jid, appCtx);
+    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
     Task task = AMWebServices.getTaskFromTaskIdString(tid, job);
     return new TaskInfo(task);
 
@@ -312,7 +271,7 @@ public class HsWebServices {
   public JobTaskCounterInfo getSingleTaskCounters(
       @PathParam("jobid") String jid, @PathParam("taskid") String tid) {
 
-    Job job = AMWebServices.getJobFromJobIdString(jid, appCtx);
+    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
     TaskId taskID = MRApps.toTaskID(tid);
     if (taskID == null) {
       throw new NotFoundException("taskid " + tid + " not found or invalid");
@@ -331,7 +290,7 @@ public class HsWebServices {
       @PathParam("taskid") String tid) {
 
     TaskAttemptsInfo attempts = new TaskAttemptsInfo();
-    Job job = AMWebServices.getJobFromJobIdString(jid, appCtx);
+    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
     Task task = AMWebServices.getTaskFromTaskIdString(tid, job);
     for (TaskAttempt ta : task.getAttempts().values()) {
       if (ta != null) {
@@ -351,7 +310,7 @@ public class HsWebServices {
   public TaskAttemptInfo getJobTaskAttemptId(@PathParam("jobid") String jid,
       @PathParam("taskid") String tid, @PathParam("attemptid") String attId) {
 
-    Job job = AMWebServices.getJobFromJobIdString(jid, appCtx);
+    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
     Task task = AMWebServices.getTaskFromTaskIdString(tid, job);
     TaskAttempt ta = AMWebServices.getTaskAttemptFromTaskAttemptString(attId,
         task);
@@ -369,7 +328,7 @@ public class HsWebServices {
       @PathParam("jobid") String jid, @PathParam("taskid") String tid,
       @PathParam("attemptid") String attId) {
 
-    Job job = AMWebServices.getJobFromJobIdString(jid, appCtx);
+    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
     Task task = AMWebServices.getTaskFromTaskIdString(tid, job);
     TaskAttempt ta = AMWebServices.getTaskAttemptFromTaskAttemptString(attId,
         task);

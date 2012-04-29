@@ -31,6 +31,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileStatus;
@@ -50,6 +52,8 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class JobHistoryUtils {
   
   /**
@@ -193,7 +197,8 @@ public class JobHistoryUtils {
     String doneDirPrefix = conf
         .get(JHAdminConfig.MR_HISTORY_INTERMEDIATE_DONE_DIR);
     if (doneDirPrefix == null) {
-      doneDirPrefix = conf.get(MRJobConfig.MR_AM_STAGING_DIR)
+      doneDirPrefix = conf.get(MRJobConfig.MR_AM_STAGING_DIR,
+          MRJobConfig.DEFAULT_MR_AM_STAGING_DIR)
           + "/history/done_intermediate";
     }
     return doneDirPrefix;
@@ -208,7 +213,8 @@ public class JobHistoryUtils {
       Configuration conf) {
     String doneDirPrefix = conf.get(JHAdminConfig.MR_HISTORY_DONE_DIR);
     if (doneDirPrefix == null) {
-      doneDirPrefix = conf.get(MRJobConfig.MR_AM_STAGING_DIR)
+      doneDirPrefix = conf.get(MRJobConfig.MR_AM_STAGING_DIR,
+          MRJobConfig.DEFAULT_MR_AM_STAGING_DIR)
           + "/history/done";
     }
     return doneDirPrefix;
@@ -501,7 +507,7 @@ public class JobHistoryUtils {
     StringBuffer sb = new StringBuffer();
     if (address.getAddress().isAnyLocalAddress() || 
         address.getAddress().isLoopbackAddress()) {
-      sb.append(InetAddress.getLocalHost().getHostAddress());
+      sb.append(InetAddress.getLocalHost().getCanonicalHostName());
     } else {
       sb.append(address.getHostName());
     }

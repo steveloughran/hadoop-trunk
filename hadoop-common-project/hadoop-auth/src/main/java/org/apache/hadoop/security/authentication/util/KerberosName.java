@@ -26,9 +26,9 @@ import java.util.regex.Pattern;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import sun.security.krb5.Config;
-import sun.security.krb5.KrbException;
 
 /**
  * This class implements parsing and handling of Kerberos principal names. In
@@ -39,6 +39,8 @@ import sun.security.krb5.KrbException;
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
 @InterfaceStability.Evolving
 public class KerberosName {
+  private static final Logger LOG = LoggerFactory.getLogger(KerberosName.class);
+
   /** The first component of the name */
   private final String serviceName;
   /** The second component of the name. It may be null. */
@@ -77,13 +79,12 @@ public class KerberosName {
   private static List<Rule> rules;
 
   private static String defaultRealm;
-  private static Config kerbConf;
 
   static {
     try {
-      kerbConf = Config.getInstance();
-      defaultRealm = kerbConf.getDefaultRealm();
-    } catch (KrbException ke) {
+      defaultRealm = KerberosUtil.getDefaultRealm();
+    } catch (Exception ke) {
+        LOG.warn("Kerberos krb5 configuration not found, setting default realm to empty");
         defaultRealm="";
     }
   }

@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ha;
 
-import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -54,9 +53,6 @@ import com.google.common.collect.Lists;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class NodeFencer {
-  public static final String CONF_METHODS_KEY =
-    "dfs.ha.fencing.methods";
-  
   private static final String CLASS_RE = "([a-zA-Z0-9\\.\\$]+)";
   private static final Pattern CLASS_WITH_ARGUMENT =
     Pattern.compile(CLASS_RE + "\\((.+?)\\)");
@@ -77,28 +73,28 @@ public class NodeFencer {
   
   private final List<FenceMethodWithArg> methods;
   
-  public NodeFencer(Configuration conf)
+  NodeFencer(Configuration conf, String spec)
       throws BadFencingConfigurationException {
-    this.methods = parseMethods(conf);
+    this.methods = parseMethods(conf, spec);
   }
   
-  public static NodeFencer create(Configuration conf)
+  public static NodeFencer create(Configuration conf, String confKey)
       throws BadFencingConfigurationException {
-    String confStr = conf.get(CONF_METHODS_KEY);
+    String confStr = conf.get(confKey);
     if (confStr == null) {
       return null;
     }
-    return new NodeFencer(conf);
+    return new NodeFencer(conf, confStr);
   }
 
-  public boolean fence(InetSocketAddress serviceAddr) {
+  public boolean fence(HAServiceTarget fromSvc) {
     LOG.info("====== Beginning Service Fencing Process... ======");
     int i = 0;
     for (FenceMethodWithArg method : methods) {
       LOG.info("Trying method " + (++i) + "/" + methods.size() +": " + method);
       
       try {
-        if (method.method.tryFence(serviceAddr, method.arg)) {
+        if (method.method.tryFence(fromSvc, method.arg)) {
           LOG.info("====== Fencing successful by method " + method + " ======");
           return true;
         }
@@ -116,10 +112,10 @@ public class NodeFencer {
     return false;
   }
 
-  private static List<FenceMethodWithArg> parseMethods(Configuration conf)
+  private static List<FenceMethodWithArg> parseMethods(Configuration conf,
+      String spec)
       throws BadFencingConfigurationException {
-    String confStr = conf.get(CONF_METHODS_KEY);
-    String[] lines = confStr.split("\\s*\n\\s*");
+    String[] lines = spec.split("\\s*\n\\s*");
     
     List<FenceMethodWithArg> methods = Lists.newArrayList();
     for (String line : lines) {

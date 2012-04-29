@@ -28,7 +28,6 @@ import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -50,7 +49,7 @@ import org.apache.hadoop.hdfs.server.common.InconsistentFSStateException;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.UpgradeManager;
 import org.apache.hadoop.hdfs.server.common.Util;
-import org.apache.hadoop.hdfs.server.namenode.JournalStream.JournalType;
+import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.hdfs.util.AtomicFileOutputStream;
 
 import org.apache.hadoop.io.IOUtils;
@@ -299,8 +298,7 @@ public class NNStorage extends Storage implements Closeable {
                           NameNodeDirType.IMAGE;
       // Add to the list of storage directories, only if the
       // URI is of type file://
-      if(dirName.getScheme().compareTo(JournalType.FILE.name().toLowerCase())
-          == 0){
+      if(dirName.getScheme().compareTo("file") == 0) {
         this.addStorageDir(new StorageDirectory(new File(dirName.getPath()),
             dirType,
             !sharedEditsDirs.contains(dirName))); // Don't lock the dir if it's shared.
@@ -312,8 +310,7 @@ public class NNStorage extends Storage implements Closeable {
       checkSchemeConsistency(dirName);
       // Add to the list of storage directories, only if the
       // URI is of type file://
-      if(dirName.getScheme().compareTo(JournalType.FILE.name().toLowerCase())
-          == 0)
+      if(dirName.getScheme().compareTo("file") == 0)
         this.addStorageDir(new StorageDirectory(new File(dirName.getPath()),
                     NameNodeDirType.EDITS, !sharedEditsDirs.contains(dirName)));
     }
@@ -536,6 +533,10 @@ public class NNStorage extends Storage implements Closeable {
     }
     return null;
   }
+  
+  public File getHighestFsImageName() {
+    return getFsImageName(getMostRecentCheckpointTxId());
+  }
 
   /** Create new dfs name directory.  Caution: this destroys all files
    * in this filesystem. */
@@ -551,12 +552,31 @@ public class NNStorage extends Storage implements Closeable {
   /**
    * Format all available storage directories.
    */
-  public void format(String clusterId) throws IOException {
+  public void format(NamespaceInfo nsInfo) throws IOException {
+    Preconditions.checkArgument(nsInfo.getLayoutVersion() == 0 ||
+        nsInfo.getLayoutVersion() == HdfsConstants.LAYOUT_VERSION,
+        "Bad layout version: %s", nsInfo.getLayoutVersion());
+    
+    this.setStorageInfo(nsInfo);
+    this.blockpoolID = nsInfo.getBlockPoolID();
+    for (Iterator<StorageDirectory> it =
+                           dirIterator(); it.hasNext();) {
+      StorageDirectory sd = it.next();
+      format(sd);
+    }
+  }
+  
+  public static NamespaceInfo newNamespaceInfo()
+      throws UnknownHostException {
+    return new NamespaceInfo(
+        newNamespaceID(),
+        newClusterID(),
+        newBlockPoolID(),
+        0L, 0);
+  }
+  
+  public void format() throws IOException {
     this.layoutVersion = HdfsConstants.LAYOUT_VERSION;
-    this.namespaceID = newNamespaceID();
-    this.clusterID = clusterId;
-    this.blockpoolID = newBlockPoolID();
-    this.cTime = 0L;
     for (Iterator<StorageDirectory> it =
                            dirIterator(); it.hasNext();) {
       StorageDirectory sd = it.next();
@@ -576,7 +596,7 @@ public class NNStorage extends Storage implements Closeable {
    *
    * @return new namespaceID
    */
-  private int newNamespaceID() {
+  private static int newNamespaceID() {
     int newID = 0;
     while(newID == 0)
       newID = DFSUtil.getRandom().nextInt(0x7FFFFFFF);  // use 31 bits only
@@ -997,7 +1017,7 @@ public class NNStorage extends Storage implements Closeable {
    * 
    * @return new blockpoolID
    */ 
-  String newBlockPoolID() throws UnknownHostException{
+  static String newBlockPoolID() throws UnknownHostException{
     String ip = "unknownIP";
     try {
       ip = DNS.getDefaultIP("default");

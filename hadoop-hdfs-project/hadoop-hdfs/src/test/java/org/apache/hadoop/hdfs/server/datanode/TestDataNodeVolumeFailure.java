@@ -37,6 +37,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -44,6 +45,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
 import org.apache.hadoop.net.NetUtils;
@@ -146,7 +148,8 @@ public class TestDataNodeVolumeFailure {
     String bpid = cluster.getNamesystem().getBlockPoolId();
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(bpid);
     final StorageBlockReport[] report = {
-        new StorageBlockReport(dnR.getStorageID(),
+        new StorageBlockReport(
+            new DatanodeStorage(dnR.getStorageID()),
             DataNodeTestUtils.getFSDataset(dn).getBlockReport(bpid
                 ).getBlockListAsLongs())
     };
@@ -268,7 +271,7 @@ public class TestDataNodeVolumeFailure {
     Socket s = null;
     ExtendedBlock block = lblock.getBlock(); 
    
-    targetAddr = NetUtils.createSocketAddr(datanode.getName());
+    targetAddr = NetUtils.createSocketAddr(datanode.getXferAddr());
       
     s = NetUtils.getDefaultSocketFactory(conf).createSocket();
     s.connect(targetAddr, HdfsServerConstants.READ_TIMEOUT);
@@ -374,7 +377,7 @@ public class TestDataNodeVolumeFailure {
         new FilenameFilter() {
           public boolean accept(File dir, String name) {
             return name.startsWith("blk_") &&
-            name.endsWith(DatanodeUtil.METADATA_EXTENSION);
+            name.endsWith(Block.METADATA_EXTENSION);
           }
         }
     );

@@ -204,6 +204,7 @@ public class SecondaryNameNode implements Runnable {
           DFS_SECONDARY_NAMENODE_USER_NAME_KEY, infoBindAddress);
     }
     // initiate Java VM metrics
+    DefaultMetricsSystem.initialize("SecondaryNameNode");
     JvmMetrics.create("SecondaryNameNode",
         conf.get(DFS_METRICS_SESSION_ID_KEY), DefaultMetricsSystem.instance());
     
@@ -251,8 +252,7 @@ public class SecondaryNameNode implements Runnable {
               new AccessControlList(conf.get(DFS_ADMIN, " ")));
           
           if(UserGroupInformation.isSecurityEnabled()) {
-            System.setProperty("https.cipherSuites", 
-                Krb5AndCertsSslSocketConnector.KRB5_CIPHER_SUITES.get(0));
+            SecurityUtil.initKrb5CipherSuites();
             InetSocketAddress secInfoSocAddr = 
               NetUtils.createSocketAddr(infoBindAddress + ":"+ conf.getInt(
                 DFS_NAMENODE_SECONDARY_HTTPS_PORT_KEY,

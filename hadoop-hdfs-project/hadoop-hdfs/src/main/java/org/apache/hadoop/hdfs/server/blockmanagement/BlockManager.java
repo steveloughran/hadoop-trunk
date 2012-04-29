@@ -253,13 +253,12 @@ public class BlockManager {
     this.shouldCheckForEnoughRacks = !AbstractDNSToSwitchMapping
         .isMappingSingleSwitch(dnsMap);
     
-
     this.replicationRecheckInterval = 
       conf.getInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 
                   DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_DEFAULT) * 1000L;
-    LOG.info("defaultReplication = " + defaultReplication);
-    LOG.info("maxReplication     = " + maxReplication);
-    LOG.info("minReplication     = " + minReplication);
+    LOG.info("defaultReplication         = " + defaultReplication);
+    LOG.info("maxReplication             = " + maxReplication);
+    LOG.info("minReplication             = " + minReplication);
     LOG.info("maxReplicationStreams      = " + maxReplicationStreams);
     LOG.info("shouldCheckForEnoughRacks  = " + shouldCheckForEnoughRacks);
     LOG.info("topology mapper = " + dnsMap);
@@ -813,9 +812,9 @@ public class BlockManager {
     final DatanodeDescriptor node = getDatanodeManager().getDatanode(datanode);
     if (node == null) {
       NameNode.stateChangeLog.warn("BLOCK* getBlocks: "
-          + "Asking for blocks from an unrecorded node " + datanode.getName());
+          + "Asking for blocks from an unrecorded node " + datanode);
       throw new HadoopIllegalArgumentException(
-          "Datanode " + datanode.getName() + " not found.");
+          "Datanode " + datanode + " not found.");
     }
 
     int numBlocks = node.numBlocks();
@@ -887,7 +886,7 @@ public class BlockManager {
         .hasNext();) {
       DatanodeDescriptor node = it.next();
       invalidateBlocks.add(b, node, false);
-      datanodes.append(node.getName()).append(" ");
+      datanodes.append(node).append(" ");
     }
     if (datanodes.length() != 0) {
       NameNode.stateChangeLog.info("BLOCK* addToInvalidates: "
@@ -926,7 +925,7 @@ public class BlockManager {
     if (node == null) {
       throw new IOException("Cannot mark block " + 
                             storedBlock.getBlockName() +
-                            " as corrupt because datanode " + dn.getName() +
+                            " as corrupt because datanode " + dn +
                             " does not exist. ");
     }
 
@@ -960,11 +959,11 @@ public class BlockManager {
   private void invalidateBlock(Block blk, DatanodeInfo dn)
       throws IOException {
     NameNode.stateChangeLog.info("BLOCK* invalidateBlock: "
-                                 + blk + " on " + dn.getName());
+                                 + blk + " on " + dn);
     DatanodeDescriptor node = getDatanodeManager().getDatanode(dn);
     if (node == null) {
       throw new IOException("Cannot invalidate block " + blk
-          + " because datanode " + dn.getName() + " does not exist.");
+          + " because datanode " + dn + " does not exist.");
     }
 
     // Check how many copies we have of the block
@@ -982,11 +981,11 @@ public class BlockManager {
       removeStoredBlock(blk, node);
       if(NameNode.stateChangeLog.isDebugEnabled()) {
         NameNode.stateChangeLog.debug("BLOCK* invalidateBlocks: "
-            + blk + " on " + dn.getName() + " listed for deletion.");
+            + blk + " on " + dn + " listed for deletion.");
       }
     } else {
       NameNode.stateChangeLog.info("BLOCK* invalidateBlocks: " + blk + " on "
-          + dn.getName() + " is the only copy and was not deleted.");
+          + dn + " is the only copy and was not deleted.");
     }
   }
 
@@ -1035,7 +1034,7 @@ public class BlockManager {
    *
    * @return number of blocks scheduled for replication during this iteration.
    */
-  int computeReplicationWork(int blocksToProcess) throws IOException {
+  int computeReplicationWork(int blocksToProcess) {
     List<List<Block>> blocksToReplicate = null;
     namesystem.writeLock();
     try {
@@ -1229,11 +1228,11 @@ public class BlockManager {
           StringBuilder targetList = new StringBuilder("datanode(s)");
           for (int k = 0; k < targets.length; k++) {
             targetList.append(' ');
-            targetList.append(targets[k].getName());
+            targetList.append(targets[k]);
           }
           NameNode.stateChangeLog.info(
                   "BLOCK* ask "
-                  + rw.srcNode.getName() + " to replicate "
+                  + rw.srcNode + " to replicate "
                   + rw.block + " to " + targetList);
         }
       }
@@ -1415,15 +1414,15 @@ public class BlockManager {
     try {
       final DatanodeDescriptor node = datanodeManager.getDatanode(nodeID);
       if (node == null || !node.isAlive) {
-        throw new IOException("ProcessReport from dead or unregistered node: "
-                              + nodeID.getName());
+        throw new IOException(
+            "ProcessReport from dead or unregistered node: " + nodeID);
       }
 
       // To minimize startup time, we discard any second (or later) block reports
       // that we receive while still in startup phase.
       if (namesystem.isInStartupSafeMode() && !node.isFirstBlockReport()) {
         NameNode.stateChangeLog.info("BLOCK* processReport: "
-            + "discarded non-initial block report from " + nodeID.getName()
+            + "discarded non-initial block report from " + nodeID
             + " because namenode still in startup phase");
         return;
       }
@@ -1456,7 +1455,7 @@ public class BlockManager {
     // Log the block report processing stats from Namenode perspective
     NameNode.getNameNodeMetrics().addBlockReport((int) (endTime - startTime));
     NameNode.stateChangeLog.info("BLOCK* processReport: from "
-        + nodeID.getName() + ", blocks: " + newReport.getNumberOfBlocks()
+        + nodeID + ", blocks: " + newReport.getNumberOfBlocks()
         + ", processing time: " + (endTime - startTime) + " msecs");
   }
 
@@ -1516,7 +1515,7 @@ public class BlockManager {
     }
     for (Block b : toInvalidate) {
       NameNode.stateChangeLog.info("BLOCK* processReport: block "
-          + b + " on " + node.getName() + " size " + b.getNumBytes()
+          + b + " on " + node + " size " + b.getNumBytes()
           + " does not belong to any file.");
       addToInvalidates(b, node);
     }
@@ -1667,7 +1666,7 @@ public class BlockManager {
     
     if(LOG.isDebugEnabled()) {
       LOG.debug("Reported block " + block
-          + " on " + dn.getName() + " size " + block.getNumBytes()
+          + " on " + dn + " size " + block.getNumBytes()
           + " replicaState = " + reportedState);
     }
   
@@ -1842,7 +1841,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
           // closed. So, ignore this report, assuming we will get a
           // FINALIZED replica later. See HDFS-2791
           LOG.info("Received an RBW replica for block " + storedBlock +
-              " on " + dn.getName() + ": ignoring it, since the block is " +
+              " on " + dn + ": ignoring it, since the block is " +
               "complete with the same generation stamp.");
           return null;
         } else {
@@ -1855,7 +1854,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     default:
       String msg = "Unexpected replica state " + reportedState
       + " for block: " + storedBlock + 
-      " on " + dn.getName() + " size " + storedBlock.getNumBytes();
+      " on " + dn + " size " + storedBlock.getNumBytes();
       // log here at WARN level since this is really a broken HDFS
       // invariant
       LOG.warn(msg);
@@ -1954,7 +1953,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     if (storedBlock == null || storedBlock.getINode() == null) {
       // If this block does not belong to anyfile, then we are done.
       NameNode.stateChangeLog.info("BLOCK* addStoredBlock: " + block + " on "
-          + node.getName() + " size " + block.getNumBytes()
+          + node + " size " + block.getNumBytes()
           + " but it does not belong to any file.");
       // we could add this block to invalidate set of this datanode.
       // it will happen in next block report otherwise.
@@ -1977,7 +1976,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
       curReplicaDelta = 0;
       NameNode.stateChangeLog.warn("BLOCK* addStoredBlock: "
           + "Redundant addStoredBlock request received for " + storedBlock
-          + " on " + node.getName() + " size " + storedBlock.getNumBytes());
+          + " on " + node + " size " + storedBlock.getNumBytes());
     }
 
     // Now check for completion of blocks and safe block count
@@ -2040,7 +2039,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     
     StringBuilder sb = new StringBuilder(500);
     sb.append("BLOCK* addStoredBlock: blockMap updated: ")
-      .append(node.getName())
+      .append(node)
       .append(" is added to ");
     storedBlock.appendStringTo(sb);
     sb.append(" size " )
@@ -2074,7 +2073,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
       } catch (IOException e) {
         NameNode.stateChangeLog.info("NameNode.invalidateCorruptReplicas " +
                                       "error in deleting bad block " + blk +
-                                      " on " + node + e);
+                                      " on " + node, e);
         gotException = true;
       }
     }
@@ -2179,7 +2178,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
   
   /** Set replication for the blocks. */
   public void setReplication(final short oldRepl, final short newRepl,
-      final String src, final Block... blocks) throws IOException {
+      final String src, final Block... blocks) {
     if (newRepl == oldRepl) {
       return;
     }
@@ -2340,7 +2339,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
       //
       addToInvalidates(b, cur);
       NameNode.stateChangeLog.info("BLOCK* chooseExcessReplicates: "
-                +"("+cur.getName()+", "+b+") is added to invalidated blocks set.");
+                +"("+cur+", "+b+") is added to invalidated blocks set.");
     }
   }
 
@@ -2355,7 +2354,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
       excessBlocksCount++;
       if(NameNode.stateChangeLog.isDebugEnabled()) {
         NameNode.stateChangeLog.debug("BLOCK* addToExcessReplicate:"
-            + " (" + dn.getName() + ", " + block
+            + " (" + dn + ", " + block
             + ") is added to excessReplicateMap");
       }
     }
@@ -2368,7 +2367,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
   public void removeStoredBlock(Block block, DatanodeDescriptor node) {
     if(NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug("BLOCK* removeStoredBlock: "
-          + block + " from " + node.getName());
+          + block + " from " + node);
     }
     assert (namesystem.hasWriteLock());
     {
@@ -2481,7 +2480,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     }
     for (Block b : toInvalidate) {
       NameNode.stateChangeLog.info("BLOCK* addBlock: block "
-          + b + " on " + node.getName() + " size " + b.getNumBytes()
+          + b + " on " + node + " size " + b.getNumBytes()
           + " does not belong to any file.");
       addToInvalidates(b, node);
     }
@@ -2509,7 +2508,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
         NameNode.stateChangeLog
             .warn("BLOCK* processIncrementalBlockReport"
                 + " is received from dead or unregistered node "
-                + nodeID.getName());
+                + nodeID);
         throw new IOException(
             "Got incremental block report from unregistered or dead node");
       }
@@ -2531,7 +2530,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
           break;
         default:
           String msg = 
-            "Unknown block status code reported by " + nodeID.getName() +
+            "Unknown block status code reported by " + nodeID +
             ": " + rdbi;
           NameNode.stateChangeLog.warn(msg);
           assert false : msg; // if assertions are enabled, throw.
@@ -2540,14 +2539,14 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
         if (NameNode.stateChangeLog.isDebugEnabled()) {
           NameNode.stateChangeLog.debug("BLOCK* block "
               + (rdbi.getStatus()) + ": " + rdbi.getBlock()
-              + " is received from " + nodeID.getName());
+              + " is received from " + nodeID);
         }
       }
     } finally {
       namesystem.writeUnlock();
       NameNode.stateChangeLog
           .debug("*BLOCK* NameNode.processIncrementalBlockReport: " + "from "
-              + nodeID.getName()
+              + nodeID
               +  " receiving: " + receiving + ", "
               + " received: " + received + ", "
               + " deleted: " + deleted);
@@ -2623,7 +2622,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     StringBuilder nodeList = new StringBuilder();
     while (nodeIter.hasNext()) {
       DatanodeDescriptor node = nodeIter.next();
-      nodeList.append(node.name);
+      nodeList.append(node);
       nodeList.append(" ");
     }
     LOG.info("Block: " + block + ", Expected Replicas: "
@@ -2633,7 +2632,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
         + ", excess replicas: " + num.excessReplicas()
         + ", Is Open File: " + fileINode.isUnderConstruction()
         + ", Datanodes having this block: " + nodeList + ", Current Datanode: "
-        + srcNode.name + ", Is current datanode decommissioning: "
+        + srcNode + ", Is current datanode decommissioning: "
         + srcNode.isDecommissionInProgress());
   }
   
@@ -2772,7 +2771,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     }
   }
 
-  public void checkReplication(Block block, int numExpectedReplicas) {
+  public void checkReplication(Block block, short numExpectedReplicas) {
     // filter out containingNodes that are marked for decommission.
     NumberReplicas number = countNodes(block);
     if (isNeededReplication(block, numExpectedReplicas, number.liveReplicas())) { 
@@ -2780,6 +2779,10 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
                              number.liveReplicas(),
                              number.decommissionedReplicas(),
                              numExpectedReplicas);
+      return;
+    }
+    if (number.liveReplicas() > numExpectedReplicas) {
+      processOverReplicatedBlock(block, numExpectedReplicas, null, null);
     }
   }
 
@@ -2830,7 +2833,9 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
       DatanodeDescriptor cur = it.next();
       if (!cur.isDecommissionInProgress() && !cur.isDecommissioned()) {
         if ((corruptNodes == null ) || !corruptNodes.contains(cur)) {
-          if (numExpectedReplicas == 1) {
+          if (numExpectedReplicas == 1 ||
+              (numExpectedReplicas > 1 &&
+                  !datanodeManager.hasClusterEverBeenMultiRack())) {
             enoughRacks = true;
             break;
           }
@@ -2942,8 +2947,6 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
         } catch (InterruptedException ie) {
           LOG.warn("ReplicationMonitor thread received InterruptedException.", ie);
           break;
-        } catch (IOException ie) {
-          LOG.warn("ReplicationMonitor thread received exception. " , ie);
         } catch (Throwable t) {
           LOG.warn("ReplicationMonitor thread received Runtime exception. ", t);
           Runtime.getRuntime().exit(-1);
@@ -2961,14 +2964,14 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
    * @return number of blocks scheduled for replication or removal.
    * @throws IOException
    */
-  int computeDatanodeWork() throws IOException {
-    int workFound = 0;
+  int computeDatanodeWork() {
     // Blocks should not be replicated or removed if in safe mode.
     // It's OK to check safe mode here w/o holding lock, in the worst
     // case extra replications will be scheduled, and these will get
     // fixed up later.
-    if (namesystem.isInSafeMode())
-      return workFound;
+    if (namesystem.isInSafeMode()) {
+      return 0;
+    }
 
     final int numlive = heartbeatManager.getLiveDatanodeCount();
     final int blocksToProcess = numlive
@@ -2976,7 +2979,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     final int nodesToProcess = (int) Math.ceil(numlive
         * ReplicationMonitor.INVALIDATE_WORK_PCT_PER_ITERATION / 100.0);
 
-    workFound = this.computeReplicationWork(blocksToProcess);
+    int workFound = this.computeReplicationWork(blocksToProcess);
 
     // Update counters
     namesystem.writeLock();

@@ -57,6 +57,7 @@ import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSClient.DFSDataInputStream;
 import org.apache.hadoop.hdfs.MiniDFSCluster.NameNodeInfo;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
@@ -339,7 +340,7 @@ public class DFSTestUtil {
   }
 
   /*
-   * Wait up to 20s for the given DN (host:port) to be decommissioned.
+   * Wait up to 20s for the given DN (IP:port) to be decommissioned
    */
   public static void waitForDecommission(FileSystem fs, String name) 
       throws IOException, InterruptedException, TimeoutException {
@@ -351,7 +352,7 @@ public class DFSTestUtil {
       Thread.sleep(1000);
       DistributedFileSystem dfs = (DistributedFileSystem)fs;
       for (DatanodeInfo info : dfs.getDataNodeStats()) {
-        if (name.equals(info.getName())) {
+        if (name.equals(info.getXferAddr())) {
           dn = info;
         }
       }
@@ -704,5 +705,15 @@ public class DFSTestUtil {
     }
     conf.set(DFSConfigKeys.DFS_FEDERATION_NAMESERVICES, Joiner.on(",")
         .join(nameservices));
+  }
+  
+  public static DatanodeDescriptor getLocalDatanodeDescriptor() {
+    return new DatanodeDescriptor(
+        new DatanodeID("127.0.0.1", DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT));
+  }
+
+  public static DatanodeInfo getLocalDatanodeInfo() {
+    return new DatanodeInfo(
+        new DatanodeID("127.0.0.1", DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT));
   }
 }

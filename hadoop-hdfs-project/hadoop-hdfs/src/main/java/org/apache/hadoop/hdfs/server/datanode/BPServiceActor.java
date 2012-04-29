@@ -24,7 +24,6 @@ import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.logging.Log;
@@ -38,7 +37,6 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.UnregisteredNodeException;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdfs.server.common.IncorrectVersionException;
-import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
@@ -53,6 +51,8 @@ import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.VersionInfo;
+import org.apache.hadoop.util.VersionUtil;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
@@ -179,17 +179,23 @@ class BPServiceActor implements Runnable {
   private void checkNNVersion(NamespaceInfo nsInfo)
       throws IncorrectVersionException {
     // build and layout versions should match
-    String nsBuildVer = nsInfo.getBuildVersion();
-    String stBuildVer = Storage.getBuildVersion();
-    if (!nsBuildVer.equals(stBuildVer)) {
-      LOG.warn("Data-node and name-node Build versions must be the same. " +
-        "Namenode build version: " + nsBuildVer + "Datanode " +
-        "build version: " + stBuildVer);
-      throw new IncorrectVersionException(nsBuildVer, "namenode", stBuildVer);
+    String nnVersion = nsInfo.getSoftwareVersion();
+    String minimumNameNodeVersion = dnConf.getMinimumNameNodeVersion();
+    if (VersionUtil.compareVersions(nnVersion, minimumNameNodeVersion) < 0) {
+      IncorrectVersionException ive = new IncorrectVersionException(
+          minimumNameNodeVersion, nnVersion, "NameNode", "DataNode");
+      LOG.warn(ive.getMessage());
+      throw ive;
+    }
+    String dnVersion = VersionInfo.getVersion();
+    if (!nnVersion.equals(dnVersion)) {
+      LOG.info("Reported NameNode version '" + nnVersion + "' does not match " +
+          "DataNode version '" + dnVersion + "' but is within acceptable " +
+          "limits. Note: This is normal during a rolling upgrade.");
     }
 
     if (HdfsConstants.LAYOUT_VERSION != nsInfo.getLayoutVersion()) {
-      LOG.warn("Data-node and name-node layout versions must be the same." +
+      LOG.warn("DataNode and NameNode layout versions must be the same." +
         " Expected: "+ HdfsConstants.LAYOUT_VERSION +
         " actual "+ nsInfo.getLayoutVersion());
       throw new IncorrectVersionException(
@@ -384,7 +390,8 @@ class BPServiceActor implements Runnable {
       // Send block report
       long brSendStartTime = now();
       StorageBlockReport[] report = { new StorageBlockReport(
-          bpRegistration.getStorageID(), bReport.getBlockListAsLongs()) };
+          new DatanodeStorage(bpRegistration.getStorageID()),
+          bReport.getBlockListAsLongs()) };
       cmd = bpNamenode.blockReport(bpRegistration, bpos.getBlockPoolId(), report);
 
       // Log the block report processing stats from Datanode perspective
@@ -417,7 +424,9 @@ class BPServiceActor implements Runnable {
   
   
   HeartbeatResponse sendHeartBeat() throws IOException {
-    LOG.info("heartbeat: " + this);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Sending heartbeat from service actor: " + this);
+    }
     // reports number of failed volumes
     StorageReport[] report = { new StorageReport(bpRegistration.getStorageID(),
         false,
@@ -602,9 +611,8 @@ class BPServiceActor implements Runnable {
 
     while (shouldRun()) {
       try {
-        // Use returned registration from namenode with updated machine name.
-        bpRegistration = bpNamenode.registerDatanode(bpRegistration,
-            new DatanodeStorage[0]);
+        // Use returned registration from namenode with updated fields
+        bpRegistration = bpNamenode.registerDatanode(bpRegistration);
         break;
       } catch(SocketTimeoutException e) {  // namenode is busy
         LOG.info("Problem connecting to server: " + nnAddr);

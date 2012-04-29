@@ -37,6 +37,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
@@ -73,6 +74,7 @@ import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskState;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskType;
+import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.TaskAttemptListener;
 import org.apache.hadoop.mapreduce.v2.app.job.Task;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobCounterUpdateEvent;
@@ -151,6 +153,7 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
   private final String userName;
   private final String queueName;
   private final long appSubmitTime;
+  private final AppContext appContext;
 
   private boolean lazyTasksCopyNeeded = false;
   volatile Map<TaskId, Task> tasks = new LinkedHashMap<TaskId, Task>();
@@ -345,6 +348,8 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
                   JobEventType.JOB_DIAGNOSTIC_UPDATE,
                   JobEventType.JOB_TASK_ATTEMPT_FETCH_FAILURE,
                   JobEventType.INTERNAL_ERROR))
+          .addTransition(JobState.ERROR, JobState.ERROR,
+              JobEventType.JOB_COUNTER_UPDATE, COUNTER_UPDATE_TRANSITION)
           // create the topology tables
           .installTopology();
  
@@ -379,7 +384,7 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       Credentials fsTokenCredentials, Clock clock,
       Map<TaskId, TaskInfo> completedTasksFromPreviousRun, MRAppMetrics metrics,
       OutputCommitter committer, boolean newApiCommitter, String userName,
-      long appSubmitTime, List<AMInfo> amInfos) {
+      long appSubmitTime, List<AMInfo> amInfos, AppContext appContext) {
     this.applicationAttemptId = applicationAttemptId;
     this.jobId = jobId;
     this.jobName = conf.get(JobContext.JOB_NAME, "<missing job name>");
@@ -388,6 +393,7 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
     this.clock = clock;
     this.completedTasksFromPreviousRun = completedTasksFromPreviousRun;
     this.amInfos = amInfos;
+    this.appContext = appContext;
     this.userName = userName;
     this.queueName = conf.get(MRJobConfig.QUEUE_NAME, "default");
     this.appSubmitTime = appSubmitTime;
@@ -724,7 +730,9 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
         // Commit job & do cleanup
         job.getCommitter().commitJob(job.getJobContext());
       } catch (IOException e) {
-        LOG.warn("Could not do commit for Job", e);
+        LOG.error("Could not do commit for Job", e);
+        job.logJobHistoryFinishedEvent();
+        return job.finished(JobState.FAILED);
       }
       job.logJobHistoryFinishedEvent();
       return job.finished(JobState.SUCCEEDED);
@@ -1063,10 +1071,10 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
                 job.remoteJobConfFile, 
                 job.conf, splits[i], 
                 job.taskAttemptListener, 
-                job.committer, job.jobToken, job.fsTokens.getAllTokens(), 
+                job.committer, job.jobToken, job.fsTokens,
                 job.clock, job.completedTasksFromPreviousRun, 
                 job.applicationAttemptId.getAttemptId(),
-                job.metrics);
+                job.metrics, job.appContext);
         job.addTask(task);
       }
       LOG.info("Input size for job " + job.jobId + " = " + inputLength
@@ -1081,10 +1089,10 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
                 job.remoteJobConfFile, 
                 job.conf, job.numMapTasks, 
                 job.taskAttemptListener, job.committer, job.jobToken,
-                job.fsTokens.getAllTokens(), job.clock, 
+                job.fsTokens, job.clock,
                 job.completedTasksFromPreviousRun, 
                 job.applicationAttemptId.getAttemptId(),
-                job.metrics);
+                job.metrics, job.appContext);
         job.addTask(task);
       }
       LOG.info("Number of reduces for job " + job.jobId + " = "
@@ -1464,5 +1472,14 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       job.eventHandler.handle(new JobHistoryEvent(job.jobId, failedEvent));
       job.finished(JobState.ERROR);
     }
+  }
+
+  @Override
+  public Configuration loadConfFile() throws IOException {
+    Path confPath = getConfFile();
+    FileContext fc = FileContext.getFileContext(confPath.toUri(), conf);
+    Configuration jobConf = new Configuration(false);
+    jobConf.addResource(fc.open(confPath));
+    return jobConf;
   }
 }

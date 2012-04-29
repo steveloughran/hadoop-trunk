@@ -27,7 +27,10 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.Vector;
 
 import javax.naming.NamingException;
@@ -91,47 +94,120 @@ public class DNS {
   }
 
   /**
+   * @return NetworkInterface for the given subinterface name (eg eth0:0)
+   *    or null if no interface with the given name can be found  
+   */
+  private static NetworkInterface getSubinterface(String strInterface)
+      throws SocketException {
+    Enumeration<NetworkInterface> nifs = 
+      NetworkInterface.getNetworkInterfaces();
+      
+    while (nifs.hasMoreElements()) {
+      Enumeration<NetworkInterface> subNifs = 
+        nifs.nextElement().getSubInterfaces();
+
+      while (subNifs.hasMoreElements()) {
+        NetworkInterface nif = subNifs.nextElement();
+        if (nif.getName().equals(strInterface)) {
+          return nif;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * @param nif network interface to get addresses for
+   * @return set containing addresses for each subinterface of nif,
+   *    see below for the rationale for using an ordered set
+   */
+  private static LinkedHashSet<InetAddress> getSubinterfaceInetAddrs(
+      NetworkInterface nif) {
+    LinkedHashSet<InetAddress> addrs = new LinkedHashSet<InetAddress>();
+    Enumeration<NetworkInterface> subNifs = nif.getSubInterfaces();
+    while (subNifs.hasMoreElements()) {
+      NetworkInterface subNif = subNifs.nextElement();
+      addrs.addAll(Collections.list(subNif.getInetAddresses()));
+    }
+    return addrs;
+  }
+
+  /**
+   * Like {@link DNS#getIPs(String, boolean), but returns all
+   * IPs associated with the given interface and its subinterfaces.
+   */
+  public static String[] getIPs(String strInterface)
+      throws UnknownHostException {
+    return getIPs(strInterface, true);
+  }
+
+  /**
    * Returns all the IPs associated with the provided interface, if any, in
    * textual form.
    * 
    * @param strInterface
-   *            The name of the network interface to query (e.g. eth0)
+   *            The name of the network interface or sub-interface to query
+   *            (eg eth0 or eth0:0) or the string "default"
+   * @param returnSubinterfaces
+   *            Whether to return IPs associated with subinterfaces of
+   *            the given interface
    * @return A string vector of all the IPs associated with the provided
-   *         interface
+   *         interface. The local host IP is returned if the interface
+   *         name "default" is specified or there is an I/O error looking
+   *         for the given interface.
    * @throws UnknownHostException
-   *             If an UnknownHostException is encountered in querying the
-   *             default interface
+   *             If the given interface is invalid
    * 
    */
-  public static String[] getIPs(String strInterface)
-    throws UnknownHostException {
+  public static String[] getIPs(String strInterface,
+      boolean returnSubinterfaces) throws UnknownHostException {
+    if ("default".equals(strInterface)) {
+      return new String[] { cachedHostAddress };
+    }
+    NetworkInterface netIf;
     try {
-      NetworkInterface netIF = NetworkInterface.getByName(strInterface);
-      if (netIF == null) {
-        return new String[] { cachedHostAddress };
-      } else {
-        Vector<String> ips = new Vector<String>();
-        Enumeration e = netIF.getInetAddresses();
-        while (e.hasMoreElements()) {
-          ips.add(((InetAddress) e.nextElement()).getHostAddress());
-        }
-        return ips.toArray(new String[] {});
+      netIf = NetworkInterface.getByName(strInterface);
+      if (netIf == null) {
+        netIf = getSubinterface(strInterface);
       }
     } catch (SocketException e) {
-      return new String[]  { cachedHostAddress };
+      LOG.warn("I/O error finding interface " + strInterface +
+          ": " + e.getMessage());
+      return new String[] { cachedHostAddress };
     }
+    if (netIf == null) {
+      throw new UnknownHostException("No such interface " + strInterface);
+    }
+
+    // NB: Using a LinkedHashSet to preserve the order for callers
+    // that depend on a particular element being 1st in the array.
+    // For example, getDefaultIP always returns the first element.
+    LinkedHashSet<InetAddress> allAddrs = new LinkedHashSet<InetAddress>();
+    allAddrs.addAll(Collections.list(netIf.getInetAddresses()));
+    if (!returnSubinterfaces) {
+      allAddrs.removeAll(getSubinterfaceInetAddrs(netIf));
+    }
+
+    String ips[] = new String[allAddrs.size()];
+    int i = 0;
+    for (InetAddress addr : allAddrs) {
+      ips[i++] = addr.getHostAddress();
+    }
+    return ips;
   }
 
 
-    /**
+  /**
    * Returns the first available IP address associated with the provided
-   * network interface
+   * network interface or the local host IP if "default" is given.
    *
    * @param strInterface
-   *            The name of the network interface to query (e.g. eth0)
-   * @return The IP address in text form
+   *            The name of the network interface or subinterface to query
+   *             (e.g. eth0 or eth0:0) or the string "default"
+   * @return The IP address in text form, the local host IP is returned
+   *         if the interface name "default" is specified
    * @throws UnknownHostException
-   *             If one is encountered in querying the default interface
+   *             If the given interface is invalid
    */
   public static String getDefaultIP(String strInterface)
     throws UnknownHostException {
@@ -144,26 +220,28 @@ public class DNS {
    * address bound to the specified network interface
    *
    * @param strInterface
-   *            The name of the network interface to query (e.g. eth0)
+   *            The name of the network interface or subinterface to query
+   *            (e.g. eth0 or eth0:0)
    * @param nameserver
    *            The DNS host name
    * @return A string vector of all host names associated with the IPs tied to
    *         the specified interface
-   * @throws UnknownHostException if the hostname cannot be determined
+   * @throws UnknownHostException if the given interface is invalid
    */
   public static String[] getHosts(String strInterface, String nameserver)
     throws UnknownHostException {
     String[] ips = getIPs(strInterface);
     Vector<String> hosts = new Vector<String>();
-    for (int ctr = 0; ctr < ips.length; ctr++)
+    for (int ctr = 0; ctr < ips.length; ctr++) {
       try {
         hosts.add(reverseDns(InetAddress.getByName(ips[ctr]),
                              nameserver));
       } catch (UnknownHostException ignored) {
       } catch (NamingException ignored) {
       }
-
+    }
     if (hosts.isEmpty()) {
+      LOG.warn("Unable to determine hostname for interface " + strInterface);
       return new String[] { cachedHostname };
     } else {
       return hosts.toArray(new String[hosts.size()]);
@@ -181,8 +259,8 @@ public class DNS {
     try {
       localhost = InetAddress.getLocalHost().getCanonicalHostName();
     } catch (UnknownHostException e) {
-      LOG.info("Unable to determine local hostname "
-              + "-falling back to \"" + LOCALHOST + "\"", e);
+      LOG.warn("Unable to determine local hostname "
+          + "-falling back to \"" + LOCALHOST + "\"", e);
       localhost = LOCALHOST;
     }
     return localhost;
@@ -204,7 +282,7 @@ public class DNS {
       try {
         address = InetAddress.getLocalHost().getHostAddress();
       } catch (UnknownHostException e) {
-        LOG.info("Unable to determine address of the host"
+        LOG.warn("Unable to determine address of the host"
                 + "-falling back to \"" + LOCALHOST + "\" address", e);
         try {
           address = InetAddress.getByName(LOCALHOST).getHostAddress();
@@ -219,7 +297,7 @@ public class DNS {
     return address;
   }
 
-    /**
+  /**
    * Returns all the host names associated by the default nameserver with the
    * address bound to the specified network interface
    * 

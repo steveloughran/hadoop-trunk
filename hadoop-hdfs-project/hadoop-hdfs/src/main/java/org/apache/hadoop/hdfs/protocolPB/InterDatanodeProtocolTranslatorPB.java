@@ -85,21 +85,32 @@ public class InterDatanodeProtocolTranslatorPB implements
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
+    if (!resp.getReplicaFound()) {
+      // No replica found on the remote node.
+      return null;
+    } else {
+      if (!resp.hasBlock() || !resp.hasState()) {
+        throw new IOException("Replica was found but missing fields. " +
+            "Req: " + req + "\n" +
+            "Resp: " + resp);
+      }
+    }
+    
     BlockProto b = resp.getBlock();
     return new ReplicaRecoveryInfo(b.getBlockId(), b.getNumBytes(),
         b.getGenStamp(), PBHelper.convert(resp.getState()));
   }
 
   @Override
-  public ExtendedBlock updateReplicaUnderRecovery(ExtendedBlock oldBlock,
+  public String updateReplicaUnderRecovery(ExtendedBlock oldBlock,
       long recoveryId, long newLength) throws IOException {
     UpdateReplicaUnderRecoveryRequestProto req = 
         UpdateReplicaUnderRecoveryRequestProto.newBuilder()
         .setBlock(PBHelper.convert(oldBlock))
         .setNewLength(newLength).setRecoveryId(recoveryId).build();
     try {
-      return PBHelper.convert(rpcProxy.updateReplicaUnderRecovery(
-          NULL_CONTROLLER, req).getBlock());
+      return rpcProxy.updateReplicaUnderRecovery(NULL_CONTROLLER, req
+          ).getStorageID();
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }

@@ -50,9 +50,9 @@ public class TestDFSAddressConfig extends TestCase {
     ArrayList<DataNode> dns = cluster.getDataNodes();
     DataNode dn = dns.get(0);
 
-    String selfSocketAddr = dn.getSelfAddr().toString();
+    String selfSocketAddr = dn.getXferAddress().toString();
     System.out.println("DN Self Socket Addr == " + selfSocketAddr);
-    assertTrue(selfSocketAddr.startsWith("/127.0.0.1:"));
+    assertTrue(selfSocketAddr.contains("/127.0.0.1:"));
 
     /*-------------------------------------------------------------------------
      * Shut down the datanodes, reconfigure, and bring them back up.
@@ -75,10 +75,10 @@ public class TestDFSAddressConfig extends TestCase {
     dns = cluster.getDataNodes();
     dn = dns.get(0);
 
-    selfSocketAddr = dn.getSelfAddr().toString();
+    selfSocketAddr = dn.getXferAddress().toString();
     System.out.println("DN Self Socket Addr == " + selfSocketAddr);
     // assert that default self socket address is 127.0.0.1
-    assertTrue(selfSocketAddr.startsWith("/127.0.0.1:"));
+    assertTrue(selfSocketAddr.contains("/127.0.0.1:"));
 
     /*-------------------------------------------------------------------------
      * Shut down the datanodes, reconfigure, and bring them back up.
@@ -100,10 +100,10 @@ public class TestDFSAddressConfig extends TestCase {
     dns = cluster.getDataNodes();
     dn = dns.get(0);
 
-    selfSocketAddr = dn.getSelfAddr().toString();
+    selfSocketAddr = dn.getXferAddress().toString();
     System.out.println("DN Self Socket Addr == " + selfSocketAddr);
     // assert that default self socket address is 0.0.0.0
-    assertTrue(selfSocketAddr.startsWith("/0.0.0.0:"));
+    assertTrue(selfSocketAddr.contains("/0.0.0.0:"));
 
     cluster.shutdown();
   }

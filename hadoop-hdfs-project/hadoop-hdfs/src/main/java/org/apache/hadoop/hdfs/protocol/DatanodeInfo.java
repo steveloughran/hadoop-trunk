@@ -17,19 +17,11 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
 import java.util.Date;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.io.WritableFactories;
-import org.apache.hadoop.io.WritableFactory;
-import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
@@ -37,9 +29,9 @@ import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.util.StringUtils;
 
 /** 
- * DatanodeInfo represents the status of a DataNode.
- * This object is used for communication in the
- * Datanode Protocol and the Client Protocol.
+ * This class extends the primary identifier of a Datanode with ephemeral
+ * state, eg usage information, current administrative state, and the
+ * network location that is communicated to clients.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -51,13 +43,8 @@ public class DatanodeInfo extends DatanodeID implements Node {
   protected long lastUpdate;
   protected int xceiverCount;
   protected String location = NetworkTopology.DEFAULT_RACK;
-
-  /** HostName as supplied by the datanode during registration as its 
-   * name. Namenode uses datanode IP address as the name.
-   */
-  protected String hostName = null;
   
-  // administrative states of a datanode
+  // Datanode administrative states
   public enum AdminStates {
     NORMAL("In Service"), 
     DECOMMISSION_INPROGRESS("Decommission In Progress"), 
@@ -83,11 +70,6 @@ public class DatanodeInfo extends DatanodeID implements Node {
 
   protected AdminStates adminState;
 
-  public DatanodeInfo() {
-    super();
-    adminState = null;
-  }
-  
   public DatanodeInfo(DatanodeInfo from) {
     super(from);
     this.capacity = from.getCapacity();
@@ -112,30 +94,27 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.adminState = null;    
   }
   
-  public DatanodeInfo(DatanodeID nodeID, String location, String hostName) {
+  public DatanodeInfo(DatanodeID nodeID, String location) {
     this(nodeID);
     this.location = location;
-    this.hostName = hostName;
   }
   
-  public DatanodeInfo(DatanodeID nodeID, String location, String hostName,
+  public DatanodeInfo(DatanodeID nodeID, String location,
       final long capacity, final long dfsUsed, final long remaining,
       final long blockPoolUsed, final long lastUpdate, final int xceiverCount,
       final AdminStates adminState) {
-    this(nodeID.getName(), nodeID.getStorageID(), nodeID.getInfoPort(), nodeID
-        .getIpcPort(), capacity, dfsUsed, remaining, blockPoolUsed, lastUpdate,
-        xceiverCount, location, hostName, adminState);
+    this(nodeID.getIpAddr(), nodeID.getHostName(), nodeID.getStorageID(), nodeID.getXferPort(),
+        nodeID.getInfoPort(), nodeID.getIpcPort(), capacity, dfsUsed, remaining,
+        blockPoolUsed, lastUpdate, xceiverCount, location, adminState);
   }
 
   /** Constructor */
-  public DatanodeInfo(final String name, final String storageID,
-      final int infoPort, final int ipcPort,
+  public DatanodeInfo(final String ipAddr, final String hostName,
+      final String storageID, final int xferPort, final int infoPort, final int ipcPort,
       final long capacity, final long dfsUsed, final long remaining,
       final long blockPoolUsed, final long lastUpdate, final int xceiverCount,
-      final String networkLocation, final String hostName,
-      final AdminStates adminState) {
-    super(name, storageID, infoPort, ipcPort);
-
+      final String networkLocation, final AdminStates adminState) {
+    super(ipAddr, hostName, storageID, xferPort, infoPort, ipcPort);
     this.capacity = capacity;
     this.dfsUsed = dfsUsed;
     this.remaining = remaining;
@@ -143,8 +122,12 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.lastUpdate = lastUpdate;
     this.xceiverCount = xceiverCount;
     this.location = networkLocation;
-    this.hostName = hostName;
     this.adminState = adminState;
+  }
+  
+  /** Network location name */
+  public String getName() {
+    return getXferAddr();
   }
   
   /** The raw capacity. */
@@ -223,15 +206,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
   public synchronized void setNetworkLocation(String location) {
     this.location = NodeBase.normalize(location);
   }
-  
-  public String getHostName() {
-    return (hostName == null || hostName.length()==0) ? getHost() : hostName;
-  }
-  
-  public void setHostName(String host) {
-    hostName = host;
-  }
-  
+    
   /** A formatted string for reporting the status of the DataNode. */
   public String getDatanodeReport() {
     StringBuilder buffer = new StringBuilder();
@@ -241,12 +216,14 @@ public class DatanodeInfo extends DatanodeID implements Node {
     long nonDFSUsed = getNonDfsUsed();
     float usedPercent = getDfsUsedPercent();
     float remainingPercent = getRemainingPercent();
-    String hostName = NetUtils.getHostNameOfIP(name);
+    String lookupName = NetUtils.getHostNameOfIP(getName());
 
-    buffer.append("Name: "+ name);
-    if(hostName != null)
-      buffer.append(" (" + hostName + ")");
+    buffer.append("Name: "+ getName());
+    if (lookupName != null) {
+      buffer.append(" (" + lookupName + ")");
+    }
     buffer.append("\n");
+    buffer.append("Hostname: " + getHostName() + "\n");
 
     if (!NetworkTopology.DEFAULT_RACK.equals(location)) {
       buffer.append("Rack: "+location+"\n");
@@ -275,7 +252,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     long c = getCapacity();
     long r = getRemaining();
     long u = getDfsUsed();
-    buffer.append(name);
+    buffer.append(getName());
     if (!NetworkTopology.DEFAULT_RACK.equals(location)) {
       buffer.append(" "+location);
     }
@@ -365,60 +342,6 @@ public class DatanodeInfo extends DatanodeID implements Node {
    */
   public int getLevel() { return level; }
   public void setLevel(int level) {this.level = level;}
-
-  /////////////////////////////////////////////////
-  // Writable
-  /////////////////////////////////////////////////
-  static {                                      // register a ctor
-    WritableFactories.setFactory
-      (DatanodeInfo.class,
-       new WritableFactory() {
-         public Writable newInstance() { return new DatanodeInfo(); }
-       });
-  }
-
-  @Override
-  public void write(DataOutput out) throws IOException {
-    super.write(out);
-
-    //TODO: move it to DatanodeID once DatanodeID is not stored in FSImage
-    out.writeShort(ipcPort);
-
-    out.writeLong(capacity);
-    out.writeLong(dfsUsed);
-    out.writeLong(remaining);
-    out.writeLong(blockPoolUsed);
-    out.writeLong(lastUpdate);
-    out.writeInt(xceiverCount);
-    Text.writeString(out, location);
-    Text.writeString(out, hostName == null? "": hostName);
-    WritableUtils.writeEnum(out, getAdminState());
-  }
-
-  @Override
-  public void readFields(DataInput in) throws IOException {
-    super.readFields(in);
-
-    //TODO: move it to DatanodeID once DatanodeID is not stored in FSImage
-    this.ipcPort = in.readShort() & 0x0000ffff;
-
-    this.capacity = in.readLong();
-    this.dfsUsed = in.readLong();
-    this.remaining = in.readLong();
-    this.blockPoolUsed = in.readLong();
-    this.lastUpdate = in.readLong();
-    this.xceiverCount = in.readInt();
-    this.location = Text.readString(in);
-    this.hostName = Text.readString(in);
-    setAdminState(WritableUtils.readEnum(in, AdminStates.class));
-  }
-
-  /** Read a DatanodeInfo */
-  public static DatanodeInfo read(DataInput in) throws IOException {
-    final DatanodeInfo d = new DatanodeInfo();
-    d.readFields(in);
-    return d;
-  }
 
   @Override
   public int hashCode() {

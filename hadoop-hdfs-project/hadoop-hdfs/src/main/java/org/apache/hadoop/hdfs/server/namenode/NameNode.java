@@ -18,19 +18,24 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
+import org.apache.hadoop.ha.HAServiceStatus;
 import org.apache.hadoop.ha.HealthCheckFailedException;
 import org.apache.hadoop.ha.ServiceFailedException;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -38,6 +43,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Trash;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
+
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -45,7 +51,11 @@ import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
+import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
+import org.apache.hadoop.hdfs.server.namenode.FileJournalManager.EditLogFile;
+import org.apache.hadoop.hdfs.server.namenode.JournalSet.JournalAndStream;
 import org.apache.hadoop.hdfs.server.namenode.ha.ActiveState;
+import org.apache.hadoop.hdfs.server.namenode.ha.BootstrapStandby;
 import org.apache.hadoop.hdfs.server.namenode.ha.HAContext;
 import org.apache.hadoop.hdfs.server.namenode.ha.HAState;
 import org.apache.hadoop.hdfs.server.namenode.ha.StandbyState;
@@ -55,6 +65,9 @@ import org.apache.hadoop.hdfs.server.protocol.JournalProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
+import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
+import org.apache.hadoop.hdfs.util.AtomicFileOutputStream;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
@@ -66,6 +79,10 @@ import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
 import org.apache.hadoop.tools.GetUserMappingsProtocol;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.StringUtils;
+import static org.apache.hadoop.util.ToolRunner.confirmPrompt;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
 
 /**********************************************************
  * NameNode serves as both directory namespace manager and
@@ -153,7 +170,8 @@ public class NameNode {
     DFS_SECONDARY_NAMENODE_KEYTAB_FILE_KEY,
     DFS_NAMENODE_BACKUP_ADDRESS_KEY,
     DFS_NAMENODE_BACKUP_HTTP_ADDRESS_KEY,
-    DFS_NAMENODE_BACKUP_SERVICE_RPC_ADDRESS_KEY
+    DFS_NAMENODE_BACKUP_SERVICE_RPC_ADDRESS_KEY,
+    DFS_HA_FENCE_METHODS_KEY
   };
   
   public long getProtocolVersion(String protocol, 
@@ -184,7 +202,7 @@ public class NameNode {
   protected FSNamesystem namesystem; 
   protected final Configuration conf;
   protected NamenodeRole role;
-  private HAState state;
+  private volatile HAState state;
   private final boolean haEnabled;
   private final HAContext haContext;
   protected boolean allowStaleStandbyReads;
@@ -205,7 +223,7 @@ public class NameNode {
   /** Format a new filesystem.  Destroys any filesystem that may already
    * exist at this location.  **/
   public static void format(Configuration conf) throws IOException {
-    format(conf, false);
+    format(conf, true, true);
   }
 
   static NameNodeMetrics metrics;
@@ -504,6 +522,8 @@ public class NameNode {
    * <li>{@link StartupOption#CHECKPOINT CHECKPOINT} - start checkpoint node</li>
    * <li>{@link StartupOption#UPGRADE UPGRADE} - start the cluster  
    * upgrade and create a snapshot of the current file system state</li> 
+   * <li>{@link StartupOption#RECOVERY RECOVERY} - recover name node
+   * metadata</li>
    * <li>{@link StartupOption#ROLLBACK ROLLBACK} - roll the  
    *            cluster back to the previous state</li>
    * <li>{@link StartupOption#FINALIZE FINALIZE} - finalize 
@@ -642,42 +662,22 @@ public class NameNode {
    * for each existing directory and format them.
    * 
    * @param conf
-   * @param isConfirmationNeeded
+   * @param force
    * @return true if formatting was aborted, false otherwise
    * @throws IOException
    */
-  private static boolean format(Configuration conf,
-                                boolean isConfirmationNeeded)
-      throws IOException {
+  private static boolean format(Configuration conf, boolean force,
+      boolean isInteractive) throws IOException {
     String nsId = DFSUtil.getNamenodeNameServiceId(conf);
     String namenodeId = HAUtil.getNameNodeId(conf, nsId);
     initializeGenericKeys(conf, nsId, namenodeId);
-
-    if (!conf.getBoolean(DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_KEY, 
-                         DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_DEFAULT)) {
-      throw new IOException("The option " + DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_KEY
-                             + " is set to false for this filesystem, so it "
-                             + "cannot be formatted. You will need to set "
-                             + DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_KEY +" parameter "
-                             + "to true in order to format this filesystem");
-    }
+    checkAllowFormat(conf);
     
     Collection<URI> dirsToFormat = FSNamesystem.getNamespaceDirs(conf);
     List<URI> editDirsToFormat = 
                  FSNamesystem.getNamespaceEditsDirs(conf);
-    for(Iterator<URI> it = dirsToFormat.iterator(); it.hasNext();) {
-      File curDir = new File(it.next().getPath());
-      // Its alright for a dir not to exist, or to exist (properly accessible)
-      // and be completely empty.
-      if (!curDir.exists() ||
-          (curDir.isDirectory() && FileUtil.listFiles(curDir).length == 0))
-        continue;
-      if (isConfirmationNeeded) {
-        if (!confirmPrompt("Re-format filesystem in " + curDir + " ?")) {
-          System.err.println("Format aborted in "+ curDir);
-          return true;
-        }
-      }
+    if (!confirmFormat(dirsToFormat, force, isInteractive)) {
+      return true; // aborted
     }
 
     // if clusterID is not provided - see if you can find the current one
@@ -692,6 +692,172 @@ public class NameNode {
     FSNamesystem fsn = new FSNamesystem(conf, fsImage);
     fsImage.format(fsn, clusterId);
     return false;
+  }
+
+  /**
+   * Check whether the given storage directories already exist.
+   * If running in interactive mode, will prompt the user for each
+   * directory to allow them to format anyway. Otherwise, returns
+   * false, unless 'force' is specified.
+   * 
+   * @param dirsToFormat the dirs to check
+   * @param force format regardless of whether dirs exist
+   * @param interactive prompt the user when a dir exists
+   * @return true if formatting should proceed
+   * @throws IOException
+   */
+  public static boolean confirmFormat(Collection<URI> dirsToFormat,
+      boolean force, boolean interactive)
+      throws IOException {
+    for(Iterator<URI> it = dirsToFormat.iterator(); it.hasNext();) {
+      File curDir = new File(it.next().getPath());
+      // Its alright for a dir not to exist, or to exist (properly accessible)
+      // and be completely empty.
+      if (!curDir.exists() ||
+          (curDir.isDirectory() && FileUtil.listFiles(curDir).length == 0))
+        continue;
+      if (force) { // Don't confirm, always format.
+        System.err.println(
+            "Storage directory exists in " + curDir + ". Formatting anyway.");
+        continue;
+      }
+      if (!interactive) { // Don't ask - always don't format
+        System.err.println(
+            "Running in non-interactive mode, and image appears to exist in " +
+            curDir + ". Not formatting.");
+        return false;
+      }
+      if (!confirmPrompt("Re-format filesystem in " + curDir + " ?")) {
+        System.err.println("Format aborted in " + curDir);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public static void checkAllowFormat(Configuration conf) throws IOException {
+    if (!conf.getBoolean(DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_KEY, 
+        DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_DEFAULT)) {
+      throw new IOException("The option " + DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_KEY
+                + " is set to false for this filesystem, so it "
+                + "cannot be formatted. You will need to set "
+                + DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_KEY +" parameter "
+                + "to true in order to format this filesystem");
+    }
+  }
+  
+  @VisibleForTesting
+  public static boolean initializeSharedEdits(Configuration conf) {
+    return initializeSharedEdits(conf, true);
+  }
+  
+  @VisibleForTesting
+  public static boolean initializeSharedEdits(Configuration conf,
+      boolean force) {
+    return initializeSharedEdits(conf, force, false);
+  }
+
+  /**
+   * Format a new shared edits dir and copy in enough edit log segments so that
+   * the standby NN can start up.
+   * 
+   * @param conf configuration
+   * @param force format regardless of whether or not the shared edits dir exists
+   * @param interactive prompt the user when a dir exists
+   * @return true if the command aborts, false otherwise
+   */
+  private static boolean initializeSharedEdits(Configuration conf,
+      boolean force, boolean interactive) {
+    String nsId = DFSUtil.getNamenodeNameServiceId(conf);
+    String namenodeId = HAUtil.getNameNodeId(conf, nsId);
+    initializeGenericKeys(conf, nsId, namenodeId);
+    NNStorage existingStorage = null;
+    try {
+      FSNamesystem fsns = FSNamesystem.loadFromDisk(conf,
+          FSNamesystem.getNamespaceDirs(conf),
+          FSNamesystem.getNamespaceEditsDirs(conf, false));
+      
+      existingStorage = fsns.getFSImage().getStorage();
+      
+      Collection<URI> sharedEditsDirs = FSNamesystem.getSharedEditsDirs(conf);
+      if (!confirmFormat(sharedEditsDirs, force, interactive)) {
+        return true; // aborted
+      }
+      NNStorage newSharedStorage = new NNStorage(conf,
+          Lists.<URI>newArrayList(),
+          sharedEditsDirs);
+      
+      newSharedStorage.format(new NamespaceInfo(
+          existingStorage.getNamespaceID(),
+          existingStorage.getClusterID(),
+          existingStorage.getBlockPoolID(),
+          existingStorage.getCTime(),
+          existingStorage.getDistributedUpgradeVersion()));
+      
+      // Need to make sure the edit log segments are in good shape to initialize
+      // the shared edits dir.
+      fsns.getFSImage().getEditLog().close();
+      fsns.getFSImage().getEditLog().initJournalsForWrite();
+      fsns.getFSImage().getEditLog().recoverUnclosedStreams();
+      
+      if (copyEditLogSegmentsToSharedDir(fsns, sharedEditsDirs,
+          newSharedStorage, conf)) {
+        return true; // aborted
+      }
+    } catch (IOException ioe) {
+      LOG.error("Could not initialize shared edits dir", ioe);
+      return true; // aborted
+    } finally {
+      // Have to unlock storage explicitly for the case when we're running in a
+      // unit test, which runs in the same JVM as NNs.
+      if (existingStorage != null) {
+        try {
+          existingStorage.unlockAll();
+        } catch (IOException ioe) {
+          LOG.warn("Could not unlock storage directories", ioe);
+          return true; // aborted
+        }
+      }
+    }
+    return false; // did not abort
+  }
+  
+  private static boolean copyEditLogSegmentsToSharedDir(FSNamesystem fsns,
+      Collection<URI> sharedEditsDirs, NNStorage newSharedStorage,
+      Configuration conf) throws FileNotFoundException, IOException {
+    // Copy edit log segments into the new shared edits dir.
+    for (JournalAndStream jas : fsns.getFSImage().getEditLog().getJournals()) {
+      FileJournalManager fjm = null;
+      if (!(jas.getManager() instanceof FileJournalManager)) {
+        LOG.error("Cannot populate shared edits dir from non-file " +
+            "journal manager: " + jas.getManager());
+        return true; // aborted
+      } else {
+        fjm = (FileJournalManager) jas.getManager();
+      }
+      for (EditLogFile elf : fjm.getLogFiles(fsns.getFSImage()
+          .getMostRecentCheckpointTxId())) {
+        File editLogSegment = elf.getFile();
+        for (URI sharedEditsUri : sharedEditsDirs) {
+          StorageDirectory sharedEditsDir = newSharedStorage
+              .getStorageDirectory(sharedEditsUri);
+          File targetFile = new File(sharedEditsDir.getCurrentDir(),
+              editLogSegment.getName());
+          if (!targetFile.exists()) {
+            InputStream in = null;
+            OutputStream out = null;
+            try {
+              in = new FileInputStream(editLogSegment);
+              out = new AtomicFileOutputStream(targetFile);
+              IOUtils.copyBytes(in, out, conf);
+            } finally {
+              IOUtils.cleanup(LOG, in, out);
+            }
+          }
+        }
+      }
+    }
+    return false; // did not abort
   }
 
   private static boolean finalize(Configuration conf,
@@ -721,12 +887,17 @@ public class NameNode {
       "Usage: java NameNode [" +
       StartupOption.BACKUP.getName() + "] | [" +
       StartupOption.CHECKPOINT.getName() + "] | [" +
-      StartupOption.FORMAT.getName() + "[" + StartupOption.CLUSTERID.getName() +  
-      " cid ]] | [" +
+      StartupOption.FORMAT.getName() + " [" + StartupOption.CLUSTERID.getName() +  
+      " cid ] [" + StartupOption.FORCE.getName() + "] [" +
+      StartupOption.NONINTERACTIVE.getName() + "] ] | [" +
       StartupOption.UPGRADE.getName() + "] | [" +
       StartupOption.ROLLBACK.getName() + "] | [" +
       StartupOption.FINALIZE.getName() + "] | [" +
-      StartupOption.IMPORT.getName() + "]");
+      StartupOption.IMPORT.getName() + "] | [" +
+      StartupOption.INITIALIZESHAREDEDITS.getName() + "] | [" +
+      StartupOption.BOOTSTRAPSTANDBY.getName() + "] | [" + 
+      StartupOption.RECOVER.getName() + " [ " +
+        StartupOption.FORCE.getName() + " ] ]");
   }
 
   private static StartupOption parseArguments(String args[]) {
@@ -736,11 +907,35 @@ public class NameNode {
       String cmd = args[i];
       if (StartupOption.FORMAT.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.FORMAT;
-        // might be followed by two args
-        if (i + 2 < argsLen
-            && args[i + 1].equalsIgnoreCase(StartupOption.CLUSTERID.getName())) {
-          i += 2;
-          startOpt.setClusterId(args[i]);
+        for (i = i + 1; i < argsLen; i++) {
+          if (args[i].equalsIgnoreCase(StartupOption.CLUSTERID.getName())) {
+            i++;
+            if (i >= argsLen) {
+              // if no cluster id specified, return null
+              LOG.fatal("Must specify a valid cluster ID after the "
+                  + StartupOption.CLUSTERID.getName() + " flag");
+              return null;
+            }
+            String clusterId = args[i];
+            // Make sure an id is specified and not another flag
+            if (clusterId.isEmpty() ||
+                clusterId.equalsIgnoreCase(StartupOption.FORCE.getName()) ||
+                clusterId.equalsIgnoreCase(
+                    StartupOption.NONINTERACTIVE.getName())) {
+              LOG.fatal("Must specify a valid cluster ID after the "
+                  + StartupOption.CLUSTERID.getName() + " flag");
+              return null;
+            }
+            startOpt.setClusterId(clusterId);
+          }
+
+          if (args[i].equalsIgnoreCase(StartupOption.FORCE.getName())) {
+            startOpt.setForceFormat(true);
+          }
+
+          if (args[i].equalsIgnoreCase(StartupOption.NONINTERACTIVE.getName())) {
+            startOpt.setInteractiveFormat(false);
+          }
         }
       } else if (StartupOption.GENCLUSTERID.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.GENCLUSTERID;
@@ -764,8 +959,30 @@ public class NameNode {
         startOpt = StartupOption.FINALIZE;
       } else if (StartupOption.IMPORT.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.IMPORT;
-      } else
+      } else if (StartupOption.BOOTSTRAPSTANDBY.getName().equalsIgnoreCase(cmd)) {
+        startOpt = StartupOption.BOOTSTRAPSTANDBY;
+        return startOpt;
+      } else if (StartupOption.INITIALIZESHAREDEDITS.getName().equalsIgnoreCase(cmd)) {
+        startOpt = StartupOption.INITIALIZESHAREDEDITS;
+        return startOpt;
+      } else if (StartupOption.RECOVER.getName().equalsIgnoreCase(cmd)) {
+        if (startOpt != StartupOption.REGULAR) {
+          throw new RuntimeException("Can't combine -recover with " +
+              "other startup options.");
+        }
+        startOpt = StartupOption.RECOVER;
+        while (++i < argsLen) {
+          if (args[i].equalsIgnoreCase(
+                StartupOption.FORCE.getName())) {
+            startOpt.setForce(MetaRecoveryContext.FORCE_FIRST_CHOICE);
+          } else {
+            throw new RuntimeException("Error parsing recovery options: " + 
+              "can't understand option \"" + args[i] + "\"");
+          }
+        }
+      } else {
         return null;
+      }
     }
     return startOpt;
   }
@@ -779,31 +996,36 @@ public class NameNode {
                                           StartupOption.REGULAR.toString()));
   }
 
-  /**
-   * Print out a prompt to the user, and return true if the user
-   * responds with "Y" or "yes".
-   */
-  static boolean confirmPrompt(String prompt) throws IOException {
-    while (true) {
-      System.err.print(prompt + " (Y or N) ");
-      StringBuilder responseBuilder = new StringBuilder();
-      while (true) {
-        int c = System.in.read();
-        if (c == -1 || c == '\r' || c == '\n') {
-          break;
-        }
-        responseBuilder.append((char)c);
+  private static void doRecovery(StartupOption startOpt, Configuration conf)
+      throws IOException {
+    if (startOpt.getForce() < MetaRecoveryContext.FORCE_ALL) {
+      if (!confirmPrompt("You have selected Metadata Recovery mode.  " +
+          "This mode is intended to recover lost metadata on a corrupt " +
+          "filesystem.  Metadata recovery mode often permanently deletes " +
+          "data from your HDFS filesystem.  Please back up your edit log " +
+          "and fsimage before trying this!\n\n" +
+          "Are you ready to proceed? (Y/N)\n")) {
+        System.err.println("Recovery aborted at user request.\n");
+        return;
       }
-  
-      String response = responseBuilder.toString();
-      if (response.equalsIgnoreCase("y") ||
-          response.equalsIgnoreCase("yes")) {
-        return true;
-      } else if (response.equalsIgnoreCase("n") ||
-          response.equalsIgnoreCase("no")) {
-        return false;
-      }
-      // else ask them again
+    }
+    MetaRecoveryContext.LOG.info("starting recovery...");
+    UserGroupInformation.setConfiguration(conf);
+    NameNode.initMetrics(conf, startOpt.toNodeRole());
+    FSNamesystem fsn = null;
+    try {
+      fsn = FSNamesystem.loadFromDisk(conf);
+      fsn.saveNamespace();
+      MetaRecoveryContext.LOG.info("RECOVERY COMPLETE");
+    } catch (IOException e) {
+      MetaRecoveryContext.LOG.info("RECOVERY FAILED: caught exception", e);
+      throw e;
+    } catch (RuntimeException e) {
+      MetaRecoveryContext.LOG.info("RECOVERY FAILED: caught exception", e);
+      throw e;
+    } finally {
+      if (fsn != null)
+        fsn.close();
     }
   }
 
@@ -827,24 +1049,44 @@ public class NameNode {
     }
 
     switch (startOpt) {
-      case FORMAT:
-        boolean aborted = format(conf, true);
+      case FORMAT: {
+        boolean aborted = format(conf, startOpt.getForceFormat(),
+            startOpt.getInteractiveFormat());
         System.exit(aborted ? 1 : 0);
         return null; // avoid javac warning
-      case GENCLUSTERID:
+      }
+      case GENCLUSTERID: {
         System.err.println("Generating new cluster id:");
         System.out.println(NNStorage.newClusterID());
         System.exit(0);
         return null;
-      case FINALIZE:
-        aborted = finalize(conf, true);
+      }
+      case FINALIZE: {
+        boolean aborted = finalize(conf, true);
         System.exit(aborted ? 1 : 0);
         return null; // avoid javac warning
+      }
+      case BOOTSTRAPSTANDBY: {
+        String toolArgs[] = Arrays.copyOfRange(argv, 1, argv.length);
+        int rc = BootstrapStandby.run(toolArgs, conf);
+        System.exit(rc);
+        return null; // avoid warning
+      }
+      case INITIALIZESHAREDEDITS: {
+        boolean aborted = initializeSharedEdits(conf, false, true);
+        System.exit(aborted ? 1 : 0);
+        return null; // avoid warning
+      }
       case BACKUP:
-      case CHECKPOINT:
+      case CHECKPOINT: {
         NamenodeRole role = startOpt.toNodeRole();
         DefaultMetricsSystem.initialize(role.toString().replace(" ", ""));
         return new BackupNode(conf, role);
+      }
+      case RECOVER: {
+        NameNode.doRecovery(startOpt, conf);
+        return null;
+      }
       default:
         DefaultMetricsSystem.initialize("NameNode");
         return new NameNode(conf);
@@ -945,24 +1187,41 @@ public class NameNode {
     state.setState(haContext, STANDBY_STATE);
   }
 
-  synchronized HAServiceState getServiceState() throws AccessControlException {
+  synchronized HAServiceStatus getServiceStatus()
+      throws ServiceFailedException, AccessControlException {
     namesystem.checkSuperuserPrivilege();
+    if (!haEnabled) {
+      throw new ServiceFailedException("HA for namenode is not enabled");
+    }
+    if (state == null) {
+      return new HAServiceStatus(HAServiceState.INITIALIZING);
+    }
+    HAServiceState retState = state.getServiceState();
+    HAServiceStatus ret = new HAServiceStatus(retState);
+    if (retState == HAServiceState.STANDBY) {
+      String safemodeTip = namesystem.getSafeModeTip();
+      if (!safemodeTip.isEmpty()) {
+        ret.setNotReadyToBecomeActive(
+            "The NameNode is in safemode. " +
+            safemodeTip);
+      } else {
+        ret.setReadyToBecomeActive();
+      }
+    } else if (retState == HAServiceState.ACTIVE) {
+      ret.setReadyToBecomeActive();
+    } else {
+      ret.setNotReadyToBecomeActive("State is " + state);
+    }
+    return ret;
+  }
+
+  synchronized HAServiceState getServiceState() {
     if (state == null) {
       return HAServiceState.INITIALIZING;
     }
     return state.getServiceState();
   }
 
-  synchronized boolean readyToBecomeActive()
-      throws ServiceFailedException, AccessControlException {
-    namesystem.checkSuperuserPrivilege();
-    if (!haEnabled) {
-      throw new ServiceFailedException("HA for namenode is not enabled");
-    }
-    return !isInSafeMode();
-  }
-
-  
   /**
    * Class used as expose {@link NameNode} as context to {@link HAState}
    * 
@@ -998,7 +1257,7 @@ public class NameNode {
 
     @Override
     public void startStandbyServices() throws IOException {
-      namesystem.startStandbyServices();
+      namesystem.startStandbyServices(conf);
     }
 
     @Override

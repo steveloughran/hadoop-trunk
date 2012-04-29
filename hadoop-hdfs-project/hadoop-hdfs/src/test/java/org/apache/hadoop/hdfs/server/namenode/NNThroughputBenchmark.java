@@ -31,6 +31,8 @@ import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -51,13 +53,12 @@ import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo;
 import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
 import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.VersionInfo;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 
@@ -612,7 +613,6 @@ public class NNThroughputBenchmark {
       super.parseArguments(args);
     }
 
-    @SuppressWarnings("deprecation")
     void generateInputs(int[] opsPerThread) throws IOException {
       // create files using opsPerThread
       String[] createArgs = new String[] {
@@ -742,7 +742,6 @@ public class NNThroughputBenchmark {
       }
     }
 
-    @SuppressWarnings("deprecation")
     long executeOp(int daemonId, int inputIdx, String ignore) 
     throws IOException {
       long start = System.currentTimeMillis();
@@ -762,33 +761,40 @@ public class NNThroughputBenchmark {
     
     NamespaceInfo nsInfo;
     DatanodeRegistration dnRegistration;
+    DatanodeStorage storage; //only one storage 
     ArrayList<Block> blocks;
     int nrBlocks; // actual number of blocks
     long[] blockReportList;
 
     /**
-     * Get data-node in the form 
-     * <host name> : <port>
-     * where port is a 6 digit integer.
+     * Return a a 6 digit integer port.
      * This is necessary in order to provide lexocographic ordering.
      * Host names are all the same, the ordering goes by port numbers.
      */
-    private static String getNodeName(int port) throws IOException {
-      String machineName = DNS.getDefaultHost("default", "default");
-      String sPort = String.valueOf(100000 + port);
-      if(sPort.length() > 6)
-        throw new IOException("Too many data-nodes.");
-      return machineName + ":" + sPort;
+    private static int getNodePort(int num) throws IOException {
+      int port = 100000 + num;
+      if (String.valueOf(port).length() > 6) {
+        throw new IOException("Too many data-nodes");
+      }
+      return port;
     }
 
     TinyDatanode(int dnIdx, int blockCapacity) throws IOException {
-      dnRegistration = new DatanodeRegistration(getNodeName(dnIdx));
+      String ipAddr = DNS.getDefaultIP("default");
+      String hostName = DNS.getDefaultHost("default", "default");
+      dnRegistration = new DatanodeRegistration(ipAddr, getNodePort(dnIdx));
+      dnRegistration.setHostName(hostName);
+      dnRegistration.setSoftwareVersion(VersionInfo.getVersion());
       this.blocks = new ArrayList<Block>(blockCapacity);
       this.nrBlocks = 0;
     }
 
-    String getName() {
-      return dnRegistration.getName();
+    public String toString() {
+      return dnRegistration.toString();
+    }
+
+    String getXferAddr() {
+      return dnRegistration.getXferAddr();
     }
 
     void register() throws IOException {
@@ -797,10 +803,15 @@ public class NNThroughputBenchmark {
       dnRegistration.setStorageInfo(new DataStorage(nsInfo, ""));
       DataNode.setNewStorageID(dnRegistration);
       // register datanode
-      
-      DatanodeStorage[] storages = { new DatanodeStorage(
-          dnRegistration.getStorageID(), DatanodeStorage.State.NORMAL) };
-      dnRegistration = nameNodeProto.registerDatanode(dnRegistration, storages);
+      dnRegistration = nameNodeProto.registerDatanode(dnRegistration);
+      //first block reports
+      storage = new DatanodeStorage(dnRegistration.getStorageID());
+      final StorageBlockReport[] reports = {
+          new StorageBlockReport(storage,
+              new BlockListAsLongs(null, null).getBlockListAsLongs())
+      };
+      nameNodeProto.blockReport(dnRegistration, 
+          nameNode.getNamesystem().getBlockPoolId(), reports);
     }
 
     /**
@@ -846,8 +857,8 @@ public class NNThroughputBenchmark {
       return blockReportList;
     }
 
-    public int compareTo(String name) {
-      return getName().compareTo(name);
+    public int compareTo(String xferAddr) {
+      return getXferAddr().compareTo(xferAddr);
     }
 
     /**
@@ -885,10 +896,12 @@ public class NNThroughputBenchmark {
         for(int t = 0; t < blockTargets.length; t++) {
           DatanodeInfo dnInfo = blockTargets[t];
           DatanodeRegistration receivedDNReg;
-          receivedDNReg = new DatanodeRegistration(dnInfo.getName());
+          receivedDNReg =
+            new DatanodeRegistration(dnInfo.getIpAddr(), dnInfo.getXferPort());
           receivedDNReg.setStorageInfo(
-                          new DataStorage(nsInfo, dnInfo.getStorageID()));
+            new DataStorage(nsInfo, dnInfo.getStorageID()));
           receivedDNReg.setInfoPort(dnInfo.getInfoPort());
+          receivedDNReg.setIpcPort(dnInfo.getIpcPort());
           ReceivedDeletedBlockInfo[] rdBlocks = {
             new ReceivedDeletedBlockInfo(
                   blocks[i], ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK,
@@ -973,10 +986,10 @@ public class NNThroughputBenchmark {
       for(int idx=0; idx < nrDatanodes; idx++) {
         datanodes[idx] = new TinyDatanode(idx, blocksPerReport);
         datanodes[idx].register();
-        assert datanodes[idx].getName().compareTo(prevDNName) > 0
+        assert datanodes[idx].getXferAddr().compareTo(prevDNName) > 0
           : "Data-nodes must be sorted lexicographically.";
         datanodes[idx].sendHeartbeat();
-        prevDNName = datanodes[idx].getName();
+        prevDNName = datanodes[idx].getXferAddr();
       }
 
       // create files 
@@ -1006,7 +1019,7 @@ public class NNThroughputBenchmark {
         LocatedBlock loc = nameNodeProto.addBlock(fileName, clientName, prevBlock, null);
         prevBlock = loc.getBlock();
         for(DatanodeInfo dnInfo : loc.getLocations()) {
-          int dnIdx = Arrays.binarySearch(datanodes, dnInfo.getName());
+          int dnIdx = Arrays.binarySearch(datanodes, dnInfo.getXferAddr());
           datanodes[dnIdx].addBlock(loc.getBlock().getLocalBlock());
           ReceivedDeletedBlockInfo[] rdBlocks = { new ReceivedDeletedBlockInfo(
               loc.getBlock().getLocalBlock(),
@@ -1032,7 +1045,7 @@ public class NNThroughputBenchmark {
       TinyDatanode dn = datanodes[daemonId];
       long start = System.currentTimeMillis();
       StorageBlockReport[] report = { new StorageBlockReport(
-          dn.dnRegistration.getStorageID(), dn.getBlockReportList()) };
+          dn.storage, dn.getBlockReportList()) };
       nameNodeProto.blockReport(dn.dnRegistration, nameNode.getNamesystem()
           .getBlockPoolId(), report);
       long end = System.currentTimeMillis();
@@ -1161,9 +1174,9 @@ public class NNThroughputBenchmark {
       for(int i=0; i < nodesToDecommission; i++) {
         TinyDatanode dn = blockReportObject.datanodes[nrDatanodes-1-i];
         numDecommissionedBlocks += dn.nrBlocks;
-        excludeFile.write(dn.getName().getBytes());
+        excludeFile.write(dn.getXferAddr().getBytes());
         excludeFile.write('\n');
-        LOG.info("Datanode " + dn.getName() + " is decommissioned.");
+        LOG.info("Datanode " + dn + " is decommissioned.");
       }
       excludeFile.close();
       nameNodeProto.refreshNodes();

@@ -137,7 +137,7 @@ public class TestBlockTokenWithDFS {
     ExtendedBlock block = lblock.getBlock();
     try {
       DatanodeInfo[] nodes = lblock.getLocations();
-      targetAddr = NetUtils.createSocketAddr(nodes[0].getName());
+      targetAddr = NetUtils.createSocketAddr(nodes[0].getXferAddr());
       s = NetUtils.getDefaultSocketFactory(conf).createSocket();
       s.connect(targetAddr, HdfsServerConstants.READ_TIMEOUT);
       s.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
@@ -182,8 +182,6 @@ public class TestBlockTokenWithDFS {
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, numDataNodes);
     conf.setInt("ipc.client.connect.max.retries", 0);
-    conf.setBoolean(DFSConfigKeys.DFS_SUPPORT_APPEND_KEY,
-        DFSConfigKeys.DFS_SUPPORT_APPEND_DEFAULT);
     return conf;
   }
 

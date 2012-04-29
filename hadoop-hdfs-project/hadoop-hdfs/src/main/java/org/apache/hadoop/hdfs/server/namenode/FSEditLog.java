@@ -18,18 +18,19 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import static org.apache.hadoop.hdfs.server.common.Util.now;
-import java.net.URI;
+
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.lang.reflect.Constructor;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -37,14 +38,34 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
-import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.*;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.AddOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.CancelDelegationTokenOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.CloseOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.ConcatDeleteOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.DeleteOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.GetDelegationTokenOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.LogSegmentOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.MkdirOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.OpInstanceCache;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.ReassignLeaseOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.RenameOldOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.RenameOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.RenewDelegationTokenOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetGenstampOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetOwnerOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetPermissionsOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetQuotaOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetReplicationOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SymlinkOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.TimesOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.UpdateBlocksOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.UpdateMasterKeyOp;
 import org.apache.hadoop.hdfs.server.namenode.JournalSet.JournalAndStream;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.RemoteEditLogManifest;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
-import org.apache.hadoop.conf.Configuration;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -127,6 +148,14 @@ public class FSEditLog  {
   private Configuration conf;
   
   private List<URI> editsDirs;
+
+  private ThreadLocal<OpInstanceCache> cache =
+      new ThreadLocal<OpInstanceCache>() {
+    @Override
+    protected OpInstanceCache initialValue() {
+      return new OpInstanceCache();
+    }
+  };
   
   /**
    * The edit directories that are shared between primary and secondary.
@@ -147,20 +176,6 @@ public class FSEditLog  {
       return new TransactionId(Long.MAX_VALUE);
     }
   };
-
-  /**
-   * Construct FSEditLog with default configuration, taking editDirs from NNStorage
-   * 
-   * @param storage Storage object used by namenode
-   */
-  @VisibleForTesting
-  FSEditLog(NNStorage storage) throws IOException {
-    Configuration conf = new Configuration();
-    // Make sure the edits dirs are set in the provided configuration object.
-    conf.set(DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_KEY,
-        StringUtils.join(storage.getEditsDirectories(), ","));
-    init(conf, storage, FSNamesystem.getNamespaceEditsDirs(conf));
-  }
 
   /**
    * Constructor for FSEditLog. Underlying journals are constructed, but 
@@ -261,7 +276,7 @@ public class FSEditLog  {
       IOUtils.closeStream(s);
     }
     
-    startLogSegment(segmentTxId, true);
+    startLogSegmentAndWriteHeaderTxn(segmentTxId);
     assert state == State.IN_SEGMENT : "Bad state: " + state;
   }
   
@@ -303,10 +318,12 @@ public class FSEditLog  {
       endCurrentLogSegment(true);
     }
     
-    try {
-      journalSet.close();
-    } catch (IOException ioe) {
-      LOG.warn("Error closing journalSet", ioe);
+    if (!journalSet.isEmpty()) {
+      try {
+        journalSet.close();
+      } catch (IOException ioe) {
+        LOG.warn("Error closing journalSet", ioe);
+      }
     }
 
     state = State.CLOSED;
@@ -596,7 +613,7 @@ public class FSEditLog  {
    * Records the block locations of the last block.
    */
   public void logOpenFile(String path, INodeFileUnderConstruction newNode) {
-    AddOp op = AddOp.getInstance()
+    AddOp op = AddOp.getInstance(cache.get())
       .setPath(path)
       .setReplication(newNode.getReplication())
       .setModificationTime(newNode.getModificationTime())
@@ -614,7 +631,7 @@ public class FSEditLog  {
    * Add close lease record to edit log.
    */
   public void logCloseFile(String path, INodeFile newNode) {
-    CloseOp op = CloseOp.getInstance()
+    CloseOp op = CloseOp.getInstance(cache.get())
       .setPath(path)
       .setReplication(newNode.getReplication())
       .setModificationTime(newNode.getModificationTime())
@@ -627,7 +644,7 @@ public class FSEditLog  {
   }
   
   public void logUpdateBlocks(String path, INodeFileUnderConstruction file) {
-    UpdateBlocksOp op = UpdateBlocksOp.getInstance()
+    UpdateBlocksOp op = UpdateBlocksOp.getInstance(cache.get())
       .setPath(path)
       .setBlocks(file.getBlocks());
     logEdit(op);
@@ -637,7 +654,7 @@ public class FSEditLog  {
    * Add create directory record to edit log
    */
   public void logMkDir(String path, INode newNode) {
-    MkdirOp op = MkdirOp.getInstance()
+    MkdirOp op = MkdirOp.getInstance(cache.get())
       .setPath(path)
       .setTimestamp(newNode.getModificationTime())
       .setPermissionStatus(newNode.getPermissionStatus());
@@ -649,7 +666,7 @@ public class FSEditLog  {
    * TODO: use String parameters until just before writing to disk
    */
   void logRename(String src, String dst, long timestamp) {
-    RenameOldOp op = RenameOldOp.getInstance()
+    RenameOldOp op = RenameOldOp.getInstance(cache.get())
       .setSource(src)
       .setDestination(dst)
       .setTimestamp(timestamp);
@@ -660,7 +677,7 @@ public class FSEditLog  {
    * Add rename record to edit log
    */
   void logRename(String src, String dst, long timestamp, Options.Rename... options) {
-    RenameOp op = RenameOp.getInstance()
+    RenameOp op = RenameOp.getInstance(cache.get())
       .setSource(src)
       .setDestination(dst)
       .setTimestamp(timestamp)
@@ -672,7 +689,7 @@ public class FSEditLog  {
    * Add set replication record to edit log
    */
   void logSetReplication(String src, short replication) {
-    SetReplicationOp op = SetReplicationOp.getInstance()
+    SetReplicationOp op = SetReplicationOp.getInstance(cache.get())
       .setPath(src)
       .setReplication(replication);
     logEdit(op);
@@ -684,7 +701,7 @@ public class FSEditLog  {
    * @param quota the directory size limit
    */
   void logSetQuota(String src, long nsQuota, long dsQuota) {
-    SetQuotaOp op = SetQuotaOp.getInstance()
+    SetQuotaOp op = SetQuotaOp.getInstance(cache.get())
       .setSource(src)
       .setNSQuota(nsQuota)
       .setDSQuota(dsQuota);
@@ -693,7 +710,7 @@ public class FSEditLog  {
 
   /**  Add set permissions record to edit log */
   void logSetPermissions(String src, FsPermission permissions) {
-    SetPermissionsOp op = SetPermissionsOp.getInstance()
+    SetPermissionsOp op = SetPermissionsOp.getInstance(cache.get())
       .setSource(src)
       .setPermissions(permissions);
     logEdit(op);
@@ -701,7 +718,7 @@ public class FSEditLog  {
 
   /**  Add set owner record to edit log */
   void logSetOwner(String src, String username, String groupname) {
-    SetOwnerOp op = SetOwnerOp.getInstance()
+    SetOwnerOp op = SetOwnerOp.getInstance(cache.get())
       .setSource(src)
       .setUser(username)
       .setGroup(groupname);
@@ -712,7 +729,7 @@ public class FSEditLog  {
    * concat(trg,src..) log
    */
   void logConcat(String trg, String [] srcs, long timestamp) {
-    ConcatDeleteOp op = ConcatDeleteOp.getInstance()
+    ConcatDeleteOp op = ConcatDeleteOp.getInstance(cache.get())
       .setTarget(trg)
       .setSources(srcs)
       .setTimestamp(timestamp);
@@ -723,7 +740,7 @@ public class FSEditLog  {
    * Add delete file record to edit log
    */
   void logDelete(String src, long timestamp) {
-    DeleteOp op = DeleteOp.getInstance()
+    DeleteOp op = DeleteOp.getInstance(cache.get())
       .setPath(src)
       .setTimestamp(timestamp);
     logEdit(op);
@@ -733,7 +750,7 @@ public class FSEditLog  {
    * Add generation stamp record to edit log
    */
   void logGenerationStamp(long genstamp) {
-    SetGenstampOp op = SetGenstampOp.getInstance()
+    SetGenstampOp op = SetGenstampOp.getInstance(cache.get())
       .setGenerationStamp(genstamp);
     logEdit(op);
   }
@@ -742,7 +759,7 @@ public class FSEditLog  {
    * Add access time record to edit log
    */
   void logTimes(String src, long mtime, long atime) {
-    TimesOp op = TimesOp.getInstance()
+    TimesOp op = TimesOp.getInstance(cache.get())
       .setPath(src)
       .setModificationTime(mtime)
       .setAccessTime(atime);
@@ -754,7 +771,7 @@ public class FSEditLog  {
    */
   void logSymlink(String path, String value, long mtime, 
                   long atime, INodeSymlink node) {
-    SymlinkOp op = SymlinkOp.getInstance()
+    SymlinkOp op = SymlinkOp.getInstance(cache.get())
       .setPath(path)
       .setValue(value)
       .setModificationTime(mtime)
@@ -770,7 +787,7 @@ public class FSEditLog  {
    */
   void logGetDelegationToken(DelegationTokenIdentifier id,
       long expiryTime) {
-    GetDelegationTokenOp op = GetDelegationTokenOp.getInstance()
+    GetDelegationTokenOp op = GetDelegationTokenOp.getInstance(cache.get())
       .setDelegationTokenIdentifier(id)
       .setExpiryTime(expiryTime);
     logEdit(op);
@@ -778,26 +795,26 @@ public class FSEditLog  {
   
   void logRenewDelegationToken(DelegationTokenIdentifier id,
       long expiryTime) {
-    RenewDelegationTokenOp op = RenewDelegationTokenOp.getInstance()
+    RenewDelegationTokenOp op = RenewDelegationTokenOp.getInstance(cache.get())
       .setDelegationTokenIdentifier(id)
       .setExpiryTime(expiryTime);
     logEdit(op);
   }
   
   void logCancelDelegationToken(DelegationTokenIdentifier id) {
-    CancelDelegationTokenOp op = CancelDelegationTokenOp.getInstance()
+    CancelDelegationTokenOp op = CancelDelegationTokenOp.getInstance(cache.get())
       .setDelegationTokenIdentifier(id);
     logEdit(op);
   }
   
   void logUpdateMasterKey(DelegationKey key) {
-    UpdateMasterKeyOp op = UpdateMasterKeyOp.getInstance()
+    UpdateMasterKeyOp op = UpdateMasterKeyOp.getInstance(cache.get())
       .setDelegationKey(key);
     logEdit(op);
   }
 
   void logReassignLease(String leaseHolder, String src, String newHolder) {
-    ReassignLeaseOp op = ReassignLeaseOp.getInstance()
+    ReassignLeaseOp op = ReassignLeaseOp.getInstance(cache.get())
       .setLeaseHolder(leaseHolder)
       .setPath(src)
       .setNewHolder(newHolder);
@@ -805,9 +822,8 @@ public class FSEditLog  {
   }
   
   /**
-   * Used only by unit tests.
+   * Get all the journals this edit log is currently operating on.
    */
-  @VisibleForTesting
   synchronized List<JournalAndStream> getJournals() {
     return journalSet.getAllJournalStreams();
   }
@@ -855,18 +871,48 @@ public class FSEditLog  {
     endCurrentLogSegment(true);
     
     long nextTxId = getLastWrittenTxId() + 1;
-    startLogSegment(nextTxId, true);
+    startLogSegmentAndWriteHeaderTxn(nextTxId);
     
     assert curSegmentTxId == nextTxId;
     return nextTxId;
+  }
+
+  /**
+   * Remote namenode just has started a log segment, start log segment locally.
+   */
+  public synchronized void startLogSegment(long txid, 
+      boolean abortCurrentLogSegment) throws IOException {
+    LOG.info("Namenode started a new log segment at txid " + txid);
+    if (isSegmentOpen()) {
+      if (getLastWrittenTxId() == txid - 1) {
+        //In sync with the NN, so end and finalize the current segment`
+        endCurrentLogSegment(false);
+      } else {
+        //Missed some transactions: probably lost contact with NN temporarily.
+        final String mess = "Cannot start a new log segment at txid " + txid
+            + " since only up to txid " + getLastWrittenTxId()
+            + " have been written in the log segment starting at "
+            + getCurSegmentTxId() + ".";
+        if (abortCurrentLogSegment) {
+          //Mark the current segment as aborted.
+          LOG.warn(mess);
+          abortCurrentLogSegment();
+        } else {
+          throw new IOException(mess);
+        }
+      }
+    }
+    setNextTxId(txid);
+    startLogSegment(txid);
   }
   
   /**
    * Start writing to the log segment with the given txid.
    * Transitions from BETWEEN_LOG_SEGMENTS state to IN_LOG_SEGMENT state. 
    */
-  synchronized void startLogSegment(final long segmentTxId,
-      boolean writeHeaderTxn) throws IOException {
+  private void startLogSegment(final long segmentTxId) throws IOException {
+    assert Thread.holdsLock(this);
+
     LOG.info("Starting log segment at " + segmentTxId);
     Preconditions.checkArgument(segmentTxId > 0,
         "Bad txid: %s", segmentTxId);
@@ -894,12 +940,15 @@ public class FSEditLog  {
     
     curSegmentTxId = segmentTxId;
     state = State.IN_SEGMENT;
+  }
 
-    if (writeHeaderTxn) {
-      logEdit(LogSegmentOp.getInstance(
-          FSEditLogOpCodes.OP_START_LOG_SEGMENT));
-      logSync();
-    }
+  synchronized void startLogSegmentAndWriteHeaderTxn(final long segmentTxId
+      ) throws IOException {
+    startLogSegment(segmentTxId);
+
+    logEdit(LogSegmentOp.getInstance(cache.get(),
+        FSEditLogOpCodes.OP_START_LOG_SEGMENT));
+    logSync();
   }
 
   /**
@@ -912,7 +961,7 @@ public class FSEditLog  {
         "Bad state: %s", state);
     
     if (writeEndTxn) {
-      logEdit(LogSegmentOp.getInstance(
+      logEdit(LogSegmentOp.getInstance(cache.get(), 
           FSEditLogOpCodes.OP_END_LOG_SEGMENT));
       logSync();
     }
@@ -1020,7 +1069,7 @@ public class FSEditLog  {
     
     LOG.info("Registering new backup node: " + bnReg);
     BackupJournalManager bjm = new BackupJournalManager(bnReg, nnReg);
-    journalSet.add(bjm, true);
+    journalSet.add(bjm, false);
   }
   
   synchronized void releaseBackupStream(NamenodeRegistration registration)
@@ -1046,6 +1095,17 @@ public class FSEditLog  {
       }
     }
     return null;
+  }
+
+  /** Write the batch of edits to edit log. */
+  public synchronized void journal(long firstTxId, int numTxns, byte[] data) {
+    final long expectedTxId = getLastWrittenTxId() + 1;
+    Preconditions.checkState(firstTxId == expectedTxId,
+        "received txid batch starting at %s but expected txid %s",
+        firstTxId, expectedTxId);
+    setNextTxId(firstTxId + numTxns - 1);
+    logEdit(data.length, data);
+    logSync();
   }
 
   /**

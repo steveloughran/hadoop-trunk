@@ -17,8 +17,38 @@
  */
 package org.apache.hadoop.hdfs;
 
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_RETRIES_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_RETRIES_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CACHED_CONN_RETRY_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CACHED_CONN_RETRY_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_BASE_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_BASE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_MAX_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_MAX_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_READ_PREFETCH_SIZE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_RETRY_WINDOW_BASE;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_CACHE_CAPACITY_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_CACHE_CAPACITY_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADER;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADER_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SOCKET_WRITE_TIMEOUT_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
+
 import java.io.BufferedOutputStream;
-import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileNotFoundException;
@@ -26,16 +56,17 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
 import java.net.Socket;
-import java.net.SocketException;
+import java.net.SocketAddress;
 import java.net.URI;
-import java.net.URISyntaxException;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import javax.net.SocketFactory;
 
@@ -60,8 +91,6 @@ import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
-
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
@@ -85,7 +114,6 @@ import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseP
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpBlockChecksumResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
-import org.apache.hadoop.hdfs.security.token.block.InvalidBlockTokenException;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.UpgradeStatusReport;
@@ -99,9 +127,9 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
@@ -109,7 +137,9 @@ import org.apache.hadoop.security.token.TokenRenewer;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Progressable;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.net.InetAddresses;
 
 /********************************************************
  * DFSClient can connect to a Hadoop Filesystem and 
@@ -133,6 +163,7 @@ public class DFSClient implements java.io.Closeable {
 
   final UserGroupInformation ugi;
   volatile boolean clientRunning = true;
+  volatile long lastLeaseRenewal;
   private volatile FsServerDefaults serverDefaults;
   private volatile long serverDefaultsLastUpdate;
   final String clientName;
@@ -144,6 +175,8 @@ public class DFSClient implements java.io.Closeable {
   final LeaseRenewer leaserenewer;
   final SocketCache socketCache;
   final Conf dfsClientConf;
+  private Random r = new Random();
+  private SocketAddress[] localInterfaceAddrs;
 
   /**
    * DFSClient configuration 
@@ -337,6 +370,68 @@ public class DFSClient implements java.io.Closeable {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Short circuit read is " + shortCircuitLocalReads);
     }
+    String localInterfaces[] =
+      conf.getTrimmedStrings(DFSConfigKeys.DFS_CLIENT_LOCAL_INTERFACES);
+    localInterfaceAddrs = getLocalInterfaceAddrs(localInterfaces);
+    if (LOG.isDebugEnabled() && 0 != localInterfaces.length) {
+      LOG.debug("Using local interfaces [" +
+      Joiner.on(',').join(localInterfaces)+ "] with addresses [" +
+      Joiner.on(',').join(localInterfaceAddrs) + "]");
+    }
+  }
+
+  /**
+   * Return the socket addresses to use with each configured
+   * local interface. Local interfaces may be specified by IP
+   * address, IP address range using CIDR notation, interface
+   * name (e.g. eth0) or sub-interface name (e.g. eth0:0).
+   * The socket addresses consist of the IPs for the interfaces
+   * and the ephemeral port (port 0). If an IP, IP range, or
+   * interface name matches an interface with sub-interfaces
+   * only the IP of the interface is used. Sub-interfaces can
+   * be used by specifying them explicitly (by IP or name).
+   * 
+   * @return SocketAddresses for the configured local interfaces,
+   *    or an empty array if none are configured
+   * @throws UnknownHostException if a given interface name is invalid
+   */
+  private static SocketAddress[] getLocalInterfaceAddrs(
+      String interfaceNames[]) throws UnknownHostException {
+    List<SocketAddress> localAddrs = new ArrayList<SocketAddress>();
+    for (String interfaceName : interfaceNames) {
+      if (InetAddresses.isInetAddress(interfaceName)) {
+        localAddrs.add(new InetSocketAddress(interfaceName, 0));
+      } else if (NetUtils.isValidSubnet(interfaceName)) {
+        for (InetAddress addr : NetUtils.getIPs(interfaceName, false)) {
+          localAddrs.add(new InetSocketAddress(addr, 0));
+        }
+      } else {
+        for (String ip : DNS.getIPs(interfaceName, false)) {
+          localAddrs.add(new InetSocketAddress(ip, 0));
+        }
+      }
+    }
+    return localAddrs.toArray(new SocketAddress[localAddrs.size()]);
+  }
+
+  /**
+   * Select one of the configured local interfaces at random. We use a random
+   * interface because other policies like round-robin are less effective
+   * given that we cache connections to datanodes.
+   *
+   * @return one of the local interface addresses at random, or null if no
+   *    local interfaces are configured
+   */
+  SocketAddress getRandomLocalInterfaceAddr() {
+    if (localInterfaceAddrs.length == 0) {
+      return null;
+    }
+    final int idx = r.nextInt(localInterfaceAddrs.length);
+    final SocketAddress addr = localInterfaceAddrs[idx];
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Using local interface " + addr);
+    }
+    return addr;
   }
 
   /**
@@ -381,6 +476,12 @@ public class DFSClient implements java.io.Closeable {
   void putFileBeingWritten(final String src, final DFSOutputStream out) {
     synchronized(filesBeingWritten) {
       filesBeingWritten.put(src, out);
+      // update the last lease renewal time only when there was no
+      // writes. once there is one write stream open, the lease renewer
+      // thread keeps it updated well with in anyone's expiration time.
+      if (lastLeaseRenewal == 0) {
+        updateLastLeaseRenewal();
+      }
     }
   }
 
@@ -388,6 +489,9 @@ public class DFSClient implements java.io.Closeable {
   void removeFileBeingWritten(final String src) {
     synchronized(filesBeingWritten) {
       filesBeingWritten.remove(src);
+      if (filesBeingWritten.isEmpty()) {
+        lastLeaseRenewal = 0;
+      }
     }
   }
 
@@ -403,6 +507,19 @@ public class DFSClient implements java.io.Closeable {
     return clientRunning;
   }
 
+  long getLastLeaseRenewal() {
+    return lastLeaseRenewal;
+  }
+
+  void updateLastLeaseRenewal() {
+    synchronized(filesBeingWritten) {
+      if (filesBeingWritten.isEmpty()) {
+        return;
+      }
+      lastLeaseRenewal = System.currentTimeMillis();
+    }
+  }
+
   /**
    * Renew leases.
    * @return true if lease was renewed. May return false if this
@@ -410,8 +527,24 @@ public class DFSClient implements java.io.Closeable {
    **/
   boolean renewLease() throws IOException {
     if (clientRunning && !isFilesBeingWrittenEmpty()) {
-      namenode.renewLease(clientName);
-      return true;
+      try {
+        namenode.renewLease(clientName);
+        updateLastLeaseRenewal();
+        return true;
+      } catch (IOException e) {
+        // Abort if the lease has already expired. 
+        final long elapsed = System.currentTimeMillis() - getLastLeaseRenewal();
+        if (elapsed > HdfsConstants.LEASE_SOFTLIMIT_PERIOD) {
+          LOG.warn("Failed to renew lease for " + clientName + " for "
+              + (elapsed/1000) + " seconds (>= soft-limit ="
+              + (HdfsConstants.LEASE_SOFTLIMIT_PERIOD/1000) + " seconds.) "
+              + "Closing all files being written ...", e);
+          closeAllFilesBeingWritten(true);
+        } else {
+          // Let the lease renewer handle it and retry.
+          throw e;
+        }
+      }
     }
     return false;
   }
@@ -505,6 +638,16 @@ public class DFSClient implements java.io.Closeable {
   }
   
   /**
+   * Get a canonical token service name for this client's tokens.  Null should
+   * be returned if the client is not using tokens.
+   * @return the token service for the client
+   */
+  @InterfaceAudience.LimitedPrivate( { "HDFS" }) 
+  public String getCanonicalServiceName() {
+    return (dtService != null) ? dtService.toString() : null;
+  }
+  
+  /**
    * @see ClientProtocol#getDelegationToken(Text)
    */
   public Token<DelegationTokenIdentifier> getDelegationToken(Text renewer)
@@ -578,33 +721,6 @@ public class DFSClient implements java.io.Closeable {
     }
     localAddrMap.put(addr.getHostAddress(), local);
     return local;
-  }
-  
-  /**
-   * Should the block access token be refetched on an exception
-   * 
-   * @param ex Exception received
-   * @param targetAddr Target datanode address from where exception was received
-   * @return true if block access token has expired or invalid and it should be
-   *         refetched
-   */
-  private static boolean tokenRefetchNeeded(IOException ex,
-      InetSocketAddress targetAddr) {
-    /*
-     * Get a new access token and retry. Retry is needed in 2 cases. 1) When
-     * both NN and DN re-started while DFSClient holding a cached access token.
-     * 2) In the case that NN fails to update its access key at pre-set interval
-     * (by a wide margin) and subsequently restarts. In this case, DN
-     * re-registers itself with NN and receives a new access key, but DN will
-     * delete the old access key from its memory since it's considered expired
-     * based on the estimated expiration date.
-     */
-    if (ex instanceof InvalidBlockTokenException || ex instanceof InvalidToken) {
-      LOG.info("Access token was invalid when connecting to " + targetAddr
-          + " : " + ex);
-      return true;
-    }
-    return false;
   }
   
   /**
@@ -1305,7 +1421,8 @@ public class DFSClient implements java.io.Closeable {
           //connect to a datanode
           sock = socketFactory.createSocket();
           NetUtils.connect(sock,
-              NetUtils.createSocketAddr(datanodes[j].getName()), timeout);
+              NetUtils.createSocketAddr(datanodes[j].getXferAddr()),
+              timeout);
           sock.setSoTimeout(timeout);
 
           out = new DataOutputStream(
@@ -1314,7 +1431,7 @@ public class DFSClient implements java.io.Closeable {
           in = new DataInputStream(NetUtils.getInputStream(sock));
 
           if (LOG.isDebugEnabled()) {
-            LOG.debug("write to " + datanodes[j].getName() + ": "
+            LOG.debug("write to " + datanodes[j] + ": "
                 + Op.BLOCK_CHECKSUM + ", block=" + block);
           }
           // get block MD5
@@ -1329,7 +1446,7 @@ public class DFSClient implements java.io.Closeable {
               if (LOG.isDebugEnabled()) {
                 LOG.debug("Got access token error in response to OP_BLOCK_CHECKSUM "
                     + "for file " + src + " for block " + block
-                    + " from datanode " + datanodes[j].getName()
+                    + " from datanode " + datanodes[j]
                     + ". Will retry the block once.");
               }
               lastRetriedIndex = i;
@@ -1339,7 +1456,7 @@ public class DFSClient implements java.io.Closeable {
               break;
             } else {
               throw new IOException("Bad response " + reply + " for block "
-                  + block + " from datanode " + datanodes[j].getName());
+                  + block + " from datanode " + datanodes[j]);
             }
           }
           
@@ -1374,12 +1491,10 @@ public class DFSClient implements java.io.Closeable {
               LOG.debug("set bytesPerCRC=" + bytesPerCRC
                   + ", crcPerBlock=" + crcPerBlock);
             }
-            LOG.debug("got reply from " + datanodes[j].getName()
-                + ": md5=" + md5);
+            LOG.debug("got reply from " + datanodes[j] + ": md5=" + md5);
           }
         } catch (IOException ie) {
-          LOG.warn("src=" + src + ", datanodes[" + j + "].getName()="
-              + datanodes[j].getName(), ie);
+          LOG.warn("src=" + src + ", datanodes["+j+"]=" + datanodes[j], ie);
         } finally {
           IOUtils.closeStream(in);
           IOUtils.closeStream(out);

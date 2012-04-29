@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,6 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ChecksumException;
+import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
@@ -54,16 +56,16 @@ import org.apache.hadoop.security.token.Token;
  * negotiation of the namenode and various datanodes as necessary.
  ****************************************************************/
 @InterfaceAudience.Private
-public class DFSInputStream extends FSInputStream {
+public class DFSInputStream extends FSInputStream implements ByteBufferReadable {
   private final SocketCache socketCache;
 
   private final DFSClient dfsClient;
   private boolean closed = false;
 
   private final String src;
-  private long prefetchSize;
+  private final long prefetchSize;
   private BlockReader blockReader = null;
-  private boolean verifyChecksum;
+  private final boolean verifyChecksum;
   private LocatedBlocks locatedBlocks = null;
   private long lastBlockBeingWrittenLength = 0;
   private DatanodeInfo currentNode = null;
@@ -83,17 +85,17 @@ public class DFSInputStream extends FSInputStream {
    * capped at maxBlockAcquireFailures
    */
   private int failures = 0;
-  private int timeWindow; 
+  private final int timeWindow;
 
   /* XXX Use of CocurrentHashMap is temp fix. Need to fix 
    * parallel accesses to DFSInputStream (through ptreads) properly */
-  private ConcurrentHashMap<DatanodeInfo, DatanodeInfo> deadNodes = 
+  private final ConcurrentHashMap<DatanodeInfo, DatanodeInfo> deadNodes =
              new ConcurrentHashMap<DatanodeInfo, DatanodeInfo>();
   private int buffersize = 1;
   
-  private byte[] oneByteBuf = new byte[1]; // used for 'int read()'
+  private final byte[] oneByteBuf = new byte[1]; // used for 'int read()'
 
-  private int nCachedConnRetry;
+  private final int nCachedConnRetry;
 
   void addToDeadNodes(DatanodeInfo dnInfo) {
     deadNodes.put(dnInfo, dnInfo);
@@ -466,11 +468,63 @@ public class DFSInputStream extends FSInputStream {
     return ( ret <= 0 ) ? -1 : (oneByteBuf[0] & 0xff);
   }
 
+  /**
+   * Wraps different possible read implementations so that readBuffer can be
+   * strategy-agnostic.
+   */
+  private interface ReaderStrategy {
+    public int doRead(BlockReader blockReader, int off, int len) throws ChecksumException, IOException;
+  }
+
+  /**
+   * Used to read bytes into a byte[]
+   */
+  private static class ByteArrayStrategy implements ReaderStrategy {
+    final byte[] buf;
+
+    public ByteArrayStrategy(byte[] buf) {
+      this.buf = buf;
+    }
+
+    @Override
+    public int doRead(BlockReader blockReader, int off, int len) throws ChecksumException, IOException {      
+        return blockReader.read(buf, off, len);     
+    }
+  }
+
+  /**
+   * Used to read bytes into a user-supplied ByteBuffer
+   */
+  private static class ByteBufferStrategy implements ReaderStrategy {
+    final ByteBuffer buf;
+    ByteBufferStrategy(ByteBuffer buf) {
+      this.buf = buf;
+    }
+
+    @Override
+    public int doRead(BlockReader blockReader, int off, int len) throws ChecksumException, IOException {
+      int oldpos = buf.position();
+      int oldlimit = buf.limit();
+      boolean success = false;
+      try {
+        int ret = blockReader.read(buf);
+        success = true;
+        return ret;
+      } finally {
+        if (!success) {
+          // Reset to original state so that retries work correctly.
+          buf.position(oldpos);
+          buf.limit(oldlimit);
+        }
+      } 
+    }
+  }
+
   /* This is a used by regular read() and handles ChecksumExceptions.
    * name readBuffer() is chosen to imply similarity to readBuffer() in
    * ChecksumFileSystem
    */ 
-  private synchronized int readBuffer(byte buf[], int off, int len,
+  private synchronized int readBuffer(ReaderStrategy reader, int off, int len,
       Map<ExtendedBlock, Set<DatanodeInfo>> corruptedBlockMap)
       throws IOException {
     IOException ioe;
@@ -486,10 +540,10 @@ public class DFSInputStream extends FSInputStream {
     while (true) {
       // retry as many times as seekToNewSource allows.
       try {
-        return blockReader.read(buf, off, len);
+        return reader.doRead(blockReader, off, len);
       } catch ( ChecksumException ce ) {
         DFSClient.LOG.warn("Found Checksum error for "
-            + getCurrentBlock() + " from " + currentNode.getName()
+            + getCurrentBlock() + " from " + currentNode
             + " at " + ce.getPos());        
         ioe = ce;
         retryCurrentNode = false;
@@ -522,11 +576,7 @@ public class DFSInputStream extends FSInputStream {
     }
   }
 
-  /**
-   * Read the entire buffer.
-   */
-  @Override
-  public synchronized int read(byte buf[], int off, int len) throws IOException {
+  private int readWithStrategy(ReaderStrategy strategy, int off, int len) throws IOException {
     dfsClient.checkOpen();
     if (closed) {
       throw new IOException("Stream closed");
@@ -538,11 +588,13 @@ public class DFSInputStream extends FSInputStream {
       int retries = 2;
       while (retries > 0) {
         try {
-          if (pos > blockEnd) {
+          // currentNode can be left as null if previous read had a checksum
+          // error on the same block. See HDFS-3067
+          if (pos > blockEnd || currentNode == null) {
             currentNode = blockSeekTo(pos);
           }
           int realLen = (int) Math.min(len, (blockEnd - pos + 1L));
-          int result = readBuffer(buf, off, realLen, corruptedBlockMap);
+          int result = readBuffer(strategy, off, realLen, corruptedBlockMap);
           
           if (result >= 0) {
             pos += result;
@@ -577,6 +629,24 @@ public class DFSInputStream extends FSInputStream {
   }
 
   /**
+   * Read the entire buffer.
+   */
+  @Override
+  public synchronized int read(final byte buf[], int off, int len) throws IOException {
+    ReaderStrategy byteArrayReader = new ByteArrayStrategy(buf);
+
+    return readWithStrategy(byteArrayReader, off, len);
+  }
+
+  @Override
+  public synchronized int read(final ByteBuffer buf) throws IOException {
+    ReaderStrategy byteBufferReader = new ByteBufferStrategy(buf);
+
+    return readWithStrategy(byteBufferReader, 0, buf.remaining());
+  }
+
+
+  /**
    * Add corrupted block replica into map.
    * @param corruptedBlockMap 
    */
@@ -601,7 +671,7 @@ public class DFSInputStream extends FSInputStream {
       try {
         DatanodeInfo chosenNode = bestNode(nodes, deadNodes);
         InetSocketAddress targetAddr = 
-                          NetUtils.createSocketAddr(chosenNode.getName());
+          NetUtils.createSocketAddr(chosenNode.getXferAddr());
         return new DNAddrPair(chosenNode, targetAddr);
       } catch (IOException ie) {
         String blockInfo = block.getBlock() + " file=" + src;
@@ -676,7 +746,7 @@ public class DFSInputStream extends FSInputStream {
       } catch (ChecksumException e) {
         DFSClient.LOG.warn("fetchBlockByteRange(). Got a checksum exception for " +
                  src + " at " + block.getBlock() + ":" + 
-                 e.getPos() + " from " + chosenNode.getName());
+                 e.getPos() + " from " + chosenNode);
         // we want to remember what we have tried
         addIntoCorruptedBlockMap(block.getBlock(), chosenNode, corruptedBlockMap);
       } catch (AccessControlException ex) {
@@ -780,7 +850,9 @@ public class DFSInputStream extends FSInputStream {
         // disaster.
         sock.setTcpNoDelay(true);
 
-        NetUtils.connect(sock, dnAddr, dfsClient.getConf().socketTimeout);
+        NetUtils.connect(sock, dnAddr,
+            dfsClient.getRandomLocalInterfaceAddr(),
+            dfsClient.getConf().socketTimeout);
         sock.setSoTimeout(dfsClient.getConf().socketTimeout);
       }
 
@@ -1050,5 +1122,4 @@ public class DFSInputStream extends FSInputStream {
       this.addr = addr;
     }
   }
-
 }

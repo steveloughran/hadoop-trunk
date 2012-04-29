@@ -30,28 +30,25 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.HardLink;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.HardLink;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LayoutVersion;
 import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
-import org.apache.hadoop.hdfs.server.common.GenerationStamp;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NodeType;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.InconsistentFSStateException;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NodeType;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.Daemon;
@@ -65,7 +62,7 @@ import org.apache.hadoop.util.DiskChecker;
 @InterfaceAudience.Private
 public class DataStorage extends Storage {
   // Constants
-  final static String BLOCK_SUBDIR_PREFIX = "subdir";
+  public final static String BLOCK_SUBDIR_PREFIX = "subdir";
   final static String BLOCK_FILE_PREFIX = "blk_";
   final static String COPY_FILE_PREFIX = "dncp_";
   final static String STORAGE_DIR_DETACHED = "detach";
@@ -73,9 +70,6 @@ public class DataStorage extends Storage {
   public final static String STORAGE_DIR_FINALIZED = "finalized";
   public final static String STORAGE_DIR_TMP = "tmp";
 
-  private static final Pattern PRE_GENSTAMP_META_FILE_PATTERN = 
-    Pattern.compile("(.*blk_[-]*\\d+)\\.meta$");
-  
   /** Access to this variable is guarded by "this" */
   private String storageID;
 
@@ -101,15 +95,17 @@ public class DataStorage extends Storage {
     this.storageID = strgID;
   }
 
-  synchronized String getStorageID() {
+  /** @return storage ID. */
+  public synchronized String getStorageID() {
     return storageID;
   }
   
   synchronized void setStorageID(String newStorageID) {
     this.storageID = newStorageID;
   }
-  
-  synchronized void createStorageID(int datanodePort) {
+
+  /** Create an ID for this storage. */
+  public synchronized void createStorageID(int datanodePort) {
     if (storageID != null && !storageID.isEmpty()) {
       return;
     }
@@ -197,7 +193,7 @@ public class DataStorage extends Storage {
     }
     
     // make sure we have storage id set - if not - generate new one
-    createStorageID(datanode.getPort());
+    createStorageID(datanode.getXferPort());
     
     // 3. Update all storages. Some of them might have just been formatted.
     this.writeAll();
@@ -669,13 +665,6 @@ public class DataStorage extends Storage {
           in.close();
         }
       } else {
-        
-        //check if we are upgrading from pre-generation stamp version.
-        if (oldLV >= PRE_GENERATIONSTAMP_LAYOUT_VERSION) {
-          // Link to the new file name.
-          to = new File(convertMetatadataFileName(to.getAbsolutePath()));
-        }
-        
         HardLink.createHardLink(from, to);
         hl.linkStats.countSingleLinks++;
       }
@@ -687,50 +676,32 @@ public class DataStorage extends Storage {
     if (!to.mkdirs())
       throw new IOException("Cannot create directory " + to);
     
-    //If upgrading from old stuff, need to munge the filenames.  That has to
-    //be done one file at a time, so hardlink them one at a time (slow).
-    if (oldLV >= PRE_GENERATIONSTAMP_LAYOUT_VERSION) {
-      String[] blockNames = from.list(new java.io.FilenameFilter() {
-          public boolean accept(File dir, String name) {
-            return name.startsWith(BLOCK_SUBDIR_PREFIX) 
-              || name.startsWith(BLOCK_FILE_PREFIX)
-              || name.startsWith(COPY_FILE_PREFIX);
-          }
-        });
-      if (blockNames.length == 0) {
-        hl.linkStats.countEmptyDirs++;
+    String[] blockNames = from.list(new java.io.FilenameFilter() {
+      public boolean accept(File dir, String name) {
+        return name.startsWith(BLOCK_FILE_PREFIX);
       }
-      else for(int i = 0; i < blockNames.length; i++)
-        linkBlocks(new File(from, blockNames[i]), 
-            new File(to, blockNames[i]), oldLV, hl);
-    } 
-    else {
-      //If upgrading from a relatively new version, we only need to create
-      //links with the same filename.  This can be done in bulk (much faster).
-      String[] blockNames = from.list(new java.io.FilenameFilter() {
+    });
+
+    // Block files just need hard links with the same file names
+    // but a different directory
+    if (blockNames.length > 0) {
+      HardLink.createHardLinkMult(from, blockNames, to);
+      hl.linkStats.countMultLinks++;
+      hl.linkStats.countFilesMultLinks += blockNames.length;
+    } else {
+      hl.linkStats.countEmptyDirs++;
+    }
+    
+    // Now take care of the rest of the files and subdirectories
+    String[] otherNames = from.list(new java.io.FilenameFilter() {
         public boolean accept(File dir, String name) {
-          return name.startsWith(BLOCK_FILE_PREFIX);
+          return name.startsWith(BLOCK_SUBDIR_PREFIX) 
+            || name.startsWith(COPY_FILE_PREFIX);
         }
       });
-      if (blockNames.length > 0) {
-        HardLink.createHardLinkMult(from, blockNames, to);
-        hl.linkStats.countMultLinks++;
-        hl.linkStats.countFilesMultLinks += blockNames.length;
-      } else {
-        hl.linkStats.countEmptyDirs++;
-      }
-      
-      //now take care of the rest of the files and subdirectories
-      String[] otherNames = from.list(new java.io.FilenameFilter() {
-          public boolean accept(File dir, String name) {
-            return name.startsWith(BLOCK_SUBDIR_PREFIX) 
-              || name.startsWith(COPY_FILE_PREFIX);
-          }
-        });
-      for(int i = 0; i < otherNames.length; i++)
-        linkBlocks(new File(from, otherNames[i]), 
-            new File(to, otherNames[i]), oldLV, hl);
-    }
+    for(int i = 0; i < otherNames.length; i++)
+      linkBlocks(new File(from, otherNames[i]), 
+          new File(to, otherNames[i]), oldLV, hl);
   }
 
   private void verifyDistributedUpgradeProgress(UpgradeManagerDatanode um,
@@ -742,26 +713,10 @@ public class DataStorage extends Storage {
   }
   
   /**
-   * This is invoked on target file names when upgrading from pre generation 
-   * stamp version (version -13) to correct the metatadata file name.
-   * @param oldFileName
-   * @return the new metadata file name with the default generation stamp.
-   */
-  private static String convertMetatadataFileName(String oldFileName) {
-    Matcher matcher = PRE_GENSTAMP_META_FILE_PATTERN.matcher(oldFileName); 
-    if (matcher.matches()) {
-      //return the current metadata file name
-      return DatanodeUtil.getMetaFileName(matcher.group(1),
-          GenerationStamp.GRANDFATHER_GENERATION_STAMP); 
-    }
-    return oldFileName;
-  }
-
-  /**
    * Add bpStorage into bpStorageMap
    */
-  private void addBlockPoolStorage(String bpID, BlockPoolSliceStorage bpStorage)
-      throws IOException {
+  private void addBlockPoolStorage(String bpID, BlockPoolSliceStorage bpStorage
+      ) {
     if (!this.bpStorageMap.containsKey(bpID)) {
       this.bpStorageMap.put(bpID, bpStorage);
     }

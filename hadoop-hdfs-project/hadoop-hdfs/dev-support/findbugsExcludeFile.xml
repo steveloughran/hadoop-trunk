@@ -215,7 +215,7 @@
        the OBL warning.
      -->
      <Match>
-       <Class name="org.apache.hadoop.hdfs.server.datanode.FSDataset" />
+       <Class name="org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetImpl" />
        <Method name="getTmpInputStreams" />
        <Bug pattern="OBL_UNSATISFIED_OBLIGATION" />
      </Match>
@@ -263,5 +263,11 @@
        <Class name="org.apache.hadoop.hdfs.server.datanode.BlockPoolManager" />
        <Method name="doRefreshNamenodes" />
        <Bug category="PERFORMANCE" />
+     </Match>
+     <!-- Don't complain about System.exit() being called from quit() -->
+     <Match>
+       <Class name="org.apache.hadoop.hdfs.server.namenode.MetaRecoveryContext" />
+       <Method name="quit" />
+       <Bug pattern="DM_EXIT" />
      </Match>
  </FindBugsFilter>

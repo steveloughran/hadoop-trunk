@@ -26,7 +26,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.HardLink;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.server.datanode.FSDatasetInterface.FSVolumeInterface;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.io.IOUtils;
 
 /**
@@ -36,7 +36,7 @@ import org.apache.hadoop.io.IOUtils;
 @InterfaceAudience.Private
 abstract public class ReplicaInfo extends Block implements Replica {
   /** volume where the replica belongs */
-  private FSVolumeInterface volume;
+  private FsVolumeSpi volume;
   /** directory where block & meta files belong */
   private File dir;
 
@@ -47,7 +47,7 @@ abstract public class ReplicaInfo extends Block implements Replica {
    * @param vol volume where replica is located
    * @param dir directory path where block and meta files are located
    */
-  ReplicaInfo(long blockId, long genStamp, FSVolumeInterface vol, File dir) {
+  ReplicaInfo(long blockId, long genStamp, FsVolumeSpi vol, File dir) {
     this( blockId, 0L, genStamp, vol, dir);
   }
   
@@ -57,7 +57,7 @@ abstract public class ReplicaInfo extends Block implements Replica {
    * @param vol volume where replica is located
    * @param dir directory path where block and meta files are located
    */
-  ReplicaInfo(Block block, FSVolumeInterface vol, File dir) {
+  ReplicaInfo(Block block, FsVolumeSpi vol, File dir) {
     this(block.getBlockId(), block.getNumBytes(), 
         block.getGenerationStamp(), vol, dir);
   }
@@ -71,7 +71,7 @@ abstract public class ReplicaInfo extends Block implements Replica {
    * @param dir directory path where block and meta files are located
    */
   ReplicaInfo(long blockId, long len, long genStamp,
-      FSVolumeInterface vol, File dir) {
+      FsVolumeSpi vol, File dir) {
     super(blockId, len, genStamp);
     this.volume = vol;
     this.dir = dir;
@@ -84,20 +84,12 @@ abstract public class ReplicaInfo extends Block implements Replica {
   ReplicaInfo(ReplicaInfo from) {
     this(from, from.getVolume(), from.getDir());
   }
-
-  /**
-   * Get this replica's meta file name
-   * @return this replica's meta file name
-   */
-  private String getMetaFileName() {
-    return getBlockName() + "_" + getGenerationStamp() + METADATA_EXTENSION; 
-  }
   
   /**
    * Get the full path of this replica's data file
    * @return the full path of this replica's data file
    */
-  File getBlockFile() {
+  public File getBlockFile() {
     return new File(getDir(), getBlockName());
   }
   
@@ -105,22 +97,23 @@ abstract public class ReplicaInfo extends Block implements Replica {
    * Get the full path of this replica's meta file
    * @return the full path of this replica's meta file
    */
-  File getMetaFile() {
-    return new File(getDir(), getMetaFileName());
+  public File getMetaFile() {
+    return new File(getDir(),
+        DatanodeUtil.getMetaName(getBlockName(), getGenerationStamp()));
   }
   
   /**
    * Get the volume where this replica is located on disk
    * @return the volume where this replica is located on disk
    */
-  FSVolumeInterface getVolume() {
+  public FsVolumeSpi getVolume() {
     return volume;
   }
   
   /**
    * Set the volume where this replica is located on disk
    */
-  void setVolume(FSVolumeInterface vol) {
+  void setVolume(FsVolumeSpi vol) {
     this.volume = vol;
   }
   
@@ -136,7 +129,7 @@ abstract public class ReplicaInfo extends Block implements Replica {
    * Set the parent directory where this replica is located
    * @param dir the parent directory where the replica is located
    */
-  void setDir(File dir) {
+  public void setDir(File dir) {
     this.dir = dir;
   }
 
@@ -145,14 +138,14 @@ abstract public class ReplicaInfo extends Block implements Replica {
    * @return true if the replica has already been unlinked 
    *         or no need to be detached; false otherwise
    */
-  boolean isUnlinked() {
+  public boolean isUnlinked() {
     return true;                // no need to be unlinked
   }
 
   /**
    * set that this replica is unlinked
    */
-  void setUnlinked() {
+  public void setUnlinked() {
     // no need to be unlinked
   }
   
@@ -201,7 +194,7 @@ abstract public class ReplicaInfo extends Block implements Replica {
    *         false if it is already detached or no need to be detached
    * @throws IOException if there is any copy error
    */
-  boolean unlinkBlock(int numLinks) throws IOException {
+  public boolean unlinkBlock(int numLinks) throws IOException {
     if (isUnlinked()) {
       return false;
     }

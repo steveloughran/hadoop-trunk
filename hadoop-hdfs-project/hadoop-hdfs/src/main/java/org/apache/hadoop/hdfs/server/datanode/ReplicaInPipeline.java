@@ -24,8 +24,8 @@ import java.io.RandomAccessFile;
 
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
-import org.apache.hadoop.hdfs.server.datanode.FSDatasetInterface.BlockWriteStreams;
-import org.apache.hadoop.hdfs.server.datanode.FSDatasetInterface.FSVolumeInterface;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaOutputStreams;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.DataChecksum;
 
@@ -37,7 +37,7 @@ import org.apache.hadoop.util.DataChecksum;
  * 
  * The base class implements a temporary replica
  */
-class ReplicaInPipeline extends ReplicaInfo
+public class ReplicaInPipeline extends ReplicaInfo
                         implements ReplicaInPipelineInterface {
   private long bytesAcked;
   private long bytesOnDisk;
@@ -50,10 +50,9 @@ class ReplicaInPipeline extends ReplicaInfo
    * @param genStamp replica generation stamp
    * @param vol volume where replica is located
    * @param dir directory path where block and meta files are located
-   * @param state replica state
    */
-    ReplicaInPipeline(long blockId, long genStamp, 
-        FSVolumeInterface vol, File dir) {
+  public ReplicaInPipeline(long blockId, long genStamp, 
+        FsVolumeSpi vol, File dir) {
     this( blockId, 0L, genStamp, vol, dir, Thread.currentThread());
   }
 
@@ -65,7 +64,7 @@ class ReplicaInPipeline extends ReplicaInfo
    * @param writer a thread that is writing to this replica
    */
   ReplicaInPipeline(Block block, 
-      FSVolumeInterface vol, File dir, Thread writer) {
+      FsVolumeSpi vol, File dir, Thread writer) {
     this( block.getBlockId(), block.getNumBytes(), block.getGenerationStamp(),
         vol, dir, writer);
   }
@@ -80,7 +79,7 @@ class ReplicaInPipeline extends ReplicaInfo
    * @param writer a thread that is writing to this replica
    */
   ReplicaInPipeline(long blockId, long len, long genStamp,
-      FSVolumeInterface vol, File dir, Thread writer ) {
+      FsVolumeSpi vol, File dir, Thread writer ) {
     super( blockId, len, genStamp, vol, dir);
     this.bytesAcked = len;
     this.bytesOnDisk = len;
@@ -91,7 +90,7 @@ class ReplicaInPipeline extends ReplicaInfo
    * Copy constructor.
    * @param from
    */
-  ReplicaInPipeline(ReplicaInPipeline from) {
+  public ReplicaInPipeline(ReplicaInPipeline from) {
     super(from);
     this.bytesAcked = from.getBytesAcked();
     this.bytesOnDisk = from.getBytesOnDisk();
@@ -151,7 +150,7 @@ class ReplicaInPipeline extends ReplicaInfo
    * Interrupt the writing thread and wait until it dies
    * @throws IOException the waiting is interrupted
    */
-  void stopWriter() throws IOException {
+  public void stopWriter() throws IOException {
     if (writer != null && writer != Thread.currentThread() && writer.isAlive()) {
       writer.interrupt();
       try {
@@ -168,7 +167,7 @@ class ReplicaInPipeline extends ReplicaInfo
   }
   
   @Override // ReplicaInPipelineInterface
-  public BlockWriteStreams createStreams(boolean isCreate, 
+  public ReplicaOutputStreams createStreams(boolean isCreate, 
       DataChecksum requestedChecksum) throws IOException {
     File blockFile = getBlockFile();
     File metaFile = getMetaFile();
@@ -234,7 +233,7 @@ class ReplicaInPipeline extends ReplicaInfo
         blockOut.getChannel().position(blockDiskSize);
         crcOut.getChannel().position(crcDiskSize);
       }
-      return new BlockWriteStreams(blockOut, crcOut, checksum);
+      return new ReplicaOutputStreams(blockOut, crcOut, checksum);
     } catch (IOException e) {
       IOUtils.closeStream(blockOut);
       IOUtils.closeStream(metaRAF);

@@ -45,6 +45,13 @@ public class NetworkTopology {
   public static final Log LOG = 
     LogFactory.getLog(NetworkTopology.class);
     
+  public static class InvalidTopologyException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+    public InvalidTopologyException(String msg) {
+      super(msg);
+    }
+  }
+
   /** InnerNode represents a switch/router of a data center or rack.
    * Different from a leaf node, it has non-null children.
    */
@@ -311,6 +318,8 @@ public class NetworkTopology {
    * the root cluster map
    */
   InnerNode clusterMap = new InnerNode(InnerNode.ROOT);
+  /** Depth of all leaf nodes */
+  private int depthOfAllLeaves = -1;
   /** rack counter */
   private int numOfRacks = 0;
   /** the lock used to manage access */
@@ -328,6 +337,7 @@ public class NetworkTopology {
    */
   public void add(Node node) {
     if (node==null) return;
+    String oldTopoStr = this.toString();
     if( node instanceof InnerNode ) {
       throw new IllegalArgumentException(
         "Not allow to add an inner node: "+NodeBase.getPath(node));
@@ -344,6 +354,19 @@ public class NetworkTopology {
         LOG.info("Adding a new node: "+NodeBase.getPath(node));
         if (rack == null) {
           numOfRacks++;
+        }
+        if (!(node instanceof InnerNode)) {
+          if (depthOfAllLeaves == -1) {
+            depthOfAllLeaves = node.getLevel();
+          } else {
+            if (depthOfAllLeaves != node.getLevel()) {
+              LOG.error("Error: can't add leaf node at depth " +
+                  node.getLevel() + " to topology:\n" + oldTopoStr);
+              throw new InvalidTopologyException("Invalid network topology. " +
+                  "You cannot have a rack and a non-rack node at the same " +
+                  "level of the network topology.");
+            }
+          }
         }
       }
       if(LOG.isDebugEnabled()) {
@@ -639,8 +662,8 @@ public class NetworkTopology {
    */
   public void pseudoSortByDistance( Node reader, Node[] nodes ) {
     int tempIndex = 0;
+    int localRackNode = -1;
     if (reader != null ) {
-      int localRackNode = -1;
       //scan the array to find the local node & local rack node
       for(int i=0; i<nodes.length; i++) {
         if(tempIndex == 0 && reader == nodes[i]) { //local node
@@ -670,7 +693,7 @@ public class NetworkTopology {
     }
     
     // put a random node at position 0 if it is not a local/local-rack node
-    if(tempIndex == 0 && nodes.length != 0) {
+    if(tempIndex == 0 && localRackNode == -1 && nodes.length != 0) {
       swap(nodes, 0, r.nextInt(nodes.length));
     }
   }

@@ -225,6 +225,158 @@ public class TestFsShellCopy {
     assertEquals(exitCode, gotExit);
   }
   
+  @Test
+  public void testRepresentsDir() throws Exception {
+    Path subdirDstPath = new Path(dstPath, srcPath.getName());
+    String argv[] = null;
+    lfs.delete(dstPath, true);
+    assertFalse(lfs.exists(dstPath));
+
+    argv = new String[]{ "-put", srcPath.toString(), dstPath.toString() };
+    assertEquals(0, shell.run(argv));
+    assertTrue(lfs.exists(dstPath) && lfs.isFile(dstPath));
+
+    lfs.delete(dstPath, true);
+    assertFalse(lfs.exists(dstPath));
+
+    // since dst path looks like a dir, it should not copy the file and
+    // rename it to what looks like a directory
+    lfs.delete(dstPath, true); // make copy fail
+    for (String suffix : new String[]{ "/", "/." } ) {
+      argv = new String[]{
+          "-put", srcPath.toString(), dstPath.toString()+suffix };
+      assertEquals(1, shell.run(argv));
+      assertFalse(lfs.exists(dstPath));
+      assertFalse(lfs.exists(subdirDstPath));
+    }
+
+    // since dst path looks like a dir, it should not copy the file and
+    // rename it to what looks like a directory
+    for (String suffix : new String[]{ "/", "/." } ) {
+      // empty out the directory and create to make copy succeed
+      lfs.delete(dstPath, true);
+      lfs.mkdirs(dstPath);
+      argv = new String[]{
+          "-put", srcPath.toString(), dstPath.toString()+suffix };
+      assertEquals(0, shell.run(argv));
+      assertTrue(lfs.exists(subdirDstPath));
+      assertTrue(lfs.isFile(subdirDstPath));
+    }
+
+    // ensure .. is interpreted as a dir
+    String dotdotDst = dstPath+"/foo/..";
+    lfs.delete(dstPath, true);
+    lfs.mkdirs(new Path(dstPath, "foo"));
+    argv = new String[]{ "-put", srcPath.toString(), dotdotDst };
+    assertEquals(0, shell.run(argv));
+    assertTrue(lfs.exists(subdirDstPath));
+    assertTrue(lfs.isFile(subdirDstPath));
+  }
+  
+  @Test
+  public void testCopyMerge() throws Exception {
+    Path root = new Path(testRootDir, "TestMerge");
+    Path f1 = new Path(root, "f1");
+    Path f2 = new Path(root, "f2");
+    Path f3 = new Path(root, "f3");
+    Path fnf = new Path(root, "fnf");
+    Path d = new Path(root, "dir");
+    Path df1 = new Path(d, "df1");
+    Path df2 = new Path(d, "df2");
+    Path df3 = new Path(d, "df3");
+    
+    createFile(f1, f2, f3, df1, df2, df3);
+    
+    int exit;
+    // one file, kind of silly
+    exit = shell.run(new String[]{
+        "-getmerge",
+        f1.toString(),
+        "out" });
+    assertEquals(0, exit);
+    assertEquals("f1", readFile("out"));
+
+    exit = shell.run(new String[]{
+        "-getmerge",
+        fnf.toString(),
+        "out" });
+    assertEquals(1, exit);
+    assertFalse(lfs.exists(new Path("out")));
+
+    // two files
+    exit = shell.run(new String[]{
+        "-getmerge",
+        f1.toString(), f2.toString(),
+        "out" });
+    assertEquals(0, exit);
+    assertEquals("f1f2", readFile("out"));
+
+    // two files, preserves order
+    exit = shell.run(new String[]{
+        "-getmerge",
+        f2.toString(), f1.toString(),
+        "out" });
+    assertEquals(0, exit);
+    assertEquals("f2f1", readFile("out"));
+
+    // two files
+    exit = shell.run(new String[]{
+        "-getmerge", "-nl",
+        f1.toString(), f2.toString(),
+        "out" });
+    assertEquals(0, exit);
+    assertEquals("f1\nf2\n", readFile("out"));
+
+    // glob three files
+    shell.run(new String[]{
+        "-getmerge", "-nl",
+        new Path(root, "f*").toString(),
+        "out" });
+    assertEquals(0, exit);
+    assertEquals("f1\nf2\nf3\n", readFile("out"));
+
+    // directory with 3 files, should skip subdir
+    shell.run(new String[]{
+        "-getmerge", "-nl",
+        root.toString(),
+        "out" });
+    assertEquals(0, exit);
+    assertEquals("f1\nf2\nf3\n", readFile("out"));
+
+    // subdir
+    shell.run(new String[]{
+        "-getmerge", "-nl",
+        d.toString(), "out"});
+    assertEquals(0, exit);
+    assertEquals("df1\ndf2\ndf3\n", readFile("out"));
+
+    // file, dir, file
+    shell.run(new String[]{
+        "-getmerge", "-nl",
+        f1.toString(), d.toString(), f2.toString(), "out" });
+    assertEquals(0, exit);
+    assertEquals("f1\ndf1\ndf2\ndf3\nf2\n", readFile("out"));
+  }
+  
+  private void createFile(Path ... paths) throws IOException {
+    for (Path path : paths) {
+      FSDataOutputStream out = lfs.create(path);
+      out.write(path.getName().getBytes());
+      out.close();
+    }
+  }
+  
+  private String readFile(String out) throws IOException {
+    Path path = new Path(out);
+    FileStatus stat = lfs.getFileStatus(path);
+    FSDataInputStream in = lfs.open(path);
+    byte[] buffer = new byte[(int)stat.getLen()];
+    in.readFully(buffer);
+    in.close();
+    lfs.delete(path, false);
+    return new String(buffer);
+  }
+  
   // path handles "." rather oddly
   private String pathAsString(Path p) {
     String s = (p == null) ? Path.CUR_DIR : p.toString();

@@ -17,7 +17,9 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -31,12 +33,12 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeMetrics;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.NNHAStatusHeartbeat;
 import org.apache.hadoop.hdfs.server.protocol.NNHAStatusHeartbeat.State;
@@ -76,7 +78,7 @@ public class TestBPOfferService {
   private NNHAStatusHeartbeat[] mockHaStatuses = new NNHAStatusHeartbeat[2];
   private int heartbeatCounts[] = new int[2];
   private DataNode mockDn;
-  private FSDatasetInterface mockFSDataset;
+  private FsDatasetSpi<?> mockFSDataset;
   
   @Before
   public void setupMocks() throws Exception {
@@ -113,9 +115,8 @@ public class TestBPOfferService {
             0, HdfsConstants.LAYOUT_VERSION))
       .when(mock).versionRequest();
     
-    Mockito.doReturn(new DatanodeRegistration("fake-node"))
-      .when(mock).registerDatanode(Mockito.any(DatanodeRegistration.class),
-          Mockito.any(DatanodeStorage[].class));
+    Mockito.doReturn(new DatanodeRegistration("fake-node", 100))
+      .when(mock).registerDatanode(Mockito.any(DatanodeRegistration.class));
     
     Mockito.doAnswer(new HeartbeatAnswer(nnIdx))
       .when(mock).sendHeartbeat(
@@ -161,10 +162,10 @@ public class TestBPOfferService {
       waitForInitialization(bpos);
       
       // The DN should have register to both NNs.
-      Mockito.verify(mockNN1).registerDatanode(Mockito.any(DatanodeRegistration.class),
-          Mockito.any(DatanodeStorage[].class));
-      Mockito.verify(mockNN2).registerDatanode(Mockito.any(DatanodeRegistration.class),
-          Mockito.any(DatanodeStorage[].class));
+      Mockito.verify(mockNN1).registerDatanode(
+          Mockito.any(DatanodeRegistration.class));
+      Mockito.verify(mockNN2).registerDatanode(
+          Mockito.any(DatanodeRegistration.class));
       
       // Should get block reports from both NNs
       waitForBlockReport(mockNN1);

@@ -55,7 +55,7 @@ import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
-import org.apache.hadoop.hdfs.server.datanode.FSDatasetInterface.MetaDataInputStream;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.LengthInputStream;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.MD5Hash;
@@ -168,13 +168,13 @@ class DataXceiver extends Receiver implements Runnable {
         ++opsProcessed;
       } while (!s.isClosed() && dnConf.socketKeepaliveTimeout > 0);
     } catch (Throwable t) {
-      LOG.error(datanode.getMachineName() + ":DataXceiver error processing " +
+      LOG.error(datanode.getDisplayName() + ":DataXceiver error processing " +
                 ((op == null) ? "unknown" : op.name()) + " operation " +
                 " src: " + remoteAddress +
                 " dest: " + localAddress, t);
     } finally {
       if (LOG.isDebugEnabled()) {
-        LOG.debug(datanode.getMachineName() + ":Number of active connections is: "
+        LOG.debug(datanode.getDisplayName() + ":Number of active connections is: "
             + datanode.getXceiverCount());
       }
       updateCurrentThreadName("Cleaning up");
@@ -352,7 +352,7 @@ class DataXceiver extends Receiver implements Runnable {
       if (targets.length > 0) {
         InetSocketAddress mirrorTarget = null;
         // Connect to backup machine
-        mirrorNode = targets[0].getName();
+        mirrorNode = targets[0].getXferAddr();
         mirrorTarget = NetUtils.createSocketAddr(mirrorNode);
         mirrorSock = datanode.newSocket();
         try {
@@ -511,7 +511,7 @@ class DataXceiver extends Receiver implements Runnable {
     checkAccess(out, true, block, blockToken,
         Op.BLOCK_CHECKSUM, BlockTokenSecretManager.AccessMode.READ);
     updateCurrentThreadName("Reading metadata for block " + block);
-    final MetaDataInputStream metadataIn = 
+    final LengthInputStream metadataIn = 
       datanode.data.getMetaDataInputStream(block);
     final DataInputStream checksumIn = new DataInputStream(new BufferedInputStream(
         metadataIn, HdfsConstants.IO_FILE_BUFFER_SIZE));
@@ -667,8 +667,8 @@ class DataXceiver extends Receiver implements Runnable {
     
     try {
       // get the output stream to the proxy
-      InetSocketAddress proxyAddr = NetUtils.createSocketAddr(
-          proxySource.getName());
+      InetSocketAddress proxyAddr =
+        NetUtils.createSocketAddr(proxySource.getXferAddr());
       proxySock = datanode.newSocket();
       NetUtils.connect(proxySock, proxyAddr, dnConf.socketTimeout);
       proxySock.setSoTimeout(dnConf.socketTimeout);
@@ -820,7 +820,7 @@ class DataXceiver extends Receiver implements Runnable {
             if (mode == BlockTokenSecretManager.AccessMode.WRITE) {
               DatanodeRegistration dnR = 
                 datanode.getDNRegistrationForBP(blk.getBlockPoolId());
-              resp.setFirstBadLink(dnR.getName());
+              resp.setFirstBadLink(dnR.getXferAddr());
             }
             resp.build().writeDelimitedTo(out);
             out.flush();

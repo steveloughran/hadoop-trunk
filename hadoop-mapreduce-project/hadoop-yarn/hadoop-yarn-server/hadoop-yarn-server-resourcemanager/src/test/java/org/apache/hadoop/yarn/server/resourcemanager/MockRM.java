@@ -18,21 +18,23 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import java.util.Map;
+
 import junit.framework.Assert;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.ClientRMProtocol;
-import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationRequest;
+import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.ApplicationMasterLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.StoreFactory;
@@ -52,6 +54,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
+@SuppressWarnings("unchecked")
 public class MockRM extends ResourceManager {
 
   public MockRM() {
@@ -93,6 +96,11 @@ public class MockRM extends ResourceManager {
 
   // client
   public RMApp submitApp(int masterMemory, String name, String user) throws Exception {
+    return submitApp(masterMemory, name, user, null);
+  }
+
+  public RMApp submitApp(int masterMemory, String name, String user,
+      Map<ApplicationAccessType, String> acls) throws Exception {
     ClientRMProtocol client = getClientRMService();
     GetNewApplicationResponse resp = client.getNewApplication(Records
         .newRecord(GetNewApplicationRequest.class));
@@ -110,6 +118,7 @@ public class MockRM extends ResourceManager {
     Resource capability = Records.newRecord(Resource.class);
     capability.setMemory(masterMemory);
     clc.setResource(capability);
+    clc.setApplicationACLs(acls);
     sub.setAMContainerSpec(clc);
     req.setApplicationSubmissionContext(sub);
 
@@ -215,8 +224,7 @@ public class MockRM extends ResourceManager {
 
   @Override
   protected ApplicationMasterService createApplicationMasterService() {
-    return new ApplicationMasterService(getRMContext(),
-        this.appTokenSecretManager, scheduler) {
+    return new ApplicationMasterService(getRMContext(), scheduler) {
       @Override
       public void start() {
         // override to not start rpc handler
@@ -231,8 +239,8 @@ public class MockRM extends ResourceManager {
 
   @Override
   protected ApplicationMasterLauncher createAMLauncher() {
-    return new ApplicationMasterLauncher(this.appTokenSecretManager,
-        this.clientToAMSecretManager, getRMContext()) {
+    return new ApplicationMasterLauncher(this.clientToAMSecretManager,
+      getRMContext()) {
       @Override
       public void start() {
         // override to not start rpc handler

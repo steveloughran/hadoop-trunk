@@ -17,6 +17,29 @@
  */
 package org.apache.hadoop.hdfs;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCKREPORT_INITIAL_DELAY_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HOST_NAME_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_IPC_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_FEDERATION_NAMESERVICES;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_FEDERATION_NAMESERVICE_ID;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_NAMENODES_KEY_PREFIX;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_NAMENODE_ID_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_STANDBY_CHECKPOINTS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HOSTS;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_DIR_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DECOMMISSION_INTERVAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_EXTENSION_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SHARED_EDITS_DIR_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
 import static org.apache.hadoop.hdfs.server.common.Util.fileAsURI;
 
 import java.io.File;
@@ -43,9 +66,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
-
-import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
-
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocolHelper;
 import org.apache.hadoop.ha.ServiceFailedException;
@@ -57,25 +77,24 @@ import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
-import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
+import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
-import org.apache.hadoop.hdfs.server.datanode.DataNodeAdapter;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.datanode.DataStorage;
-import org.apache.hadoop.hdfs.server.datanode.FSDatasetInterface;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
-import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.StaticMapping;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.util.StringUtils;
@@ -563,6 +582,10 @@ public class MiniDFSCluster {
       }
     }
     
+    if (operation == StartupOption.RECOVER) {
+      return;
+    }
+
     // Start the DataNodes
     startDataNodes(conf, numDataNodes, manageDataDfsDirs, operation, racks,
         hosts, simulatedCapacities, setupHostsFile);
@@ -713,7 +736,9 @@ public class MiniDFSCluster {
       Preconditions.checkArgument(!dstDir.equals(srcDir));
       File dstDirF = new File(dstDir);
       if (dstDirF.exists()) {
-        Files.deleteRecursively(dstDirF);
+        if (!FileUtil.fullyDelete(dstDirF)) {
+          throw new IOException("Unable to delete: " + dstDirF);
+        }
       }
       LOG.info("Copying namedir from primary node dir "
           + srcDir + " to " + dstDir);
@@ -761,6 +786,9 @@ public class MiniDFSCluster {
                      operation == StartupOption.REGULAR) ?
       new String[] {} : new String[] {operation.getName()};
     NameNode nn =  NameNode.createNameNode(args, conf);
+    if (operation == StartupOption.RECOVER) {
+      return;
+    }
     
     // After the NN has started, set back the bound ports into
     // the conf
@@ -936,6 +964,9 @@ public class MiniDFSCluster {
                              long[] simulatedCapacities,
                              boolean setupHostsFile,
                              boolean checkDataNodeAddrConfig) throws IOException {
+    if (operation == StartupOption.RECOVER) {
+      return;
+    }
     conf.set(DFS_DATANODE_HOST_NAME_KEY, "127.0.0.1");
 
     int curDatanodesNum = dataNodes.size();
@@ -1019,16 +1050,14 @@ public class MiniDFSCluster {
       if(dn == null)
         throw new IOException("Cannot start DataNode in "
             + dnConf.get(DFS_DATANODE_DATA_DIR_KEY));
-      //NOTE: the following is true if and only if:
-      //      hadoop.security.token.service.use_ip=true
-      //since the HDFS does things based on IP:port, we need to add the mapping
-      //for IP:port to rackId
-      String ipAddr = dn.getSelfAddr().getAddress().getHostAddress();
+      //since the HDFS does things based on host|ip:port, we need to add the
+      //mapping for the service to rackId
+      String service =
+          SecurityUtil.buildTokenService(dn.getXferAddress()).toString();
       if (racks != null) {
-        int port = dn.getSelfAddr().getPort();
-        LOG.info("Adding node with IP:port : " + ipAddr + ":" + port +
+        LOG.info("Adding node with service : " + service +
                             " to rack " + racks[i-curDatanodesNum]);
-        StaticMapping.addNodeToRack(ipAddr + ":" + port,
+        StaticMapping.addNodeToRack(service,
                                   racks[i-curDatanodesNum]);
       }
       dn.runDatanodeDaemon();
@@ -1404,7 +1433,7 @@ public class MiniDFSCluster {
     DataNodeProperties dnprop = dataNodes.remove(i);
     DataNode dn = dnprop.datanode;
     LOG.info("MiniDFSCluster Stopping DataNode " +
-                       dn.getMachineName() +
+                       dn.getDisplayName() +
                        " from a total of " + (dataNodes.size() + 1) + 
                        " datanodes.");
     dn.shutdown();
@@ -1415,16 +1444,13 @@ public class MiniDFSCluster {
   /*
    * Shutdown a datanode by name.
    */
-  public synchronized DataNodeProperties stopDataNode(String name) {
+  public synchronized DataNodeProperties stopDataNode(String dnName) {
     int i;
     for (i = 0; i < dataNodes.size(); i++) {
       DataNode dn = dataNodes.get(i).datanode;
-      // get BP registration
-      DatanodeRegistration dnR = 
-        DataNodeTestUtils.getDNRegistrationByMachineName(dn, name);
-      LOG.info("for name=" + name + " found bp=" + dnR + 
-          "; with dnMn=" + dn.getMachineName());
-      if(dnR != null) {
+      LOG.info("DN name=" + dnName + " found DN=" + dn +
+          " with name=" + dn.getDisplayName());
+      if (dnName.equals(dn.getDatanodeId().getXferAddr())) {
         break;
       }
     }
@@ -1454,9 +1480,9 @@ public class MiniDFSCluster {
     String[] args = dnprop.dnArgs;
     Configuration newconf = new HdfsConfiguration(conf); // save cloned config
     if (keepPort) {
-      InetSocketAddress addr = dnprop.datanode.getSelfAddr();
-      conf.set(DFS_DATANODE_ADDRESS_KEY, addr.getAddress().getHostAddress() + ":"
-          + addr.getPort());
+      InetSocketAddress addr = dnprop.datanode.getXferAddress();
+      conf.set(DFS_DATANODE_ADDRESS_KEY, 
+          addr.getAddress().getHostAddress() + ":" + addr.getPort());
     }
     dataNodes.add(new DataNodeProperties(DataNode.createDataNode(args, conf),
         newconf, args));
@@ -1645,7 +1671,7 @@ public class MiniDFSCluster {
   public void triggerBlockReports()
       throws IOException {
     for (DataNode dn : getDataNodes()) {
-      DataNodeAdapter.triggerBlockReport(dn);
+      DataNodeTestUtils.triggerBlockReport(dn);
     }
   }
 
@@ -1653,14 +1679,14 @@ public class MiniDFSCluster {
   public void triggerDeletionReports()
       throws IOException {
     for (DataNode dn : getDataNodes()) {
-      DataNodeAdapter.triggerDeletionReport(dn);
+      DataNodeTestUtils.triggerDeletionReport(dn);
     }
   }
 
   public void triggerHeartbeats()
       throws IOException {
     for (DataNode dn : getDataNodes()) {
-      DataNodeAdapter.triggerHeartbeat(dn);
+      DataNodeTestUtils.triggerHeartbeat(dn);
     }
   }
 
@@ -1744,7 +1770,7 @@ public class MiniDFSCluster {
     
     // If datanode dataset is not initialized then wait
     for (DataNodeProperties dn : dataNodes) {
-      if (dn.datanode.data == null) {
+      if (DataNodeTestUtils.getFSDataset(dn.datanode) == null) {
         return true;
       }
     }
@@ -1802,7 +1828,7 @@ public class MiniDFSCluster {
       throw new IndexOutOfBoundsException();
     }
     final DataNode dn = dataNodes.get(dataNodeIndex).datanode;
-    final FSDatasetInterface<?> dataSet = DataNodeTestUtils.getFSDataset(dn);
+    final FsDatasetSpi<?> dataSet = DataNodeTestUtils.getFSDataset(dn);
     if (!(dataSet instanceof SimulatedFSDataset)) {
       throw new IOException("injectBlocks is valid only for SimilatedFSDataset");
     }
@@ -1821,7 +1847,7 @@ public class MiniDFSCluster {
       throw new IndexOutOfBoundsException();
     }
     final DataNode dn = dataNodes.get(dataNodeIndex).datanode;
-    final FSDatasetInterface<?> dataSet = DataNodeTestUtils.getFSDataset(dn);
+    final FsDatasetSpi<?> dataSet = DataNodeTestUtils.getFSDataset(dn);
     if (!(dataSet instanceof SimulatedFSDataset)) {
       throw new IOException("injectBlocks is valid only for SimilatedFSDataset");
     }

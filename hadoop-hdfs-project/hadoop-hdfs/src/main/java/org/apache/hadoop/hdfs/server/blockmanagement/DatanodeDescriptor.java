@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import java.io.DataInput;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -26,24 +24,18 @@ import java.util.List;
 import java.util.Queue;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.hdfs.DeprecatedUTF8;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.util.LightWeightHashSet;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.WritableUtils;
 
-/**************************************************
- * DatanodeDescriptor tracks stats on a given DataNode, such as
- * available storage capacity, last update time, etc., and maintains a
- * set of blocks stored on the datanode.
- *
- * This data structure is internal to the namenode. It is *not* sent
- * over-the-wire to the Client or the Datanodes. Neither is it stored
- * persistently in the fsImage.
- **************************************************/
+/**
+ * This class extends the DatanodeInfo class with ephemeral information (eg
+ * health, capacity, what blocks are associated with the Datanode) that is
+ * private to the Namenode, ie this class is not exposed to clients.
+ */
 @InterfaceAudience.Private
+@InterfaceStability.Evolving
 public class DatanodeDescriptor extends DatanodeInfo {
   
   // Stores status of decommissioning.
@@ -161,40 +153,26 @@ public class DatanodeDescriptor extends DatanodeInfo {
    */
   private boolean disallowed = false;
 
-  /** Default constructor */
-  public DatanodeDescriptor() {}
-  
-  /** DatanodeDescriptor constructor
+  /**
+   * DatanodeDescriptor constructor
    * @param nodeID id of the data node
    */
   public DatanodeDescriptor(DatanodeID nodeID) {
     this(nodeID, 0L, 0L, 0L, 0L, 0, 0);
   }
 
-  /** DatanodeDescriptor constructor
-   * 
+  /**
+   * DatanodeDescriptor constructor
    * @param nodeID id of the data node
    * @param networkLocation location of the data node in network
    */
   public DatanodeDescriptor(DatanodeID nodeID, 
                             String networkLocation) {
-    this(nodeID, networkLocation, null);
+    this(nodeID, networkLocation, 0L, 0L, 0L, 0L, 0, 0);
   }
   
-  /** DatanodeDescriptor constructor
-   * 
-   * @param nodeID id of the data node
-   * @param networkLocation location of the data node in network
-   * @param hostName it could be different from host specified for DatanodeID
-   */
-  public DatanodeDescriptor(DatanodeID nodeID, 
-                            String networkLocation,
-                            String hostName) {
-    this(nodeID, networkLocation, hostName, 0L, 0L, 0L, 0L, 0, 0);
-  }
-  
-  /** DatanodeDescriptor constructor
-   * 
+  /**
+   * DatanodeDescriptor constructor
    * @param nodeID id of the data node
    * @param capacity capacity of the data node
    * @param dfsUsed space used by the data node
@@ -214,8 +192,8 @@ public class DatanodeDescriptor extends DatanodeInfo {
         failedVolumes);
   }
 
-  /** DatanodeDescriptor constructor
-   * 
+  /**
+   * DatanodeDescriptor constructor
    * @param nodeID id of the data node
    * @param networkLocation location of the data node in network
    * @param capacity capacity of the data node, including space used by non-dfs
@@ -226,14 +204,13 @@ public class DatanodeDescriptor extends DatanodeInfo {
    */
   public DatanodeDescriptor(DatanodeID nodeID,
                             String networkLocation,
-                            String hostName,
                             long capacity,
                             long dfsUsed,
                             long remaining,
                             long bpused,
                             int xceiverCount,
                             int failedVolumes) {
-    super(nodeID, networkLocation, hostName);
+    super(nodeID, networkLocation);
     updateHeartbeat(capacity, dfsUsed, remaining, bpused, xceiverCount, 
         failedVolumes);
   }
@@ -439,23 +416,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
     }
   }
 
-  /** Serialization for FSEditLog */
-  public void readFieldsFromFSEditLog(DataInput in) throws IOException {
-    this.name = DeprecatedUTF8.readString(in);
-    this.storageID = DeprecatedUTF8.readString(in);
-    this.infoPort = in.readShort() & 0x0000ffff;
-
-    this.capacity = in.readLong();
-    this.dfsUsed = in.readLong();
-    this.remaining = in.readLong();
-    this.blockPoolUsed = in.readLong();
-    this.lastUpdate = in.readLong();
-    this.xceiverCount = in.readInt();
-    this.location = Text.readString(in);
-    this.hostName = Text.readString(in);
-    setAdminState(WritableUtils.readEnum(in, AdminStates.class));
-  }
-  
   /**
    * @return Approximate number of blocks currently scheduled to be written 
    * to this datanode.
@@ -586,14 +546,14 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }
 
   /**
-   * @return Blanacer bandwidth in bytes per second for this datanode.
+   * @return balancer bandwidth in bytes per second for this datanode
    */
   public long getBalancerBandwidth() {
     return this.bandwidth;
   }
 
   /**
-   * @param bandwidth Blanacer bandwidth in bytes per second for this datanode.
+   * @param bandwidth balancer bandwidth in bytes per second for this datanode
    */
   public void setBalancerBandwidth(long bandwidth) {
     this.bandwidth = bandwidth;

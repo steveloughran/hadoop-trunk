@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -45,6 +46,8 @@ import org.apache.hadoop.yarn.api.records.AMResponse;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.NodeReport;
+import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRemoteException;
@@ -52,8 +55,9 @@ import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
-import org.apache.hadoop.yarn.security.ApplicationTokenSecretManager;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger.AuditConstants;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.AMLivelinessMonitor;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
@@ -61,18 +65,20 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event.RMAppAt
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event.RMAppAttemptStatusupdateEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event.RMAppAttemptUnregistrationEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeReport;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.authorize.RMPolicyProvider;
 import org.apache.hadoop.yarn.service.AbstractService;
+import org.apache.hadoop.yarn.util.BuilderUtils;
 
+@SuppressWarnings("unchecked")
 @Private
 public class ApplicationMasterService extends AbstractService implements
     AMRMProtocol {
   private static final Log LOG = LogFactory.getLog(ApplicationMasterService.class);
   private final AMLivelinessMonitor amLivelinessMonitor;
   private YarnScheduler rScheduler;
-  private ApplicationTokenSecretManager appTokenManager;
-  private InetSocketAddress masterServiceAddress;
+  private InetSocketAddress bindAddress;
   private Server server;
   private final RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
   private final ConcurrentMap<ApplicationAttemptId, AMResponse> responseMap =
@@ -80,11 +86,9 @@ public class ApplicationMasterService extends AbstractService implements
   private final AMResponse reboot = recordFactory.newRecordInstance(AMResponse.class);
   private final RMContext rmContext;
 
-  public ApplicationMasterService(RMContext rmContext,
-      ApplicationTokenSecretManager appTokenManager, YarnScheduler scheduler) {
+  public ApplicationMasterService(RMContext rmContext, YarnScheduler scheduler) {
     super(ApplicationMasterService.class.getName());
     this.amLivelinessMonitor = rmContext.getAMLivelinessMonitor();
-    this.appTokenManager = appTokenManager;
     this.rScheduler = scheduler;
     this.reboot.setReboot(true);
 //    this.reboot.containers = new ArrayList<Container>();
@@ -92,23 +96,21 @@ public class ApplicationMasterService extends AbstractService implements
   }
 
   @Override
-  public void init(Configuration conf) {
-    String bindAddress =
-      conf.get(YarnConfiguration.RM_SCHEDULER_ADDRESS,
-          YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS);
-    masterServiceAddress =  NetUtils.createSocketAddr(bindAddress,
-      YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT,
-      YarnConfiguration.RM_SCHEDULER_ADDRESS);
-    super.init(conf);
-  }
-
-  @Override
   public void start() {
     Configuration conf = getConfig();
     YarnRPC rpc = YarnRPC.create(conf);
+
+    String bindAddressStr =
+        conf.get(YarnConfiguration.RM_SCHEDULER_ADDRESS,
+          YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS);
+    InetSocketAddress masterServiceAddress =
+        NetUtils.createSocketAddr(bindAddressStr,
+          YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT,
+          YarnConfiguration.RM_SCHEDULER_ADDRESS);
+
     this.server =
       rpc.getServer(AMRMProtocol.class, this, masterServiceAddress,
-          conf, this.appTokenManager,
+          conf, this.rmContext.getApplicationTokenSecretManager(),
           conf.getInt(YarnConfiguration.RM_SCHEDULER_CLIENT_THREAD_COUNT, 
               YarnConfiguration.DEFAULT_RM_SCHEDULER_CLIENT_THREAD_COUNT));
     
@@ -120,7 +122,17 @@ public class ApplicationMasterService extends AbstractService implements
     }
     
     this.server.start();
+
+    this.bindAddress =
+        NetUtils.createSocketAddr(masterServiceAddress.getHostName(),
+          this.server.getPort());
+
     super.start();
+  }
+
+  @Private
+  public InetSocketAddress getBindAddress() {
+    return this.bindAddress;
   }
 
   private void authorizeRequest(ApplicationAttemptId appAttemptID)
@@ -183,7 +195,8 @@ public class ApplicationMasterService extends AbstractService implements
           new RMAppAttemptRegistrationEvent(applicationAttemptId, request
               .getHost(), request.getRpcPort(), request.getTrackingUrl()));
 
-      RMAuditLogger.logSuccess(this.rmContext.getRMApps().get(appID).getUser(),
+      RMApp app = this.rmContext.getRMApps().get(appID);
+      RMAuditLogger.logSuccess(app.getUser(),
           AuditConstants.REGISTER_AM, "ApplicationMasterService", appID,
           applicationAttemptId);
 
@@ -194,6 +207,8 @@ public class ApplicationMasterService extends AbstractService implements
           .getMinimumResourceCapability());
       response.setMaximumResourceCapability(rScheduler
           .getMaximumResourceCapability());
+      response.setApplicationACLs(app.getRMAppAttempt(applicationAttemptId)
+          .getSubmissionContext().getAMContainerSpec().getApplicationACLs());
       return response;
     }
   }
@@ -276,8 +291,33 @@ public class ApplicationMasterService extends AbstractService implements
 
       RMApp app = this.rmContext.getRMApps().get(appAttemptId.getApplicationId());
       RMAppAttempt appAttempt = app.getRMAppAttempt(appAttemptId);
-
+      
       AMResponse response = recordFactory.newRecordInstance(AMResponse.class);
+
+      // update the response with the deltas of node status changes
+      List<RMNode> updatedNodes = new ArrayList<RMNode>();
+      if(app.pullRMNodeUpdates(updatedNodes) > 0) {
+        List<NodeReport> updatedNodeReports = new ArrayList<NodeReport>();
+        for(RMNode rmNode: updatedNodes) {
+          SchedulerNodeReport schedulerNodeReport =  
+              rScheduler.getNodeReport(rmNode.getNodeID());
+          Resource used = BuilderUtils.newResource(0);
+          int numContainers = 0;
+          if (schedulerNodeReport != null) {
+            used = schedulerNodeReport.getUsedResource();
+            numContainers = schedulerNodeReport.getNumContainers();
+          }
+          NodeReport report = BuilderUtils.newNodeReport(rmNode.getNodeID(),
+              RMNodeState.toNodeState(rmNode.getState()),
+              rmNode.getHttpAddress(), rmNode.getRackName(), used,
+              rmNode.getTotalCapability(), numContainers,
+              rmNode.getNodeHealthStatus());
+          
+          updatedNodeReports.add(report);
+        }
+        response.setUpdatedNodes(updatedNodeReports);
+      }
+
       response.setAllocatedContainers(allocation.getContainers());
       response.setCompletedContainersStatuses(appAttempt
           .pullJustFinishedContainers());

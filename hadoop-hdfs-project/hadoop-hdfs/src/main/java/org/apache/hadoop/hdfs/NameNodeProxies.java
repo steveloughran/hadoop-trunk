@@ -1,3 +1,20 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.hdfs;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_PROXY_PROVIDER_KEY_PREFIX;
@@ -173,7 +190,7 @@ public class NameNodeProxies {
       InetSocketAddress address, Configuration conf, UserGroupInformation ugi)
       throws IOException {
     JournalProtocolPB proxy = (JournalProtocolPB) createNameNodeProxy(address,
-        conf, ugi, JournalProtocolPB.class);
+        conf, ugi, JournalProtocolPB.class, 30000);
     return new JournalProtocolTranslatorPB(proxy);
   }
 
@@ -181,7 +198,7 @@ public class NameNodeProxies {
       createNNProxyWithRefreshAuthorizationPolicyProtocol(InetSocketAddress address,
           Configuration conf, UserGroupInformation ugi) throws IOException {
     RefreshAuthorizationPolicyProtocolPB proxy = (RefreshAuthorizationPolicyProtocolPB)
-        createNameNodeProxy(address, conf, ugi, RefreshAuthorizationPolicyProtocolPB.class);
+        createNameNodeProxy(address, conf, ugi, RefreshAuthorizationPolicyProtocolPB.class, 0);
     return new RefreshAuthorizationPolicyProtocolClientSideTranslatorPB(proxy);
   }
   
@@ -189,7 +206,7 @@ public class NameNodeProxies {
       createNNProxyWithRefreshUserMappingsProtocol(InetSocketAddress address,
           Configuration conf, UserGroupInformation ugi) throws IOException {
     RefreshUserMappingsProtocolPB proxy = (RefreshUserMappingsProtocolPB)
-        createNameNodeProxy(address, conf, ugi, RefreshUserMappingsProtocolPB.class);
+        createNameNodeProxy(address, conf, ugi, RefreshUserMappingsProtocolPB.class, 0);
     return new RefreshUserMappingsProtocolClientSideTranslatorPB(proxy);
   }
 
@@ -197,7 +214,7 @@ public class NameNodeProxies {
       InetSocketAddress address, Configuration conf, UserGroupInformation ugi)
       throws IOException {
     GetUserMappingsProtocolPB proxy = (GetUserMappingsProtocolPB)
-        createNameNodeProxy(address, conf, ugi, GetUserMappingsProtocolPB.class);
+        createNameNodeProxy(address, conf, ugi, GetUserMappingsProtocolPB.class, 0);
     return new GetUserMappingsProtocolClientSideTranslatorPB(proxy);
   }
   
@@ -205,7 +222,7 @@ public class NameNodeProxies {
       InetSocketAddress address, Configuration conf, UserGroupInformation ugi,
       boolean withRetries) throws IOException {
     NamenodeProtocolPB proxy = (NamenodeProtocolPB) createNameNodeProxy(
-        address, conf, ugi, NamenodeProtocolPB.class);
+        address, conf, ugi, NamenodeProtocolPB.class, 0);
     if (withRetries) { // create the proxy with retries
       RetryPolicy timeoutPolicy = RetryPolicies.exponentialBackoffRetry(5, 200,
           TimeUnit.MILLISECONDS);
@@ -227,7 +244,7 @@ public class NameNodeProxies {
       InetSocketAddress address, Configuration conf, UserGroupInformation ugi,
       boolean withRetries) throws IOException {
     ClientNamenodeProtocolPB proxy = (ClientNamenodeProtocolPB) NameNodeProxies
-        .createNameNodeProxy(address, conf, ugi, ClientNamenodeProtocolPB.class);
+        .createNameNodeProxy(address, conf, ugi, ClientNamenodeProtocolPB.class, 0);
     if (withRetries) { // create the proxy with retries
       RetryPolicy createPolicy = RetryPolicies
           .retryUpToMaximumCountWithFixedSleep(5,
@@ -258,11 +275,11 @@ public class NameNodeProxies {
   
   @SuppressWarnings("unchecked")
   private static Object createNameNodeProxy(InetSocketAddress address,
-      Configuration conf, UserGroupInformation ugi, Class xface)
+      Configuration conf, UserGroupInformation ugi, Class xface, int rpcTimeout)
       throws IOException {
     RPC.setProtocolEngine(conf, xface, ProtobufRpcEngine.class);
     Object proxy = RPC.getProxy(xface, RPC.getProtocolVersion(xface), address,
-        ugi, conf, NetUtils.getDefaultSocketFactory(conf));
+        ugi, conf, NetUtils.getDefaultSocketFactory(conf), rpcTimeout);
     return proxy;
   }
 

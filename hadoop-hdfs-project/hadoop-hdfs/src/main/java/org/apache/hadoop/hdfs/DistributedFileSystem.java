@@ -51,6 +51,7 @@ import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.UpgradeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.HdfsLocatedFileStatus;
@@ -71,8 +72,8 @@ import org.apache.hadoop.util.Progressable;
  * DistributedFileSystem.
  *
  *****************************************************************/
-@InterfaceAudience.Private
-@InterfaceStability.Evolving
+@InterfaceAudience.LimitedPrivate({ "MapReduce", "HBase" })
+@InterfaceStability.Unstable
 public class DistributedFileSystem extends FileSystem {
   private Path workingDir;
   private URI uri;
@@ -687,7 +688,7 @@ public class DistributedFileSystem extends FileSystem {
     lblocks[0] = new LocatedBlock(dataBlock, dataNode);
     LOG.info("Found checksum error in data stream at block="
         + dataBlock + " on datanode="
-        + dataNode[0].getName());
+        + dataNode[0]);
 
     // Find block in checksum stream
     DFSClient.DFSDataInputStream dfsSums = (DFSClient.DFSDataInputStream) sums;
@@ -699,8 +700,7 @@ public class DistributedFileSystem extends FileSystem {
     DatanodeInfo[] sumsNode = {dfsSums.getCurrentDatanode()}; 
     lblocks[1] = new LocatedBlock(sumsBlock, sumsNode);
     LOG.info("Found checksum error in checksum stream at block="
-        + sumsBlock + " on datanode="
-        + sumsNode[0].getName());
+        + sumsBlock + " on datanode=" + sumsNode[0]);
 
     // Ask client to delete blocks.
     dfs.reportChecksumFailure(f.toString(), lblocks);
@@ -839,5 +839,25 @@ public class DistributedFileSystem extends FileSystem {
    */
   public void setBalancerBandwidth(long bandwidth) throws IOException {
     dfs.setBalancerBandwidth(bandwidth);
+  }
+
+  /**
+   * Get a canonical service name for this file system. If the URI is logical,
+   * the hostname part of the URI will be returned.
+   * @return a service string that uniquely identifies this file system.
+   */
+  @Override
+  public String getCanonicalServiceName() {
+    return dfs.getCanonicalServiceName();
+  }
+
+  /**
+   * Utility function that returns if the NameNode is in safemode or not.
+   *
+   * @return true if NameNode is in safemode, false otherwise.
+   * @throws IOException when there is an issue communicating with the NameNode
+   */
+  public boolean isInSafeMode() throws IOException {
+    return setSafeMode(SafeModeAction.SAFEMODE_GET);
   }
 }

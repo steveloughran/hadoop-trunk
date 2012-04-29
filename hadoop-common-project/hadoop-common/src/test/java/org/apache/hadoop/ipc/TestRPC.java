@@ -21,6 +21,7 @@ package org.apache.hadoop.ipc;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.ConnectException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
@@ -33,6 +34,7 @@ import java.util.Arrays;
 import javax.net.SocketFactory;
 
 import org.apache.commons.logging.*;
+import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.UTF8;
@@ -40,6 +42,8 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.Client.ConnectionId;
+import org.apache.hadoop.ipc.TestSaslRPC.TestSaslImpl;
+import org.apache.hadoop.ipc.TestSaslRPC.TestSaslProtocol;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.authorize.AuthorizationException;
@@ -49,6 +53,7 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.test.MockitoUtil;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -56,8 +61,6 @@ import com.google.protobuf.DescriptorProtos;
 import com.google.protobuf.DescriptorProtos.EnumDescriptorProto;
 
 import static org.apache.hadoop.test.MetricsAsserts.*;
-
-import static org.mockito.Mockito.*;
 
 /** Unit tests for RPC. */
 @SuppressWarnings("deprecation")
@@ -257,7 +260,8 @@ public class TestRPC {
     public org.apache.hadoop.ipc.RPC.Server getServer(Class<?> protocol,
         Object instance, String bindAddress, int port, int numHandlers,
         int numReaders, int queueSizePerHandler, boolean verbose, Configuration conf,
-        SecretManager<? extends TokenIdentifier> secretManager) throws IOException {
+        SecretManager<? extends TokenIdentifier> secretManager, 
+        String portRangeConfig) throws IOException {
       return null;
     }
 
@@ -543,6 +547,19 @@ public class TestRPC {
   }
   
   @Test
+  public void testServerAddress() throws IOException {
+    Server server = RPC.getServer(TestProtocol.class,
+        new TestImpl(), ADDRESS, 0, 5, true, conf, null);
+    InetSocketAddress bindAddr = null;
+    try {
+      bindAddr = NetUtils.getConnectAddress(server);
+    } finally {
+      server.stop();
+    }
+    assertEquals(bindAddr.getAddress(), InetAddress.getLocalHost());
+  }
+  
+  @Test
   public void testAuthorization() throws Exception {
     Configuration conf = new Configuration();
     conf.setBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
@@ -584,9 +601,18 @@ public class TestRPC {
    * Test stopping a non-registered proxy
    * @throws Exception
    */
-  @Test
+  @Test(expected=HadoopIllegalArgumentException.class)
   public void testStopNonRegisteredProxy() throws Exception {
-    RPC.stopProxy(mock(TestProtocol.class));
+    RPC.stopProxy(null);
+  }
+
+  /**
+   * Test that the mockProtocol helper returns mock proxies that can
+   * be stopped without error.
+   */
+  @Test
+  public void testStopMockObject() throws Exception {
+    RPC.stopProxy(MockitoUtil.mockProtocol(TestProtocol.class)); 
   }
   
   @Test

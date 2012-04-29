@@ -62,7 +62,7 @@ public class TestDFSUtil {
    */
   @Test
   public void testLocatedBlocks2Locations() {
-    DatanodeInfo d = new DatanodeInfo();
+    DatanodeInfo d = DFSTestUtil.getLocalDatanodeInfo();
     DatanodeInfo[] ds = new DatanodeInfo[1];
     ds[0] = d;
 
@@ -178,6 +178,17 @@ public class TestDFSUtil {
     assertEquals(2, nameserviceIds.size());
     assertEquals("nn1", it.next().toString());
     assertEquals("nn2", it.next().toString());
+  }
+  
+  @Test
+  public void testGetOnlyNameServiceIdOrNull() {
+    HdfsConfiguration conf = new HdfsConfiguration();
+    conf.set(DFS_FEDERATION_NAMESERVICES, "ns1,ns2");
+    assertNull(DFSUtil.getOnlyNameServiceIdOrNull(conf));
+    conf.set(DFS_FEDERATION_NAMESERVICES, "");
+    assertNull(DFSUtil.getOnlyNameServiceIdOrNull(conf));
+    conf.set(DFS_FEDERATION_NAMESERVICES, "ns1");
+    assertEquals("ns1", DFSUtil.getOnlyNameServiceIdOrNull(conf));
   }
 
   /**
@@ -384,9 +395,9 @@ public class TestDFSUtil {
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
     UserGroupInformation.setConfiguration(conf);
     String httpsport = DFSUtil.getInfoServer(null, conf, true);
-    assertEquals("0.0.0.0:50470", httpsport);
+    assertEquals("0.0.0.0:"+DFS_NAMENODE_HTTPS_PORT_DEFAULT, httpsport);
     String httpport = DFSUtil.getInfoServer(null, conf, false);
-    assertEquals("0.0.0.0:50070", httpport);
+    assertEquals("0.0.0.0:"+DFS_NAMENODE_HTTP_PORT_DEFAULT, httpport);
   }
   
   @Test

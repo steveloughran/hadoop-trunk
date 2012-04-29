@@ -29,6 +29,7 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.Resources;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
@@ -50,6 +51,7 @@ public class TestParentQueue {
   private static final Log LOG = LogFactory.getLog(TestParentQueue.class);
   
   RMContext rmContext;
+  YarnConfiguration conf;
   CapacitySchedulerConfiguration csConf;
   CapacitySchedulerContext csContext;
   
@@ -59,9 +61,11 @@ public class TestParentQueue {
   @Before
   public void setUp() throws Exception {
     rmContext = TestUtils.getMockRMContext();
+    conf = new YarnConfiguration();
     csConf = new CapacitySchedulerConfiguration();
     
     csContext = mock(CapacitySchedulerContext.class);
+    when(csContext.getConf()).thenReturn(conf);
     when(csContext.getConfiguration()).thenReturn(csConf);
     when(csContext.getMinimumResourceCapability()).thenReturn(
         Resources.createResource(GB));
@@ -495,6 +499,71 @@ public class TestParentQueue {
 
   }
   
+  @Test
+  public void testOffSwitchSchedulingMultiLevelQueues() throws Exception {
+    // Setup queue configs
+    setupMultiLevelQueues(csConf);
+    //B3
+    Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
+    CSQueue root = 
+        CapacityScheduler.parseQueue(csContext, csConf, null, 
+            CapacitySchedulerConfiguration.ROOT, queues, queues, 
+            CapacityScheduler.queueComparator, 
+            CapacityScheduler.applicationComparator,
+            TestUtils.spyHook);
+
+    // Setup some nodes
+    final int memoryPerNode = 10;
+    final int numNodes = 2;
+    
+    SchedulerNode node_0 = 
+        TestUtils.getMockNode("host_0", DEFAULT_RACK, 0, memoryPerNode*GB);
+    SchedulerNode node_1 = 
+        TestUtils.getMockNode("host_1", DEFAULT_RACK, 0, memoryPerNode*GB);
+    
+    final Resource clusterResource = 
+        Resources.createResource(numNodes * (memoryPerNode*GB));
+    when(csContext.getNumClusterNodes()).thenReturn(numNodes);
+
+    // Start testing
+    LeafQueue b3 = (LeafQueue)queues.get(B3);
+    LeafQueue b2 = (LeafQueue)queues.get(B2);
+    
+    // Simulate B3 returning a container on node_0
+    stubQueueAllocation(b2, clusterResource, node_0, 0*GB, NodeType.OFF_SWITCH);
+    stubQueueAllocation(b3, clusterResource, node_0, 1*GB, NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_0);
+    verifyQueueMetrics(b2, 0*GB, clusterResource);
+    verifyQueueMetrics(b3, 1*GB, clusterResource);
+    
+    // Now, B2 should get the scheduling opportunity since B2=0G/2G, B3=1G/7G
+    // also, B3 gets a scheduling opportunity since B2 allocates RACK_LOCAL
+    stubQueueAllocation(b2, clusterResource, node_1, 1*GB, NodeType.RACK_LOCAL);
+    stubQueueAllocation(b3, clusterResource, node_1, 1*GB, NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_1);
+    InOrder allocationOrder = inOrder(b2, b3);
+    allocationOrder.verify(b2).assignContainers(eq(clusterResource), 
+        any(SchedulerNode.class));
+    allocationOrder.verify(b3).assignContainers(eq(clusterResource), 
+        any(SchedulerNode.class));
+    verifyQueueMetrics(b2, 1*GB, clusterResource);
+    verifyQueueMetrics(b3, 2*GB, clusterResource);
+    
+    // Now, B3 should get the scheduling opportunity 
+    // since B2 has 1/2G while B3 has 2/7G, 
+    // However, since B3 returns off-switch, B2 won't get an opportunity
+    stubQueueAllocation(b2, clusterResource, node_0, 1*GB, NodeType.NODE_LOCAL);
+    stubQueueAllocation(b3, clusterResource, node_0, 1*GB, NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_0);
+    allocationOrder = inOrder(b3, b2);
+    allocationOrder.verify(b3).assignContainers(eq(clusterResource), 
+        any(SchedulerNode.class));
+    allocationOrder.verify(b2).assignContainers(eq(clusterResource), 
+        any(SchedulerNode.class));
+    verifyQueueMetrics(b2, 1*GB, clusterResource);
+    verifyQueueMetrics(b3, 3*GB, clusterResource);
+
+  }
 
   public boolean hasQueueACL(List<QueueUserACLInfo> aclInfos, QueueACL acl, String qName) {
     for (QueueUserACLInfo aclInfo : aclInfos) {

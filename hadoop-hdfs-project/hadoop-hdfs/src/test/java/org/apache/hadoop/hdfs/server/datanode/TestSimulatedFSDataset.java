@@ -29,7 +29,9 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.server.datanode.FSDatasetInterface.BlockWriteStreams;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaOutputStreams;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetFactory;
 import org.apache.hadoop.util.DataChecksum;
 
 /**
@@ -63,10 +65,10 @@ public class TestSimulatedFSDataset extends TestCase {
       // we pass expected len as zero, - fsdataset should use the sizeof actual
       // data written
       ReplicaInPipelineInterface bInfo = fsdataset.createRbw(b);
-      BlockWriteStreams out = bInfo.createStreams(true,
+      ReplicaOutputStreams out = bInfo.createStreams(true,
           DataChecksum.newDataChecksum(DataChecksum.CHECKSUM_CRC32, 512));
       try {
-        OutputStream dataOut  = out.dataOut;
+        OutputStream dataOut  = out.getDataOut();
         assertEquals(0, fsdataset.getLength(b));
         for (int j=1; j <= blockIdToLen(i); ++j) {
           dataOut.write(j);
@@ -88,12 +90,12 @@ public class TestSimulatedFSDataset extends TestCase {
   
   public void testFSDatasetFactory() {
     final Configuration conf = new Configuration();
-    FSDatasetInterface.Factory<?> f = FSDatasetInterface.Factory.getFactory(conf);
-    assertEquals(FSDataset.Factory.class, f.getClass());
+    FsDatasetSpi.Factory<?> f = FsDatasetSpi.Factory.getFactory(conf);
+    assertEquals(FsDatasetFactory.class, f.getClass());
     assertFalse(f.isSimulated());
 
     SimulatedFSDataset.setFactory(conf);
-    FSDatasetInterface.Factory<?> s = FSDatasetInterface.Factory.getFactory(conf);
+    FsDatasetSpi.Factory<?> s = FsDatasetSpi.Factory.getFactory(conf);
     assertEquals(SimulatedFSDataset.Factory.class, s.getClass());
     assertTrue(s.isSimulated());
   }
@@ -102,7 +104,7 @@ public class TestSimulatedFSDataset extends TestCase {
     final SimulatedFSDataset fsdataset = getSimulatedFSDataset();
     ExtendedBlock b = new ExtendedBlock(bpid, 1, 5, 0);
     try {
-      assertFalse(fsdataset.metaFileExists(b));
+      assertTrue(fsdataset.getMetaDataInputStream(b) == null);
       assertTrue("Expected an IO exception", false);
     } catch (IOException e) {
       // ok - as expected
@@ -242,7 +244,7 @@ public class TestSimulatedFSDataset extends TestCase {
     }
   }
 
-  public void checkInvalidBlock(ExtendedBlock b) throws IOException {
+  public void checkInvalidBlock(ExtendedBlock b) {
     final SimulatedFSDataset fsdataset = getSimulatedFSDataset();
     assertFalse(fsdataset.isValidBlock(b));
     try {

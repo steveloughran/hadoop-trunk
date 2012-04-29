@@ -98,6 +98,12 @@ The default implementation, <code>org.apache.hadoop.security.ShellBasedUnixGroup
 to the Unix <code>bash -c groups</code> command to resolve a list of groups for a user.
 </p>
 <p>
+An alternate implementation, which connects directly to an LDAP server to resolve the list of groups, is available
+via <code>org.apache.hadoop.security.LdapGroupsMapping</code>. However, this provider should only be used if the
+required groups reside exclusively in LDAP, and are not materialized on the Unix servers. More information on
+configuring the group mapping service is available in the Javadocs.
+</p>
+<p>
 For HDFS, the mapping of users to groups is performed on the NameNode. Thus, the host system configuration of
 the NameNode determines the group mappings for the users.
 </p>
@@ -233,11 +239,6 @@ to the web server.</p>
 	<br />The name of the group of super-users.
 	</li>
 
-	<li><code>dfs.namenode.upgrade.permission = 0777</code>
-	<br />The choice of initial mode during upgrade. The <em>x</em> permission is <em>never</em> set for files. 
-		For configuration files, the decimal value <em>511<sub>10</sub></em> may be used.
-    </li>
-    
 	<li><code>fs.permissions.umask-mode = 022</code>
     <br />The <code>umask</code> used when creating files and directories. For configuration files, the decimal 
 		value <em>18<sub>10</sub></em> may be used.

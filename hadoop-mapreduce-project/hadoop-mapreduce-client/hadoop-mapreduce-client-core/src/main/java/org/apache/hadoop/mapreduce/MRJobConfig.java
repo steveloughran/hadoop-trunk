@@ -175,14 +175,13 @@ public interface MRJobConfig {
   public static final String MAP_INPUT_START = "mapreduce.map.input.start";
 
   public static final String MAP_MEMORY_MB = "mapreduce.map.memory.mb";
+  public static final int DEFAULT_MAP_MEMORY_MB = 1024;
 
   public static final String MAP_MEMORY_PHYSICAL_MB = "mapreduce.map.memory.physical.mb";
 
   public static final String MAP_ENV = "mapreduce.map.env";
 
   public static final String MAP_JAVA_OPTS = "mapreduce.map.java.opts";
-
-  public static final String MAP_ULIMIT = "mapreduce.map.ulimit";
 
   public static final String MAP_MAX_ATTEMPTS = "mapreduce.map.maxattempts";
 
@@ -225,6 +224,7 @@ public interface MRJobConfig {
   public static final String REDUCE_MEMORY_PHYSICAL_MB = "mapreduce.reduce.memory.physical.mb";
 
   public static final String REDUCE_MEMORY_MB = "mapreduce.reduce.memory.mb";
+  public static final int DEFAULT_REDUCE_MEMORY_MB = 1024;
 
   public static final String REDUCE_MEMORY_TOTAL_BYTES = "mapreduce.reduce.memory.totalbytes";
 
@@ -241,8 +241,6 @@ public interface MRJobConfig {
 
   public static final String REDUCE_JAVA_OPTS = "mapreduce.reduce.java.opts";
 
-  public static final String REDUCE_ULIMIT = "mapreduce.reduce.ulimit";
-  
   public static final String MAPREDUCE_JOB_DIR = "mapreduce.job.dir";
 
   public static final String REDUCE_MAX_ATTEMPTS = "mapreduce.reduce.maxattempts";
@@ -330,6 +328,8 @@ public interface MRJobConfig {
   /** The staging directory for map reduce.*/
   public static final String MR_AM_STAGING_DIR = 
     MR_AM_PREFIX+"staging-dir";
+  public static final String DEFAULT_MR_AM_STAGING_DIR = 
+    "/tmp/hadoop-yarn/staging";
 
   /** The amount of memory the MR app master needs.*/
   public static final String MR_AM_VMEM_MB =

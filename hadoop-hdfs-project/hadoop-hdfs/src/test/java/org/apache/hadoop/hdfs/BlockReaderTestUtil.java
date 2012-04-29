@@ -49,7 +49,11 @@ public class BlockReaderTestUtil {
    * Setup the cluster
    */
   public BlockReaderTestUtil(int replicationFactor) throws Exception {
-    conf = new HdfsConfiguration();
+    this(replicationFactor, new HdfsConfiguration());
+  }
+
+  public BlockReaderTestUtil(int replicationFactor, HdfsConfiguration config) throws Exception {
+    this.conf = config;
     conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, replicationFactor);
     cluster = new MiniDFSCluster.Builder(conf).format(true).build();
     cluster.waitActive();
@@ -139,7 +143,7 @@ public class BlockReaderTestUtil {
     Socket sock = null;
     ExtendedBlock block = testBlock.getBlock();
     DatanodeInfo[] nodes = testBlock.getLocations();
-    targetAddr = NetUtils.createSocketAddr(nodes[0].getName());
+    targetAddr = NetUtils.createSocketAddr(nodes[0].getXferAddr());
     sock = NetUtils.getDefaultSocketFactory(conf).createSocket();
     sock.connect(targetAddr, HdfsServerConstants.READ_TIMEOUT);
     sock.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
@@ -158,7 +162,7 @@ public class BlockReaderTestUtil {
    */
   public DataNode getDataNode(LocatedBlock testBlock) {
     DatanodeInfo[] nodes = testBlock.getLocations();
-    int ipcport = nodes[0].ipcPort;
+    int ipcport = nodes[0].getIpcPort();
     return cluster.getDataNode(ipcport);
   }
 

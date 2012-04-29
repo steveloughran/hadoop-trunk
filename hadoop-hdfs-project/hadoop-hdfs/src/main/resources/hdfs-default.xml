@@ -371,6 +371,12 @@
 
     This is a site-wide property to enable/disable the feature.
 
+    When the cluster size is extremely small, e.g. 3 nodes or less, cluster
+    administrators may want to set the policy to NEVER in the default
+    configuration file or disable this feature.  Otherwise, users may
+    experience an unusually high rate of pipeline failures since it is
+    impossible to find new datanodes for replacement.
+
     See also dfs.client.block.write.replace-datanode-on-failure.policy
   </description>
 </property>
@@ -419,15 +425,6 @@
   <value>1</value>
   <description>How many threads should the threadpool used to compile reports
   for volumes in parallel have.
-  </description>
-</property>
-
-<property>
-  <name>dfs.datanode.block.volume.choice.policy</name>
-  <value>org.apache.hadoop.hdfs.server.datanode.RoundRobinVolumesPolicy</value>
-  <description>The policy class to use to determine into which of the
-  datanode's available volumes a block must be written to. Default is a simple
-  round-robin policy that chooses volumes in a cyclic order.
   </description>
 </property>
 
@@ -836,6 +833,28 @@
   <description>
     How often, in seconds, the StandbyNode should check for new
     finalized log segments in the shared edits log.
+  </description>
+</property>
+
+<property>
+  <name>dfs.support.append</name>
+  <value>true</value>
+  <description>
+    Does HDFS allow appends to files?
+  </description>
+</property>
+
+<property>
+  <name>dfs.client.local.interfaces</name>
+  <value></value>
+  <description>A comma separated list of network interface names to use
+    for data transfer between the client and datanodes. When creating
+    a connection to read from or write to a datanode, the client
+    chooses one of the specified interfaces at random and binds its
+    socket to the IP of that interface. Individual names may be
+    specified as either an interface name (eg "eth0"), a subinterface
+    name (eg "eth0:0"), or an IP address (which may be specified using
+    CIDR notation to match a range of IPs).
   </description>
 </property>
 

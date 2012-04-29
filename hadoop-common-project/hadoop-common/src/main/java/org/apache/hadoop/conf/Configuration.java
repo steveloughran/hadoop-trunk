@@ -30,6 +30,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
+import java.net.InetSocketAddress;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -68,6 +69,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.codehaus.jackson.JsonFactory;
@@ -190,6 +192,12 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     CACHE_CLASSES = new WeakHashMap<ClassLoader, Map<String, Class<?>>>();
 
   /**
+   * Sentinel value to store negative cache results in {@link #CACHE_CLASSES}.
+   */
+  private static final Class<?> NEGATIVE_CACHE_SENTINEL =
+    NegativeCacheSentinel.class;
+
+  /**
    * Stores the mapping of key to the resource which modifies or loads 
    * the key most recently
    */
@@ -303,10 +311,29 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    * @return <code>true</code> if the key is deprecated and 
    *         <code>false</code> otherwise.
    */
-  private static boolean isDeprecated(String key) {
+  public static boolean isDeprecated(String key) {
     return deprecatedKeyMap.containsKey(key);
   }
- 
+
+  /**
+   * Returns the alternate name for a key if the property name is deprecated
+   * or if deprecates a property name.
+   *
+   * @param name property name.
+   * @return alternate name.
+   */
+  private String getAlternateName(String name) {
+    String altName;
+    DeprecatedKeyInfo keyInfo = deprecatedKeyMap.get(name);
+    if (keyInfo != null) {
+      altName = (keyInfo.newKeys.length > 0) ? keyInfo.newKeys[0] : null;
+    }
+    else {
+      altName = reverseDeprecatedKeyMap.get(name);
+    }
+    return altName;
+  }
+
   /**
    * Checks for the presence of the property <code>name</code> in the
    * deprecation map. Returns the first of the list of new keys if present
@@ -322,9 +349,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
   private String handleDeprecation(String name) {
     if (isDeprecated(name)) {
       DeprecatedKeyInfo keyInfo = deprecatedKeyMap.get(name);
-      if (!keyInfo.accessed) {
-        LOG.warn(keyInfo.getWarningMessage(name));
-      }
+      warnOnceIfDeprecated(name);
       for (String newKey : keyInfo.newKeys) {
         if(newKey != null) {
           name = newKey;
@@ -337,11 +362,6 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
         getOverlay().containsKey(deprecatedKey)) {
       getProps().setProperty(name, getOverlay().getProperty(deprecatedKey));
       getOverlay().setProperty(name, getOverlay().getProperty(deprecatedKey));
-      
-      DeprecatedKeyInfo keyInfo = deprecatedKeyMap.get(deprecatedKey);
-      if (!keyInfo.accessed) {
-        LOG.warn(keyInfo.getWarningMessage(deprecatedKey));
-      }
     }
     return name;
   }
@@ -619,8 +639,8 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
 
   /** 
    * Set the <code>value</code> of the <code>name</code> property. If 
-   * <code>name</code> is deprecated, it sets the <code>value</code> to the keys
-   * that replace the deprecated key.
+   * <code>name</code> is deprecated or there is a deprecated name associated to it,
+   * it sets the value to both names.
    * 
    * @param name property name.
    * @param value property value.
@@ -629,29 +649,35 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     if (deprecatedKeyMap.isEmpty()) {
       getProps();
     }
-    if (!isDeprecated(name)) {
-      getOverlay().setProperty(name, value);
-      getProps().setProperty(name, value);
-      updatingResource.put(name, UNKNOWN_RESOURCE);
+    getOverlay().setProperty(name, value);
+    getProps().setProperty(name, value);
+    updatingResource.put(name, UNKNOWN_RESOURCE);
+    String altName = getAlternateName(name);
+    if (altName != null) {
+      getOverlay().setProperty(altName, value);
+      getProps().setProperty(altName, value);
     }
-    else {
-      DeprecatedKeyInfo keyInfo = deprecatedKeyMap.get(name);
+    warnOnceIfDeprecated(name);
+  }
+
+  private void warnOnceIfDeprecated(String name) {
+    DeprecatedKeyInfo keyInfo = deprecatedKeyMap.get(name);
+    if (keyInfo != null && !keyInfo.accessed) {
       LOG.warn(keyInfo.getWarningMessage(name));
-      for (String newKey : keyInfo.newKeys) {
-        getOverlay().setProperty(newKey, value);
-        getProps().setProperty(newKey, value);
-      }
     }
   }
-  
+
   /**
    * Unset a previously set property.
    */
   public synchronized void unset(String name) {
-    name = handleDeprecation(name);
-
+    String altName = getAlternateName(name);
     getOverlay().remove(name);
     getProps().remove(name);
+    if (altName !=null) {
+      getOverlay().remove(altName);
+       getProps().remove(altName);
+    }
   }
 
   /**
@@ -938,11 +964,57 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    * bound may be omitted meaning all values up to or over. So the string 
    * above means 2, 3, 5, and 7, 8, 9, ...
    */
-  public static class IntegerRanges {
+  public static class IntegerRanges implements Iterable<Integer>{
     private static class Range {
       int start;
       int end;
     }
+    
+    private static class RangeNumberIterator implements Iterator<Integer> {
+      Iterator<Range> internal;
+      int at;
+      int end;
+
+      public RangeNumberIterator(List<Range> ranges) {
+        if (ranges != null) {
+          internal = ranges.iterator();
+        }
+        at = -1;
+        end = -2;
+      }
+      
+      @Override
+      public boolean hasNext() {
+        if (at <= end) {
+          return true;
+        } else if (internal != null){
+          return internal.hasNext();
+        }
+        return false;
+      }
+
+      @Override
+      public Integer next() {
+        if (at <= end) {
+          at++;
+          return at - 1;
+        } else if (internal != null){
+          Range found = internal.next();
+          if (found != null) {
+            at = found.start;
+            end = found.end;
+            at++;
+            return at - 1;
+          }
+        }
+        return null;
+      }
+
+      @Override
+      public void remove() {
+        throw new UnsupportedOperationException();
+      }
+    };
 
     List<Range> ranges = new ArrayList<Range>();
     
@@ -1001,6 +1073,13 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       return false;
     }
     
+    /**
+     * @return true if there are no values in this range, else false.
+     */
+    public boolean isEmpty() {
+      return ranges == null || ranges.isEmpty();
+    }
+    
     @Override
     public String toString() {
       StringBuilder result = new StringBuilder();
@@ -1017,6 +1096,12 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       }
       return result.toString();
     }
+
+    @Override
+    public Iterator<Integer> iterator() {
+      return new RangeNumberIterator(ranges);
+    }
+    
   }
 
   /**
@@ -1139,6 +1224,20 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
   }
 
   /**
+   * Get the socket address for <code>name</code> property as a
+   * <code>InetSocketAddress</code>.
+   * @param name property name.
+   * @param defaultAddress the default value
+   * @param defaultPort the default port
+   * @return InetSocketAddress
+   */
+  public InetSocketAddress getSocketAddr(
+      String name, String defaultAddress, int defaultPort) {
+    final String address = get(name, defaultAddress);
+    return NetUtils.createSocketAddr(address, defaultPort, name);
+  }
+  
+  /**
    * Load a class by name.
    * 
    * @param name the class name.
@@ -1173,24 +1272,24 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       }
     }
 
-    Class<?> clazz = null;
-    if (!map.containsKey(name)) {
+    Class<?> clazz = map.get(name);
+    if (clazz == null) {
       try {
         clazz = Class.forName(name, true, classLoader);
       } catch (ClassNotFoundException e) {
-        map.put(name, null); //cache negative that class is not found
+        // Leave a marker that the class isn't found
+        map.put(name, NEGATIVE_CACHE_SENTINEL);
         return null;
       }
       // two putters can race here, but they'll put the same class
       map.put(name, clazz);
-    } else { // check already performed on this class name
-      clazz = map.get(name);
-      if (clazz == null) { // found the negative
-        return null;
-      }
+      return clazz;
+    } else if (clazz == NEGATIVE_CACHE_SENTINEL) {
+      return null; // not found
+    } else {
+      // cache hit
+      return clazz;
     }
-
-    return clazz;
   }
 
   /** 
@@ -1894,4 +1993,10 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     Configuration.addDeprecation("fs.default.name", 
                new String[]{CommonConfigurationKeys.FS_DEFAULT_NAME_KEY});
   }
+  
+  /**
+   * A unique class which is used as a sentinel value in the caching
+   * for getClassByName. {@see Configuration#getClassByNameOrNull(String)}
+   */
+  private static abstract class NegativeCacheSentinel {}
 }

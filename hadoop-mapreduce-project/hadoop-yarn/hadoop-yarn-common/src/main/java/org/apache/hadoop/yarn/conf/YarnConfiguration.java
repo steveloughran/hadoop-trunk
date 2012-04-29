@@ -233,7 +233,25 @@ public class YarnConfiguration extends Configuration {
 
   /** Default queue name */
   public static final String DEFAULT_QUEUE_NAME = "default";
-  
+
+  /**
+   * Buckets (in minutes) for the number of apps running in each queue.
+   */
+  public static final String RM_METRICS_RUNTIME_BUCKETS =
+    RM_PREFIX + "metrics.runtime.buckets";
+
+  /**
+   * Default sizes of the runtime metric buckets in minutes.
+   */
+  public static final String DEFAULT_RM_METRICS_RUNTIME_BUCKETS = 
+    "60,300,1440";
+
+  public static final String RM_APP_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS = RM_PREFIX
+      + "application-tokens.master-key-rolling-interval-secs";
+
+  public static final long DEFAULT_RM_APP_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS =
+      24 * 60 * 60;
+
   ////////////////////////////////
   // Node Manager Configs
   ////////////////////////////////

@@ -39,6 +39,7 @@ import javax.net.SocketFactory;
 
 import org.apache.commons.logging.*;
 
+import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.ipc.Client.ConnectionId;
 import org.apache.hadoop.ipc.RpcPayloadHeader.RpcKind;
@@ -85,7 +86,7 @@ public class RPC {
      * @throws IOException
      **/
     public Writable call(Server server, String protocol,
-        Writable rpcRequest, long receiveTime) throws IOException ;
+        Writable rpcRequest, long receiveTime) throws Exception ;
   }
   
   static final Log LOG = LogFactory.getLog(RPC.class);
@@ -572,38 +573,44 @@ public class RPC {
   }
 
   /**
-   * Stop this proxy and release its invoker's resource by getting the
-   * invocation handler for the given proxy object and calling
-   * {@link Closeable#close} if that invocation handler implements
-   * {@link Closeable}.
+   * Stop the proxy. Proxy must either implement {@link Closeable} or must have
+   * associated {@link RpcInvocationHandler}.
    * 
-   * @param proxy the RPC proxy object to be stopped
+   * @param proxy
+   *          the RPC proxy object to be stopped
+   * @throws HadoopIllegalArgumentException
+   *           if the proxy does not implement {@link Closeable} interface or
+   *           does not have closeable {@link InvocationHandler}
    */
   public static void stopProxy(Object proxy) {
-    if (proxy instanceof ProtocolTranslator) {
-      RPC.stopProxy(((ProtocolTranslator)proxy)
-          .getUnderlyingProxyObject());
-      return;
+    if (proxy == null) {
+      throw new HadoopIllegalArgumentException(
+          "Cannot close proxy since it is null");
+    }
+    try {
+      if (proxy instanceof Closeable) {
+        ((Closeable) proxy).close();
+        return;
+      } else {
+        InvocationHandler handler = Proxy.getInvocationHandler(proxy);
+        if (handler instanceof Closeable) {
+          ((Closeable) handler).close();
+          return;
+        }
+      }
+    } catch (IOException e) {
+      LOG.error("Closing proxy or invocation handler caused exception", e);
+    } catch (IllegalArgumentException e) {
+      LOG.error("RPC.stopProxy called on non proxy.", e);
     }
     
-    InvocationHandler invocationHandler = null;
-    try {
-      invocationHandler = Proxy.getInvocationHandler(proxy);
-    } catch (IllegalArgumentException e) {
-      LOG.error("Tried to call RPC.stopProxy on an object that is not a proxy.", e);
-    }
-    if (proxy != null && invocationHandler != null &&
-        invocationHandler instanceof Closeable) {
-      try {
-        ((Closeable)invocationHandler).close();
-      } catch (IOException e) {
-        LOG.error("Stopping RPC invocation handler caused exception", e);
-      }
-    } else {
-      LOG.error("Could not get invocation handler " + invocationHandler +
-          " for proxy class " + (proxy == null ? null : proxy.getClass()) +
-          ", or invocation handler is not closeable.");
-    }
+    // If you see this error on a mock object in a unit test you're
+    // developing, make sure to use MockitoUtil.mockProtocol() to
+    // create your mock.
+    throw new HadoopIllegalArgumentException(
+        "Cannot close proxy - is not Closeable or "
+            + "does not provide closeable invocation handler "
+            + proxy.getClass());
   }
 
   /** 
@@ -647,7 +654,8 @@ public class RPC {
                                  final boolean verbose, Configuration conf) 
     throws IOException {
     return getServer(instance.getClass(),         // use impl class for protocol
-                     instance, bindAddress, port, numHandlers, false, conf, null);
+                     instance, bindAddress, port, numHandlers, false, conf, null,
+                     null);
   }
 
   /** Construct a server for a protocol implementation instance. */
@@ -655,7 +663,8 @@ public class RPC {
                                  Object instance, String bindAddress,
                                  int port, Configuration conf) 
     throws IOException {
-    return getServer(protocol, instance, bindAddress, port, 1, false, conf, null);
+    return getServer(protocol, instance, bindAddress, port, 1, false, conf, null,
+        null);
   }
 
   /** Construct a server for a protocol implementation instance.
@@ -669,7 +678,7 @@ public class RPC {
     throws IOException {
     
     return getServer(protocol, instance, bindAddress, port, numHandlers, verbose,
-                 conf, null);
+                 conf, null, null);
   }
   
   /** Construct a server for a protocol implementation instance. */
@@ -679,10 +688,20 @@ public class RPC {
                                  boolean verbose, Configuration conf,
                                  SecretManager<? extends TokenIdentifier> secretManager) 
     throws IOException {
-    
+    return getServer(protocol, instance, bindAddress, port, numHandlers, verbose,
+        conf, secretManager, null);
+  }
+  
+  public static Server getServer(Class<?> protocol,
+      Object instance, String bindAddress, int port,
+      int numHandlers,
+      boolean verbose, Configuration conf,
+      SecretManager<? extends TokenIdentifier> secretManager,
+      String portRangeConfig) 
+  throws IOException {
     return getProtocolEngine(protocol, conf)
       .getServer(protocol, instance, bindAddress, port, numHandlers, -1, -1,
-                 verbose, conf, secretManager);
+                 verbose, conf, secretManager, portRangeConfig);
   }
 
   /** Construct a server for a protocol implementation instance. */
@@ -697,7 +716,8 @@ public class RPC {
     
     return getProtocolEngine(protocol, conf)
       .getServer(protocol, instance, bindAddress, port, numHandlers,
-                 numReaders, queueSizePerHandler, verbose, conf, secretManager);
+                 numReaders, queueSizePerHandler, verbose, conf, secretManager,
+                 null);
   }
 
   /** An RPC Server. */
@@ -848,9 +868,10 @@ public class RPC {
                      Class<? extends Writable> paramClass, int handlerCount,
                      int numReaders, int queueSizePerHandler,
                      Configuration conf, String serverName, 
-                     SecretManager<? extends TokenIdentifier> secretManager) throws IOException {
+                     SecretManager<? extends TokenIdentifier> secretManager,
+                     String portRangeConfig) throws IOException {
       super(bindAddress, port, paramClass, handlerCount, numReaders, queueSizePerHandler,
-            conf, serverName, secretManager);
+            conf, serverName, secretManager, portRangeConfig);
       initProtocolMetaInfo(conf);
     }
     
@@ -880,7 +901,7 @@ public class RPC {
     
     @Override
     public Writable call(RpcKind rpcKind, String protocol,
-        Writable rpcRequest, long receiveTime) throws IOException {
+        Writable rpcRequest, long receiveTime) throws Exception {
       return getRpcInvoker(rpcKind).call(this, protocol, rpcRequest,
           receiveTime);
     }

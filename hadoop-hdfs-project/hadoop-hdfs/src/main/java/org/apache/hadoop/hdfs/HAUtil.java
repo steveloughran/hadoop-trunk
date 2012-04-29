@@ -30,11 +30,14 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -49,6 +52,9 @@ public class HAUtil {
   private static final Log LOG = 
     LogFactory.getLog(HAUtil.class);
   
+  private static final DelegationTokenSelector tokenSelector =
+      new DelegationTokenSelector();
+
   private HAUtil() { /* Hidden constructor */ }
 
   /**
@@ -238,24 +244,50 @@ public class HAUtil {
    * one is found, clone it to also represent the underlying namenode address.
    * @param ugi the UGI to modify
    * @param haUri the logical URI for the cluster
-   * @param singleNNAddr one of the NNs in the cluster to which the token
+   * @param nnAddrs collection of NNs in the cluster to which the token
    * applies
    */
   public static void cloneDelegationTokenForLogicalUri(
       UserGroupInformation ugi, URI haUri,
-      InetSocketAddress singleNNAddr) {
-    Text haService = buildTokenServiceForLogicalUri(haUri);
+      Collection<InetSocketAddress> nnAddrs) {
+    Text haService = HAUtil.buildTokenServiceForLogicalUri(haUri);
     Token<DelegationTokenIdentifier> haToken =
-        DelegationTokenSelector.selectHdfsDelegationToken(haService, ugi);
-    if (haToken == null) {
-      // no token
-      return;
+        tokenSelector.selectToken(haService, ugi.getTokens());
+    if (haToken != null) {
+      for (InetSocketAddress singleNNAddr : nnAddrs) {
+        Token<DelegationTokenIdentifier> specificToken =
+            new Token<DelegationTokenIdentifier>(haToken);
+        SecurityUtil.setTokenService(specificToken, singleNNAddr);
+        ugi.addToken(specificToken);
+        LOG.debug("Mapped HA service delegation token for logical URI " +
+            haUri + " to namenode " + singleNNAddr);
+      }
+    } else {
+      LOG.debug("No HA service delegation token found for logical URI " +
+          haUri);
     }
-    Token<DelegationTokenIdentifier> specificToken =
-        new Token<DelegationTokenIdentifier>(haToken);
-    specificToken.setService(SecurityUtil.buildTokenService(singleNNAddr));
-    ugi.addToken(specificToken);
-    LOG.debug("Mapped HA service delegation token for logical URI " +
-        haUri + " to namenode " + singleNNAddr);
+  }
+
+  /**
+   * Get the internet address of the currently-active NN. This should rarely be
+   * used, since callers of this method who connect directly to the NN using the
+   * resulting InetSocketAddress will not be able to connect to the active NN if
+   * a failover were to occur after this method has been called.
+   * 
+   * @param fs the file system to get the active address of.
+   * @return the internet address of the currently-active NN.
+   * @throws IOException if an error occurs while resolving the active NN.
+   */
+  @SuppressWarnings("deprecation")
+  public static InetSocketAddress getAddressOfActive(FileSystem fs)
+      throws IOException {
+    if (!(fs instanceof DistributedFileSystem)) {
+      throw new IllegalArgumentException("FileSystem " + fs + " is not a DFS.");
+    }
+    // force client address resolution.
+    fs.exists(new Path("/"));
+    DistributedFileSystem dfs = (DistributedFileSystem) fs;
+    DFSClient dfsClient = dfs.getClient();
+    return RPC.getServerAddress(dfsClient.getNamenode());
   }
 }

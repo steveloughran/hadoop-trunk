@@ -70,7 +70,6 @@ public class TestFileAppend3 extends junit.framework.TestCase {
         AppendTestUtil.LOG.info("setUp()");
         conf = new HdfsConfiguration();
         conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, 512);
-        conf.setBoolean(DFSConfigKeys.DFS_SUPPORT_APPEND_KEY, true);
         buffersize = conf.getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096);
         cluster = new MiniDFSCluster.Builder(conf).numDataNodes(DATANODE_NUM).build();
         fs = (DistributedFileSystem)cluster.getFileSystem();
@@ -272,8 +271,8 @@ public class TestFileAppend3 extends junit.framework.TestCase {
       }
       for(DatanodeInfo datanodeinfo : lb.getLocations()) {
         final DataNode dn = cluster.getDataNode(datanodeinfo.getIpcPort());
-        final Block metainfo = dn.data.getStoredBlock(blk.getBlockPoolId(), 
-            blk.getBlockId());
+        final Block metainfo = DataNodeTestUtils.getFSDataset(dn).getStoredBlock(
+            blk.getBlockPoolId(), blk.getBlockId());
         assertEquals(size, metainfo.getNumBytes());
       }
     }
