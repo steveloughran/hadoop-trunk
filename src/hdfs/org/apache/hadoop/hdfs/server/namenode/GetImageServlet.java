@@ -17,9 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_KRB_HTTPS_USER_NAME_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SECONDARY_NAMENODE_KRB_HTTPS_USER_NAME_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SECONDARY_NAMENODE_USER_NAME_KEY;
 
 import java.io.IOException;
@@ -36,7 +34,6 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 
@@ -58,12 +55,13 @@ public class GetImageServlet extends HttpServlet {
       final FSImage nnImage = (FSImage)context.getAttribute("name.system.image");
       final TransferFsImage ff = new TransferFsImage(pmap, request, response);
       final Configuration conf = (Configuration)getServletContext().getAttribute(JspHelper.CURRENT_CONF);
+
       if(UserGroupInformation.isSecurityEnabled() && 
-          !isValidRequestor(request.getRemoteUser(), conf)) {
+          !isValidRequestor(request.getUserPrincipal().getName(), conf)) {
         response.sendError(HttpServletResponse.SC_FORBIDDEN, 
             "Only Namenode and Secondary Namenode may access this servlet");
         LOG.warn("Received non-NN/SNN request for image or edits from " 
-            + request.getRemoteHost());
+            + request.getUserPrincipal().getName() + " at " + request.getRemoteHost());
         return;
       }
       
@@ -82,31 +80,11 @@ public class GetImageServlet extends HttpServlet {
           } else if (ff.putImage()) {
             // issue a HTTP get request to download the new fsimage 
             nnImage.validateCheckpointUpload(ff.getToken());
-            reloginIfNecessary().doAs(new PrivilegedExceptionAction<Void>() {
-              @Override
-              public Void run() throws Exception {
-                TransferFsImage.getFileClient(ff.getInfoServer(), "getimage=1", 
-                    nnImage.getFsImageNameCheckpoint());
-                return null;
-              }
-            });
-
+            TransferFsImage.getFileClient(ff.getInfoServer(), "getimage=1",
+                nnImage.getFsImageNameCheckpoint());
             nnImage.checkpointUploadDone();
           }
           return null;
-        }
-
-        // We may have lost our ticket since the last time we tried to open
-        // an http connection, so log in just in case.
-        private UserGroupInformation reloginIfNecessary() throws IOException {
-          // This method is only called on the NN, therefore it is safe to
-          // use these key values.
-          return UserGroupInformation
-          .loginUserFromKeytabAndReturnUGI(
-                  SecurityUtil.getServerPrincipal(conf
-                      .get(DFS_NAMENODE_KRB_HTTPS_USER_NAME_KEY), NameNode
-                      .getAddress(conf).getHostName()),
-              conf.get(DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY));
         }
       });
 
@@ -127,25 +105,19 @@ public class GetImageServlet extends HttpServlet {
     }
     
     String[] validRequestors = {
-        SecurityUtil.getServerPrincipal(conf
-            .get(DFS_NAMENODE_KRB_HTTPS_USER_NAME_KEY), NameNode.getAddress(
-            conf).getHostName()),
         SecurityUtil.getServerPrincipal(conf.get(DFS_NAMENODE_USER_NAME_KEY),
             NameNode.getAddress(conf).getHostName()),
-        SecurityUtil.getServerPrincipal(conf
-            .get(DFS_SECONDARY_NAMENODE_KRB_HTTPS_USER_NAME_KEY),
-            SecondaryNameNode.getHttpAddress(conf).getHostName()),
         SecurityUtil.getServerPrincipal(conf
             .get(DFS_SECONDARY_NAMENODE_USER_NAME_KEY), SecondaryNameNode
             .getHttpAddress(conf).getHostName()) };
     
     for(String v : validRequestors) {
       if(v != null && v.equals(remoteUser)) {
-        if(LOG.isDebugEnabled()) LOG.debug("isValidRequestor is allowing: " + remoteUser);
+        if(LOG.isInfoEnabled()) LOG.info("GetImageServlet allowing: " + remoteUser);
         return true;
       }
     }
-    if(LOG.isDebugEnabled()) LOG.debug("isValidRequestor is rejecting: " + remoteUser);
+    if(LOG.isInfoEnabled()) LOG.info("GetImageServlet rejecting: " + remoteUser);
     return false;
   }
 }

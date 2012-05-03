@@ -216,13 +216,13 @@ public class HftpFileSystem extends FileSystem
       ugi.checkTGTAndReloginFromKeytab();
       return ugi.doAs(new PrivilegedExceptionAction<Token<?>>() {
         public Token<?> run() throws IOException {
-          final String nnHttpUrl = DFSUtil.createUri("https", nnSecureAddr).toString();
+          final String nnHttpUrl = DFSUtil.createUri("http", nnSecureAddr).toString();
           Credentials c;
           try {
             c = DelegationTokenFetcher.getDTfromRemote(nnHttpUrl, renewer);
           } catch (Exception e) {
             LOG.info("Couldn't get a delegation token from " + nnHttpUrl + 
-            " using https.");
+            " using http.");
             LOG.debug("error was ", e);
             //Maybe the server is in unsecure mode (that's bad but okay)
             remoteIsInsecure = true;
@@ -670,10 +670,10 @@ public class HftpFileSystem extends FileSystem
                       Configuration conf) throws IOException {
       // update the kerberos credentials, if they are coming from a keytab
       UserGroupInformation.getLoginUser().checkTGTAndReloginFromKeytab();
-      // use https to renew the token
+      // use http to renew the token
       InetSocketAddress serviceAddr = SecurityUtil.getTokenServiceAddr(token);
       return DelegationTokenFetcher.renewDelegationToken(
-          DFSUtil.createUri("https", serviceAddr).toString(),
+          DFSUtil.createUri("http", serviceAddr).toString(),
           (Token<DelegationTokenIdentifier>) token
       );
     }
@@ -684,10 +684,10 @@ public class HftpFileSystem extends FileSystem
                        Configuration conf) throws IOException {
       // update the kerberos credentials, if they are coming from a keytab
       UserGroupInformation.getLoginUser().checkTGTAndReloginFromKeytab();
-      // use https to cancel the token
+      // use http to cancel the token
       InetSocketAddress serviceAddr = SecurityUtil.getTokenServiceAddr(token);
       DelegationTokenFetcher.cancelDelegationToken(
-          DFSUtil.createUri("https", serviceAddr).toString(), 
+          DFSUtil.createUri("http", serviceAddr).toString(),
           (Token<DelegationTokenIdentifier>) token
       );
     }

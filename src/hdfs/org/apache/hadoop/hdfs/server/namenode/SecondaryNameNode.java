@@ -19,21 +19,21 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
 import org.apache.hadoop.hdfs.server.common.InconsistentFSStateException;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
@@ -42,9 +42,9 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.metrics2.source.JvmMetricsSource;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.Krb5AndCertsSslSocketConnector;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.StringUtils;
 
@@ -79,7 +79,7 @@ public class SecondaryNameNode implements Runnable {
   private volatile boolean shouldRun;
   private HttpServer infoServer;
   private int infoPort;
-  private int imagePort;
+  //private int imagePort;
   private String infoBindAddress;
 
   private Collection<File> checkpointDirs;
@@ -179,57 +179,44 @@ public class SecondaryNameNode implements Runnable {
     checkpointSize = conf.getLong("fs.checkpoint.size", 4194304);
 
     // initialize the webserver for uploading files.
-    // Kerberized SSL servers must be run from the host principal...
-    UserGroupInformation httpUGI = 
-      UserGroupInformation.loginUserFromKeytabAndReturnUGI(
-          SecurityUtil.getServerPrincipal(conf
-        .get(DFSConfigKeys.DFS_SECONDARY_NAMENODE_KRB_HTTPS_USER_NAME_KEY), 
-        infoBindAddress), 
-        conf.get(DFSConfigKeys.DFS_SECONDARY_NAMENODE_KEYTAB_FILE_KEY));
-    try {
-      infoServer = httpUGI.doAs(new PrivilegedExceptionAction<HttpServer>() {
-
-        @Override
-        public HttpServer run() throws IOException, InterruptedException {
-          LOG.info("Starting web server as: " +
-              UserGroupInformation.getCurrentUser().getUserName());
-
-          int tmpInfoPort = infoSocAddr.getPort();
-          infoServer = new HttpServer("secondary", infoBindAddress, tmpInfoPort,
-              tmpInfoPort == 0, conf, 
-              SecurityUtil.getAdminAcls(conf, DFSConfigKeys.DFS_ADMIN));
-          
-          if(UserGroupInformation.isSecurityEnabled()) {
-            System.setProperty("https.cipherSuites", 
-                Krb5AndCertsSslSocketConnector.KRB5_CIPHER_SUITES.get(0));
-            InetSocketAddress secInfoSocAddr = 
-              NetUtils.createSocketAddr(infoBindAddress + ":"+ conf.get(
-                "dfs.secondary.https.port", infoBindAddress + ":" + 0));
-            imagePort = secInfoSocAddr.getPort();
-            infoServer.addSslListener(secInfoSocAddr, conf, false, true);
+    int tmpInfoPort = infoSocAddr.getPort();
+    infoServer = new HttpServer("secondary", infoBindAddress, tmpInfoPort,
+        tmpInfoPort == 0, conf,
+        SecurityUtil.getAdminAcls(conf, DFSConfigKeys.DFS_ADMIN)) {
+                  {
+        if (UserGroupInformation.isSecurityEnabled()) {
+          Map<String, String> params = new HashMap<String, String>();
+          String principalInConf = conf.get(DFSConfigKeys.DFS_SECONDARY_NAMENODE_INTERNAL_SPENGO_USER_NAME_KEY);
+          if (principalInConf != null && !principalInConf.isEmpty()) {
+            params.put("kerberos.principal",
+                    SecurityUtil.getServerPrincipal(principalInConf, infoSocAddr.getHostName()));
           }
-          
-          infoServer.setAttribute("name.system.image", checkpointImage);
-          infoServer.setAttribute(JspHelper.CURRENT_CONF, conf);
-          infoServer.addInternalServlet("getimage", "/getimage",
-              GetImageServlet.class, true);
-          infoServer.start();
-          return infoServer;
+          String httpKeytab = conf.get(DFSConfigKeys.DFS_SECONDARY_NAMENODE_KEYTAB_FILE_KEY);
+          if (httpKeytab != null && !httpKeytab.isEmpty()) {
+            params.put("kerberos.keytab", httpKeytab);
+          }
+
+          params.put(AuthenticationFilter.AUTH_TYPE, "kerberos");
+
+          defineFilter(webAppContext, SPNEGO_FILTER, AuthenticationFilter.class.getName(),
+                  params, null);
         }
-      });
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    }
+      }
+    };
+
+    infoServer.setAttribute("name.system.image", checkpointImage);
+    infoServer.setAttribute(JspHelper.CURRENT_CONF, conf);
+    infoServer.addInternalServlet("getimage", "/getimage",
+        GetImageServlet.class, true);
+    infoServer.start();
+
     LOG.info("Web server init done");
     // The web-server port can be ephemeral... ensure we have the correct info
     
     infoPort = infoServer.getPort();
-    if(!UserGroupInformation.isSecurityEnabled())
-      imagePort = infoPort;
-    
+
     conf.set("dfs.secondary.http.address", infoBindAddress + ":" +infoPort); 
     LOG.info("Secondary Web-server up at: " + infoBindAddress + ":" +infoPort);
-    LOG.info("Secondary image servlet up at: " + infoBindAddress + ":" + imagePort);
     LOG.warn("Checkpoint Period   :" + checkpointPeriod + " secs " +
              "(" + checkpointPeriod/60 + " min)");
     LOG.warn("Log Size Trigger    :" + checkpointSize + " bytes " +
@@ -370,7 +357,7 @@ public class SecondaryNameNode implements Runnable {
    * Copy the new fsimage into the NameNode
    */
   private void putFSImage(CheckpointSignature sig) throws IOException {
-    String fileid = "putimage=1&port=" + imagePort +
+    String fileid = "putimage=1&port=" + infoPort +
       "&machine=" + infoBindAddress +
       "&token=" + sig.toString();
     LOG.info("Posted URL " + fsName + fileid);

@@ -66,11 +66,6 @@ public class DelegationTokenFetcher {
   private static final String WEBSERVICE = "webservice";
   private static final String CANCEL = "cancel";
   private static final String RENEW = "renew";
-  
-  static {
-    // Enable Kerberos sockets
-    System.setProperty("https.cipherSuites", "TLS_KRB5_WITH_3DES_EDE_CBC_SHA");
-  }
 
   private static void printUsage(PrintStream err) throws IOException {
     err.println("fetchdt retrieves delegation tokens from the NameNode");
@@ -98,7 +93,7 @@ public class DelegationTokenFetcher {
     final Configuration conf = new Configuration();
     Options fetcherOptions = new Options();
     fetcherOptions.addOption(WEBSERVICE, true, 
-                             "HTTPS url to reach the NameNode at");
+                             "HTTP url to reach the NameNode at");
     fetcherOptions.addOption(CANCEL, false, "cancel the token");
     fetcherOptions.addOption(RENEW, false, "renew the token");
     GenericOptionsParser parser =
@@ -176,7 +171,8 @@ public class DelegationTokenFetcher {
   
   /**
    * Utility method to obtain a delegation token over http
-   * @param nnHttpAddr Namenode http addr, such as http://namenode:50070
+   * @param nnAddr Namenode http addr, such as http://namenode:50070
+   * @param renewer User that is renewing the ticket in such a request
    */
   static public Credentials getDTfromRemote(String nnAddr, 
                                             String renewer) throws IOException {
@@ -195,8 +191,7 @@ public class DelegationTokenFetcher {
         LOG.debug("Retrieving token from: " + url);
       }
       URL remoteURL = new URL(url.toString());
-      SecurityUtil.fetchServiceTicket(remoteURL);
-      URLConnection connection = remoteURL.openConnection();
+      URLConnection connection = SecurityUtil.openSecureHttpConnection(remoteURL);
 
       InputStream in = connection.getInputStream();
       Credentials ts = new Credentials();
@@ -235,8 +230,7 @@ public class DelegationTokenFetcher {
     HttpURLConnection connection = null;
     try {
       URL url = new URL(buf.toString());
-      SecurityUtil.fetchServiceTicket(url);
-      connection = (HttpURLConnection)url.openConnection();
+      connection = (HttpURLConnection) SecurityUtil.openSecureHttpConnection(url);
       in = new BufferedReader(new InputStreamReader
                               (connection.getInputStream()));
       long result = Long.parseLong(in.readLine());
@@ -301,8 +295,8 @@ public class DelegationTokenFetcher {
     BufferedReader in = null;
     try {
       URL url = new URL(buf.toString());
-      SecurityUtil.fetchServiceTicket(url);
-      HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+      HttpURLConnection connection =
+              (HttpURLConnection)SecurityUtil.openSecureHttpConnection(url);
       if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
         throw new IOException("Error cancelling token:" + 
                               connection.getResponseMessage());

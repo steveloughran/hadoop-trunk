@@ -30,8 +30,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NamenodeFsck;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.Krb5AndCertsSslSocketConnector;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Tool;
@@ -110,14 +108,7 @@ public class DFSck extends Configured implements Tool {
       return UserGroupInformation.getCurrentUser().doAs(new PrivilegedExceptionAction<Integer>() {      
         @Override
         public Integer run() throws Exception {
-
-          String proto = "http://";
-          if(UserGroupInformation.isSecurityEnabled()) { 
-             System.setProperty("https.cipherSuites", Krb5AndCertsSslSocketConnector.KRB5_CIPHER_SUITES.get(0));
-             proto = "https://";
-          }
-          
-          final StringBuffer url = new StringBuffer(proto);
+          final StringBuffer url = new StringBuffer("http://");
           url.append(NameNode.getInfoServer(getConf())).append("/fsck?ugi=").append(ugi.getShortUserName()).append("&path=");
 
           String dir = "/";
@@ -135,9 +126,10 @@ public class DFSck extends Configured implements Tool {
             else if (args[idx].equals("-locations")) { url.append("&locations=1"); }
             else if (args[idx].equals("-racks")) { url.append("&racks=1"); }
           }
+
           URL path = new URL(url.toString());
-          SecurityUtil.fetchServiceTicket(path);
-          URLConnection connection = path.openConnection();
+
+          URLConnection connection = SecurityUtil.openSecureHttpConnection(path);
           InputStream stream = connection.getInputStream();
           BufferedReader input = new BufferedReader(new InputStreamReader(
               stream, "UTF-8"));
