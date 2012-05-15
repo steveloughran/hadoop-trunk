@@ -19,9 +19,8 @@ package org.apache.hadoop.io.retry;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.ipc.RemoteException;
@@ -248,6 +247,13 @@ public class RetryPolicies {
     public ExponentialBackoffRetry(
         int maxRetries, long sleepTime, TimeUnit timeUnit) {
       super(maxRetries, sleepTime, timeUnit);
+
+      if (maxRetries < 0) {
+        throw new IllegalArgumentException("maxRetries = " + maxRetries + " < 0");
+      } else if (maxRetries > 30) {
+        //if maxRetries > 30, calculateSleepTime will overflow. 
+        throw new IllegalArgumentException("maxRetries = " + maxRetries + " > 30");
+      }
     }
     
     @Override

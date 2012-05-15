@@ -39,6 +39,7 @@ import org.apache.hadoop.hdfs.server.common.UpgradeStatusReport;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
+import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -110,7 +111,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
   public static ClientProtocol createNamenode( InetSocketAddress nameNodeAddr,
       Configuration conf) throws IOException {
     return createNamenode(createRPCNamenode(nameNodeAddr, conf,
-      UserGroupInformation.getCurrentUser()));
+      UserGroupInformation.getCurrentUser()), conf);
   }
 
   private static ClientProtocol createRPCNamenode(InetSocketAddress nameNodeAddr,
@@ -121,8 +122,65 @@ public class DFSClient implements FSConstants, java.io.Closeable {
         NetUtils.getSocketFactory(conf, ClientProtocol.class));
   }
 
-  private static ClientProtocol createNamenode(ClientProtocol rpcNamenode)
-    throws IOException {
+  /**
+   * Return the default retry policy used in RPC.
+   * 
+   * If dfs.client.retry.max == 0, use TRY_ONCE_THEN_FAIL.
+   * 
+   * If dfs.client.retry.max > 0, then 
+   * (1) use exponentialBackoff for
+   *     - SafeModeException, or
+   *     - IOException other than RemoteException; and
+   * (2) use TRY_ONCE_THEN_FAIL for
+   *     - non-SafeMode RemoteException, or
+   *     - non-IOException.
+   *     
+   * Note that dfs.client.retry.max < 0 is not allowed.
+   */
+  private static RetryPolicy getDefaultRpcRetryPolicy(Configuration conf) {
+    final int maxRetries = conf.getInt(DFSConfigKeys.DFS_CLIENT_RETRY_MAX_KEY,
+                                       DFSConfigKeys.DFS_CLIENT_RETRY_MAX_DEFAULT);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(DFSConfigKeys.DFS_CLIENT_RETRY_MAX_KEY + " = " + maxRetries);
+    }
+    if (maxRetries == 0) {
+      //no retry
+      return RetryPolicies.TRY_ONCE_THEN_FAIL;
+    } else {
+      //use exponential backoff
+      final RetryPolicy exponentialBackoff = RetryPolicies.exponentialBackoffRetry(
+          maxRetries, 1000, TimeUnit.MILLISECONDS);
+      return new RetryPolicy() {
+        @Override
+        public boolean shouldRetry(Exception e, int retries) throws Exception {
+          //see (1) and (2) in the javadoc of this method.
+          final RetryPolicy p;
+          if (e instanceof RemoteException) {
+            final RemoteException re = (RemoteException)e;
+            p = SafeModeException.class.getName().equals(re.getClassName())?
+                exponentialBackoff: RetryPolicies.TRY_ONCE_THEN_FAIL;
+          } else if (e instanceof IOException) {
+            p = exponentialBackoff;
+          } else { //non-IOException
+            p = RetryPolicies.TRY_ONCE_THEN_FAIL;
+          }
+
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("RETRY " + retries + ") policy="
+                + p.getClass().getSimpleName() + ", exception=" + e);
+          }
+          return p.shouldRetry(e, retries);
+        }
+      };
+    }
+  }
+
+  private static ClientProtocol createNamenode(ClientProtocol rpcNamenode,
+      Configuration conf) throws IOException {
+    //default policy
+    final RetryPolicy defaultPolicy = getDefaultRpcRetryPolicy(conf);
+
+    //create policy
     RetryPolicy createPolicy = RetryPolicies.retryUpToMaximumCountWithFixedSleep(
         5, LEASE_SOFTLIMIT_PERIOD, TimeUnit.MILLISECONDS);
     
@@ -134,15 +192,15 @@ public class DFSClient implements FSConstants, java.io.Closeable {
       new HashMap<Class<? extends Exception>, RetryPolicy>();
     exceptionToPolicyMap.put(RemoteException.class, 
         RetryPolicies.retryByRemoteException(
-            RetryPolicies.TRY_ONCE_THEN_FAIL, remoteExceptionToPolicyMap));
+            defaultPolicy, remoteExceptionToPolicyMap));
     RetryPolicy methodPolicy = RetryPolicies.retryByException(
-        RetryPolicies.TRY_ONCE_THEN_FAIL, exceptionToPolicyMap);
+        defaultPolicy, exceptionToPolicyMap);
     Map<String,RetryPolicy> methodNameToPolicyMap = new HashMap<String,RetryPolicy>();
     
     methodNameToPolicyMap.put("create", methodPolicy);
 
     return (ClientProtocol) RetryProxy.create(ClientProtocol.class,
-        rpcNamenode, methodNameToPolicyMap);
+        rpcNamenode, defaultPolicy, methodNameToPolicyMap);
   }
 
   /** Create {@link ClientDatanodeProtocol} proxy with block/token */
@@ -236,7 +294,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
 
     if (nameNodeAddr != null && rpcNamenode == null) {
       this.rpcNamenode = createRPCNamenode(nameNodeAddr, conf, ugi);
-      this.namenode = createNamenode(this.rpcNamenode);
+      this.namenode = createNamenode(this.rpcNamenode, conf);
     } else if (nameNodeAddr == null && rpcNamenode != null) {
       //This case is used for testing.
       this.namenode = this.rpcNamenode = rpcNamenode;
