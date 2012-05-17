@@ -5096,4 +5096,42 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     return map;
   }
   // End MXbean implementaiton
+
+  /**
+   * JobTracker SafeMode
+   */
+  // SafeMode actions
+  public enum SafeModeAction{ SAFEMODE_LEAVE, SAFEMODE_ENTER, SAFEMODE_GET; }
+  
+  private AtomicBoolean safeMode = new AtomicBoolean(false);
+
+  public boolean setSafeMode(JobTracker.SafeModeAction safeModeAction) 
+      throws IOException {
+    if (safeModeAction == SafeModeAction.SAFEMODE_GET) {
+      LOG.info("Getting safemode information: safemode=" + safeMode + ". " +
+          "Requested by : " +
+          UserGroupInformation.getCurrentUser().getShortUserName());
+    } else {
+      boolean safeMode = false;
+      if (safeModeAction == SafeModeAction.SAFEMODE_ENTER) {
+        safeMode = true;
+      } else if (safeModeAction == SafeModeAction.SAFEMODE_LEAVE) {
+        safeMode = false;
+      }
+      LOG.info("Setting safe mode to " + safeMode + ". Requested by : " +
+          UserGroupInformation.getCurrentUser().getShortUserName());
+      this.safeMode.set(safeMode);
+    }
+    return this.safeMode.get();
+  }
+
+  public boolean getSafeMode() {
+    return safeMode.get();
+  }
+  
+  String getSafeModeText() {
+    if (!getSafeMode())
+      return "OFF";
+    return "<em>ON</em>";
+  }
 }
