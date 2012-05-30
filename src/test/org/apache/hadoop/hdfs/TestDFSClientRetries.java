@@ -28,6 +28,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -538,9 +539,11 @@ public class TestDFSClientRetries extends TestCase {
         conf, numDatanodes, true, null);
     try {
       cluster.waitActive();
+      final DistributedFileSystem dfs = (DistributedFileSystem)cluster.getFileSystem();
+      final URI uri = dfs.getUri();
+      assertTrue(DistributedFileSystem.isHealthy(uri));
 
       //create a file
-      final DistributedFileSystem dfs = (DistributedFileSystem)cluster.getFileSystem();
       final long length = 1L << 20;
       final Path file1 = new Path(dir, "foo"); 
       DFSTestUtil.createFile(dfs, file1, length, numDatanodes, 20120406L);
@@ -550,7 +553,9 @@ public class TestDFSClientRetries extends TestCase {
       assertEquals(length, s1.getLen());
 
       //shutdown namenode
+      assertTrue(DistributedFileSystem.isHealthy(uri));
       cluster.shutdownNameNode();
+      assertFalse(DistributedFileSystem.isHealthy(uri));
 
       //restart namenode in a new thread
       new Thread(new Runnable() {
@@ -559,8 +564,10 @@ public class TestDFSClientRetries extends TestCase {
           try {
             //sleep, restart, and then wait active
             TimeUnit.SECONDS.sleep(30);
+            assertFalse(DistributedFileSystem.isHealthy(uri));
             cluster.restartNameNode(false, false);
             cluster.waitActive();
+            assertTrue(DistributedFileSystem.isHealthy(uri));
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
@@ -572,7 +579,9 @@ public class TestDFSClientRetries extends TestCase {
       assertEquals(s1, s2);
 
       //enter safe mode
+      assertTrue(DistributedFileSystem.isHealthy(uri));
       dfs.setSafeMode(SafeModeAction.SAFEMODE_ENTER);
+      assertFalse(DistributedFileSystem.isHealthy(uri));
       
       //leave safe mode in a new thread
       new Thread(new Runnable() {
@@ -581,7 +590,9 @@ public class TestDFSClientRetries extends TestCase {
           try {
             //sleep and then leave safe mode
             TimeUnit.SECONDS.sleep(30);
+            assertFalse(DistributedFileSystem.isHealthy(uri));
             dfs.setSafeMode(SafeModeAction.SAFEMODE_LEAVE);
+            assertTrue(DistributedFileSystem.isHealthy(uri));
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
@@ -592,6 +603,8 @@ public class TestDFSClientRetries extends TestCase {
       final Path file2 = new Path(dir, "bar");
       DFSTestUtil.createFile(dfs, file2, length, numDatanodes, 20120406L);
       assertEquals(dfs.getFileChecksum(file1), dfs.getFileChecksum(file2));
+
+      assertTrue(DistributedFileSystem.isHealthy(uri));
       
       //make sure it won't retry on exceptions like FileNotFoundException
       final Path nonExisting = new Path(dir, "nonExisting");
