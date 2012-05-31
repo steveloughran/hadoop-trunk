@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import junit.framework.Assert;
 import junit.framework.TestCase;
 
 import org.apache.commons.logging.Log;
@@ -66,6 +67,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.retry.RetryPolicies.MultipleLinearRandomRetry;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.Server;
@@ -529,10 +531,12 @@ public class TestDFSClientRetries extends TestCase {
   public void testNamenodeRestart() throws Exception {
     ((Log4JLogger)DFSClient.LOG).getLogger().setLevel(Level.ALL);
 
+    final List<Exception> exceptions = new ArrayList<Exception>();
+
     final Path dir = new Path("/testNamenodeRestart");
 
     final Configuration conf = new Configuration();
-    conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_MAX_KEY, 10);
+    conf.setBoolean(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_KEY, true);
 
     final short numDatanodes = 3;
     final MiniDFSCluster cluster = new MiniDFSCluster(
@@ -557,6 +561,22 @@ public class TestDFSClientRetries extends TestCase {
       cluster.shutdownNameNode();
       assertFalse(DistributedFileSystem.isHealthy(uri));
 
+      //namenode is down, create another file in a thread
+      final Path file3 = new Path(dir, "file"); 
+      final Thread thread = new Thread(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            //it should retry till namenode is up.
+            final FileSystem fs = AppendTestUtil.createHdfsWithDifferentUsername(conf);
+            DFSTestUtil.createFile(fs, file3, length, numDatanodes, 20120406L);
+          } catch (Exception e) {
+            exceptions.add(e);
+          }
+        }
+      });
+      thread.start();
+ 
       //restart namenode in a new thread
       new Thread(new Runnable() {
         @Override
@@ -569,7 +589,7 @@ public class TestDFSClientRetries extends TestCase {
             cluster.waitActive();
             assertTrue(DistributedFileSystem.isHealthy(uri));
           } catch (Exception e) {
-            throw new RuntimeException(e);
+            exceptions.add(e);
           }
         }
       }).start();
@@ -577,6 +597,10 @@ public class TestDFSClientRetries extends TestCase {
       //namenode is down, it should retry until namenode is up again. 
       final FileStatus s2 = dfs.getFileStatus(file1);
       assertEquals(s1, s2);
+
+      //check file1 and file3
+      thread.join();
+      assertEquals(dfs.getFileChecksum(file1), dfs.getFileChecksum(file3));
 
       //enter safe mode
       assertTrue(DistributedFileSystem.isHealthy(uri));
@@ -594,7 +618,7 @@ public class TestDFSClientRetries extends TestCase {
             dfs.setSafeMode(SafeModeAction.SAFEMODE_LEAVE);
             assertTrue(DistributedFileSystem.isHealthy(uri));
           } catch (Exception e) {
-            throw new RuntimeException(e);
+            exceptions.add(e);
           }
         }
       }).start();
@@ -615,8 +639,47 @@ public class TestDFSClientRetries extends TestCase {
       } catch(FileNotFoundException fnfe) {
         LOG.info("GOOD!", fnfe);
       }
+
+      if (!exceptions.isEmpty()) {
+        LOG.error("There are " + exceptions.size() + " exception(s):");
+        for(int i = 0; i < exceptions.size(); i++) {
+          LOG.error("Exception " + i, exceptions.get(i));
+        }
+        fail();
+      }
     } finally {
       cluster.shutdown();
+    }
+  }
+
+  public void testMultipleLinearRandomRetry() {
+    parseMultipleLinearRandomRetry(null, "");
+    parseMultipleLinearRandomRetry(null, "11");
+    parseMultipleLinearRandomRetry(null, "11,22,33");
+    parseMultipleLinearRandomRetry(null, "11,22,33,44,55");
+    parseMultipleLinearRandomRetry(null, "AA");
+    parseMultipleLinearRandomRetry(null, "11,AA");
+    parseMultipleLinearRandomRetry(null, "11,22,33,FF");
+    parseMultipleLinearRandomRetry(null, "11,-22");
+    parseMultipleLinearRandomRetry(null, "-11,22");
+
+    parseMultipleLinearRandomRetry("[22x11ms]",
+        "11,22");
+    parseMultipleLinearRandomRetry("[22x11ms, 44x33ms]",
+        "11,22,33,44");
+    parseMultipleLinearRandomRetry("[22x11ms, 44x33ms, 66x55ms]",
+        "11,22,33,44,55,66");
+    parseMultipleLinearRandomRetry("[22x11ms, 44x33ms, 66x55ms]",
+        "   11,   22, 33,  44, 55,  66   ");
+  }
+  
+  static void parseMultipleLinearRandomRetry(String expected, String s) {
+    final MultipleLinearRandomRetry r = MultipleLinearRandomRetry.parseCommaSeparatedString(s);
+    LOG.info("input=" + s + ", parsed=" + r + ", expected=" + expected);
+    if (r == null) {
+      Assert.assertEquals(expected, null);
+    } else {
+      Assert.assertEquals("MultipleLinearRandomRetry" + expected, r.toString());
     }
   }
 }

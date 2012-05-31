@@ -119,16 +119,17 @@ public class DFSClient implements FSConstants, java.io.Closeable {
     throws IOException {
     return (ClientProtocol)RPC.getProxy(ClientProtocol.class,
         ClientProtocol.versionID, nameNodeAddr, ugi, conf,
-        NetUtils.getSocketFactory(conf, ClientProtocol.class));
+        NetUtils.getSocketFactory(conf, ClientProtocol.class), 0,
+        getMultipleLinearRandomRetry(conf));
   }
 
   /**
    * Return the default retry policy used in RPC.
    * 
-   * If dfs.client.retry.max == 0, use TRY_ONCE_THEN_FAIL.
+   * If dfs.client.retry.policy.enabled == false, use TRY_ONCE_THEN_FAIL.
    * 
-   * If dfs.client.retry.max > 0, then 
-   * (1) use exponentialBackoff for
+   * Otherwise, 
+   * (1) use multipleLinearRandomRetry for
    *     - SafeModeException, or
    *     - IOException other than RemoteException; and
    * (2) use TRY_ONCE_THEN_FAIL for
@@ -138,18 +139,16 @@ public class DFSClient implements FSConstants, java.io.Closeable {
    * Note that dfs.client.retry.max < 0 is not allowed.
    */
   private static RetryPolicy getDefaultRpcRetryPolicy(Configuration conf) {
-    final int maxRetries = conf.getInt(DFSConfigKeys.DFS_CLIENT_RETRY_MAX_KEY,
-                                       DFSConfigKeys.DFS_CLIENT_RETRY_MAX_DEFAULT);
+    final RetryPolicy multipleLinearRandomRetry = getMultipleLinearRandomRetry(conf);
     if (LOG.isDebugEnabled()) {
-      LOG.debug(DFSConfigKeys.DFS_CLIENT_RETRY_MAX_KEY + " = " + maxRetries);
+      LOG.debug("multipleLinearRandomRetry = " + multipleLinearRandomRetry);
     }
-    if (maxRetries == 0) {
+
+    if (multipleLinearRandomRetry == null) {
       //no retry
       return RetryPolicies.TRY_ONCE_THEN_FAIL;
     } else {
       //use exponential backoff
-      final RetryPolicy exponentialBackoff = RetryPolicies.exponentialBackoffRetry(
-          maxRetries, 1000, TimeUnit.MILLISECONDS);
       return new RetryPolicy() {
         @Override
         public boolean shouldRetry(Exception e, int retries) throws Exception {
@@ -158,9 +157,9 @@ public class DFSClient implements FSConstants, java.io.Closeable {
           if (e instanceof RemoteException) {
             final RemoteException re = (RemoteException)e;
             p = SafeModeException.class.getName().equals(re.getClassName())?
-                exponentialBackoff: RetryPolicies.TRY_ONCE_THEN_FAIL;
+                multipleLinearRandomRetry: RetryPolicies.TRY_ONCE_THEN_FAIL;
           } else if (e instanceof IOException) {
-            p = exponentialBackoff;
+            p = multipleLinearRandomRetry;
           } else { //non-IOException
             p = RetryPolicies.TRY_ONCE_THEN_FAIL;
           }
@@ -173,6 +172,32 @@ public class DFSClient implements FSConstants, java.io.Closeable {
         }
       };
     }
+  }
+
+  /**
+   * Return the MultipleLinearRandomRetry policy specified in the conf,
+   * or null if the feature is disabled.
+   * If the policy is specified in the conf but the policy cannot be parsed,
+   * the default policy is returned.
+   * 
+   * Conf property: N pairs of sleep-time and number-of-retries
+   *   dfs.client.retry.policy = "s1,n1,s2,n2,..."
+   */
+  private static RetryPolicy getMultipleLinearRandomRetry(Configuration conf) {
+    final boolean enabled = conf.getBoolean(
+        DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_KEY,
+        DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_DEFAULT);
+    if (!enabled) {
+      return null;
+    }
+
+    final String policy = conf.get(
+        DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY,
+        DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_DEFAULT);
+
+    final RetryPolicy r = RetryPolicies.MultipleLinearRandomRetry.parseCommaSeparatedString(policy);
+    return r != null? r: RetryPolicies.MultipleLinearRandomRetry.parseCommaSeparatedString(
+        DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_DEFAULT);
   }
 
   private static ClientProtocol createNamenode(ClientProtocol rpcNamenode,

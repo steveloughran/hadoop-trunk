@@ -46,7 +46,9 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.common.UpgradeStatusReport;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
@@ -644,6 +646,7 @@ public class DistributedFileSystem extends FileSystem {
    * @return true if HDFS is healthy; false, otherwise.
    */
   public static boolean isHealthy(URI uri) {
+    //check scheme
     final String scheme = uri.getScheme();
     if (!"hdfs".equalsIgnoreCase(scheme)) {
       throw new IllegalArgumentException("This scheme is not hdfs, uri=" + uri);
@@ -652,22 +655,28 @@ public class DistributedFileSystem extends FileSystem {
     final Configuration conf = new Configuration();
     //disable FileSystem cache
     conf.setBoolean(String.format("fs.%s.impl.disable.cache", scheme), true);
-    //disable client retry for rpc calls
-    conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_MAX_KEY, 0);
+    //disable client retry for rpc connection and rpc calls
+    conf.setBoolean(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_KEY, false);
+    conf.setInt(Client.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 0);
 
+    DistributedFileSystem fs = null;
     try {
-      final DistributedFileSystem fs = (DistributedFileSystem)FileSystem.get(
-          uri, conf);
+      fs = (DistributedFileSystem)FileSystem.get(uri, conf);
       final boolean safemode = fs.setSafeMode(SafeModeAction.SAFEMODE_GET);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Is namenode in safemode? " + safemode + "; uri=" + uri);
       }
+
+      fs.close();
+      fs = null;
       return !safemode;
     } catch(IOException e) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Got an exception for uri=" + uri, e);
       }
       return false;
+    } finally {
+      IOUtils.cleanup(LOG, fs);
     }
   }
 }
