@@ -1,0 +1,7 @@
+YET TO RELEASE 
+Branched From HADOOP-1.0.3
+  HDFS-2617. Jakob's spnego patch
+  commit retry20120511_branch-1.0.patch
+  BUG-444: MAPREDUCE-3837.patch
+  BUG-444 :JT_Safemode.patch
+  BUG:531 - b531_20120521.patch  - Add a method to check if HDFS is healthy
