@@ -269,16 +269,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     return clock;
   }
     
-  static final String JT_HDFS_MONITOR_ENABLE = 
-      "mapreduce.jt.hdfs.monitor.enable";
-  static final boolean DEFAULT_JT_HDFS_MONITOR_THREAD_ENABLE = false;
-  
-  static final String JT_HDFS_MONITOR_THREAD_INTERVAL = 
-      "mapreduce.jt.hdfs.monitor.interval.ms";
-  static final int DEFAULT_JT_HDFS_MONITOR_THREAD_INTERVAL_MS = 10000;
-  
-  private Thread hdfsMonitor;
-
   /**
    * Start the JobTracker with given configuration.
    * 
@@ -2194,13 +2184,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
     //initializes the job status store
     completedJobStatusStore = new CompletedJobStatusStore(conf, aclsManager);
-    
-    // Setup HDFS monitoring
-    if (this.conf.getBoolean(
-        JT_HDFS_MONITOR_ENABLE, DEFAULT_JT_HDFS_MONITOR_THREAD_ENABLE)) {
-      hdfsMonitor = new HDFSMonitorThread(this.conf, this, this.fs);
-      hdfsMonitor.start();
-    }
   }
 
   private static SimpleDateFormat getDateFormat() {
@@ -5151,5 +5134,4 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       return "OFF";
     return "<em>ON</em>";
   }
-  
 }

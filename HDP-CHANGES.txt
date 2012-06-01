@@ -8,3 +8,4 @@ Branched From HADOOP-1.0.3
   BUG-535 Support a more general RPC connection retry policy - b535_20120530.patch
   BUG-558 Namenode edit log changes - b558_20120531b.patch
   BUG-627 NN should throw SafeModeException when getBlockLocations has zero locations - bug-627-3.patch
+  BUG-444 JobTracker Restart and SafeMode - JT_SafeMode_HDFS_Monitor.patch
