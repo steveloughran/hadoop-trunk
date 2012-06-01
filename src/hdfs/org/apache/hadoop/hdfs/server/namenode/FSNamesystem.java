@@ -939,6 +939,14 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
                     Server.getRemoteIp(),
                     "open", src, null, null);
     }
+    if (isInSafeMode()) {
+      for (LocatedBlock b : ret.getLocatedBlocks()) {
+        // if safemode & no block  locations yet then throw safemodeException 
+        if ( (b.getLocations() == null) || (b.getLocations().length==0)) {
+          throw new SafeModeException("Zero blocklocations for " + src, safeMode);         
+        }
+      }
+    }
     return ret;
   }
 
