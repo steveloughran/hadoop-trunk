@@ -1,5 +1,5 @@
-YET TO RELEASE 
-Branched From HADOOP-1.0.3
+HDP-PREVIEW-4  
+  Branched From HADOOP-1.0.3
   HDFS-2617. Jakob's spnego patch
   commit retry20120511_branch-1.0.patch
   BUG-444 MAPREDUCE-3837.patch
@@ -10,3 +10,5 @@ Branched From HADOOP-1.0.3
   BUG-627 NN should throw SafeModeException when getBlockLocations has zero locations - bug-627-3.patch
   BUG-444 JobTracker Restart and SafeMode - JT_SafeMode_HDFS_Monitor.patch
   BUG-602 HADOOP-5464 to back port it to branch 1.1 - BUG-602.patch
+YET-TO-BE-RELEASED
+  BUG-765 spnego principal uses the wrong keytab file for the HTTP principal - bug-765.patch 

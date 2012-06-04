@@ -191,7 +191,7 @@ public class SecondaryNameNode implements Runnable {
             params.put("kerberos.principal",
                     SecurityUtil.getServerPrincipal(principalInConf, infoSocAddr.getHostName()));
           }
-          String httpKeytab = conf.get(DFSConfigKeys.DFS_SECONDARY_NAMENODE_KEYTAB_FILE_KEY);
+          String httpKeytab = conf.get(DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY);
           if (httpKeytab != null && !httpKeytab.isEmpty()) {
             params.put("kerberos.keytab", httpKeytab);
           }
