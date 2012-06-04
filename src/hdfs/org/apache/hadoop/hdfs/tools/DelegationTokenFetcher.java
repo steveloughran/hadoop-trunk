@@ -38,6 +38,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HftpFileSystem;
+import org.apache.hadoop.hdfs.HsftpFileSystem;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.namenode.CancelDelegationTokenServlet;
 import org.apache.hadoop.hdfs.server.namenode.GetDelegationTokenServlet;
@@ -91,6 +92,7 @@ public class DelegationTokenFetcher {
    */
   public static void main(final String [] args) throws Exception {
     final Configuration conf = new Configuration();
+    setupSsl(conf);
     Options fetcherOptions = new Options();
     fetcherOptions.addOption(WEBSERVICE, true, 
                              "HTTP url to reach the NameNode at");
@@ -169,6 +171,27 @@ public class DelegationTokenFetcher {
 
   }
   
+  /** Set up SSL resources */
+  public static void setupSsl(Configuration conf) {
+    Configuration sslConf = new Configuration(false);
+    sslConf.addResource(conf.get("dfs.https.client.keystore.resource",
+        "ssl-client.xml"));
+    System.setProperty("javax.net.ssl.trustStore", sslConf.get(
+        "ssl.client.truststore.location", ""));
+    System.setProperty("javax.net.ssl.trustStorePassword", sslConf.get(
+        "ssl.client.truststore.password", ""));
+    System.setProperty("javax.net.ssl.trustStoreType", sslConf.get(
+        "ssl.client.truststore.type", "jks"));
+    System.setProperty("javax.net.ssl.keyStore", sslConf.get(
+        "ssl.client.keystore.location", ""));
+    System.setProperty("javax.net.ssl.keyStorePassword", sslConf.get(
+        "ssl.client.keystore.password", ""));
+    System.setProperty("javax.net.ssl.keyPassword", sslConf.get(
+        "ssl.client.keystore.keypassword", ""));
+    System.setProperty("javax.net.ssl.keyStoreType", sslConf.get(
+        "ssl.client.keystore.type", "jks"));
+  }
+
   /**
    * Utility method to obtain a delegation token over http
    * @param nnAddr Namenode http addr, such as http://namenode:50070
@@ -191,14 +214,20 @@ public class DelegationTokenFetcher {
         LOG.debug("Retrieving token from: " + url);
       }
       URL remoteURL = new URL(url.toString());
-      URLConnection connection = SecurityUtil.openSecureHttpConnection(remoteURL);
+      boolean isSecure = "https".equals(remoteURL.getProtocol().toLowerCase());
+      URLConnection connection = 
+       SecurityUtil.openSecureHttpConnection(remoteURL);
 
       InputStream in = connection.getInputStream();
       Credentials ts = new Credentials();
       dis = new DataInputStream(in);
       ts.readFields(dis);
       for(Token<?> token: ts.getAllTokens()) {
-        token.setKind(HftpFileSystem.TOKEN_KIND);
+        if (isSecure) {
+          token.setKind(HsftpFileSystem.TOKEN_KIND);
+        } else {
+          token.setKind(HftpFileSystem.TOKEN_KIND);
+        }
         SecurityUtil.setTokenService(token, serviceAddr);
       }
       return ts;

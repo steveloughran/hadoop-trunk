@@ -52,8 +52,8 @@ public class TestHftpFileSystem {
     URI uri = URI.create("hftp://localhost");
     HftpFileSystem fs = (HftpFileSystem) FileSystem.get(uri, conf);
 
-    assertEquals(DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_DEFAULT, fs.getDefaultPort());
-    assertEquals(DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT, fs.getDefaultSecurePort());
+    assertEquals(DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_DEFAULT, 
+		 fs.getDefaultPort());
 
     URI fsUri = fs.getUri();
     assertEquals(uri.getHost(), fsUri.getHost());
@@ -75,7 +75,6 @@ public class TestHftpFileSystem {
     HftpFileSystem fs = (HftpFileSystem) FileSystem.get(uri, conf);
 
     assertEquals(123, fs.getDefaultPort());
-    assertEquals(456, fs.getDefaultSecurePort());
     
     URI fsUri = fs.getUri();
     assertEquals(uri.getHost(), fsUri.getHost());
@@ -94,7 +93,6 @@ public class TestHftpFileSystem {
     HftpFileSystem fs = (HftpFileSystem) FileSystem.get(uri, conf);
 
     assertEquals(DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_DEFAULT, fs.getDefaultPort());
-    assertEquals(DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT, fs.getDefaultSecurePort());
 
     URI fsUri = fs.getUri();
     assertEquals(uri.getHost(), fsUri.getHost());
@@ -116,7 +114,6 @@ public class TestHftpFileSystem {
     HftpFileSystem fs = (HftpFileSystem) FileSystem.get(uri, conf);
 
     assertEquals(123, fs.getDefaultPort());
-    assertEquals(456, fs.getDefaultSecurePort());
     
     URI fsUri = fs.getUri();
     assertEquals(uri.getHost(), fsUri.getHost());
@@ -137,7 +134,6 @@ public class TestHftpFileSystem {
     HsftpFileSystem fs = (HsftpFileSystem) FileSystem.get(uri, conf);
 
     assertEquals(DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT, fs.getDefaultPort());
-    assertEquals(DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT, fs.getDefaultSecurePort());
 
     URI fsUri = fs.getUri();
     assertEquals(uri.getHost(), fsUri.getHost());
@@ -159,7 +155,6 @@ public class TestHftpFileSystem {
     HsftpFileSystem fs = (HsftpFileSystem) FileSystem.get(uri, conf);
 
     assertEquals(456, fs.getDefaultPort());
-    assertEquals(456, fs.getDefaultSecurePort());
     
     URI fsUri = fs.getUri();
     assertEquals(uri.getHost(), fsUri.getHost());
@@ -178,7 +173,6 @@ public class TestHftpFileSystem {
     HsftpFileSystem fs = (HsftpFileSystem) FileSystem.get(uri, conf);
 
     assertEquals(DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT, fs.getDefaultPort());
-    assertEquals(DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT, fs.getDefaultSecurePort());
 
     URI fsUri = fs.getUri();
     assertEquals(uri.getHost(), fsUri.getHost());
@@ -200,7 +194,6 @@ public class TestHftpFileSystem {
     HsftpFileSystem fs = (HsftpFileSystem) FileSystem.get(uri, conf);
 
     assertEquals(456, fs.getDefaultPort());
-    assertEquals(456, fs.getDefaultSecurePort());
     
     URI fsUri = fs.getUri();
     assertEquals(uri.getHost(), fsUri.getHost());
