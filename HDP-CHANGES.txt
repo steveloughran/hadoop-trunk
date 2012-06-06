@@ -13,3 +13,4 @@ HDP-PREVIEW-4
 YET-TO-BE-RELEASED
   HDFS-3466 spnego principal uses the wrong keytab file for the HTTP principal - bug-765.patch 
   HDFS-3461 HFTP should use the same port & protocol for getting the delegation token - bug-766.patch
+  HADOOP-6947 Kerberos relogin should set refreshKrb5Config to true
