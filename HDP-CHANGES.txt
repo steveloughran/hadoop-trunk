@@ -1,5 +1,6 @@
 HA fixes
   BUG-851 Do not check safemode in FSNamesystem.getBlockLocations(..) for fsck.
+  BUG-845 Disable edit log toleration in SecondaryNameNode.
 
 HDP-PREVIEW-4  
   Branched From HADOOP-1.0.3
