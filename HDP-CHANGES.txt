@@ -17,3 +17,5 @@ HDP-PREVIEW-4
 YET-TO-BE-RELEASED
   BUG-765 spnego principal uses the wrong keytab file for the HTTP principal - bug-765.patch 
   BUG-766 HFTP should use the same port & protocol for getting the delegation token - bug-766.patch
+  BUG-444 Ensure admin-set safemode is respected always and turn of retry
+          logic for DFSClient in JobTracker. 

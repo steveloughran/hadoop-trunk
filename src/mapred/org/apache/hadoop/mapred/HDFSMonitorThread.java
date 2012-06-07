@@ -71,7 +71,15 @@ public class HDFSMonitorThread extends Thread {
         }
         
         try {
-          previouslyHealthy = !(jt.setSafeMode(action)); //safemode => !healthy
+          if (jt.getAdminSafeMode()) {
+            // Don't override admin-set safemode
+            LOG.info("JobTracker is in admin-set safemode, not overriding " +
+            		"through " + action);
+           previouslyHealthy = currentlyHealthy; 
+          } else {
+            previouslyHealthy = !(jt.setSafeModeInternal(action)); 
+                                                         //safemode => !healthy
+          }
         } catch (IOException ioe) {
           LOG.info("Failed to setSafeMode with action " + action, ioe);
         }

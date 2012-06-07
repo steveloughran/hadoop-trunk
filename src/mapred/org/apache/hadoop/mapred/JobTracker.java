@@ -62,6 +62,7 @@ import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.http.HttpServer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RPC;
@@ -275,7 +276,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   
   static final String JT_HDFS_MONITOR_THREAD_INTERVAL = 
       "mapreduce.jt.hdfs.monitor.interval.ms";
-  static final int DEFAULT_JT_HDFS_MONITOR_THREAD_INTERVAL_MS = 10000;
+  static final int DEFAULT_JT_HDFS_MONITOR_THREAD_INTERVAL_MS = 5000;
   
   private Thread hdfsMonitor;
 
@@ -1912,8 +1913,20 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     this(conf, identifier, clock, new QueueManager(new Configuration(conf)));
   } 
   
+  private void initJTConf(JobConf conf) {
+    if (conf.getBoolean(
+        DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_KEY, false)) {
+      LOG.warn(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_KEY + 
+          " is enabled, disabling it");
+      conf.setBoolean(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_KEY, false);
+    }
+  }
+  
   JobTracker(final JobConf conf, String identifier, Clock clock, QueueManager qm) 
-  throws IOException, InterruptedException { 
+  throws IOException, InterruptedException {
+    
+    initJTConf(conf);
+    
     this.queueManager = qm;
     this.clock = clock;
     // Set ports, start RPC servers, setup security policy etc.
@@ -3530,6 +3543,12 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   // returns cleanup tasks first, then setup tasks.
   synchronized List<Task> getSetupAndCleanupTasks(
     TaskTrackerStatus taskTracker) throws IOException {
+    
+    // Don't assign *any* new task in safemode
+    if (getSafeMode()) {
+      return null;
+    }
+    
     int maxMapTasks = taskTracker.getMaxMapSlots();
     int maxReduceTasks = taskTracker.getMaxReduceSlots();
     int numMaps = taskTracker.countOccupiedMapSlots();
@@ -5121,14 +5140,45 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   public enum SafeModeAction{ SAFEMODE_LEAVE, SAFEMODE_ENTER, SAFEMODE_GET; }
   
   private AtomicBoolean safeMode = new AtomicBoolean(false);
+  private AtomicBoolean adminSafeMode = new AtomicBoolean(false);
 
   public boolean setSafeMode(JobTracker.SafeModeAction safeModeAction) 
       throws IOException {
+    String user = UserGroupInformation.getCurrentUser().getShortUserName();
+
+    // Anyone can check JT safe-mode
     if (safeModeAction == SafeModeAction.SAFEMODE_GET) {
+      boolean safeMode = this.safeMode.get();
       LOG.info("Getting safemode information: safemode=" + safeMode + ". " +
           "Requested by : " +
           UserGroupInformation.getCurrentUser().getShortUserName());
-    } else {
+      AuditLogger.logSuccess(user, Constants.GET_SAFEMODE, 
+          Constants.JOBTRACKER);
+      return safeMode;
+    }
+    
+    // Check access for modifications to safe-mode
+    if (!aclsManager.isMRAdmin(UserGroupInformation.getCurrentUser())) {
+      AuditLogger.logFailure(user, Constants.SET_SAFEMODE, 
+          aclsManager.getAdminsAcl().toString(), Constants.JOBTRACKER, 
+          Constants.UNAUTHORIZED_USER);
+      throw new AccessControlException(user + 
+                                       " is not authorized to refresh nodes.");
+    }
+    AuditLogger.logSuccess(user, Constants.SET_SAFEMODE, Constants.JOBTRACKER);
+
+    boolean currSafeMode = setSafeModeInternal(safeModeAction);
+    adminSafeMode.set(currSafeMode);
+    return currSafeMode;
+  }
+  
+  boolean getAdminSafeMode() {
+    return adminSafeMode.get();
+  }
+  
+  boolean setSafeModeInternal(JobTracker.SafeModeAction safeModeAction) 
+      throws IOException {
+    if (safeModeAction != SafeModeAction.SAFEMODE_GET) {
       boolean safeMode = false;
       if (safeModeAction == SafeModeAction.SAFEMODE_ENTER) {
         safeMode = true;
