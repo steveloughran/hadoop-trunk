@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERSIST_BLOCKS_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERSIST_BLOCKS_KEY;
+
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -180,6 +183,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
   public static final float DEFAULT_MAP_LOAD_FACTOR = 0.75f;
 
   private boolean isPermissionEnabled;
+  private boolean persistBlocks;
   private UserGroupInformation fsOwner;
   private String supergroup;
   private PermissionStatus defaultPermission;
@@ -479,6 +483,10 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
     this.isPermissionEnabled = conf.getBoolean("dfs.permissions", true);
     LOG.info("supergroup=" + supergroup);
     LOG.info("isPermissionEnabled=" + isPermissionEnabled);
+    
+    this.persistBlocks = conf.getBoolean(DFS_PERSIST_BLOCKS_KEY,
+                                                  DFS_PERSIST_BLOCKS_DEFAULT);
+    
     short filePermission = (short)conf.getInt("dfs.upgrade.permission", 0777);
     this.defaultPermission = PermissionStatus.createImmutable(
         fsOwner.getShortUserName(), supergroup, new FsPermission(filePermission));
@@ -1590,7 +1598,11 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
       
       for (DatanodeDescriptor dn : targets) {
         dn.incBlocksScheduled();
-      }      
+      }
+      dir.persistBlocks(src, pendingFile);
+    }
+    if (persistBlocks) {
+      getEditLog().logSync();
     }
         
     // Create next block
@@ -1621,6 +1633,10 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
     NameNode.stateChangeLog.debug("BLOCK* NameSystem.abandonBlock: "
                                     + b
                                     + " is removed from pendingCreates");
+    dir.persistBlocks(src, file);
+    if (persistBlocks) {
+      getEditLog().logSync();
+    }
     return true;
   }
   
