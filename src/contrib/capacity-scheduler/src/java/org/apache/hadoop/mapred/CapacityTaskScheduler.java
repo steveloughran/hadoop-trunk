@@ -1039,20 +1039,10 @@ class CapacityTaskScheduler extends TaskScheduler {
      */ 
     updateAllQueues(mapClusterCapacity, reduceClusterCapacity);
     
-    /*
-     * Schedule tasks
-     */
-    
+    // schedule tasks
     List<Task> result = new ArrayList<Task>();
-    
-    // Check for JT safe-mode
-    if (taskTrackerManager.getSafeMode()) {
-      LOG.info("JobTracker is in safe-mode, not scheduling any tasks.");
-    } else {
-      addMapTasks(taskTracker, result, maxMapSlots, currentMapSlots);
-      addReduceTask(taskTracker, result, maxReduceSlots, currentReduceSlots);
-    }
-    
+    addMapTasks(taskTracker, result, maxMapSlots, currentMapSlots);
+    addReduceTask(taskTracker, result, maxReduceSlots, currentReduceSlots);
     return result;
   }
 

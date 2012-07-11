@@ -238,12 +238,6 @@ public class TestJobQueueTaskScheduler extends TestCase {
       status.setRunState(TaskStatus.State.RUNNING);
       trackers.get(taskTrackerName).getStatus().getTaskReports().add(status);
     }
-
-    @Override
-    public boolean getSafeMode() {
-      // TODO Auto-generated method stub
-      return false;
-    }
     
   }
   
