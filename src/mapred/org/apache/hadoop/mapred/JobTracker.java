@@ -1905,9 +1905,11 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
     
     // Ensure HDFS is healthy
-    while (!DistributedFileSystem.isHealthy(fs.getUri())) {
-      LOG.info("HDFS initialized but not 'healthy' yet, waiting...");
-      Thread.sleep(FS_ACCESS_RETRY_PERIOD);
+    if ("hdfs".equalsIgnoreCase(fs.getUri().getScheme())) {
+      while (!DistributedFileSystem.isHealthy(fs.getUri())) {
+        LOG.info("HDFS initialized but not 'healthy' yet, waiting...");
+        Thread.sleep(FS_ACCESS_RETRY_PERIOD);
+      }
     }
   }
   
