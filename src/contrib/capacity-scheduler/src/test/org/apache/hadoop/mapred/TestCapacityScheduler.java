@@ -677,6 +677,12 @@ public class TestCapacityScheduler extends TestCase {
     public QueueManager getQueueManager() {
       return qm;
     }
+
+    @Override
+    public boolean isInSafeMode() {
+      // TODO Auto-generated method stub
+      return false;
+    }
   }
   
   // represents a fake queue configuration info
