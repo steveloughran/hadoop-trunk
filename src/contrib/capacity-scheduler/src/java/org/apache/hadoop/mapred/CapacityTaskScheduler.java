@@ -1046,7 +1046,7 @@ class CapacityTaskScheduler extends TaskScheduler {
     List<Task> result = new ArrayList<Task>();
     
     // Check for JT safe-mode
-    if (taskTrackerManager.getSafeMode()) {
+    if (taskTrackerManager.isInSafeMode()) {
       LOG.info("JobTracker is in safe-mode, not scheduling any tasks.");
     } else {
       addMapTasks(taskTracker, result, maxMapSlots, currentMapSlots);

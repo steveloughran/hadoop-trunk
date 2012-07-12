@@ -81,7 +81,7 @@ class JobQueueTaskScheduler extends TaskScheduler {
   public synchronized List<Task> assignTasks(TaskTracker taskTracker)
       throws IOException {
     // Check for JT safe-mode
-    if (taskTrackerManager.getSafeMode()) {
+    if (taskTrackerManager.isInSafeMode()) {
       LOG.info("JobTracker is in safe-mode, not scheduling any tasks.");
       return null;
     } 

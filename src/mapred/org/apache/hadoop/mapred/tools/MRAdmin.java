@@ -22,8 +22,6 @@ import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.mapred.AdminOperationsProtocol;
@@ -35,7 +33,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.mortbay.log.Log;
 
 /**
  * Administrative access to Hadoop Map-Reduce.
@@ -59,7 +56,9 @@ public class MRAdmin extends Configured implements Tool {
     "The full syntax is: \n\n" +
     "hadoop mradmin [-refreshServiceAcl] [-refreshQueues] " +
     "[-refreshNodes] [-refreshUserToGroupsMappings] " +
-    "[-refreshSuperUserGroupsConfiguration] [-help [cmd]]\n";
+    "[-refreshSuperUserGroupsConfiguration] " +
+    "[-safemode <enter | leave | wait | get> " +
+    "[-help [cmd]]\n";
 
   String refreshServiceAcl = "-refreshServiceAcl: Reload the service-level authorization policy file\n" +
     "\t\tJobtracker will reload the authorization policy file.\n";
@@ -137,6 +136,7 @@ public class MRAdmin extends Configured implements Tool {
       System.err.println("           [-refreshQueues]");
       System.err.println("           [-refreshUserToGroupsMappings]");
       System.err.println("           [-refreshSuperUserGroupsConfiguration]");
+      System.err.println("           [-refreshNodes]");      
       System.err.println("           [-safemode <enter | leave | get | wait>]");
       System.err.println("           [-help [cmd]]");
       System.err.println();

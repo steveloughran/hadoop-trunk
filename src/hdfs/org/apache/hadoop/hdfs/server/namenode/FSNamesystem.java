@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERSIST_BLOCKS_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERSIST_BLOCKS_KEY;
+
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -180,6 +183,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
   public static final float DEFAULT_MAP_LOAD_FACTOR = 0.75f;
 
   private boolean isPermissionEnabled;
+  private boolean persistBlocks;
   private UserGroupInformation fsOwner;
   private String supergroup;
   private PermissionStatus defaultPermission;
@@ -479,6 +483,10 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
     this.isPermissionEnabled = conf.getBoolean("dfs.permissions", true);
     LOG.info("supergroup=" + supergroup);
     LOG.info("isPermissionEnabled=" + isPermissionEnabled);
+    
+    this.persistBlocks = conf.getBoolean(DFS_PERSIST_BLOCKS_KEY,
+                                                  DFS_PERSIST_BLOCKS_DEFAULT);
+    
     short filePermission = (short)conf.getInt("dfs.upgrade.permission", 0777);
     this.defaultPermission = PermissionStatus.createImmutable(
         fsOwner.getShortUserName(), supergroup, new FsPermission(filePermission));
@@ -895,7 +903,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
    */
   LocatedBlocks getBlockLocations(String clientMachine, String src,
       long offset, long length) throws IOException {
-    LocatedBlocks blocks = getBlockLocations(src, offset, length, true, true);
+    LocatedBlocks blocks = getBlockLocations(src, offset, length, true, true, true);
     if (blocks != null) {
       //sort the blocks
       DatanodeDescriptor client = host2DataNodeMap.getDatanodeByHost(
@@ -913,7 +921,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
    */
   public LocatedBlocks getBlockLocations(String src, long offset, long length
       ) throws IOException {
-    return getBlockLocations(src, offset, length, false, true);
+    return getBlockLocations(src, offset, length, false, true, true);
   }
 
   /**
@@ -921,7 +929,8 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
    * @see ClientProtocol#getBlockLocations(String, long, long)
    */
   public LocatedBlocks getBlockLocations(String src, long offset, long length,
-      boolean doAccessTime, boolean needBlockToken) throws IOException {
+      boolean doAccessTime, boolean needBlockToken, boolean checkSafeMode
+      ) throws IOException {
     if (isPermissionEnabled) {
       checkPathAccess(src, FsAction.READ);
     }
@@ -939,7 +948,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
                     Server.getRemoteIp(),
                     "open", src, null, null);
     }
-    if (isInSafeMode()) {
+    if (checkSafeMode && isInSafeMode()) {
       for (LocatedBlock b : ret.getLocatedBlocks()) {
         // if safemode & no block  locations yet then throw safemodeException 
         if ( (b.getLocations() == null) || (b.getLocations().length==0)) {
@@ -1589,7 +1598,11 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
       
       for (DatanodeDescriptor dn : targets) {
         dn.incBlocksScheduled();
-      }      
+      }
+      dir.persistBlocks(src, pendingFile);
+    }
+    if (persistBlocks) {
+      getEditLog().logSync();
     }
         
     // Create next block
@@ -1620,6 +1633,10 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
     NameNode.stateChangeLog.debug("BLOCK* NameSystem.abandonBlock: "
                                     + b
                                     + " is removed from pendingCreates");
+    dir.persistBlocks(src, file);
+    if (persistBlocks) {
+      getEditLog().logSync();
+    }
     return true;
   }
   

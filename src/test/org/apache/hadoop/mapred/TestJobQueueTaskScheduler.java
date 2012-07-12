@@ -240,7 +240,7 @@ public class TestJobQueueTaskScheduler extends TestCase {
     }
 
     @Override
-    public boolean getSafeMode() {
+    public boolean isInSafeMode() {
       // TODO Auto-generated method stub
       return false;
     }

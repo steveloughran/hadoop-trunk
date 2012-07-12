@@ -117,5 +117,5 @@ interface TaskTrackerManager {
    * Get safe mode.
    * @return
    */
-  public boolean getSafeMode();
+  public boolean isInSafeMode();
 }

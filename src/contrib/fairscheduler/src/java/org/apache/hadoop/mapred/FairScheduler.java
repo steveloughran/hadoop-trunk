@@ -404,7 +404,7 @@ public class FairScheduler extends TaskScheduler {
     updateLocalityWaitTimes(currentTime);
 
     // Check for JT safe-mode
-    if (taskTrackerManager.getSafeMode()) {
+    if (taskTrackerManager.isInSafeMode()) {
       LOG.info("JobTracker is in safe-mode, not scheduling any tasks.");
       return null;
     } 

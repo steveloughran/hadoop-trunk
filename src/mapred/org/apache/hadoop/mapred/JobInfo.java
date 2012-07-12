@@ -32,7 +32,7 @@ import org.apache.hadoop.io.WritableUtils;
  * JobTracker receives a submitJob request. The information is saved
  * so that the JobTracker can recover incomplete jobs upon restart.
  */
-class JobInfo implements Writable, Comparable<JobInfo> {
+class JobInfo implements Writable {
   private org.apache.hadoop.mapreduce.JobID id;
   private Text user;
   private Path jobSubmitDir;
@@ -79,13 +79,5 @@ class JobInfo implements Writable, Comparable<JobInfo> {
     id.write(out);
     user.write(out);
     WritableUtils.writeString(out, jobSubmitDir.toString());
-  }
-
-  @Override
-  public int compareTo(JobInfo o) {
-    if (o == this) {
-      return 0;
-    }
-    return id.compareTo(o.id);
   }
 }

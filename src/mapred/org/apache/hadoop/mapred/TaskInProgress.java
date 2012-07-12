@@ -612,7 +612,7 @@ class TaskInProgress {
     // but finishTime has to be updated.
     
     // Don't fail tasks when JobTracker is in safe-mode
-    if (status.getRunState() == State.FAILED && jobtracker.getSafeMode()) {
+    if (status.getRunState() == State.FAILED && jobtracker.isInSafeMode()) {
       LOG.info("JT is in safe-mode; marking " + taskid + " as KILLED");
       status.setRunState(State.KILLED);
     }

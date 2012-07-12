@@ -62,6 +62,8 @@ import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.http.HttpServer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RPC;
@@ -76,7 +78,6 @@ import org.apache.hadoop.mapred.QueueManager.QueueACL;
 import org.apache.hadoop.mapred.TaskTrackerStatus.TaskTrackerHealthStatus;
 import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.TaskType;
-import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.mapreduce.security.token.DelegationTokenRenewal;
 import org.apache.hadoop.mapreduce.security.token.JobTokenSecretManager;
 import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
@@ -196,9 +197,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   
   public static enum State { INITIALIZING, RUNNING }
   State state = State.INITIALIZING;
-  
-  private static final int FS_ACCESS_RETRY_PERIOD = 10000;
+  private static final int FS_ACCESS_RETRY_PERIOD = 1000;
   static final String JOB_INFO_FILE = "job-info";
+  static final String JOB_TOKEN_FILE = "jobToken";
   private DNSToSwitchMapping dnsToSwitchMapping;
   private NetworkTopology clusterMap = new NetworkTopology();
   private int numTaskCacheLevels; // the max level to which we cache tasks
@@ -275,7 +276,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   
   static final String JT_HDFS_MONITOR_THREAD_INTERVAL = 
       "mapreduce.jt.hdfs.monitor.interval.ms";
-  static final int DEFAULT_JT_HDFS_MONITOR_THREAD_INTERVAL_MS = 10000;
+  static final int DEFAULT_JT_HDFS_MONITOR_THREAD_INTERVAL_MS = 5000;
   
   private Thread hdfsMonitor;
 
@@ -1207,8 +1208,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   // Used to recover the jobs upon restart
   ///////////////////////////////////////////////////////
   class RecoveryManager {
-    Set<JobInfo> jobsToRecover; // set of jobs to be recovered
-    Set<JobID> jobIdsToRecover;
+    Set<JobID> jobsToRecover; // set of jobs to be recovered
     
     private int totalEventsRecovered = 0;
     private int restartCount = 0;
@@ -1222,17 +1222,15 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
      */
     
     public RecoveryManager() {
-      jobsToRecover = new TreeSet<JobInfo>();
-      jobIdsToRecover = new TreeSet<JobID>();
+      jobsToRecover = new TreeSet<JobID>();
     }
 
     public boolean contains(JobID id) {
       return jobsToRecover.contains(id);
     }
 
-    void addJobForRecovery(JobID jobId, JobInfo job) {
-      jobsToRecover.add(job);
-      jobIdsToRecover.add(jobId);
+    void addJobForRecovery(JobID id) {
+      jobsToRecover.add(id);
     }
 
     public boolean shouldRecover() {
@@ -1251,12 +1249,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       recoveredTrackers.remove(trackerName);
     }
 
-    Set<JobInfo> getJobsToRecover() {
+    Set<JobID> getJobsToRecover() {
       return jobsToRecover;
-    }
-
-    Set<JobID> getJobIdsToRecover() {
-      return jobIdsToRecover;
     }
 
     /** Check if the given string represents a job-id or not 
@@ -1276,56 +1270,28 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       return false;
     }
     
-    /** 
-     * Checks if the job directory is clean and has all the required components 
-     * for (re) starting the job
-     */
-    private boolean isJobDirValid(Path jobDirPath, FileSystem fs) 
-    throws IOException {
-      FileStatus[] contents = fs.listStatus(jobDirPath);
-      int matchCount = 0;
-      if (contents != null && contents.length >=2) {
-        for (FileStatus status : contents) {
-          if (JobTracker.JOB_INFO_FILE.equals(status.getPath().getName())) {
-            ++matchCount;
-          }
-          if (TokenCache.JOB_TOKEN_HDFS_FILE.equals(status.getPath().getName())) {
-            ++matchCount;
-          }
-        }
-        if (matchCount == 2) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    
     // checks if the job dir has the required files
     public void checkAndAddJob(FileStatus status) throws IOException {
       String fileName = status.getPath().getName();
-      if (isJobNameValid(fileName)) {
-        try {
-
-          if (!isJobDirValid(status.getPath(), fs)) {
-            throw new IOException("Invalid job directory:" + status.getPath());
-          }
-
-          JobID jobId = JobID.forName(fileName);
-          Path jobInfoFile = getSystemFileForJob(jobId);
-          FSDataInputStream in = fs.open(jobInfoFile);
-          final JobInfo jobInfo = new JobInfo();
-          jobInfo.readFields(in);
-          in.close();
-
-          recoveryManager.addJobForRecovery(jobId, jobInfo);
-          shouldRecover = true; // enable actual recovery if num-files > 1
-        } catch (IOException ioe) {
-          LOG.info("Found an incomplete job directory " + fileName + "." 
-              + " Deleting it!!");
-          fs.delete(status.getPath(), true);          
-        }
+      if (isJobNameValid(fileName) && isJobDirValid(JobID.forName(fileName))) {
+        recoveryManager.addJobForRecovery(JobID.forName(fileName));
+        shouldRecover = true; // enable actual recovery if num-files > 1
       }
+    }
+    
+    private boolean isJobDirValid(JobID jobId) throws IOException {
+      boolean ret = false;
+      Path jobInfoFile = getSystemFileForJob(jobId);
+      final Path jobTokenFile = getTokenFileForJob(jobId);
+      JobConf job = new JobConf();
+      if (jobTokenFile.getFileSystem(job).exists(jobTokenFile)
+          && jobInfoFile.getFileSystem(job).exists(jobInfoFile)) {
+        ret = true;
+      } else {
+        LOG.warn("Job " + jobId
+            + " does not have valid info/token file so ignoring for recovery");
+      }
+      return ret;
     }
     
     private JobStatusChangeEvent updateJob(JobInProgress jip, 
@@ -1588,11 +1554,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         fs.rename(tmpRestartFile, restartFile); // rename .rec to main file
       } else {
         // For the very first time the jobtracker will create a jobtracker.info
-        // file. If the jobtracker has restarted then disable recovery as files'
-        // needed for recovery are missing.
-
-        // disable recovery if this is a restart
-        shouldRecover = false;
+        // file.
+        // enable recovery if this is a restart
+        shouldRecover = true;
 
         // write the jobtracker.info file
         try {
@@ -1645,50 +1609,50 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
 
     public void recover() {
-        int recovered = 0;
-        long recoveryProcessStartTime = clock.getTime();
-        if (!shouldRecover()) {
-          // clean up jobs structure
-          jobsToRecover.clear();
-          jobIdsToRecover.clear();
-          return;
+      int recovered = 0;
+      long recoveryProcessStartTime = clock.getTime();
+      if (!shouldRecover()) {
+        // clean up jobs structure
+        jobsToRecover.clear();
+        return;
+      }
+
+      LOG.info("Starting the recovery process for " + jobsToRecover.size()
+          + " jobs ...");
+      for (JobID jobId : jobsToRecover) {
+        LOG.info("Submitting job " + jobId);
+        try {
+          Path jobInfoFile = getSystemFileForJob(jobId);
+          final Path jobTokenFile = getTokenFileForJob(jobId);
+          FSDataInputStream in = fs.open(jobInfoFile);
+          final JobInfo token = new JobInfo();
+          token.readFields(in);
+          in.close();
+          final UserGroupInformation ugi = UserGroupInformation
+              .createRemoteUser(token.getUser().toString());
+          ugi.doAs(new PrivilegedExceptionAction<JobStatus>() {
+            public JobStatus run() throws IOException, InterruptedException {
+              Credentials ts = null;
+              JobConf job = new JobConf();
+              if (jobTokenFile.getFileSystem(job).exists(jobTokenFile)) {
+                ts = Credentials.readTokenStorageFile(jobTokenFile, job);
+              }
+              return submitJob(JobID.downgrade(token.getJobID()), token
+                  .getJobSubmitDir().toString(), ugi, ts, true);
+            }
+          });
+          recovered++;
+        } catch (Exception e) {
+          LOG.warn("Could not recover job " + jobId, e);
         }
+      }
+      recoveryDuration = clock.getTime() - recoveryProcessStartTime;
+      hasRecovered = true;
 
-        LOG.info("Starting the recovery process for " + jobsToRecover.size() +
-            " jobs ...");
-        
-        for (final JobInfo jobInfo : jobsToRecover) {
-          JobID jobId = JobID.downgrade(jobInfo.getJobID());
-          LOG.info("Recovering job "+ jobId);
-          try {
-            // Get job tokens from HDFS
-            Path jobTokenFile = 
-                new Path(getSystemDirectoryForJob(jobId), 
-                    TokenCache.JOB_TOKEN_HDFS_FILE);
-            final Credentials ts = 
-                Credentials.readTokenStorageFile(jobTokenFile, fs.getConf());
-
-            final UserGroupInformation ugi = 
-              UserGroupInformation.createRemoteUser(jobInfo.getUser().toString());
-            ugi.doAs(new PrivilegedExceptionAction<JobStatus>() {
-                public JobStatus run() throws IOException ,InterruptedException{
-                  return submitJob(
-                      JobID.downgrade(jobInfo.getJobID()), 
-                      jobInfo.getJobSubmitDir().toString(), ugi, 
-                      ts, true);
-              }});            
-            recovered++;
-          } catch (Exception e) {
-            LOG.warn("Could not recover job " + jobInfo.getJobID(), e);
-          }
-        }
-        recoveryDuration = clock.getTime() - recoveryProcessStartTime;
-        hasRecovered = true;
-
-        LOG.info("Recovery done! Recoverd " + recovered +" of "+ 
-            jobsToRecover.size() + " jobs.");
-        LOG.info("Recovery Duration (ms):" + recoveryDuration);
-     }
+      LOG.info("Recovery done! Recoverd " + recovered + " of "
+          + jobsToRecover.size() + " jobs.");
+      LOG.info("Recovery Duration (ms):" + recoveryDuration);
+    }
     
     int totalEventsRecovered() {
       return totalEventsRecovered;
@@ -1912,8 +1876,179 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     this(conf, identifier, clock, new QueueManager(new Configuration(conf)));
   } 
   
+  private void initJTConf(JobConf conf) {
+    if (conf.getBoolean(
+        DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_KEY, false)) {
+      LOG.warn(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_KEY + 
+          " is enabled, disabling it");
+      conf.setBoolean(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_KEY, false);
+    }
+  }
+  
+  private void initializeFilesystem() throws IOException, InterruptedException {
+    // Connect to HDFS NameNode
+    while (!Thread.currentThread().isInterrupted() && fs == null) {
+      try {
+        fs = getMROwner().doAs(new PrivilegedExceptionAction<FileSystem>() {
+          public FileSystem run() throws IOException {
+            return FileSystem.get(conf);
+          }});
+      } catch (IOException ie) {
+        fs = null;
+        LOG.info("Problem connecting to HDFS Namenode... re-trying", ie);
+        Thread.sleep(FS_ACCESS_RETRY_PERIOD);
+      }
+    }
+    
+    if (Thread.currentThread().isInterrupted()) {
+      throw new InterruptedException();
+    }
+    
+    // Ensure HDFS is healthy
+    if ("hdfs".equalsIgnoreCase(fs.getUri().getScheme())) {
+      while (!DistributedFileSystem.isHealthy(fs.getUri())) {
+        LOG.info("HDFS initialized but not 'healthy' yet, waiting...");
+        Thread.sleep(FS_ACCESS_RETRY_PERIOD);
+      }
+    }
+  }
+  
+  private void initialize() 
+      throws IOException, InterruptedException {
+    // initialize history parameters.
+    final JobTracker jtFinal = this;
+    
+    getMROwner().doAs(new PrivilegedExceptionAction<Boolean>() {
+      @Override
+      public Boolean run() throws Exception {
+        JobHistory.init(jtFinal, conf, jtFinal.localMachine, 
+            jtFinal.startTime);
+        return true;
+      }
+    });
+
+    // start the recovery manager
+    recoveryManager = new RecoveryManager();
+    
+    while (!Thread.currentThread().isInterrupted()) {
+      try {
+        // if we haven't contacted the namenode go ahead and do it
+        // clean up the system dir, which will only work if hdfs is out of 
+        // safe mode
+        if(systemDir == null) {
+          systemDir = new Path(getSystemDir());    
+        }
+        try {
+          FileStatus systemDirStatus = fs.getFileStatus(systemDir);
+          if (!systemDirStatus.getOwner().equals(
+              getMROwner().getShortUserName())) {
+            throw new AccessControlException("The systemdir " + systemDir +
+                " is not owned by " + getMROwner().getShortUserName());
+          }
+          if (!systemDirStatus.getPermission().equals(SYSTEM_DIR_PERMISSION)) {
+            LOG.warn("Incorrect permissions on " + systemDir +
+                ". Setting it to " + SYSTEM_DIR_PERMISSION);
+            fs.setPermission(systemDir,new FsPermission(SYSTEM_DIR_PERMISSION));
+          }
+        } catch (FileNotFoundException fnf) {} //ignore
+        // Make sure that the backup data is preserved
+        FileStatus[] systemDirData = fs.listStatus(this.systemDir);
+        // Check if the history is enabled .. as we cant have persistence with 
+        // history disabled
+        if (conf.getBoolean("mapred.jobtracker.restart.recover", false) 
+            && systemDirData != null) {
+          for (FileStatus status : systemDirData) {
+            try {
+              recoveryManager.checkAndAddJob(status);
+            } catch (Throwable t) {
+              LOG.warn("Failed to add the job " + status.getPath().getName(), 
+                       t);
+            }
+          }
+          
+          // Check if there are jobs to be recovered
+          hasRestarted = recoveryManager.shouldRecover();
+          if (hasRestarted) {
+            break; // if there is something to recover else clean the sys dir
+          }
+        }
+        LOG.info("Cleaning up the system directory");
+        fs.delete(systemDir, true);
+        if (FileSystem.mkdirs(fs, systemDir, 
+            new FsPermission(SYSTEM_DIR_PERMISSION))) {
+          break;
+        }
+        LOG.error("Mkdirs failed to create " + systemDir);
+      } catch (AccessControlException ace) {
+        LOG.warn("Failed to operate on mapred.system.dir (" + systemDir 
+                 + ") because of permissions.");
+        LOG.warn("Manually delete the mapred.system.dir (" + systemDir 
+                 + ") and then start the JobTracker.");
+        LOG.warn("Bailing out ... ", ace);
+        throw ace;
+      } catch (IOException ie) {
+        LOG.info("problem cleaning system directory: " + systemDir, ie);
+      }
+      Thread.sleep(FS_ACCESS_RETRY_PERIOD);
+    }
+    
+    if (Thread.currentThread().isInterrupted()) {
+      throw new InterruptedException();
+    }
+    
+    // Same with 'localDir' except it's always on the local disk.
+    if (!hasRestarted) {
+      conf.deleteLocalFiles(SUBDIR);
+    }
+
+    // Initialize history DONE folder
+    FileSystem historyFS = getMROwner().doAs(
+        new PrivilegedExceptionAction<FileSystem>() {
+      public FileSystem run() throws IOException {
+        JobHistory.initDone(conf, fs);
+        final String historyLogDir = 
+          JobHistory.getCompletedJobHistoryLocation().toString();
+        infoServer.setAttribute("historyLogDir", historyLogDir);
+
+        infoServer.setAttribute
+          ("serialNumberDirectoryDigits",
+           Integer.valueOf(JobHistory.serialNumberDirectoryDigits()));
+
+        infoServer.setAttribute
+          ("serialNumberTotalDigits",
+           Integer.valueOf(JobHistory.serialNumberTotalDigits()));
+        
+        return new Path(historyLogDir).getFileSystem(conf);
+      }
+    });
+    infoServer.setAttribute("fileSys", historyFS);
+    infoServer.setAttribute("jobConf", conf);
+    infoServer.setAttribute("aclManager", aclsManager);
+
+    if (JobHistoryServer.isEmbedded(conf)) {
+      LOG.info("History server being initialized in embedded mode");
+      jobHistoryServer = new JobHistoryServer(conf, aclsManager, infoServer);
+      jobHistoryServer.start();
+      LOG.info("Job History Server web address: " + JobHistoryServer.getAddress(conf));
+    }
+
+    //initializes the job status store
+    completedJobStatusStore = new CompletedJobStatusStore(conf, aclsManager);
+    
+    // Setup HDFS monitoring
+    if (this.conf.getBoolean(
+        JT_HDFS_MONITOR_ENABLE, DEFAULT_JT_HDFS_MONITOR_THREAD_ENABLE)) {
+      hdfsMonitor = new HDFSMonitorThread(this.conf, this, this.fs);
+      hdfsMonitor.start();
+    }
+
+  }
+  
   JobTracker(final JobConf conf, String identifier, Clock clock, QueueManager qm) 
-  throws IOException, InterruptedException { 
+  throws IOException, InterruptedException {
+    
+    initJTConf(conf);
+    
     this.queueManager = qm;
     this.clock = clock;
     // Set ports, start RPC servers, setup security policy etc.
@@ -2046,16 +2181,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     infoServer = new HttpServer("job", infoBindAddress, tmpInfoPort, 
         tmpInfoPort == 0, conf, aclsManager.getAdminsAcl());
     infoServer.setAttribute("job.tracker", this);
-    // initialize history parameters.
-    final JobTracker jtFinal = this;
-    getMROwner().doAs(new PrivilegedExceptionAction<Boolean>() {
-      @Override
-      public Boolean run() throws Exception {
-        JobHistory.init(jtFinal, conf,jtFinal.localMachine, 
-            jtFinal.startTime);
-        return true;
-      }
-    });
     
     infoServer.addServlet("reducegraph", "/taskgraph", TaskGraphServlet.class);
     infoServer.start();
@@ -2075,132 +2200,12 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         infoBindAddress + ":" + this.infoPort); 
     LOG.info("JobTracker webserver: " + this.infoServer.getPort());
     
-    // start the recovery manager
-    recoveryManager = new RecoveryManager();
-    
-    while (!Thread.currentThread().isInterrupted()) {
-      try {
-        // if we haven't contacted the namenode go ahead and do it
-        if (fs == null) {
-          fs = getMROwner().doAs(new PrivilegedExceptionAction<FileSystem>() {
-            public FileSystem run() throws IOException {
-              return FileSystem.get(conf);
-          }});
-        }
-        // clean up the system dir, which will only work if hdfs is out of 
-        // safe mode
-        if(systemDir == null) {
-          systemDir = new Path(getSystemDir());    
-        }
-        try {
-          FileStatus systemDirStatus = fs.getFileStatus(systemDir);
-          if (!systemDirStatus.getOwner().equals(
-              getMROwner().getShortUserName())) {
-            throw new AccessControlException("The systemdir " + systemDir +
-                " is not owned by " + getMROwner().getShortUserName());
-          }
-          if (!systemDirStatus.getPermission().equals(SYSTEM_DIR_PERMISSION)) {
-            LOG.warn("Incorrect permissions on " + systemDir +
-                ". Setting it to " + SYSTEM_DIR_PERMISSION);
-            fs.setPermission(systemDir,new FsPermission(SYSTEM_DIR_PERMISSION));
-          }
-        } catch (FileNotFoundException fnf) {} //ignore
-        // Make sure that the backup data is preserved
-        FileStatus[] systemDirData = fs.listStatus(this.systemDir);
-        // Check if the history is enabled .. as we cant have persistence with 
-        // history disabled
-        if (conf.getBoolean("mapred.jobtracker.restart.recover", false) 
-            && systemDirData != null) {
-          for (FileStatus status : systemDirData) {
-            try {
-              recoveryManager.checkAndAddJob(status);
-            } catch (Throwable t) {
-              LOG.warn("Failed to add the job " + status.getPath().getName(), 
-                       t);
-            }
-          }
-          
-          // Check if there are jobs to be recovered
-          hasRestarted = recoveryManager.shouldRecover();
-          if (hasRestarted) {
-            break; // if there is something to recover else clean the sys dir
-          }
-        }
-        LOG.info("Cleaning up the system directory");
-        fs.delete(systemDir, true);
-        if (FileSystem.mkdirs(fs, systemDir, 
-            new FsPermission(SYSTEM_DIR_PERMISSION))) {
-          break;
-        }
-        LOG.error("Mkdirs failed to create " + systemDir);
-      } catch (AccessControlException ace) {
-        LOG.warn("Failed to operate on mapred.system.dir (" + systemDir 
-                 + ") because of permissions.");
-        LOG.warn("Manually delete the mapred.system.dir (" + systemDir 
-                 + ") and then start the JobTracker.");
-        LOG.warn("Bailing out ... ", ace);
-        throw ace;
-      } catch (IOException ie) {
-        LOG.info("problem cleaning system directory: " + systemDir, ie);
-      }
-      Thread.sleep(FS_ACCESS_RETRY_PERIOD);
-    }
-    
-    if (Thread.currentThread().isInterrupted()) {
-      throw new InterruptedException();
-    }
-    
-    // Same with 'localDir' except it's always on the local disk.
-    if (!hasRestarted) {
-      jobConf.deleteLocalFiles(SUBDIR);
-    }
-
-    // Initialize history DONE folder
-    FileSystem historyFS = getMROwner().doAs(
-        new PrivilegedExceptionAction<FileSystem>() {
-      public FileSystem run() throws IOException {
-        JobHistory.initDone(conf, fs);
-        final String historyLogDir = 
-          JobHistory.getCompletedJobHistoryLocation().toString();
-        infoServer.setAttribute("historyLogDir", historyLogDir);
-
-        infoServer.setAttribute
-          ("serialNumberDirectoryDigits",
-           Integer.valueOf(JobHistory.serialNumberDirectoryDigits()));
-
-        infoServer.setAttribute
-          ("serialNumberTotalDigits",
-           Integer.valueOf(JobHistory.serialNumberTotalDigits()));
-        
-        return new Path(historyLogDir).getFileSystem(conf);
-      }
-    });
-    infoServer.setAttribute("fileSys", historyFS);
-    infoServer.setAttribute("jobConf", conf);
-    infoServer.setAttribute("aclManager", aclsManager);
-
-    if (JobHistoryServer.isEmbedded(conf)) {
-      LOG.info("History server being initialized in embedded mode");
-      jobHistoryServer = new JobHistoryServer(conf, aclsManager, infoServer);
-      jobHistoryServer.start();
-      LOG.info("Job History Server web address: " + JobHistoryServer.getAddress(conf));
-    }
-
     this.dnsToSwitchMapping = ReflectionUtils.newInstance(
         conf.getClass("topology.node.switch.mapping.impl", ScriptBasedMapping.class,
             DNSToSwitchMapping.class), conf);
     this.numTaskCacheLevels = conf.getInt("mapred.task.cache.levels", 
         NetworkTopology.DEFAULT_HOST_LEVEL);
 
-    //initializes the job status store
-    completedJobStatusStore = new CompletedJobStatusStore(conf, aclsManager);
-    
-    // Setup HDFS monitoring
-    if (this.conf.getBoolean(
-        JT_HDFS_MONITOR_ENABLE, DEFAULT_JT_HDFS_MONITOR_THREAD_ENABLE)) {
-      hdfsMonitor = new HDFSMonitorThread(this.conf, this, this.fs);
-      hdfsMonitor.start();
-    }
   }
 
   private static SimpleDateFormat getDateFormat() {
@@ -2291,6 +2296,17 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * Run forever
    */
   public void offerService() throws InterruptedException, IOException {
+    // start the inter-tracker server 
+    this.interTrackerServer.start();
+    
+    // Initialize the JobTracker FileSystem within safemode
+    setSafeModeInternal(SafeModeAction.SAFEMODE_ENTER);
+    initializeFilesystem();
+    setSafeModeInternal(SafeModeAction.SAFEMODE_LEAVE);
+    
+    // Initialize JobTracker
+    initialize();
+    
     // Prepare for recovery. This is done irrespective of the status of restart
     // flag.
     while (true) {
@@ -2330,12 +2346,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       completedJobsStoreThread.start();
     }
 
-    // start the inter-tracker server once the jt is ready
-    this.interTrackerServer.start();
-    
     synchronized (this) {
       state = State.RUNNING;
     }
+    
     LOG.info("Starting RUNNING");
     
     this.interTrackerServer.join();
@@ -3162,7 +3176,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     
     // check if the restart info is req
     if (addRestartInfo) {
-      response.setRecoveredJobs(recoveryManager.getJobIdsToRecover());
+      response.setRecoveredJobs(recoveryManager.getJobsToRecover());
     }
         
     // Update the trackerToHeartbeatResponseMap
@@ -3530,6 +3544,12 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   // returns cleanup tasks first, then setup tasks.
   synchronized List<Task> getSetupAndCleanupTasks(
     TaskTrackerStatus taskTracker) throws IOException {
+    
+    // Don't assign *any* new task in safemode
+    if (isInSafeMode()) {
+      return null;
+    }
+    
     int maxMapTasks = taskTracker.getMaxMapSlots();
     int maxReduceTasks = taskTracker.getMaxReduceSlots();
     int numMaps = taskTracker.countOccupiedMapSlots();
@@ -3650,23 +3670,22 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    */
   public JobStatus submitJob(JobID jobId, String jobSubmitDir, Credentials ts)
       throws IOException {
-	  return submitJob(jobId, jobSubmitDir, null, ts, false);
+    return submitJob(jobId, jobSubmitDir, null, ts, false);
   }
 
   /**
-   * JobTracker.submitJob() kicks off a new job.  
-   *
-   * Create a 'JobInProgress' object, which contains both JobProfile
-   * and JobStatus.  Those two sub-objects are sometimes shipped outside
-   * of the JobTracker.  But JobInProgress adds info that's useful for
-   * the JobTracker alone.
+   * JobTracker.submitJob() kicks off a new job.
+   * 
+   * Create a 'JobInProgress' object, which contains both JobProfile and
+   * JobStatus. Those two sub-objects are sometimes shipped outside of the
+   * JobTracker. But JobInProgress adds info that's useful for the JobTracker
+   * alone.
    */
-  private JobStatus submitJob(JobID jobId, String jobSubmitDir, 
-                             UserGroupInformation ugi, 
-                             Credentials ts, boolean recovered
-                             ) throws IOException {
+  public JobStatus submitJob(JobID jobId, String jobSubmitDir,
+      UserGroupInformation ugi, Credentials ts, boolean recovered)
+      throws IOException {
     JobInfo jobInfo = null;
-    if(ugi == null){
+    if (ugi == null) {
       ugi = UserGroupInformation.getCurrentUser();
     }
     synchronized (this) {
@@ -4351,6 +4370,11 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * @see org.apache.hadoop.mapred.JobSubmissionProtocol#getSystemDir()
    */
   public String getSystemDir() {
+    // Might not be initialized yet, TT handles this
+    if (isInSafeMode()) {
+      return null;
+    }
+    
     Path sysDir = new Path(conf.get("mapred.system.dir", "/tmp/hadoop/mapred/system"));  
     return fs.makeQualified(sysDir).toString();
   }
@@ -4384,6 +4408,11 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     return new Path(getSystemDirectoryForJob(id)+"/" + JOB_INFO_FILE);
   }
 
+  //Get the job token file in system directory
+  Path getTokenFileForJob(JobID id) {
+    return new Path(getSystemDirectoryForJob(id)+"/" + JOB_TOKEN_FILE);
+  }
+  
   /**
    * Change the run-time priority of the given job.
    * 
@@ -5121,14 +5150,47 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   public enum SafeModeAction{ SAFEMODE_LEAVE, SAFEMODE_ENTER, SAFEMODE_GET; }
   
   private AtomicBoolean safeMode = new AtomicBoolean(false);
-
+  private AtomicBoolean adminSafeMode = new AtomicBoolean(false);
+  private String adminSafeModeUser = "";
+  
   public boolean setSafeMode(JobTracker.SafeModeAction safeModeAction) 
       throws IOException {
+    String user = UserGroupInformation.getCurrentUser().getShortUserName();
+
+    // Anyone can check JT safe-mode
     if (safeModeAction == SafeModeAction.SAFEMODE_GET) {
+      boolean safeMode = this.safeMode.get();
       LOG.info("Getting safemode information: safemode=" + safeMode + ". " +
           "Requested by : " +
           UserGroupInformation.getCurrentUser().getShortUserName());
-    } else {
+      AuditLogger.logSuccess(user, Constants.GET_SAFEMODE, 
+          Constants.JOBTRACKER);
+      return safeMode;
+    }
+    
+    // Check access for modifications to safe-mode
+    if (!aclsManager.isMRAdmin(UserGroupInformation.getCurrentUser())) {
+      AuditLogger.logFailure(user, Constants.SET_SAFEMODE, 
+          aclsManager.getAdminsAcl().toString(), Constants.JOBTRACKER, 
+          Constants.UNAUTHORIZED_USER);
+      throw new AccessControlException(user + 
+                                       " is not authorized to refresh nodes.");
+    }
+    AuditLogger.logSuccess(user, Constants.SET_SAFEMODE, Constants.JOBTRACKER);
+
+    boolean currSafeMode = setSafeModeInternal(safeModeAction);
+    adminSafeMode.set(currSafeMode);
+    adminSafeModeUser = user;
+    return currSafeMode;
+  }
+  
+  boolean isInAdminSafeMode() {
+    return adminSafeMode.get();
+  }
+  
+  boolean setSafeModeInternal(JobTracker.SafeModeAction safeModeAction) 
+      throws IOException {
+    if (safeModeAction != SafeModeAction.SAFEMODE_GET) {
       boolean safeMode = false;
       if (safeModeAction == SafeModeAction.SAFEMODE_ENTER) {
         safeMode = true;
@@ -5142,14 +5204,18 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     return this.safeMode.get();
   }
 
-  public boolean getSafeMode() {
+  public boolean isInSafeMode() {
     return safeMode.get();
   }
   
   String getSafeModeText() {
-    if (!getSafeMode())
+    if (!isInSafeMode())
       return "OFF";
-    return "<em>ON</em>";
+    String safeModeInfo = 
+        adminSafeMode.get() ? 
+            "Set by admin <strong>" + adminSafeModeUser + "</strong>": 
+            "HDFS unavailable";
+    return "<em>ON - " + safeModeInfo + "</em>";
   }
   
 }
