@@ -20,4 +20,5 @@ HDP-PREVIEW-4
   BUG-602 HADOOP-5464 to back port it to branch 1.1 - BUG-602.patch - HADOOP-5464
   BUG-765 spnego principal uses the wrong keytab file for the HTTP principal - bug-765.patch  - HDFS-3466
   BUG-766 HFTP should use the same port & protocol for getting the delegation token - bug-766.patch - HDFS-3461
-  HADOOP-6947 Kerberos relogin should set refreshKrb5Config to true
+HDP-1.0.15
+  HDFS-3652. FSEditLog failure removes the wrong edit stream when storage dirs have same name. (todd)
