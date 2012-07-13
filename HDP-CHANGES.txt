@@ -5,6 +5,7 @@ HA Fixes
   BUG-444 MAPREDUCE-4328. Only check DFS health for hdfs uris.
           MAPREDUCE-4328. Add JobTracker safe mode.
           MAPREDUCE-3837. JobTracker restart fixed. 
+  HDFS-3551 WebHDFS CREATE does not use client location for redirection
 
 HDP-PREVIEW-4  
   Branched From HADOOP-1.0.3
