@@ -32,7 +32,11 @@ this="$config_bin/$script"
 
 # the root of the Hadoop installation
 export HADOOP_PREFIX=`dirname "$this"`/..
-
+# Newer versions of glibc use an arena memory allocator that causes virtual
+# memory usage to explode. This interacts badly with the many threads that
+# we use in Hadoop. Tune the variable down to prevent vmem explosion.
+export MALLOC_ARENA_MAX=${MALLOC_ARENA_MAX:-4}
+ 
 #check to see if the conf dir is given as an optional argument
 if [ $# -gt 1 ]
 then

@@ -22,3 +22,4 @@ HDP-PREVIEW-4
   BUG-766 HFTP should use the same port & protocol for getting the delegation token - bug-766.patch - HDFS-3461
 HDP-1.0.15
   HDFS-3652. FSEditLog failure removes the wrong edit stream when storage dirs have same name. (todd)
+  HADOOP-7154. Should set MALLOC_ARENA_MAX in hadoop-config.sh
