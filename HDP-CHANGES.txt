@@ -23,3 +23,4 @@ HDP-PREVIEW-4
 HDP-1.0.15
   HDFS-3652. FSEditLog failure removes the wrong edit stream when storage dirs have same name. (todd)
   HADOOP-7154. Should set MALLOC_ARENA_MAX in hadoop-config.sh
+  MAPREDUCE-4399. Fix performance regression in shuffle
