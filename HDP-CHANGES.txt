@@ -3,6 +3,9 @@ Performance improvements:
     HADOOP-7753. Support fadvise and sync_file_range in NativeIO. Add
     ReadaheadPool infrastructure for use in HDFS and MR.
     (Brandon Li and todd via suresh)
+
+    HDFS-2465. Add HDFS support for fadvise readahead and drop-behind.
+    (todd via suresh)
   
 
 HA Fixes
