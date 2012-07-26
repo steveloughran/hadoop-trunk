@@ -1,3 +1,10 @@
+Performance improvements:
+  RMP-270 - HDFS low-risk performance improvements
+    HADOOP-7753. Support fadvise and sync_file_range in NativeIO. Add
+    ReadaheadPool infrastructure for use in HDFS and MR.
+    (Brandon Li and todd via suresh)
+  
+
 HA Fixes
   BUG-851 Do not check safemode in FSNamesystem.getBlockLocations(..) for fsck. - HDFS-3522
   BUG-845 Disable edit log toleration in SecondaryNameNode. -  HDFS-3521
