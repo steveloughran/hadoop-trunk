@@ -19,8 +19,9 @@ Performance improvements:
     shuffle performance.
 
     MAPREDUCE-4400 Fix performance regression for small jobs/workflows
-    
-    
+
+    MAPREDUCE-782. Use PureJavaCrc32 in mapreduce spills.
+    (Todd Lipcon, backport by Brandon Li via sseth)
     
 HA Fixes
   BUG-851 Do not check safemode in FSNamesystem.getBlockLocations(..) for fsck. - HDFS-3522
