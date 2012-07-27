@@ -9,8 +9,19 @@ Performance improvements:
 
     HDFS-2751. Backport: Datanode may incorrectly drop OS cache behind reads
     even for short reads.  (Brandon Li via szetszwo)
-  
 
+    HADOOP-8617. Backport HADOOP-6148, HADOOP-6166 and HADOOP-7333 for 
+    a pure Java CRC32 calculator implementation. (Brandon Li via szetszwo)
+
+    HDFS-496. Backport: Use PureJavaCrc32 in HDFS. (Brandon Li via szetszwo)
+
+    MAPREDUCE-4399. Change the Jetty response buffer size to improve 
+    shuffle performance.
+
+    MAPREDUCE-4400 Fix performance regression for small jobs/workflows
+    
+    
+    
 HA Fixes
   BUG-851 Do not check safemode in FSNamesystem.getBlockLocations(..) for fsck. - HDFS-3522
   BUG-845 Disable edit log toleration in SecondaryNameNode. -  HDFS-3521
