@@ -6,6 +6,9 @@ Performance improvements:
 
     HDFS-2465. Add HDFS support for fadvise readahead and drop-behind.
     (todd via suresh)
+
+    HDFS-2751. Backport: Datanode may incorrectly drop OS cache behind reads
+    even for short reads.  (Brandon Li via szetszwo)
   
 
 HA Fixes
