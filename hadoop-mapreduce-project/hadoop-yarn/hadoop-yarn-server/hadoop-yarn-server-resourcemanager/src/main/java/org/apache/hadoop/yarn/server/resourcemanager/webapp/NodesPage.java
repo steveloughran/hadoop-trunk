@@ -27,10 +27,10 @@ import static org.apache.hadoop.yarn.webapp.view.JQueryUI.tableInit;
 import java.util.Collection;
 
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeState;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeInfo;
 import org.apache.hadoop.yarn.util.Times;
@@ -78,9 +78,9 @@ class NodesPage extends RmView {
           th(".mem", "Mem Avail").
           _()._().
           tbody();
-      RMNodeState stateFilter = null;
+      NodeState stateFilter = null;
       if(type != null && !type.isEmpty()) {
-        stateFilter = RMNodeState.valueOf(type.toUpperCase());
+        stateFilter = NodeState.valueOf(type.toUpperCase());
       }
       Collection<RMNode> rmNodes = this.rmContext.getRMNodes().values();
       boolean isInactive = false;
@@ -96,14 +96,14 @@ class NodesPage extends RmView {
       }
       for (RMNode ni : rmNodes) {
         if(stateFilter != null) {
-          RMNodeState state = ni.getState();
+          NodeState state = ni.getState();
           if(!stateFilter.equals(state)) {
             continue;
           }
         } else {
           // No filter. User is asking for all nodes. Make sure you skip the
           // unhealthy nodes.
-          if (ni.getState() == RMNodeState.UNHEALTHY) {
+          if (ni.getState() == NodeState.UNHEALTHY) {
             continue;
           }
         }
@@ -121,7 +121,8 @@ class NodesPage extends RmView {
           row.td().a("http://" + httpAddress, httpAddress)._();
         }
         row.td(info.getHealthStatus()).
-            td(Times.format(info.getLastHealthUpdate())).
+            td().br().$title(String.valueOf(info.getLastHealthUpdate()))._().
+              _(Times.format(info.getLastHealthUpdate()))._().
             td(info.getHealthReport()).
             td(String.valueOf(info.getNumContainers())).
             td().br().$title(String.valueOf(usedMemory))._().
@@ -153,10 +154,12 @@ class NodesPage extends RmView {
   }
 
   private String nodesTableInit() {
-    StringBuilder b = tableInit().append(",aoColumnDefs:[");
-    b.append("{'bSearchable':false, 'aTargets': [7]} ,");
-    b.append("{'sType':'title-numeric', 'bSearchable':false, " +
-    		"'aTargets': [ 8, 9] }]}");
+    StringBuilder b = tableInit().append(", aoColumnDefs: [");
+    b.append("{'bSearchable': false, 'aTargets': [ 7 ]}");
+    b.append(", {'sType': 'title-numeric', 'bSearchable': false, " +
+    		"'aTargets': [ 8, 9 ] }");
+    b.append(", {'sType': 'title-numeric', 'aTargets': [ 5 ]}");
+    b.append("]}");
     return b.toString();
   }
 }

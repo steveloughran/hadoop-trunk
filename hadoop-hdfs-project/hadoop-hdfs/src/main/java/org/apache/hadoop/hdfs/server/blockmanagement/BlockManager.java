@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.TreeMap;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
@@ -38,6 +39,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs.BlockReportIterator;
@@ -51,13 +53,13 @@ import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.AccessMode;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.server.blockmanagement.PendingDataNodeMessages.ReportedBlockInfo;
+
+import static org.apache.hadoop.util.ExitUtil.terminate;
+
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.common.Util;
 import org.apache.hadoop.hdfs.server.namenode.FSClusterStats;
-import org.apache.hadoop.hdfs.server.namenode.INode;
-import org.apache.hadoop.hdfs.server.namenode.INodeFile;
-import org.apache.hadoop.hdfs.server.namenode.INodeFileUnderConstruction;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.Namesystem;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
@@ -71,8 +73,10 @@ import org.apache.hadoop.net.AbstractDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.util.Daemon;
+import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 
 /**
@@ -145,7 +149,7 @@ public class BlockManager {
   private final long replicationRecheckInterval;
   
   /**
-   * Mapping: Block -> { INode, datanodes, self ref }
+   * Mapping: Block -> { BlockCollection, datanodes, self ref }
    * Updated only in response to client-sent information.
    */
   final BlocksMap blocksMap;
@@ -195,11 +199,22 @@ public class BlockManager {
   public final short minReplication;
   /** Default number of replicas */
   public final int defaultReplication;
-  /** The maximum number of entries returned by getCorruptInodes() */
+  /** value returned by MAX_CORRUPT_FILES_RETURNED */
   final int maxCorruptFilesReturned;
+
+  final float blocksInvalidateWorkPct;
+  final int blocksReplWorkMultiplier;
 
   /** variable to enable check for enough racks */
   final boolean shouldCheckForEnoughRacks;
+
+  /**
+   * When running inside a Standby node, the node may receive block reports
+   * from datanodes before receiving the corresponding namespace edits from
+   * the active NameNode. Thus, it will postpone them for later processing,
+   * instead of marking the blocks as corrupt.
+   */
+  private boolean shouldPostponeBlocksFromFuture = false;
 
   /** for block replicas placement */
   private BlockPlacementPolicy blockplacement;
@@ -252,7 +267,25 @@ public class BlockManager {
     DNSToSwitchMapping dnsMap = datanodeManager.getDnsToSwitchMapping();
     this.shouldCheckForEnoughRacks = !AbstractDNSToSwitchMapping
         .isMappingSingleSwitch(dnsMap);
-    
+
+    this.blocksInvalidateWorkPct = conf.getFloat(
+        DFSConfigKeys.DFS_NAMENODE_INVALIDATE_WORK_PCT_PER_ITERATION,
+        DFSConfigKeys.DFS_NAMENODE_INVALIDATE_WORK_PCT_PER_ITERATION_DEFAULT);
+    Preconditions.checkArgument(
+        (this.blocksInvalidateWorkPct > 0),
+        DFSConfigKeys.DFS_NAMENODE_INVALIDATE_WORK_PCT_PER_ITERATION +
+        " = '" + this.blocksInvalidateWorkPct + "' is invalid. " +
+        "It should be a positive, non-zero float value " +
+        "indicating a percentage.");
+    this.blocksReplWorkMultiplier = conf.getInt(
+        DFSConfigKeys.DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION,
+        DFSConfigKeys.DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION_DEFAULT);
+    Preconditions.checkArgument(
+        (this.blocksReplWorkMultiplier > 0),
+        DFSConfigKeys.DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION +
+        " = '" + this.blocksReplWorkMultiplier + "' is invalid. " +
+        "It should be a positive, non-zero integer value.");
+
     this.replicationRecheckInterval = 
       conf.getInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 
                   DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_DEFAULT) * 1000L;
@@ -286,12 +319,24 @@ public class BlockManager {
         + "=" + updateMin + " min(s), "
         + DFSConfigKeys.DFS_BLOCK_ACCESS_TOKEN_LIFETIME_KEY
         + "=" + lifetimeMin + " min(s)");
-    return new BlockTokenSecretManager(true,
-        updateMin*60*1000L, lifetimeMin*60*1000L);
+    
+    String nsId = DFSUtil.getNamenodeNameServiceId(conf);
+    boolean isHaEnabled = HAUtil.isHAEnabled(conf, nsId);
+
+    if (isHaEnabled) {
+      String thisNnId = HAUtil.getNameNodeId(conf, nsId);
+      String otherNnId = HAUtil.getNameNodeIdOfOtherNode(conf, nsId);
+      return new BlockTokenSecretManager(updateMin*60*1000L,
+          lifetimeMin*60*1000L, thisNnId.compareTo(otherNnId) < 0 ? 0 : 1);
+    } else {
+      return new BlockTokenSecretManager(updateMin*60*1000L,
+          lifetimeMin*60*1000L, 0);
+    }
   }
 
   /** get the BlockTokenSecretManager */
-  BlockTokenSecretManager getBlockTokenSecretManager() {
+  @VisibleForTesting
+  public BlockTokenSecretManager getBlockTokenSecretManager() {
     return blockTokenSecretManager;
   }
 
@@ -390,7 +435,7 @@ public class BlockManager {
                          numReplicas.decommissionedReplicas();
     
     if (block instanceof BlockInfo) {
-      String fileName = ((BlockInfo)block).getINode().getFullPathName();
+      String fileName = ((BlockInfo)block).getBlockCollection().getName();
       out.print(fileName + ": ");
     }
     // l: == live:, d: == decommissioned c: == corrupt e: == excess
@@ -445,7 +490,7 @@ public class BlockManager {
    * @throws IOException if the block does not have at least a minimal number
    * of replicas reported from data-nodes.
    */
-  private boolean commitBlock(final BlockInfoUnderConstruction block,
+  private static boolean commitBlock(final BlockInfoUnderConstruction block,
       final Block commitBlock) throws IOException {
     if (block.getBlockUCState() == BlockUCState.COMMITTED)
       return false;
@@ -460,17 +505,17 @@ public class BlockManager {
    * Commit the last block of the file and mark it as complete if it has
    * meets the minimum replication requirement
    * 
-   * @param fileINode file inode
+   * @param bc block collection
    * @param commitBlock - contains client reported block length and generation
    * @return true if the last block is changed to committed state.
    * @throws IOException if the block does not have at least a minimal number
    * of replicas reported from data-nodes.
    */
-  public boolean commitOrCompleteLastBlock(INodeFileUnderConstruction fileINode, 
+  public boolean commitOrCompleteLastBlock(MutableBlockCollection bc, 
       Block commitBlock) throws IOException {
     if(commitBlock == null)
       return false; // not committing, this is a block allocation retry
-    BlockInfo lastBlock = fileINode.getLastBlock();
+    BlockInfo lastBlock = bc.getLastBlock();
     if(lastBlock == null)
       return false; // no blocks in file yet
     if(lastBlock.isComplete())
@@ -478,22 +523,22 @@ public class BlockManager {
     
     final boolean b = commitBlock((BlockInfoUnderConstruction)lastBlock, commitBlock);
     if(countNodes(lastBlock).liveReplicas() >= minReplication)
-      completeBlock(fileINode,fileINode.numBlocks()-1, false);
+      completeBlock(bc, bc.numBlocks()-1, false);
     return b;
   }
 
   /**
    * Convert a specified block of the file to a complete block.
-   * @param fileINode file
+   * @param bc file
    * @param blkIndex  block index in the file
    * @throws IOException if the block does not have at least a minimal number
    * of replicas reported from data-nodes.
    */
-  private BlockInfo completeBlock(final INodeFile fileINode,
+  private BlockInfo completeBlock(final MutableBlockCollection bc,
       final int blkIndex, boolean force) throws IOException {
     if(blkIndex < 0)
       return null;
-    BlockInfo curBlock = fileINode.getBlocks()[blkIndex];
+    BlockInfo curBlock = bc.getBlocks()[blkIndex];
     if(curBlock.isComplete())
       return curBlock;
     BlockInfoUnderConstruction ucBlock = (BlockInfoUnderConstruction)curBlock;
@@ -506,7 +551,7 @@ public class BlockManager {
           "Cannot complete block: block has not been COMMITTED by the client");
     BlockInfo completeBlock = ucBlock.convertToCompleteBlock();
     // replace penultimate block in file
-    fileINode.setBlock(blkIndex, completeBlock);
+    bc.setBlock(blkIndex, completeBlock);
     
     // Since safe-mode only counts complete blocks, and we now have
     // one more complete block, we need to adjust the total up, and
@@ -522,12 +567,12 @@ public class BlockManager {
     return blocksMap.replaceBlock(completeBlock);
   }
 
-  private BlockInfo completeBlock(final INodeFile fileINode,
+  private BlockInfo completeBlock(final MutableBlockCollection bc,
       final BlockInfo block, boolean force) throws IOException {
-    BlockInfo[] fileBlocks = fileINode.getBlocks();
+    BlockInfo[] fileBlocks = bc.getBlocks();
     for(int idx = 0; idx < fileBlocks.length; idx++)
       if(fileBlocks[idx] == block) {
-        return completeBlock(fileINode, idx, force);
+        return completeBlock(bc, idx, force);
       }
     return block;
   }
@@ -537,10 +582,10 @@ public class BlockManager {
    * regardless of whether enough replicas are present. This is necessary
    * when tailing edit logs as a Standby.
    */
-  public BlockInfo forceCompleteBlock(final INodeFile fileINode,
+  public BlockInfo forceCompleteBlock(final MutableBlockCollection bc,
       final BlockInfoUnderConstruction block) throws IOException {
     block.commitBlock(block);
-    return completeBlock(fileINode, block, true);
+    return completeBlock(bc, block, true);
   }
 
   
@@ -554,14 +599,14 @@ public class BlockManager {
    * The methods returns null if there is no partial block at the end.
    * The client is supposed to allocate a new block with the next call.
    *
-   * @param fileINode file
+   * @param bc file
    * @return the last block locations if the block is partial or null otherwise
    */
   public LocatedBlock convertLastBlockToUnderConstruction(
-      INodeFileUnderConstruction fileINode) throws IOException {
-    BlockInfo oldBlock = fileINode.getLastBlock();
+      MutableBlockCollection bc) throws IOException {
+    BlockInfo oldBlock = bc.getLastBlock();
     if(oldBlock == null ||
-        fileINode.getPreferredBlockSize() == oldBlock.getNumBytes())
+        bc.getPreferredBlockSize() == oldBlock.getNumBytes())
       return null;
     assert oldBlock == getStoredBlock(oldBlock) :
       "last block of the file is not in blocksMap";
@@ -569,7 +614,7 @@ public class BlockManager {
     DatanodeDescriptor[] targets = getNodes(oldBlock);
 
     BlockInfoUnderConstruction ucBlock =
-      fileINode.setLastBlock(oldBlock, targets);
+      bc.setLastBlock(oldBlock, targets);
     blocksMap.replaceBlock(ucBlock);
 
     // Remove block from replication queue.
@@ -589,7 +634,7 @@ public class BlockManager {
         // always decrement total blocks
         -1);
 
-    final long fileLength = fileINode.computeContentSummary().getLength();
+    final long fileLength = bc.computeContentSummary().getLength();
     final long pos = fileLength - ucBlock.getNumBytes();
     return createLocatedBlock(ucBlock, pos, AccessMode.WRITE);
   }
@@ -914,80 +959,79 @@ public class BlockManager {
           + blk + " not found.");
       return;
     }
-    markBlockAsCorrupt(storedBlock, dn, reason);
+    markBlockAsCorrupt(new BlockToMarkCorrupt(storedBlock, reason), dn);
   }
 
-  private void markBlockAsCorrupt(BlockInfo storedBlock,
-                                  DatanodeInfo dn,
-                                  String reason) throws IOException {
-    assert storedBlock != null : "storedBlock should not be null";
+  private void markBlockAsCorrupt(BlockToMarkCorrupt b,
+                                  DatanodeInfo dn) throws IOException {
     DatanodeDescriptor node = getDatanodeManager().getDatanode(dn);
     if (node == null) {
-      throw new IOException("Cannot mark block " + 
-                            storedBlock.getBlockName() +
-                            " as corrupt because datanode " + dn +
-                            " does not exist. ");
+      throw new IOException("Cannot mark " + b
+          + " as corrupt because datanode " + dn + " does not exist");
     }
 
-    INodeFile inode = storedBlock.getINode();
-    if (inode == null) {
-      NameNode.stateChangeLog.info("BLOCK markBlockAsCorrupt: " +
-                                   "block " + storedBlock +
-                                   " could not be marked as corrupt as it" +
-                                   " does not belong to any file");
-      addToInvalidates(storedBlock, node);
+    BlockCollection bc = b.corrupted.getBlockCollection();
+    if (bc == null) {
+      NameNode.stateChangeLog.info("BLOCK markBlockAsCorrupt: " + b
+          + " cannot be marked as corrupt as it does not belong to any file");
+      addToInvalidates(b.corrupted, node);
       return;
     } 
 
     // Add replica to the data-node if it is not already there
-    node.addBlock(storedBlock);
+    node.addBlock(b.stored);
 
     // Add this replica to corruptReplicas Map
-    corruptReplicas.addToCorruptReplicasMap(storedBlock, node, reason);
-    if (countNodes(storedBlock).liveReplicas() >= inode.getReplication()) {
+    corruptReplicas.addToCorruptReplicasMap(b.corrupted, node, b.reason);
+    if (countNodes(b.stored).liveReplicas() >= bc.getReplication()) {
       // the block is over-replicated so invalidate the replicas immediately
-      invalidateBlock(storedBlock, node);
+      invalidateBlock(b, node);
     } else if (namesystem.isPopulatingReplQueues()) {
       // add the block to neededReplication
-      updateNeededReplications(storedBlock, -1, 0);
+      updateNeededReplications(b.stored, -1, 0);
     }
   }
 
   /**
    * Invalidates the given block on the given datanode.
    */
-  private void invalidateBlock(Block blk, DatanodeInfo dn)
-      throws IOException {
-    NameNode.stateChangeLog.info("BLOCK* invalidateBlock: "
-                                 + blk + " on " + dn);
+  private void invalidateBlock(BlockToMarkCorrupt b, DatanodeInfo dn
+      ) throws IOException {
+    NameNode.stateChangeLog.info("BLOCK* invalidateBlock: " + b + " on " + dn);
     DatanodeDescriptor node = getDatanodeManager().getDatanode(dn);
     if (node == null) {
-      throw new IOException("Cannot invalidate block " + blk
+      throw new IOException("Cannot invalidate " + b
           + " because datanode " + dn + " does not exist.");
     }
 
     // Check how many copies we have of the block
-    NumberReplicas nr = countNodes(blk);
+    NumberReplicas nr = countNodes(b.stored);
     if (nr.replicasOnStaleNodes() > 0) {
       NameNode.stateChangeLog.info("BLOCK* invalidateBlocks: postponing " +
-          "invalidation of block " + blk + " on " + dn + " because " +
+          "invalidation of " + b + " on " + dn + " because " +
           nr.replicasOnStaleNodes() + " replica(s) are located on nodes " +
           "with potentially out-of-date block reports.");
-      postponeBlock(blk);
+      postponeBlock(b.corrupted);
 
     } else if (nr.liveReplicas() >= 1) {
       // If we have at least one copy on a live node, then we can delete it.
-      addToInvalidates(blk, dn);
-      removeStoredBlock(blk, node);
+      addToInvalidates(b.corrupted, dn);
+      removeStoredBlock(b.stored, node);
       if(NameNode.stateChangeLog.isDebugEnabled()) {
         NameNode.stateChangeLog.debug("BLOCK* invalidateBlocks: "
-            + blk + " on " + dn + " listed for deletion.");
+            + b + " on " + dn + " listed for deletion.");
       }
     } else {
-      NameNode.stateChangeLog.info("BLOCK* invalidateBlocks: " + blk + " on "
-          + dn + " is the only copy and was not deleted.");
+      NameNode.stateChangeLog.info("BLOCK* invalidateBlocks: " + b
+          + " on " + dn + " is the only copy and was not deleted.");
     }
   }
+
+
+  public void setPostponeBlocksFromFuture(boolean postpone) {
+    this.shouldPostponeBlocksFromFuture  = postpone;
+  }
+
 
   private void postponeBlock(Block blk) {
     if (postponedMisreplicatedBlocks.add(blk)) {
@@ -1057,7 +1101,7 @@ public class BlockManager {
     int requiredReplication, numEffectiveReplicas;
     List<DatanodeDescriptor> containingNodes, liveReplicaNodes;
     DatanodeDescriptor srcNode;
-    INodeFile fileINode = null;
+    BlockCollection bc = null;
     int additionalReplRequired;
 
     int scheduledWork = 0;
@@ -1069,15 +1113,15 @@ public class BlockManager {
         for (int priority = 0; priority < blocksToReplicate.size(); priority++) {
           for (Block block : blocksToReplicate.get(priority)) {
             // block should belong to a file
-            fileINode = blocksMap.getINode(block);
+            bc = blocksMap.getBlockCollection(block);
             // abandoned block or block reopened for append
-            if(fileINode == null || fileINode.isUnderConstruction()) {
+            if(bc == null || bc instanceof MutableBlockCollection) {
               neededReplications.remove(block, priority); // remove from neededReplications
               neededReplications.decrementReplicationIndex(priority);
               continue;
             }
 
-            requiredReplication = fileINode.getReplication();
+            requiredReplication = bc.getReplication();
 
             // get a source data-node
             containingNodes = new ArrayList<DatanodeDescriptor>();
@@ -1113,7 +1157,7 @@ public class BlockManager {
             } else {
               additionalReplRequired = 1; // Needed on a new rack
             }
-            work.add(new ReplicationWork(block, fileINode, srcNode,
+            work.add(new ReplicationWork(block, bc, srcNode,
                 containingNodes, liveReplicaNodes, additionalReplRequired,
                 priority));
           }
@@ -1135,8 +1179,8 @@ public class BlockManager {
 
       // choose replication targets: NOT HOLDING THE GLOBAL LOCK
       // It is costly to extract the filename for which chooseTargets is called,
-      // so for now we pass in the Inode itself.
-      rw.targets = blockplacement.chooseTarget(rw.fileINode,
+      // so for now we pass in the block collection itself.
+      rw.targets = blockplacement.chooseTarget(rw.bc,
           rw.additionalReplRequired, rw.srcNode, rw.liveReplicaNodes,
           excludedNodes, rw.block.getNumBytes());
     }
@@ -1155,15 +1199,15 @@ public class BlockManager {
           int priority = rw.priority;
           // Recheck since global lock was released
           // block should belong to a file
-          fileINode = blocksMap.getINode(block);
+          bc = blocksMap.getBlockCollection(block);
           // abandoned block or block reopened for append
-          if(fileINode == null || fileINode.isUnderConstruction()) {
+          if(bc == null || bc instanceof MutableBlockCollection) {
             neededReplications.remove(block, priority); // remove from neededReplications
             rw.targets = null;
             neededReplications.decrementReplicationIndex(priority);
             continue;
           }
-          requiredReplication = fileINode.getReplication();
+          requiredReplication = bc.getReplication();
 
           // do not schedule more if enough replicas is already pending
           NumberReplicas numReplicas = countNodes(block);
@@ -1392,13 +1436,36 @@ public class BlockManager {
    * list of blocks that should be considered corrupt due to a block report.
    */
   private static class BlockToMarkCorrupt {
-    final BlockInfo blockInfo;
+    /** The corrupted block in a datanode. */
+    final BlockInfo corrupted;
+    /** The corresponding block stored in the BlockManager. */
+    final BlockInfo stored;
+    /** The reason to mark corrupt. */
     final String reason;
     
-    BlockToMarkCorrupt(BlockInfo blockInfo, String reason) {
-      super();
-      this.blockInfo = blockInfo;
+    BlockToMarkCorrupt(BlockInfo corrupted, BlockInfo stored, String reason) {
+      Preconditions.checkNotNull(corrupted, "corrupted is null");
+      Preconditions.checkNotNull(stored, "stored is null");
+
+      this.corrupted = corrupted;
+      this.stored = stored;
       this.reason = reason;
+    }
+
+    BlockToMarkCorrupt(BlockInfo stored, String reason) {
+      this(stored, stored, reason);
+    }
+
+    BlockToMarkCorrupt(BlockInfo stored, long gs, String reason) {
+      this(new BlockInfo(stored), stored, reason);
+      //the corrupted block in datanode has a different generation stamp
+      corrupted.setGenerationStamp(gs);
+    }
+
+    @Override
+    public String toString() {
+      return corrupted + "("
+          + (corrupted == stored? "same as stored": "stored=" + stored) + ")";
     }
   }
 
@@ -1409,7 +1476,7 @@ public class BlockManager {
   public void processReport(final DatanodeID nodeID, final String poolId,
       final BlockListAsLongs newReport) throws IOException {
     namesystem.writeLock();
-    final long startTime = Util.now(); //after acquiring write lock
+    final long startTime = Time.now(); //after acquiring write lock
     final long endTime;
     try {
       final DatanodeDescriptor node = datanodeManager.getDatanode(nodeID);
@@ -1448,7 +1515,7 @@ public class BlockManager {
       }
       
     } finally {
-      endTime = Util.now();
+      endTime = Time.now();
       namesystem.writeUnlock();
     }
 
@@ -1520,7 +1587,7 @@ public class BlockManager {
       addToInvalidates(b, node);
     }
     for (BlockToMarkCorrupt b : toCorrupt) {
-      markBlockAsCorrupt(b.blockInfo, node, b.reason);
+      markBlockAsCorrupt(b, node);
     }
   }
 
@@ -1542,13 +1609,11 @@ public class BlockManager {
     assert (node.numBlocks() == 0);
     BlockReportIterator itBR = report.getBlockReportIterator();
 
-    boolean isStandby = namesystem.isInStandbyState();
-    
     while(itBR.hasNext()) {
       Block iblk = itBR.next();
       ReplicaState reportedState = itBR.getCurrentReplicaState();
       
-      if (isStandby &&
+      if (shouldPostponeBlocksFromFuture &&
           namesystem.isGenStampInFuture(iblk.getGenerationStamp())) {
         queueReportedBlock(node, iblk, reportedState,
             QUEUE_REASON_FUTURE_GENSTAMP);
@@ -1564,13 +1629,13 @@ public class BlockManager {
       BlockToMarkCorrupt c = checkReplicaCorrupt(
           iblk, reportedState, storedBlock, ucState, node);
       if (c != null) {
-        if (namesystem.isInStandbyState()) {
+        if (shouldPostponeBlocksFromFuture) {
           // In the Standby, we may receive a block report for a file that we
           // just have an out-of-date gen-stamp or state for, for example.
           queueReportedBlock(node, iblk, reportedState,
               QUEUE_REASON_CORRUPT_STATE);
         } else {
-          markBlockAsCorrupt(c.blockInfo, node, c.reason);
+          markBlockAsCorrupt(c, node);
         }
         continue;
       }
@@ -1670,7 +1735,7 @@ public class BlockManager {
           + " replicaState = " + reportedState);
     }
   
-    if (namesystem.isInStandbyState() &&
+    if (shouldPostponeBlocksFromFuture &&
         namesystem.isGenStampInFuture(block.getGenerationStamp())) {
       queueReportedBlock(dn, block, reportedState,
           QUEUE_REASON_FUTURE_GENSTAMP);
@@ -1703,7 +1768,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     BlockToMarkCorrupt c = checkReplicaCorrupt(
         block, reportedState, storedBlock, ucState, dn);
     if (c != null) {
-      if (namesystem.isInStandbyState()) {
+      if (shouldPostponeBlocksFromFuture) {
         // If the block is an out-of-date generation stamp or state,
         // but we're the standby, we shouldn't treat it as corrupt,
         // but instead just queue it for later processing.
@@ -1736,7 +1801,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
    */
   private void queueReportedBlock(DatanodeDescriptor dn, Block block,
       ReplicaState reportedState, String reason) {
-    assert namesystem.isInStandbyState();
+    assert shouldPostponeBlocksFromFuture;
     
     if (LOG.isDebugEnabled()) {
       LOG.debug("Queueing reported block " + block +
@@ -1779,9 +1844,9 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
    * with the namespace information.
    */
   public void processAllPendingDNMessages() throws IOException {
-    assert !namesystem.isInStandbyState() :
-      "processAllPendingDNMessages() should be called after exiting " +
-      "standby state!";
+    assert !shouldPostponeBlocksFromFuture :
+      "processAllPendingDNMessages() should be called after disabling " +
+      "block postponement.";
     int count = pendingDNMessages.count();
     if (count > 0) {
       LOG.info("Processing " + count + " messages from DataNodes " +
@@ -1791,7 +1856,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     assert pendingDNMessages.count() == 0;
   }
 
-  /*
+  /**
    * The next two methods test the various cases under which we must conclude
    * the replica is corrupt, or under construction.  These are laid out
    * as switch statements, on the theory that it is easier to understand
@@ -1801,7 +1866,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
    * @return a BlockToMarkCorrupt object, or null if the replica is not corrupt
    */
   private BlockToMarkCorrupt checkReplicaCorrupt(
-      Block iblk, ReplicaState reportedState, 
+      Block reported, ReplicaState reportedState, 
       BlockInfo storedBlock, BlockUCState ucState, 
       DatanodeDescriptor dn) {
     switch(reportedState) {
@@ -1809,15 +1874,16 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
       switch(ucState) {
       case COMPLETE:
       case COMMITTED:
-        if (storedBlock.getGenerationStamp() != iblk.getGenerationStamp()) {
-          return new BlockToMarkCorrupt(storedBlock,
-              "block is " + ucState + " and reported genstamp " +
-              iblk.getGenerationStamp() + " does not match " +
-              "genstamp in block map " + storedBlock.getGenerationStamp());
-        } else if (storedBlock.getNumBytes() != iblk.getNumBytes()) {
+        if (storedBlock.getGenerationStamp() != reported.getGenerationStamp()) {
+          final long reportedGS = reported.getGenerationStamp();
+          return new BlockToMarkCorrupt(storedBlock, reportedGS,
+              "block is " + ucState + " and reported genstamp " + reportedGS
+              + " does not match genstamp in block map "
+              + storedBlock.getGenerationStamp());
+        } else if (storedBlock.getNumBytes() != reported.getNumBytes()) {
           return new BlockToMarkCorrupt(storedBlock,
               "block is " + ucState + " and reported length " +
-              iblk.getNumBytes() + " does not match " +
+              reported.getNumBytes() + " does not match " +
               "length in block map " + storedBlock.getNumBytes());
         } else {
           return null; // not corrupt
@@ -1829,11 +1895,12 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     case RWR:
       if (!storedBlock.isComplete()) {
         return null; // not corrupt
-      } else if (storedBlock.getGenerationStamp() != iblk.getGenerationStamp()) {
-        return new BlockToMarkCorrupt(storedBlock,
-            "reported " + reportedState + " replica with genstamp " +
-            iblk.getGenerationStamp() + " does not match COMPLETE block's " +
-            "genstamp in block map " + storedBlock.getGenerationStamp());
+      } else if (storedBlock.getGenerationStamp() != reported.getGenerationStamp()) {
+        final long reportedGS = reported.getGenerationStamp();
+        return new BlockToMarkCorrupt(storedBlock, reportedGS,
+            "reported " + reportedState + " replica with genstamp " + reportedGS
+            + " does not match COMPLETE block's genstamp in block map "
+            + storedBlock.getGenerationStamp());
       } else { // COMPLETE block, same genstamp
         if (reportedState == ReplicaState.RBW) {
           // If it's a RBW report for a COMPLETE block, it may just be that
@@ -1855,8 +1922,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
       String msg = "Unexpected replica state " + reportedState
       + " for block: " + storedBlock + 
       " on " + dn + " size " + storedBlock.getNumBytes();
-      // log here at WARN level since this is really a broken HDFS
-      // invariant
+      // log here at WARN level since this is really a broken HDFS invariant
       LOG.warn(msg);
       return new BlockToMarkCorrupt(storedBlock, msg);
     }
@@ -1922,7 +1988,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     int numCurrentReplica = countLiveNodes(storedBlock);
     if (storedBlock.getBlockUCState() == BlockUCState.COMMITTED
         && numCurrentReplica >= minReplication) {
-      completeBlock(storedBlock.getINode(), storedBlock, false);
+      completeBlock((MutableBlockCollection)storedBlock.getBlockCollection(), storedBlock, false);
     } else if (storedBlock.isComplete()) {
       // check whether safe replication is reached for the block
       // only complete blocks are counted towards that.
@@ -1950,7 +2016,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     } else {
       storedBlock = block;
     }
-    if (storedBlock == null || storedBlock.getINode() == null) {
+    if (storedBlock == null || storedBlock.getBlockCollection() == null) {
       // If this block does not belong to anyfile, then we are done.
       NameNode.stateChangeLog.info("BLOCK* addStoredBlock: " + block + " on "
           + node + " size " + block.getNumBytes()
@@ -1960,8 +2026,8 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
       return block;
     }
     assert storedBlock != null : "Block must be stored by now";
-    INodeFile fileINode = storedBlock.getINode();
-    assert fileINode != null : "Block must belong to a file";
+    BlockCollection bc = storedBlock.getBlockCollection();
+    assert bc != null : "Block must belong to a file";
 
     // add block to the datanode
     boolean added = node.addBlock(storedBlock);
@@ -1987,7 +2053,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
 
     if(storedBlock.getBlockUCState() == BlockUCState.COMMITTED &&
         numLiveReplicas >= minReplication) {
-      storedBlock = completeBlock(fileINode, storedBlock, false);
+      storedBlock = completeBlock((MutableBlockCollection)bc, storedBlock, false);
     } else if (storedBlock.isComplete()) {
       // check whether safe replication is reached for the block
       // only complete blocks are counted towards that
@@ -1998,7 +2064,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     }
     
     // if file is under construction, then done for now
-    if (fileINode.isUnderConstruction()) {
+    if (bc instanceof MutableBlockCollection) {
       return storedBlock;
     }
 
@@ -2008,7 +2074,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     }
 
     // handle underReplication/overReplication
-    short fileReplication = fileINode.getReplication();
+    short fileReplication = bc.getReplication();
     if (!isNeededReplication(storedBlock, fileReplication, numCurrentReplica)) {
       neededReplications.remove(storedBlock, numCurrentReplica,
           num.decommissionedReplicas(), fileReplication);
@@ -2059,7 +2125,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
    *
    * @param blk Block whose corrupt replicas need to be invalidated
    */
-  private void invalidateCorruptReplicas(Block blk) {
+  private void invalidateCorruptReplicas(BlockInfo blk) {
     Collection<DatanodeDescriptor> nodes = corruptReplicas.getNodes(blk);
     boolean gotException = false;
     if (nodes == null)
@@ -2069,7 +2135,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     DatanodeDescriptor[] nodesCopy = nodes.toArray(new DatanodeDescriptor[0]);
     for (DatanodeDescriptor node : nodesCopy) {
       try {
-        invalidateBlock(blk, node);
+        invalidateBlock(new BlockToMarkCorrupt(blk, null), node);
       } catch (IOException e) {
         NameNode.stateChangeLog.info("NameNode.invalidateCorruptReplicas " +
                                       "error in deleting bad block " + blk +
@@ -2135,8 +2201,8 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
    * what happened with it.
    */
   private MisReplicationResult processMisReplicatedBlock(BlockInfo block) {
-    INodeFile fileINode = block.getINode();
-    if (fileINode == null) {
+    BlockCollection bc = block.getBlockCollection();
+    if (bc == null) {
       // block does not belong to any file
       addToInvalidates(block);
       return MisReplicationResult.INVALID;
@@ -2147,7 +2213,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
       return MisReplicationResult.UNDER_CONSTRUCTION;
     }
     // calculate current replication
-    short expectedReplication = fileINode.getReplication();
+    short expectedReplication = bc.getReplication();
     NumberReplicas num = countNodes(block);
     int numCurrentReplica = num.liveReplicas();
     // add to under-replicated queue if need to be
@@ -2264,33 +2330,17 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
                               BlockPlacementPolicy replicator) {
     assert namesystem.hasWriteLock();
     // first form a rack to datanodes map and
-    INodeFile inode = getINode(b);
+    BlockCollection bc = getBlockCollection(b);
     final Map<String, List<DatanodeDescriptor>> rackMap
         = new HashMap<String, List<DatanodeDescriptor>>();
-    for(final Iterator<DatanodeDescriptor> iter = nonExcess.iterator();
-        iter.hasNext(); ) {
-      final DatanodeDescriptor node = iter.next();
-      final String rackName = node.getNetworkLocation();
-      List<DatanodeDescriptor> datanodeList = rackMap.get(rackName);
-      if (datanodeList == null) {
-        datanodeList = new ArrayList<DatanodeDescriptor>();
-        rackMap.put(rackName, datanodeList);
-      }
-      datanodeList.add(node);
-    }
+    final List<DatanodeDescriptor> moreThanOne = new ArrayList<DatanodeDescriptor>();
+    final List<DatanodeDescriptor> exactlyOne = new ArrayList<DatanodeDescriptor>();
     
     // split nodes into two sets
-    // priSet contains nodes on rack with more than one replica
-    // remains contains the remaining nodes
-    final List<DatanodeDescriptor> priSet = new ArrayList<DatanodeDescriptor>();
-    final List<DatanodeDescriptor> remains = new ArrayList<DatanodeDescriptor>();
-    for(List<DatanodeDescriptor> datanodeList : rackMap.values()) {
-      if (datanodeList.size() == 1 ) {
-        remains.add(datanodeList.get(0));
-      } else {
-        priSet.addAll(datanodeList);
-      }
-    }
+    // moreThanOne contains nodes on rack with more than one replica
+    // exactlyOne contains the remaining nodes
+    replicator.splitNodesWithRack(nonExcess, rackMap, moreThanOne,
+        exactlyOne);
     
     // pick one node to delete that favors the delete hint
     // otherwise pick one with least space from priSet if it is not empty
@@ -2300,30 +2350,18 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
       // check if we can delete delNodeHint
       final DatanodeInfo cur;
       if (firstOne && delNodeHint !=null && nonExcess.contains(delNodeHint)
-          && (priSet.contains(delNodeHint)
-              || (addedNode != null && !priSet.contains(addedNode))) ) {
+          && (moreThanOne.contains(delNodeHint)
+              || (addedNode != null && !moreThanOne.contains(addedNode))) ) {
         cur = delNodeHint;
       } else { // regular excessive replica removal
-        cur = replicator.chooseReplicaToDelete(inode, b, replication,
-            priSet, remains);
+        cur = replicator.chooseReplicaToDelete(bc, b, replication,
+        		moreThanOne, exactlyOne);
       }
       firstOne = false;
 
-      // adjust rackmap, priSet, and remains
-      String rack = cur.getNetworkLocation();
-      final List<DatanodeDescriptor> datanodes = rackMap.get(rack);
-      datanodes.remove(cur);
-      if (datanodes.isEmpty()) {
-        rackMap.remove(rack);
-      }
-      if (priSet.remove(cur)) {
-        if (datanodes.size() == 1) {
-          priSet.remove(datanodes.get(0));
-          remains.add(datanodes.get(0));
-        }
-      } else {
-        remains.remove(cur);
-      }
+      // adjust rackmap, moreThanOne, and exactlyOne
+      replicator.adjustSetsWithChosenReplica(rackMap, moreThanOne,
+          exactlyOne, cur);
 
       nonExcess.remove(cur);
       addToExcessReplicate(cur, b);
@@ -2385,8 +2423,8 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
       // necessary. In that case, put block on a possibly-will-
       // be-replicated list.
       //
-      INode fileINode = blocksMap.getINode(block);
-      if (fileINode != null) {
+      BlockCollection bc = blocksMap.getBlockCollection(block);
+      if (bc != null) {
         namesystem.decrementSafeBlockCount(block);
         updateNeededReplications(block, -1, 0);
       }
@@ -2485,7 +2523,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
       addToInvalidates(b, node);
     }
     for (BlockToMarkCorrupt b : toCorrupt) {
-      markBlockAsCorrupt(b.blockInfo, node, b.reason);
+      markBlockAsCorrupt(b, node);
     }
   }
 
@@ -2617,7 +2655,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
       NumberReplicas num) {
     int curReplicas = num.liveReplicas();
     int curExpectedReplicas = getReplication(block);
-    INode fileINode = blocksMap.getINode(block);
+    BlockCollection bc = blocksMap.getBlockCollection(block);
     Iterator<DatanodeDescriptor> nodeIter = blocksMap.nodeIterator(block);
     StringBuilder nodeList = new StringBuilder();
     while (nodeIter.hasNext()) {
@@ -2630,7 +2668,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
         + ", corrupt replicas: " + num.corruptReplicas()
         + ", decommissioned replicas: " + num.decommissionedReplicas()
         + ", excess replicas: " + num.excessReplicas()
-        + ", Is Open File: " + fileINode.isUnderConstruction()
+        + ", Is Open File: " + (bc instanceof MutableBlockCollection)
         + ", Datanodes having this block: " + nodeList + ", Current Datanode: "
         + srcNode + ", Is current datanode decommissioning: "
         + srcNode.isDecommissionInProgress());
@@ -2645,8 +2683,8 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     final Iterator<? extends Block> it = srcNode.getBlockIterator();
     while(it.hasNext()) {
       final Block block = it.next();
-      INodeFile fileINode = blocksMap.getINode(block);
-      short expectedReplication = fileINode.getReplication();
+      BlockCollection bc = blocksMap.getBlockCollection(block);
+      short expectedReplication = bc.getReplication();
       NumberReplicas num = countNodes(block);
       int numCurrentReplica = num.liveReplicas();
       if (numCurrentReplica > expectedReplication) {
@@ -2668,9 +2706,9 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     final Iterator<? extends Block> it = srcNode.getBlockIterator();
     while(it.hasNext()) {
       final Block block = it.next();
-      INode fileINode = blocksMap.getINode(block);
+      BlockCollection bc = blocksMap.getBlockCollection(block);
 
-      if (fileINode != null) {
+      if (bc != null) {
         NumberReplicas num = countNodes(block);
         int curReplicas = num.liveReplicas();
         int curExpectedReplicas = getReplication(block);
@@ -2685,7 +2723,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
             if ((curReplicas == 0) && (num.decommissionedReplicas() > 0)) {
               decommissionOnlyReplicas++;
             }
-            if (fileINode.isUnderConstruction()) {
+            if (bc instanceof MutableBlockCollection) {
               underReplicatedInOpenFiles++;
             }
           }
@@ -2788,12 +2826,11 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
 
   /* get replication factor of a block */
   private int getReplication(Block block) {
-    INodeFile fileINode = blocksMap.getINode(block);
-    if (fileINode == null) { // block does not belong to any file
+    BlockCollection bc = blocksMap.getBlockCollection(block);
+    if (bc == null) { // block does not belong to any file
       return 0;
     }
-    assert !fileINode.isDirectory() : "Block cannot belong to a directory.";
-    return fileINode.getReplication();
+    return bc.getReplication();
   }
 
 
@@ -2865,12 +2902,12 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     return this.neededReplications.getCorruptBlockSize();
   }
 
-  public BlockInfo addINode(BlockInfo block, INodeFile iNode) {
-    return blocksMap.addINode(block, iNode);
+  public BlockInfo addBlockCollection(BlockInfo block, BlockCollection bc) {
+    return blocksMap.addBlockCollection(block, bc);
   }
 
-  public INodeFile getINode(Block b) {
-    return blocksMap.getINode(b);
+  public BlockCollection getBlockCollection(Block b) {
+    return blocksMap.getBlockCollection(b);
   }
 
   /** @return an iterator of the datanodes. */
@@ -2934,8 +2971,6 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
    * Periodically calls computeReplicationWork().
    */
   private class ReplicationMonitor implements Runnable {
-    private static final int INVALIDATE_WORK_PCT_PER_ITERATION = 32;
-    private static final int REPLICATION_WORK_MULTIPLIER_PER_ITERATION = 2;
 
     @Override
     public void run() {
@@ -2948,8 +2983,8 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
           LOG.warn("ReplicationMonitor thread received InterruptedException.", ie);
           break;
         } catch (Throwable t) {
-          LOG.warn("ReplicationMonitor thread received Runtime exception. ", t);
-          Runtime.getRuntime().exit(-1);
+          LOG.fatal("ReplicationMonitor thread received Runtime exception. ", t);
+          terminate(1, t);
         }
       }
     }
@@ -2975,9 +3010,9 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
 
     final int numlive = heartbeatManager.getLiveDatanodeCount();
     final int blocksToProcess = numlive
-        * ReplicationMonitor.REPLICATION_WORK_MULTIPLIER_PER_ITERATION;
+        * this.blocksReplWorkMultiplier;
     final int nodesToProcess = (int) Math.ceil(numlive
-        * ReplicationMonitor.INVALIDATE_WORK_PCT_PER_ITERATION / 100.0);
+        * this.blocksInvalidateWorkPct);
 
     int workFound = this.computeReplicationWork(blocksToProcess);
 
@@ -3009,7 +3044,7 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
   private static class ReplicationWork {
 
     private Block block;
-    private INodeFile fileINode;
+    private BlockCollection bc;
 
     private DatanodeDescriptor srcNode;
     private List<DatanodeDescriptor> containingNodes;
@@ -3020,14 +3055,14 @@ assert storedBlock.findDatanode(dn) < 0 : "Block " + block
     private int priority;
 
     public ReplicationWork(Block block,
-        INodeFile fileINode,
+        BlockCollection bc,
         DatanodeDescriptor srcNode,
         List<DatanodeDescriptor> containingNodes,
         List<DatanodeDescriptor> liveReplicaNodes,
         int additionalReplRequired,
         int priority) {
       this.block = block;
-      this.fileINode = fileINode;
+      this.bc = bc;
       this.srcNode = srcNode;
       this.containingNodes = containingNodes;
       this.liveReplicaNodes = liveReplicaNodes;

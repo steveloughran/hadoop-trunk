@@ -17,7 +17,9 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -52,7 +54,6 @@ import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.RpcPayloadHeader.RpcKind;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.net.NetUtils;
 import org.junit.Assert;
@@ -86,7 +87,7 @@ public class TestInterDatanodeProtocol {
     }
 
     @Override
-    public Writable call(RpcKind rpcKind, String protocol, Writable param, long receiveTime)
+    public Writable call(RPC.RpcKind rpcKind, String protocol, Writable param, long receiveTime)
         throws IOException {
       if (sleep) {
         // sleep a bit
@@ -357,8 +358,7 @@ public class TestInterDatanodeProtocol {
     server.start();
 
     final InetSocketAddress addr = NetUtils.getConnectAddress(server);
-    DatanodeID fakeDnId = new DatanodeID(
-        "localhost", "localhost", "fake-storage", addr.getPort(), 0, addr.getPort());
+    DatanodeID fakeDnId = DFSTestUtil.getLocalDatanodeID(addr.getPort());
     DatanodeInfo dInfo = new DatanodeInfo(fakeDnId);
     InterDatanodeProtocol proxy = null;
 

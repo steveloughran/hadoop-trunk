@@ -34,11 +34,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 
+import javax.ws.rs.core.MediaType;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.ContentSummary;
+import org.apache.hadoop.fs.DelegationTokenRenewer;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -57,7 +60,6 @@ import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
-import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenRenewer;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
@@ -155,6 +157,17 @@ public class WebHdfsFileSystem extends FileSystem
     }
   }
 
+  /**
+   * Return the protocol scheme for the FileSystem.
+   * <p/>
+   *
+   * @return <code>webhdfs</code>
+   */
+  @Override
+  public String getScheme() {
+    return "webhdfs";
+  }
+
   @Override
   public synchronized void initialize(URI uri, Configuration conf
       ) throws IOException {
@@ -165,7 +178,7 @@ public class WebHdfsFileSystem extends FileSystem
     } catch (URISyntaxException e) {
       throw new IllegalArgumentException(e);
     }
-    this.nnAddr = NetUtils.createSocketAddrForHost(uri.getHost(), uri.getPort());
+    this.nnAddr = NetUtils.createSocketAddr(uri.getAuthority(), getDefaultPort());
     this.workingDir = getHomeDirectory();
 
     if (UserGroupInformation.isSecurityEnabled()) {
@@ -175,7 +188,7 @@ public class WebHdfsFileSystem extends FileSystem
 
   protected void initDelegationToken() throws IOException {
     // look for webhdfs token, then try hdfs
-    Token<?> token = selectDelegationToken();
+    Token<?> token = selectDelegationToken(ugi);
 
     //since we don't already have a token, go get one
     boolean createdToken = false;
@@ -196,8 +209,9 @@ public class WebHdfsFileSystem extends FileSystem
     }
   }
 
-  protected Token<DelegationTokenIdentifier> selectDelegationToken() {
-    return DT_SELECTOR.selectToken(getUri(), ugi.getTokens(), getConf());
+  protected Token<DelegationTokenIdentifier> selectDelegationToken(
+      UserGroupInformation ugi) {
+    return DT_SELECTOR.selectToken(getCanonicalUri(), ugi.getTokens(), getConf());
   }
 
   @Override
@@ -240,9 +254,23 @@ public class WebHdfsFileSystem extends FileSystem
     return f.isAbsolute()? f: new Path(workingDir, f);
   }
 
-  static Map<?, ?> jsonParse(final InputStream in) throws IOException {
+  static Map<?, ?> jsonParse(final HttpURLConnection c, final boolean useErrorStream
+      ) throws IOException {
+    if (c.getContentLength() == 0) {
+      return null;
+    }
+    final InputStream in = useErrorStream? c.getErrorStream(): c.getInputStream();
     if (in == null) {
-      throw new IOException("The input stream is null.");
+      throw new IOException("The " + (useErrorStream? "error": "input") + " stream is null.");
+    }
+    final String contentType = c.getContentType();
+    if (contentType != null) {
+      final MediaType parsed = MediaType.valueOf(contentType);
+      if (!MediaType.APPLICATION_JSON_TYPE.isCompatible(parsed)) {
+        throw new IOException("Content-Type \"" + contentType
+            + "\" is incompatible with \"" + MediaType.APPLICATION_JSON
+            + "\" (parsed=\"" + parsed + "\")");
+      }
     }
     return (Map<?, ?>)JSON.parse(new InputStreamReader(in));
   }
@@ -253,7 +281,7 @@ public class WebHdfsFileSystem extends FileSystem
     if (code != op.getExpectedHttpResponseCode()) {
       final Map<?, ?> m;
       try {
-        m = jsonParse(conn.getErrorStream());
+        m = jsonParse(conn, true);
       } catch(IOException e) {
         throw new IOException("Unexpected HTTP response: code=" + code + " != "
             + op.getExpectedHttpResponseCode() + ", " + op.toQueryString()
@@ -395,6 +423,7 @@ public class WebHdfsFileSystem extends FileSystem
     //Step 2) Submit another Http request with the URL from the Location header with data.
     conn = (HttpURLConnection)new URL(redirect).openConnection();
     conn.setRequestMethod(op.getType().toString());
+    conn.setChunkedStreamingMode(32 << 10); //32kB-chunk
     return conn;
   }
 
@@ -413,7 +442,7 @@ public class WebHdfsFileSystem extends FileSystem
     final HttpURLConnection conn = httpConnect(op, fspath, parameters);
     try {
       final Map<?, ?> m = validateResponse(op, conn);
-      return m != null? m: jsonParse(conn.getInputStream());
+      return m != null? m: jsonParse(conn, false);
     } finally {
       conn.disconnect();
     }
@@ -807,8 +836,7 @@ public class WebHdfsFileSystem extends FileSystem
     }
 
     private static WebHdfsFileSystem getWebHdfs(
-        final Token<?> token, final Configuration conf
-        ) throws IOException, InterruptedException, URISyntaxException {
+        final Token<?> token, final Configuration conf) throws IOException {
       
       final InetSocketAddress nnAddr = SecurityUtil.getTokenServiceAddr(token);
       final URI uri = DFSUtil.createUri(WebHdfsFileSystem.SCHEME, nnAddr);
@@ -822,12 +850,7 @@ public class WebHdfsFileSystem extends FileSystem
       // update the kerberos credentials, if they are coming from a keytab
       ugi.reloginFromKeytab();
 
-      try {
-        WebHdfsFileSystem webhdfs = getWebHdfs(token, conf);
-        return webhdfs.renewDelegationToken(token);
-      } catch (URISyntaxException e) {
-        throw new IOException(e);
-      }
+      return getWebHdfs(token, conf).renewDelegationToken(token);
     }
   
     @Override
@@ -837,12 +860,7 @@ public class WebHdfsFileSystem extends FileSystem
       // update the kerberos credentials, if they are coming from a keytab
       ugi.checkTGTAndReloginFromKeytab();
 
-      try {
-        final WebHdfsFileSystem webhdfs = getWebHdfs(token, conf);
-        webhdfs.cancelDelegationToken(token);
-      } catch (URISyntaxException e) {
-        throw new IOException(e);
-      }
+      getWebHdfs(token, conf).cancelDelegationToken(token);
     }
   }
   

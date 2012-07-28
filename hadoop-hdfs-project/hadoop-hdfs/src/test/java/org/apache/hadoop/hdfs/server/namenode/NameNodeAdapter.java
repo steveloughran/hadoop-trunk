@@ -56,7 +56,7 @@ public class NameNodeAdapter {
   public static LocatedBlocks getBlockLocations(NameNode namenode,
       String src, long offset, long length) throws IOException {
     return namenode.getNamesystem().getBlockLocations(
-        src, offset, length, false, true);
+        src, offset, length, false, true, true);
   }
   
   public static HdfsFileStatus getFileInfo(NameNode namenode, String src,
@@ -126,7 +126,8 @@ public class NameNodeAdapter {
   }
 
   public static String getLeaseHolderForPath(NameNode namenode, String path) {
-    return namenode.getNamesystem().leaseManager.getLeaseByPath(path).getHolder();
+    Lease l = namenode.getNamesystem().leaseManager.getLeaseByPath(path);
+    return l == null? null: l.getHolder();
   }
 
   /**

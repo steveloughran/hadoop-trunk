@@ -23,6 +23,7 @@ import java.util.Collection;
 import java.util.concurrent.ConcurrentMap;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -38,17 +39,20 @@ import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeState;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppAttemptInfo;
+import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppAttemptsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.CapacitySchedulerInfo;
@@ -77,6 +81,8 @@ public class RMWebServices {
       .getRecordFactory(null);
   private final ApplicationACLsManager aclsManager;
 
+  private @Context HttpServletResponse response;
+
   @Inject
   public RMWebServices(final ResourceManager rm,
       final ApplicationACLsManager aclsManager) {
@@ -100,6 +106,11 @@ public class RMWebServices {
     return true;
   }
 
+  private void init() {
+    //clear content type
+    response.setContentType(null);
+  }
+
   @GET
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   public ClusterInfo get() {
@@ -110,6 +121,7 @@ public class RMWebServices {
   @Path("/info")
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   public ClusterInfo getClusterInfo() {
+    init();
     return new ClusterInfo(this.rm);
   }
 
@@ -117,6 +129,7 @@ public class RMWebServices {
   @Path("/metrics")
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   public ClusterMetricsInfo getClusterMetricsInfo() {
+    init();
     return new ClusterMetricsInfo(this.rm, this.rm.getRMContext());
   }
 
@@ -124,6 +137,7 @@ public class RMWebServices {
   @Path("/scheduler")
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   public SchedulerTypeInfo getSchedulerInfo() {
+    init();
     ResourceScheduler rs = rm.getResourceScheduler();
     SchedulerInfo sinfo;
     if (rs instanceof CapacityScheduler) {
@@ -143,6 +157,7 @@ public class RMWebServices {
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   public NodesInfo getNodes(@QueryParam("state") String filterState,
       @QueryParam("healthy") String healthState) {
+    init();
     ResourceScheduler sched = this.rm.getResourceScheduler();
     if (sched == null) {
       throw new NotFoundException("Null ResourceScheduler instance");
@@ -150,7 +165,7 @@ public class RMWebServices {
     Collection<RMNode> rmNodes = this.rm.getRMContext().getRMNodes().values();
     boolean isInactive = false;
     if (filterState != null && !filterState.isEmpty()) {
-      RMNodeState nodeState = RMNodeState.valueOf(filterState.toUpperCase());
+      NodeState nodeState = NodeState.valueOf(filterState.toUpperCase());
       switch (nodeState) {
       case DECOMMISSIONED:
       case LOST:
@@ -170,7 +185,7 @@ public class RMWebServices {
       } else {
         // No filter. User is asking for all nodes. Make sure you skip the
         // unhealthy nodes.
-        if (ni.getState() == RMNodeState.UNHEALTHY) {
+        if (ni.getState() == NodeState.UNHEALTHY) {
           continue;
         }
       }
@@ -197,6 +212,7 @@ public class RMWebServices {
   @Path("/nodes/{nodeId}")
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   public NodeInfo getNode(@PathParam("nodeId") String nodeId) {
+    init();
     if (nodeId == null || nodeId.isEmpty()) {
       throw new NotFoundException("nodeId, " + nodeId + ", is empty or null");
     }
@@ -246,6 +262,7 @@ public class RMWebServices {
     long fBegin = 0;
     long fEnd = Long.MAX_VALUE;
 
+    init();
     if (count != null && !count.isEmpty()) {
       checkCount = true;
       countNum = Long.parseLong(count);
@@ -355,6 +372,7 @@ public class RMWebServices {
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   public AppInfo getApp(@Context HttpServletRequest hsr,
       @PathParam("appid") String appId) {
+    init();
     if (appId == null || appId.isEmpty()) {
       throw new NotFoundException("appId, " + appId + ", is empty or null");
     }
@@ -370,4 +388,31 @@ public class RMWebServices {
     return new AppInfo(app, hasAccess(app, hsr));
   }
 
+  @GET
+  @Path("/apps/{appid}/appattempts")
+  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+  public AppAttemptsInfo getAppAttempts(@PathParam("appid") String appId) {
+
+    init();
+    if (appId == null || appId.isEmpty()) {
+      throw new NotFoundException("appId, " + appId + ", is empty or null");
+    }
+    ApplicationId id;
+    id = ConverterUtils.toApplicationId(recordFactory, appId);
+    if (id == null) {
+      throw new NotFoundException("appId is null");
+    }
+    RMApp app = rm.getRMContext().getRMApps().get(id);
+    if (app == null) {
+      throw new NotFoundException("app with id: " + appId + " not found");
+    }
+
+    AppAttemptsInfo appAttemptsInfo = new AppAttemptsInfo();
+    for (RMAppAttempt attempt : app.getAppAttempts().values()) {
+      AppAttemptInfo attemptInfo = new AppAttemptInfo(attempt);
+      appAttemptsInfo.add(attemptInfo);
+    }
+
+    return appAttemptsInfo;
+  }
 }

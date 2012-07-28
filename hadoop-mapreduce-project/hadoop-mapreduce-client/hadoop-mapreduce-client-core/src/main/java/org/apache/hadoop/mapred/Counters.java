@@ -90,7 +90,23 @@ public class Counters
   }
 
   public synchronized String makeCompactString() {
-    return CountersStrings.toEscapedCompactString(this);
+    StringBuilder builder = new StringBuilder();
+    boolean first = true;
+    for(Group group: this){
+      for(Counter counter: group) {
+        if (first) {
+          first = false;
+        } else {
+          builder.append(',');
+        }
+        builder.append(group.getDisplayName());
+        builder.append('.');
+        builder.append(counter.getDisplayName());
+        builder.append(':');
+        builder.append(counter.getCounter());
+      }
+    }
+    return builder.toString();
   }
   
   /**
@@ -387,21 +403,13 @@ public class Counters
   private static class FrameworkGroupImpl<T extends Enum<T>>
       extends FrameworkCounterGroup<T, Counter> {
 
-    // Mix the framework counter implementation into the Counter interface
-    class FrameworkCounterImpl extends FrameworkCounter {
-      FrameworkCounterImpl(T key) {
-        super(key);
-      }
-
-    }
-
     FrameworkGroupImpl(Class<T> cls) {
       super(cls);
     }
 
     @Override
     protected Counter newCounter(T key) {
-      return new Counter(new FrameworkCounterImpl(key));
+      return new Counter(new FrameworkCounter<T>(key, getName()));
     }
 
     @Override
@@ -413,17 +421,9 @@ public class Counters
   // Mix the file system counter group implementation into the Group interface
   private static class FSGroupImpl extends FileSystemCounterGroup<Counter> {
 
-    private class FSCounterImpl extends FSCounter {
-
-      FSCounterImpl(String scheme, FileSystemCounter key) {
-        super(scheme, key);
-      }
-
-    }
-
     @Override
     protected Counter newCounter(String scheme, FileSystemCounter key) {
-      return new Counter(new FSCounterImpl(scheme, key));
+      return new Counter(new FSCounter(scheme, key));
     }
 
     @Override

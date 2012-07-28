@@ -37,6 +37,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
+import org.apache.hadoop.fs.DelegationTokenRenewer;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileChecksum;
@@ -46,7 +47,6 @@ import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
-import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenRenewer;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
 import org.apache.hadoop.hdfs.tools.DelegationTokenFetcher;
@@ -94,8 +94,8 @@ public class HftpFileSystem extends FileSystem
   protected UserGroupInformation ugi;
   private URI hftpURI;
 
-  protected InetSocketAddress nnAddr;
-  protected InetSocketAddress nnSecureAddr;
+  protected URI nnUri;
+  protected URI nnSecureUri;
 
   public static final String HFTP_TIMEZONE = "UTC";
   public static final String HFTP_DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ssZ";
@@ -113,6 +113,7 @@ public class HftpFileSystem extends FileSystem
 
   protected static final ThreadLocal<SimpleDateFormat> df =
     new ThreadLocal<SimpleDateFormat>() {
+    @Override
     protected SimpleDateFormat initialValue() {
       return getDateFormat();
     }
@@ -139,11 +140,30 @@ public class HftpFileSystem extends FileSystem
     return NetUtils.createSocketAddrForHost(uri.getHost(), getDefaultSecurePort());
   }
 
+  protected URI getNamenodeUri(URI uri) {
+    return DFSUtil.createUri("http", getNamenodeAddr(uri));
+  }
+
+  protected URI getNamenodeSecureUri(URI uri) {
+    return DFSUtil.createUri("http", getNamenodeSecureAddr(uri));
+  }
+
   @Override
   public String getCanonicalServiceName() {
     // unlike other filesystems, hftp's service is the secure port, not the
     // actual port in the uri
-    return SecurityUtil.buildTokenService(nnSecureAddr).toString();
+    return SecurityUtil.buildTokenService(nnSecureUri).toString();
+  }
+
+  /**
+   * Return the protocol scheme for the FileSystem.
+   * <p/>
+   *
+   * @return <code>hftp</code>
+   */
+  @Override
+  public String getScheme() {
+    return "hftp";
   }
 
   @Override
@@ -152,8 +172,8 @@ public class HftpFileSystem extends FileSystem
     super.initialize(name, conf);
     setConf(conf);
     this.ugi = UserGroupInformation.getCurrentUser(); 
-    this.nnAddr = getNamenodeAddr(name);
-    this.nnSecureAddr = getNamenodeSecureAddr(name);
+    this.nnUri = getNamenodeUri(name);
+    this.nnSecureUri = getNamenodeSecureUri(name);
     try {
       this.hftpURI = new URI(name.getScheme(), name.getAuthority(),
                              null, null, null);
@@ -168,7 +188,7 @@ public class HftpFileSystem extends FileSystem
 
   protected void initDelegationToken() throws IOException {
     // look for hftp token, then try hdfs
-    Token<?> token = selectDelegationToken();
+    Token<?> token = selectDelegationToken(ugi);
 
     // if we don't already have a token, go get one over https
     boolean createdToken = false;
@@ -189,8 +209,9 @@ public class HftpFileSystem extends FileSystem
     }
   }
 
-  protected Token<DelegationTokenIdentifier> selectDelegationToken() {
-  	return hftpTokenSelector.selectToken(getUri(), ugi.getTokens(), getConf());
+  protected Token<DelegationTokenIdentifier> selectDelegationToken(
+      UserGroupInformation ugi) {
+  	return hftpTokenSelector.selectToken(nnSecureUri, ugi.getTokens(), getConf());
   }
   
 
@@ -220,14 +241,15 @@ public class HftpFileSystem extends FileSystem
       //Renew TGT if needed
       ugi.reloginFromKeytab();
       return ugi.doAs(new PrivilegedExceptionAction<Token<?>>() {
+        @Override
         public Token<?> run() throws IOException {
-          final String nnHttpUrl = DFSUtil.createUri("https", nnSecureAddr).toString();
+          final String nnHttpUrl = nnSecureUri.toString();
           Credentials c;
           try {
             c = DelegationTokenFetcher.getDTfromRemote(nnHttpUrl, renewer);
           } catch (Exception e) {
             LOG.info("Couldn't get a delegation token from " + nnHttpUrl + 
-            " using https.");
+            " using http.");
             if(LOG.isDebugEnabled()) {
               LOG.debug("error was ", e);
             }
@@ -263,8 +285,8 @@ public class HftpFileSystem extends FileSystem
    * @throws IOException on error constructing the URL
    */
   protected URL getNamenodeURL(String path, String query) throws IOException {
-    final URL url = new URL("http", nnAddr.getHostName(),
-          nnAddr.getPort(), path + '?' + query);
+    final URL url = new URL("http", nnUri.getHost(),
+          nnUri.getPort(), path + '?' + query);
     if (LOG.isTraceEnabled()) {
       LOG.trace("url=" + url);
     }
@@ -382,6 +404,7 @@ public class HftpFileSystem extends FileSystem
 
     ArrayList<FileStatus> fslist = new ArrayList<FileStatus>();
 
+    @Override
     public void startElement(String ns, String localname, String qname,
                 Attributes attrs) throws SAXException {
       if ("listing".equals(qname)) return;
@@ -521,6 +544,7 @@ public class HftpFileSystem extends FileSystem
   public void setWorkingDirectory(Path f) { }
 
   /** This optional operation is not yet supported. */
+  @Override
   public FSDataOutputStream append(Path f, int bufferSize,
       Progressable progress) throws IOException {
     throw new IOException("Not supported");
@@ -666,11 +690,11 @@ public class HftpFileSystem extends FileSystem
                       Configuration conf) throws IOException {
       // update the kerberos credentials, if they are coming from a keytab
       UserGroupInformation.getLoginUser().reloginFromKeytab();
-      // use https to renew the token
+      // use http to renew the token
       InetSocketAddress serviceAddr = SecurityUtil.getTokenServiceAddr(token);
       return 
         DelegationTokenFetcher.renewDelegationToken
-        (DFSUtil.createUri("https", serviceAddr).toString(), 
+        (DFSUtil.createUri("http", serviceAddr).toString(),
          (Token<DelegationTokenIdentifier>) token);
     }
 
@@ -680,10 +704,10 @@ public class HftpFileSystem extends FileSystem
                        Configuration conf) throws IOException {
       // update the kerberos credentials, if they are coming from a keytab
       UserGroupInformation.getLoginUser().checkTGTAndReloginFromKeytab();
-      // use https to cancel the token
+      // use http to cancel the token
       InetSocketAddress serviceAddr = SecurityUtil.getTokenServiceAddr(token);
       DelegationTokenFetcher.cancelDelegationToken
-        (DFSUtil.createUri("https", serviceAddr).toString(), 
+        (DFSUtil.createUri("http", serviceAddr).toString(),
          (Token<DelegationTokenIdentifier>) token);
     }    
   }

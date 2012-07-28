@@ -18,9 +18,7 @@
 
 package org.apache.hadoop.mapreduce.v2.app.client;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -78,7 +76,6 @@ import org.apache.hadoop.mapreduce.v2.app.webapp.AMWebApp;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.PolicyProvider;
-import org.apache.hadoop.yarn.YarnException;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.exceptions.YarnRemoteException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
@@ -116,13 +113,7 @@ public class MRClientService extends AbstractService
   public void start() {
     Configuration conf = getConfig();
     YarnRPC rpc = YarnRPC.create(conf);
-    InetSocketAddress address = NetUtils.createSocketAddr("0.0.0.0:0");
-    InetAddress hostNameResolved = null;
-    try {
-      hostNameResolved = InetAddress.getLocalHost();
-    } catch (UnknownHostException e) {
-      throw new YarnException(e);
-    }
+    InetSocketAddress address = new InetSocketAddress(0);
 
     ClientToAMSecretManager secretManager = null;
     if (UserGroupInformation.isSecurityEnabled()) {
@@ -139,7 +130,8 @@ public class MRClientService extends AbstractService
         rpc.getServer(MRClientProtocol.class, protocolHandler, address,
             conf, secretManager,
             conf.getInt(MRJobConfig.MR_AM_JOB_CLIENT_THREAD_COUNT, 
-                MRJobConfig.DEFAULT_MR_AM_JOB_CLIENT_THREAD_COUNT));
+                MRJobConfig.DEFAULT_MR_AM_JOB_CLIENT_THREAD_COUNT),
+                MRJobConfig.MR_AM_JOB_CLIENT_PORT_RANGE);
     
     // Enable service authorization?
     if (conf.getBoolean(
@@ -149,9 +141,7 @@ public class MRClientService extends AbstractService
     }
 
     server.start();
-    this.bindAddress =
-        NetUtils.createSocketAddr(hostNameResolved.getHostAddress()
-            + ":" + server.getPort());
+    this.bindAddress = NetUtils.getConnectAddress(server);
     LOG.info("Instantiated MRClientService at " + this.bindAddress);
     try {
       webApp = WebApps.$for("mapreduce", AppContext.class, appContext, "ws").with(conf).
@@ -190,6 +180,11 @@ public class MRClientService extends AbstractService
     private RecordFactory recordFactory = 
       RecordFactoryProvider.getRecordFactory(null);
 
+    @Override
+    public InetSocketAddress getConnectAddress() {
+      return getBindAddress();
+    }
+    
     private Job verifyAndGetJob(JobId jobID, 
         boolean modifyAccess) throws YarnRemoteException {
       Job job = appContext.getJob(jobID);

@@ -49,6 +49,9 @@ import org.apache.hadoop.yarn.logaggregation.LogAggregationUtils;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
 import org.apache.hadoop.yarn.server.nodemanager.LocalDirsHandlerService;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEvent;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEventType;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationFinishEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.LogHandler;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppFinishedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppStartedEvent;
@@ -56,6 +59,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.eve
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerEvent;
 import org.apache.hadoop.yarn.service.AbstractService;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 public class LogAggregationService extends AbstractService implements
@@ -146,13 +150,13 @@ public class LogAggregationService extends AbstractService implements
     try {
       remoteFS = FileSystem.get(conf);
     } catch (IOException e) {
-      throw new YarnException("Unable to get Remote FileSystem isntance", e);
+      throw new YarnException("Unable to get Remote FileSystem instance", e);
     }
     boolean remoteExists = false;
     try {
       remoteExists = remoteFS.exists(this.remoteRootLogDir);
     } catch (IOException e) {
-      throw new YarnException("Failed to check for existance of remoteLogDir ["
+      throw new YarnException("Failed to check for existence of remoteLogDir ["
           + this.remoteRootLogDir + "]");
     }
     if (remoteExists) {
@@ -266,7 +270,24 @@ public class LogAggregationService extends AbstractService implements
     }
   }
 
+  @SuppressWarnings("unchecked")
   private void initApp(final ApplicationId appId, String user,
+      Credentials credentials, ContainerLogsRetentionPolicy logRetentionPolicy,
+      Map<ApplicationAccessType, String> appAcls) {
+    ApplicationEvent eventResponse;
+    try {
+      initAppAggregator(appId, user, credentials, logRetentionPolicy, appAcls);
+      eventResponse = new ApplicationEvent(appId,
+          ApplicationEventType.APPLICATION_LOG_HANDLING_INITED);
+    } catch (YarnException e) {
+      eventResponse = new ApplicationFinishEvent(appId,
+          "Application failed to init aggregation: " + e.getMessage());
+    }
+    this.dispatcher.getEventHandler().handle(eventResponse);
+  }
+
+  @VisibleForTesting
+  public void initAppAggregator(final ApplicationId appId, String user,
       Credentials credentials, ContainerLogsRetentionPolicy logRetentionPolicy,
       Map<ApplicationAccessType, String> appAcls) {
 
@@ -321,14 +342,14 @@ public class LogAggregationService extends AbstractService implements
     // A container is complete. Put this containers' logs up for aggregation if
     // this containers' logs are needed.
 
-    if (!this.appLogAggregators.containsKey(
-        containerId.getApplicationAttemptId().getApplicationId())) {
-      throw new YarnException("Application is not initialized yet for "
-          + containerId);
+    AppLogAggregator aggregator = this.appLogAggregators.get(
+        containerId.getApplicationAttemptId().getApplicationId());
+    if (aggregator == null) {
+      LOG.warn("Log aggregation is not initialized for " + containerId
+          + ", did it fail to start?");
+      return;
     }
-    this.appLogAggregators.get(
-        containerId.getApplicationAttemptId().getApplicationId())
-        .startContainerLogAggregation(containerId, exitCode == 0);
+    aggregator.startContainerLogAggregation(containerId, exitCode == 0);
   }
 
   private void stopApp(ApplicationId appId) {
@@ -336,11 +357,13 @@ public class LogAggregationService extends AbstractService implements
     // App is complete. Finish up any containers' pending log aggregation and
     // close the application specific logFile.
 
-    if (!this.appLogAggregators.containsKey(appId)) {
-      throw new YarnException("Application is not initialized yet for "
-          + appId);
+    AppLogAggregator aggregator = this.appLogAggregators.get(appId);
+    if (aggregator == null) {
+      LOG.warn("Log aggregation is not initialized for " + appId
+          + ", did it fail to start?");
+      return;
     }
-    this.appLogAggregators.get(appId).finishLogAggregation();
+    aggregator.finishLogAggregation();
   }
 
   @Override

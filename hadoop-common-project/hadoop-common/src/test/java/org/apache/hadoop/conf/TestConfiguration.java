@@ -18,11 +18,14 @@
 package org.apache.hadoop.conf;
 
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringWriter;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -75,6 +78,22 @@ public class TestConfiguration extends TestCase {
 
   private void addInclude(String filename) throws IOException{
     out.write("<xi:include href=\"" + filename + "\" xmlns:xi=\"http://www.w3.org/2001/XInclude\"  />\n ");
+  }
+  
+  public void testInputStreamResource() throws Exception {
+    StringWriter writer = new StringWriter();
+    out = new BufferedWriter(writer);
+    startConfig();
+    declareProperty("prop", "A", "A");
+    endConfig();
+    
+    InputStream in1 = new ByteArrayInputStream(writer.toString().getBytes());
+    Configuration conf = new Configuration(false);
+    conf.addResource(in1);
+    assertEquals("A", conf.get("prop"));
+    InputStream in2 = new ByteArrayInputStream(writer.toString().getBytes());
+    conf.addResource(in2);
+    assertEquals("A", conf.get("prop"));
   }
 
   public void testVariableSubstitution() throws IOException {
@@ -167,7 +186,8 @@ public class TestConfiguration extends TestCase {
     appendProperty(name, val, false);
   }
  
-  void appendProperty(String name, String val, boolean isFinal)
+  void appendProperty(String name, String val, boolean isFinal, 
+      String ... sources)
     throws IOException {
     out.write("<property>");
     out.write("<name>");
@@ -178,6 +198,11 @@ public class TestConfiguration extends TestCase {
     out.write("</value>");
     if (isFinal) {
       out.write("<final>true</final>");
+    }
+    for(String s : sources) {
+      out.write("<source>");
+      out.write(s);
+      out.write("</source>");
     }
     out.write("</property>\n");
   }
@@ -525,6 +550,29 @@ public class TestConfiguration extends TestCase {
     }
   }
   
+  public void testDoubleValues() throws IOException {
+    out=new BufferedWriter(new FileWriter(CONFIG));
+    startConfig();
+    appendProperty("test.double1", "3.1415");
+    appendProperty("test.double2", "003.1415");
+    appendProperty("test.double3", "-3.1415");
+    appendProperty("test.double4", " -3.1415 ");
+    appendProperty("test.double5", "xyz-3.1415xyz");
+    endConfig();
+    Path fileResource = new Path(CONFIG);
+    conf.addResource(fileResource);
+    assertEquals(3.1415, conf.getDouble("test.double1", 0.0));
+    assertEquals(3.1415, conf.getDouble("test.double2", 0.0));
+    assertEquals(-3.1415, conf.getDouble("test.double3", 0.0));
+    assertEquals(-3.1415, conf.getDouble("test.double4", 0.0));
+    try {
+      conf.getDouble("test.double5", 0.0);
+      fail("Property had invalid double value, but was read successfully.");
+    } catch (NumberFormatException e) {
+      // pass
+    }
+  }
+  
   public void testGetClass() throws IOException {
     out=new BufferedWriter(new FileWriter(CONFIG));
     startConfig();
@@ -553,7 +601,7 @@ public class TestConfiguration extends TestCase {
     assertArrayEquals(expectedNames, extractClassNames(classes2));
   }
   
-  public void testGetStringCollection() throws IOException {
+  public void testGetStringCollection() {
     Configuration c = new Configuration();
     c.set("x", " a, b\n,\nc ");
     Collection<String> strs = c.getTrimmedStringCollection("x");
@@ -570,7 +618,7 @@ public class TestConfiguration extends TestCase {
     strs.add("z");
   }
 
-  public void testGetTrimmedStringCollection() throws IOException {
+  public void testGetTrimmedStringCollection() {
     Configuration c = new Configuration();
     c.set("x", "a, b, c");
     Collection<String> strs = c.getStringCollection("x");
@@ -597,7 +645,7 @@ public class TestConfiguration extends TestCase {
   
   enum Dingo { FOO, BAR };
   enum Yak { RAB, FOO };
-  public void testEnum() throws IOException {
+  public void testEnum() {
     Configuration conf = new Configuration();
     conf.setEnum("test.enum", Dingo.FOO);
     assertSame(Dingo.FOO, conf.getEnum("test.enum", Dingo.BAR));
@@ -605,7 +653,7 @@ public class TestConfiguration extends TestCase {
     boolean fail = false;
     try {
       conf.setEnum("test.enum", Dingo.BAR);
-      Yak y = conf.getEnum("test.enum", Yak.FOO);
+      conf.getEnum("test.enum", Yak.FOO);
     } catch (IllegalArgumentException e) {
       fail = true;
     }
@@ -639,7 +687,49 @@ public class TestConfiguration extends TestCase {
                  conf.getPattern("test.pattern3", defaultPattern).pattern());
   }
 
-  public void testSocketAddress() throws IOException {
+  public void testPropertySource() throws IOException {
+    out = new BufferedWriter(new FileWriter(CONFIG));
+    startConfig();
+    appendProperty("test.foo", "bar");
+    endConfig();
+    Path fileResource = new Path(CONFIG);
+    conf.addResource(fileResource);
+    conf.set("fs.defaultFS", "value");
+    String [] sources = conf.getPropertySources("test.foo");
+    assertEquals(1, sources.length);
+    assertEquals(
+        "Resource string returned for a file-loaded property" +
+        " must be a proper absolute path",
+        fileResource,
+        new Path(sources[0]));
+    assertArrayEquals("Resource string returned for a set() property must be " +
+    		"\"programatically\"",
+        new String[]{"programatically"},
+        conf.getPropertySources("fs.defaultFS"));
+    assertEquals("Resource string returned for an unset property must be null",
+        null, conf.getPropertySources("fs.defaultFoo"));
+  }
+  
+  public void testMultiplePropertySource() throws IOException {
+    out = new BufferedWriter(new FileWriter(CONFIG));
+    startConfig();
+    appendProperty("test.foo", "bar", false, "a", "b", "c");
+    endConfig();
+    Path fileResource = new Path(CONFIG);
+    conf.addResource(fileResource);
+    String [] sources = conf.getPropertySources("test.foo");
+    assertEquals(4, sources.length);
+    assertEquals("a", sources[0]);
+    assertEquals("b", sources[1]);
+    assertEquals("c", sources[2]);
+    assertEquals(
+        "Resource string returned for a file-loaded property" +
+        " must be a proper absolute path",
+        fileResource,
+        new Path(sources[3]));
+  }
+
+  public void testSocketAddress() {
     Configuration conf = new Configuration();
     final String defaultAddr = "host:1";
     final int defaultPort = 2;
@@ -669,6 +759,27 @@ public class TestConfiguration extends TestCase {
     } finally {
       assertTrue(threwException);
     }
+  }
+
+  public void testSetSocketAddress() {
+    Configuration conf = new Configuration();
+    NetUtils.addStaticResolution("host", "127.0.0.1");
+    final String defaultAddr = "host:1";
+    
+    InetSocketAddress addr = NetUtils.createSocketAddr(defaultAddr);    
+    conf.setSocketAddr("myAddress", addr);
+    assertEquals(defaultAddr, NetUtils.getHostPortString(addr));
+  }
+  
+  public void testUpdateSocketAddress() throws IOException {
+    InetSocketAddress addr = NetUtils.createSocketAddrForHost("host", 1);
+    InetSocketAddress connectAddr = conf.updateConnectAddr("myAddress", addr);
+    assertEquals(connectAddr.getHostName(), addr.getHostName());
+    
+    addr = new InetSocketAddress(1);
+    connectAddr = conf.updateConnectAddr("myAddress", addr);
+    assertEquals(connectAddr.getHostName(),
+                 InetAddress.getLocalHost().getHostName());
   }
 
   public void testReload() throws IOException {
@@ -712,14 +823,14 @@ public class TestConfiguration extends TestCase {
     assertEquals("value5", conf.get("test.key4"));
   }
 
-  public void testSize() throws IOException {
+  public void testSize() {
     Configuration conf = new Configuration(false);
     conf.set("a", "A");
     conf.set("b", "B");
     assertEquals(2, conf.size());
   }
 
-  public void testClear() throws IOException {
+  public void testClear() {
     Configuration conf = new Configuration(false);
     conf.set("a", "A");
     conf.set("b", "B");
@@ -864,7 +975,7 @@ public class TestConfiguration extends TestCase {
       confDump.put(prop.getKey(), prop);
     }
     assertEquals("value5",confDump.get("test.key6").getValue());
-    assertEquals("Unknown", confDump.get("test.key4").getResource());
+    assertEquals("programatically", confDump.get("test.key4").getResource());
     outWriter.close();
   }
   
@@ -953,6 +1064,97 @@ public class TestConfiguration extends TestCase {
     assertEquals(
         "Not returning expected number of classes. Number of returned classes ="
             + classes.length, 0, classes.length);
+  }
+  
+  public void testSettingValueNull() throws Exception {
+    Configuration config = new Configuration();
+    try {
+      config.set("testClassName", null);
+      fail("Should throw an IllegalArgumentException exception ");
+    } catch (Exception e) {
+      assertTrue(e instanceof IllegalArgumentException);
+    }
+  }
+
+  public void testSettingKeyNull() throws Exception {
+    Configuration config = new Configuration();
+    try {
+      config.set(null, "test");
+      fail("Should throw an IllegalArgumentException exception ");
+    } catch (Exception e) {
+      assertTrue(e instanceof IllegalArgumentException);
+    }
+  }
+
+  public void testInvalidSubstitutation() {
+    String key = "test.random.key";
+    String keyExpression = "${" + key + "}";
+    Configuration configuration = new Configuration();
+    configuration.set(key, keyExpression);
+    String value = configuration.get(key);
+    assertTrue("Unexpected value " + value, value.equals(keyExpression));
+  }
+
+  public void testBoolean() {
+    boolean value = true;
+    Configuration configuration = new Configuration();
+    configuration.setBoolean("value", value);
+    assertEquals(value, configuration.getBoolean("value", false));
+  }
+
+  public void testBooleanIfUnset() {
+    boolean value = true;
+    Configuration configuration = new Configuration();
+    configuration.setBooleanIfUnset("value", value);
+    assertEquals(value, configuration.getBoolean("value", false));
+    configuration.setBooleanIfUnset("value", false);
+    assertEquals(value, configuration.getBoolean("value", false));
+  }
+
+  public void testFloat() {
+    float value = 1.0F;
+    Configuration configuration = new Configuration();
+    configuration.setFloat("value", value);
+    assertEquals(value, configuration.getFloat("value", 0.0F));
+  }
+  
+  public void testDouble() {
+    double value = 1.0D;
+    Configuration configuration = new Configuration();
+    configuration.setDouble("value", value);
+    assertEquals(value, configuration.getDouble("value", 0.0D));
+  }
+
+  public void testInt() {
+    int value = 1;
+    Configuration configuration = new Configuration();
+    configuration.setInt("value", value);
+    assertEquals(value, configuration.getInt("value", 0));
+  }
+
+  public void testLong() {
+    long value = 1L;
+    Configuration configuration = new Configuration();
+    configuration.setLong("value", value);
+    assertEquals(value, configuration.getLong("value", 0L));
+  }
+
+  public void testStrings() {
+    String [] strings = {"FOO","BAR"};
+    Configuration configuration = new Configuration();
+    configuration.setStrings("strings", strings);
+    String [] returnStrings = configuration.getStrings("strings");
+    for(int i=0;i<returnStrings.length;i++) {
+       assertEquals(strings[i], returnStrings[i]);
+    }
+  }
+  
+  public void testSetPattern() {
+    Pattern testPattern = Pattern.compile("a+b");
+    Configuration configuration = new Configuration();
+    configuration.setPattern("testPattern", testPattern);
+    assertEquals(testPattern.pattern(),
+        configuration.getPattern("testPattern", Pattern.compile("")).pattern());
   }
   
   public static void main(String[] argv) throws Exception {

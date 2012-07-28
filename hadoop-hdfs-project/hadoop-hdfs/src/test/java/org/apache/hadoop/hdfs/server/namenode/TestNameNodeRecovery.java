@@ -18,13 +18,17 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.spy;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.HashSet;
 import java.util.Set;
-
-import static org.junit.Assert.*;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -35,11 +39,8 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
-import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.OpInstanceCache;
-import org.apache.hadoop.hdfs.server.namenode.FSImage;
-import org.apache.hadoop.hdfs.server.namenode.FSImageTestUtil;
-import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.DeleteOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.OpInstanceCache;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeDirType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.StringUtils;
@@ -123,7 +124,7 @@ public class TestNameNodeRecovery {
           }
         } catch (Throwable e) {
           fail("caught IOException while trying to skip over bad " +
-              "transaction.  message was " + e.getMessage() + 
+              "transaction.   message was " + e.getMessage() + 
               "\nstack trace\n" + StringUtils.stringifyException(e));
         }
       }
@@ -134,6 +135,9 @@ public class TestNameNodeRecovery {
     }
   }
 
+  /**
+   * A test scenario for the edit log
+   */
   private interface EditLogTestSetup {
     /** 
      * Set up the edit log.
@@ -155,16 +159,59 @@ public class TestNameNodeRecovery {
     abstract public Set<Long> getValidTxIds();
   }
   
-  private class EltsTestEmptyLog implements EditLogTestSetup {
-    public void addTransactionsToLog(EditLogOutputStream elos,
+  static void padEditLog(EditLogOutputStream elos, int paddingLength)
+      throws IOException {
+    if (paddingLength <= 0) {
+      return;
+    }
+    byte buf[] = new byte[4096];
+    for (int i = 0; i < buf.length; i++) {
+      buf[i] = (byte)-1;
+    }
+    int pad = paddingLength;
+    while (pad > 0) {
+      int toWrite = pad > buf.length ? buf.length : pad;
+      elos.writeRaw(buf, 0, toWrite);
+      pad -= toWrite;
+    }
+  }
+
+  static void addDeleteOpcode(EditLogOutputStream elos,
         OpInstanceCache cache) throws IOException {
-        // do nothing
+    DeleteOp op = DeleteOp.getInstance(cache);
+    op.setTransactionId(0x0);
+    op.setPath("/foo");
+    op.setTimestamp(0);
+    elos.write(op);
+  }
+  
+  /**
+   * Test the scenario where we have an empty edit log.
+   *
+   * This class is also useful in testing whether we can correctly handle
+   * various amounts of padding bytes at the end of the log.  We should be
+   * able to handle any amount of padding (including no padding) without
+   * throwing an exception.
+   */
+  private static class EltsTestEmptyLog implements EditLogTestSetup {
+    private int paddingLength;
+
+    public EltsTestEmptyLog(int paddingLength) {
+      this.paddingLength = paddingLength;
     }
 
+    @Override
+    public void addTransactionsToLog(EditLogOutputStream elos,
+        OpInstanceCache cache) throws IOException {
+      padEditLog(elos, paddingLength);
+    }
+
+    @Override
     public long getLastValidTxId() {
       return -1;
     }
 
+    @Override
     public Set<Long> getValidTxIds() {
       return new HashSet<Long>();
     } 
@@ -173,13 +220,72 @@ public class TestNameNodeRecovery {
   /** Test an empty edit log */
   @Test(timeout=180000)
   public void testEmptyLog() throws IOException {
-    runEditLogTest(new EltsTestEmptyLog());
+    runEditLogTest(new EltsTestEmptyLog(0));
+  }
+
+  /** Test an empty edit log with padding */
+  @Test(timeout=180000)
+  public void testEmptyPaddedLog() throws IOException {
+    runEditLogTest(new EltsTestEmptyLog(
+        EditLogFileOutputStream.MIN_PREALLOCATION_LENGTH));
   }
   
-  private class EltsTestGarbageInEditLog implements EditLogTestSetup {
+  /** Test an empty edit log with extra-long padding */
+  @Test(timeout=180000)
+  public void testEmptyExtraPaddedLog() throws IOException {
+    runEditLogTest(new EltsTestEmptyLog(
+        3 * EditLogFileOutputStream.MIN_PREALLOCATION_LENGTH));
+  }
+
+  /**
+   * Test the scenario where an edit log contains some padding (0xff) bytes
+   * followed by valid opcode data.
+   *
+   * These edit logs are corrupt, but all the opcodes should be recoverable
+   * with recovery mode.
+   */
+  private static class EltsTestOpcodesAfterPadding implements EditLogTestSetup {
+    private int paddingLength;
+
+    public EltsTestOpcodesAfterPadding(int paddingLength) {
+      this.paddingLength = paddingLength;
+    }
+
+    @Override
+    public void addTransactionsToLog(EditLogOutputStream elos,
+        OpInstanceCache cache) throws IOException {
+      padEditLog(elos, paddingLength);
+      addDeleteOpcode(elos, cache);
+    }
+
+    @Override
+    public long getLastValidTxId() {
+      return 0;
+    }
+
+    @Override
+    public Set<Long> getValidTxIds() {
+      return Sets.newHashSet(0L);
+    } 
+  }
+
+  @Test(timeout=180000)
+  public void testOpcodesAfterPadding() throws IOException {
+    runEditLogTest(new EltsTestOpcodesAfterPadding(
+        EditLogFileOutputStream.MIN_PREALLOCATION_LENGTH));
+  }
+
+  @Test(timeout=180000)
+  public void testOpcodesAfterExtraPadding() throws IOException {
+    runEditLogTest(new EltsTestOpcodesAfterPadding(
+        3 * EditLogFileOutputStream.MIN_PREALLOCATION_LENGTH));
+  }
+
+  private static class EltsTestGarbageInEditLog implements EditLogTestSetup {
     final private long BAD_TXID = 4;
     final private long MAX_TXID = 10;
     
+    @Override
     public void addTransactionsToLog(EditLogOutputStream elos,
         OpInstanceCache cache) throws IOException {
       for (long txid = 1; txid <= MAX_TXID; txid++) {
@@ -198,10 +304,12 @@ public class TestNameNodeRecovery {
       }
     }
 
+    @Override
     public long getLastValidTxId() {
       return BAD_TXID - 1;
     }
 
+    @Override
     public Set<Long> getValidTxIds() {
       return Sets.newHashSet(1L , 2L, 3L, 5L, 6L, 7L, 8L, 9L, 10L);
     }
@@ -213,29 +321,151 @@ public class TestNameNodeRecovery {
   public void testSkipEdit() throws IOException {
     runEditLogTest(new EltsTestGarbageInEditLog());
   }
-  
-  /** Test that we can successfully recover from a situation where the last
-   * entry in the edit log has been truncated. */
-  @Test(timeout=180000)
-  public void testRecoverTruncatedEditLog() throws IOException {
+
+  /**
+   * An algorithm for corrupting an edit log.
+   */
+  static interface Corruptor {
+    /*
+     * Corrupt an edit log file.
+     *
+     * @param editFile   The edit log file
+     */
+    public void corrupt(File editFile) throws IOException;
+
+    /*
+     * Explain whether we need to read the log in recovery mode
+     *
+     * @param finalized  True if the edit log in question is finalized.
+     *                   We're a little more lax about reading unfinalized
+     *                   logs.  We will allow a small amount of garbage at
+     *                   the end.  In a finalized log, every byte must be
+     *                   perfect.
+     *
+     * @return           Whether we need to read the log in recovery mode
+     */
+    public boolean needRecovery(boolean finalized);
+
+    /*
+     * Get the name of this corruptor
+     *
+     * @return           The Corruptor name
+     */
+    public String getName();
+  }
+
+  static class TruncatingCorruptor implements Corruptor {
+    @Override
+    public void corrupt(File editFile) throws IOException {
+      // Corrupt the last edit
+      long fileLen = editFile.length();
+      RandomAccessFile rwf = new RandomAccessFile(editFile, "rw");
+      rwf.setLength(fileLen - 1);
+      rwf.close();
+    }
+
+    @Override
+    public boolean needRecovery(boolean finalized) {
+      return finalized;
+    }
+
+    @Override
+    public String getName() {
+      return "truncated";
+    }
+  }
+
+  static class PaddingCorruptor implements Corruptor {
+    @Override
+    public void corrupt(File editFile) throws IOException {
+      // Add junk to the end of the file
+      RandomAccessFile rwf = new RandomAccessFile(editFile, "rw");
+      rwf.seek(editFile.length());
+      for (int i = 0; i < 129; i++) {
+        rwf.write((byte)0);
+      }
+      rwf.write(0xd);
+      rwf.write(0xe);
+      rwf.write(0xa);
+      rwf.write(0xd);
+      rwf.close();
+    }
+
+    @Override
+    public boolean needRecovery(boolean finalized) {
+      // With finalized edit logs, we ignore what's at the end as long as we
+      // can make it to the correct transaction ID.
+      // With unfinalized edit logs, the finalization process ignores garbage
+      // at the end.
+      return false;
+    }
+
+    @Override
+    public String getName() {
+      return "padFatal";
+    }
+  }
+
+  static class SafePaddingCorruptor implements Corruptor {
+    private byte padByte;
+
+    public SafePaddingCorruptor(byte padByte) {
+      this.padByte = padByte;
+      assert ((this.padByte == 0) || (this.padByte == -1));
+    }
+
+    @Override
+    public void corrupt(File editFile) throws IOException {
+      // Add junk to the end of the file
+      RandomAccessFile rwf = new RandomAccessFile(editFile, "rw");
+      rwf.seek(editFile.length());
+      rwf.write((byte)-1);
+      for (int i = 0; i < 1024; i++) {
+        rwf.write(padByte);
+      }
+      rwf.close();
+    }
+
+    @Override
+    public boolean needRecovery(boolean finalized) {
+      return false;
+    }
+
+    @Override
+    public String getName() {
+      return "pad" + ((int)padByte);
+    }
+  }
+
+  static void testNameNodeRecoveryImpl(Corruptor corruptor, boolean finalize)
+      throws IOException {
     final String TEST_PATH = "/test/path/dir";
-    final int NUM_TEST_MKDIRS = 10;
-    
-    // start a cluster 
+    final String TEST_PATH2 = "/second/dir";
+    final boolean needRecovery = corruptor.needRecovery(finalize);
+
+    // start a cluster
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = null;
     FileSystem fileSys = null;
     StorageDirectory sd = null;
     try {
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0)
-          .build();
+          .enableManagedDfsDirsRedundancy(false).build();
       cluster.waitActive();
+      if (!finalize) {
+        // Normally, the in-progress edit log would be finalized by
+        // FSEditLog#endCurrentLogSegment.  For testing purposes, we
+        // disable that here.
+        FSEditLog spyLog =
+            spy(cluster.getNameNode().getFSImage().getEditLog());
+        doNothing().when(spyLog).endCurrentLogSegment(true);
+        cluster.getNameNode().getFSImage().setEditLogForTesting(spyLog);
+      }
       fileSys = cluster.getFileSystem();
       final FSNamesystem namesystem = cluster.getNamesystem();
       FSImage fsimage = namesystem.getFSImage();
-      for (int i = 0; i < NUM_TEST_MKDIRS; i++) {
-        fileSys.mkdirs(new Path(TEST_PATH));
-      }
+      fileSys.mkdirs(new Path(TEST_PATH));
+      fileSys.mkdirs(new Path(TEST_PATH2));
       sd = fsimage.getStorage().dirIterator(NameNodeDirType.EDITS).next();
     } finally {
       if (cluster != null) {
@@ -246,53 +476,62 @@ public class TestNameNodeRecovery {
     File editFile = FSImageTestUtil.findLatestEditsLog(sd).getFile();
     assertTrue("Should exist: " + editFile, editFile.exists());
 
-    // Corrupt the last edit
-    long fileLen = editFile.length();
-    RandomAccessFile rwf = new RandomAccessFile(editFile, "rw");
-    rwf.setLength(fileLen - 1);
-    rwf.close();
-    
-    // Make sure that we can't start the cluster normally before recovery
+    // Corrupt the edit log
+    LOG.info("corrupting edit log file '" + editFile + "'");
+    corruptor.corrupt(editFile);
+
+    // If needRecovery == true, make sure that we can't start the
+    // cluster normally before recovery
     cluster = null;
     try {
       LOG.debug("trying to start normally (this should fail)...");
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0)
-          .format(false).build();
+          .enableManagedDfsDirsRedundancy(false).format(false).build();
       cluster.waitActive();
       cluster.shutdown();
-      fail("expected the truncated edit log to prevent normal startup");
+      if (needRecovery) {
+        fail("expected the corrupted edit log to prevent normal startup");
+      }
     } catch (IOException e) {
-      // success
+      if (!needRecovery) {
+        LOG.error("Got unexpected failure with " + corruptor.getName() +
+            corruptor, e);
+        fail("got unexpected exception " + e.getMessage());
+      }
     } finally {
       if (cluster != null) {
         cluster.shutdown();
       }
     }
-    
-    // Perform recovery
+
+    // Perform NameNode recovery.
+    // Even if there was nothing wrong previously (needRecovery == false),
+    // this should still work fine.
     cluster = null;
     try {
       LOG.debug("running recovery...");
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0)
-          .format(false).startupOption(recoverStartOpt).build();
+          .enableManagedDfsDirsRedundancy(false).format(false)
+          .startupOption(recoverStartOpt).build();
     } catch (IOException e) {
       fail("caught IOException while trying to recover. " +
-          "message was " + e.getMessage() + 
+          "message was " + e.getMessage() +
           "\nstack trace\n" + StringUtils.stringifyException(e));
     } finally {
       if (cluster != null) {
         cluster.shutdown();
       }
     }
-    
+
     // Make sure that we can start the cluster normally after recovery
     cluster = null;
     try {
       LOG.debug("starting cluster normally after recovery...");
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0)
-          .format(false).build();
-      LOG.debug("testRecoverTruncatedEditLog: successfully recovered the " +
-          "truncated edit log");
+          .enableManagedDfsDirsRedundancy(false).format(false).build();
+      LOG.debug("successfully recovered the " + corruptor.getName() +
+          " corrupted edit log");
+      cluster.waitActive();
       assertTrue(cluster.getFileSystem().exists(new Path(TEST_PATH)));
     } catch (IOException e) {
       fail("failed to recover.  Error message: " + e.getMessage());
@@ -301,5 +540,37 @@ public class TestNameNodeRecovery {
         cluster.shutdown();
       }
     }
+  }
+
+  /** Test that we can successfully recover from a situation where the last
+   * entry in the edit log has been truncated. */
+  @Test(timeout=180000)
+  public void testRecoverTruncatedEditLog() throws IOException {
+    testNameNodeRecoveryImpl(new TruncatingCorruptor(), true);
+    testNameNodeRecoveryImpl(new TruncatingCorruptor(), false);
+  }
+
+  /** Test that we can successfully recover from a situation where the last
+   * entry in the edit log has been padded with garbage. */
+  @Test(timeout=180000)
+  public void testRecoverPaddedEditLog() throws IOException {
+    testNameNodeRecoveryImpl(new PaddingCorruptor(), true);
+    testNameNodeRecoveryImpl(new PaddingCorruptor(), false);
+  }
+
+  /** Test that don't need to recover from a situation where the last
+   * entry in the edit log has been padded with 0. */
+  @Test(timeout=180000)
+  public void testRecoverZeroPaddedEditLog() throws IOException {
+    testNameNodeRecoveryImpl(new SafePaddingCorruptor((byte)0), true);
+    testNameNodeRecoveryImpl(new SafePaddingCorruptor((byte)0), false);
+  }
+
+  /** Test that don't need to recover from a situation where the last
+   * entry in the edit log has been padded with 0xff bytes. */
+  @Test(timeout=180000)
+  public void testRecoverNegativeOnePaddedEditLog() throws IOException {
+    testNameNodeRecoveryImpl(new SafePaddingCorruptor((byte)-1), true);
+    testNameNodeRecoveryImpl(new SafePaddingCorruptor((byte)-1), false);
   }
 }

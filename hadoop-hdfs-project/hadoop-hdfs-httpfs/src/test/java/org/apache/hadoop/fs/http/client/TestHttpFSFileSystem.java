@@ -18,7 +18,21 @@
 
 package org.apache.hadoop.fs.http.client;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.Writer;
+import java.net.URI;
+import java.net.URL;
+import java.security.PrivilegedExceptionAction;
+import java.util.Arrays;
+import java.util.Collection;
+
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
@@ -43,18 +57,6 @@ import org.junit.runners.Parameterized;
 import org.mortbay.jetty.Server;
 import org.mortbay.jetty.webapp.WebAppContext;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.Writer;
-import java.net.URL;
-import java.security.PrivilegedExceptionAction;
-import java.util.Arrays;
-import java.util.Collection;
-
 @RunWith(value = Parameterized.class)
 public class TestHttpFSFileSystem extends HFSTestCase {
 
@@ -70,16 +72,24 @@ public class TestHttpFSFileSystem extends HFSTestCase {
     w.write("secret");
     w.close();
 
-    String fsDefaultName = TestHdfsHelper.getHdfsConf().get("fs.default.name");
+    //HDFS configuration
+    String fsDefaultName = TestHdfsHelper.getHdfsConf().get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY);
     Configuration conf = new Configuration(false);
-    conf.set("httpfs.hadoop.conf:fs.default.name", fsDefaultName);
-    conf.set("httpfs.proxyuser." + HadoopUsersConfTestHelper.getHadoopProxyUser() + ".groups", HadoopUsersConfTestHelper
-      .getHadoopProxyUserGroups());
-    conf.set("httpfs.proxyuser." + HadoopUsersConfTestHelper.getHadoopProxyUser() + ".hosts", HadoopUsersConfTestHelper
-      .getHadoopProxyUserHosts());
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, fsDefaultName);
+    File hdfsSite = new File(new File(homeDir, "conf"), "hdfs-site.xml");
+    OutputStream os = new FileOutputStream(hdfsSite);
+    conf.writeXml(os);
+    os.close();
+
+    //HTTPFS configuration
+    conf = new Configuration(false);
+    conf.set("httpfs.proxyuser." + HadoopUsersConfTestHelper.getHadoopProxyUser() + ".groups",
+             HadoopUsersConfTestHelper.getHadoopProxyUserGroups());
+    conf.set("httpfs.proxyuser." + HadoopUsersConfTestHelper.getHadoopProxyUser() + ".hosts",
+             HadoopUsersConfTestHelper.getHadoopProxyUserHosts());
     conf.set("httpfs.authentication.signature.secret.file", secretFile.getAbsolutePath());
-    File hoopSite = new File(new File(homeDir, "conf"), "httpfs-site.xml");
-    OutputStream os = new FileOutputStream(hoopSite);
+    File httpfsSite = new File(new File(homeDir, "conf"), "httpfs-site.xml");
+    os = new FileOutputStream(httpfsSite);
     conf.writeXml(os);
     os.close();
 
@@ -91,16 +101,24 @@ public class TestHttpFSFileSystem extends HFSTestCase {
     server.start();
   }
 
+  protected Class getFileSystemClass() {
+    return HttpFSFileSystem.class;
+  }
+
   protected FileSystem getHttpFileSystem() throws Exception {
     Configuration conf = new Configuration();
-    conf.set("fs.http.impl", HttpFSFileSystem.class.getName());
-    return FileSystem.get(TestJettyHelper.getJettyURL().toURI(), conf);
+    conf.set("fs.webhdfs.impl", getFileSystemClass().getName());
+    URI uri = new URI("webhdfs://" +
+                      TestJettyHelper.getJettyURL().toURI().getAuthority());
+    return FileSystem.get(uri, conf);
   }
 
   protected void testGet() throws Exception {
     FileSystem fs = getHttpFileSystem();
     Assert.assertNotNull(fs);
-    Assert.assertEquals(fs.getUri(), TestJettyHelper.getJettyURL().toURI());
+    URI uri = new URI("webhdfs://" +
+                      TestJettyHelper.getJettyURL().toURI().getAuthority());
+    Assert.assertEquals(fs.getUri(), uri);
     fs.close();
   }
 
@@ -301,11 +319,8 @@ public class TestHttpFSFileSystem extends HFSTestCase {
 
   private void testSetPermission() throws Exception {
     FileSystem fs = FileSystem.get(TestHdfsHelper.getHdfsConf());
-    Path path = new Path(TestHdfsHelper.getHdfsTestDir(), "foo.txt");
-    OutputStream os = fs.create(path);
-    os.write(1);
-    os.close();
-    fs.close();
+    Path path = new Path(TestHdfsHelper.getHdfsTestDir(), "foodir");
+    fs.mkdirs(path);
 
     fs = getHttpFileSystem();
     FsPermission permission1 = new FsPermission(FsAction.READ_WRITE, FsAction.NONE, FsAction.NONE);
@@ -316,6 +331,19 @@ public class TestHttpFSFileSystem extends HFSTestCase {
     FileStatus status1 = fs.getFileStatus(path);
     fs.close();
     FsPermission permission2 = status1.getPermission();
+    Assert.assertEquals(permission2, permission1);
+
+    //sticky bit 
+    fs = getHttpFileSystem();
+    permission1 = new FsPermission(FsAction.READ_WRITE, FsAction.NONE, FsAction.NONE, true);
+    fs.setPermission(path, permission1);
+    fs.close();
+
+    fs = FileSystem.get(TestHdfsHelper.getHdfsConf());
+    status1 = fs.getFileStatus(path);
+    fs.close();
+    permission2 = status1.getPermission();
+    Assert.assertTrue(permission2.getStickyBit());
     Assert.assertEquals(permission2, permission1);
   }
 
@@ -455,6 +483,8 @@ public class TestHttpFSFileSystem extends HFSTestCase {
     for (int i = 0; i < Operation.values().length; i++) {
       ops[i] = new Object[]{Operation.values()[i]};
     }
+    //To test one or a subset of operations do:
+    //return Arrays.asList(new Object[][]{ new Object[]{Operation.OPEN}});
     return Arrays.asList(ops);
   }
 

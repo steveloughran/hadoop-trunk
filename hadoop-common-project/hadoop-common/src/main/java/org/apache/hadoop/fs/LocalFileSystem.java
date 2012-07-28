@@ -40,6 +40,28 @@ public class LocalFileSystem extends ChecksumFileSystem {
     this(new RawLocalFileSystem());
   }
   
+  @Override
+  public void initialize(URI name, Configuration conf) throws IOException {
+    if (fs.getConf() == null) {
+      fs.initialize(name, conf);
+    }
+    String scheme = name.getScheme();
+    if (!scheme.equals(fs.getUri().getScheme())) {
+      swapScheme = scheme;
+    }
+  }
+
+  /**
+   * Return the protocol scheme for the FileSystem.
+   * <p/>
+   *
+   * @return <code>file</code>
+   */
+  @Override
+  public String getScheme() {
+    return "file";
+  }
+
   public FileSystem getRaw() {
     return getRawFileSystem();
   }

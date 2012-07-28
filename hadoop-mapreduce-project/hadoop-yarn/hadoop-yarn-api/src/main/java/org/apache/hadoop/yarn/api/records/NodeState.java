@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.api.records;
 
-// TODO NodeState is a clone of RMNodeState made for MR-3353. In a subsequent 
-// patch RMNodeState should be replaced with NodeState
 /**
  * <p>State of a <code>Node</code>.</p>
  */
@@ -40,5 +38,9 @@ public enum NodeState {
   LOST, 
   
   /** Node has rebooted */
-  REBOOTED
+  REBOOTED;
+  
+  public boolean isUnusable() {
+    return (this == UNHEALTHY || this == DECOMMISSIONED || this == LOST);
+  }
 }

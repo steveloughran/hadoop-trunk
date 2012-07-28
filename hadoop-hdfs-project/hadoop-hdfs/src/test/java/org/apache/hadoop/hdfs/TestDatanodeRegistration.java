@@ -19,7 +19,8 @@ package org.apache.hadoop.hdfs;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 
 import java.net.InetSocketAddress;
 
@@ -38,8 +39,7 @@ import org.apache.hadoop.util.VersionInfo;
 import org.junit.Test;
 
 /**
- * This class tests that a file need not be closed before its
- * data can be read by another client.
+ * This class tests data node registration.
  */
 public class TestDatanodeRegistration {
   

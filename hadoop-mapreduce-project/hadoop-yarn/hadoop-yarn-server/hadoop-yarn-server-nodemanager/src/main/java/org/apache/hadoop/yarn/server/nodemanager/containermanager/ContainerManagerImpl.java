@@ -23,7 +23,6 @@ import static org.apache.hadoop.yarn.service.Service.STATE.STARTED;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.Map;
 
@@ -40,7 +39,6 @@ import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.yarn.YarnException;
 import org.apache.hadoop.yarn.api.ContainerManager;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusResponse;
@@ -76,6 +74,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.Ap
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationContainerInitEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEventType;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationFinishEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationImpl;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationInitEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
@@ -226,10 +225,10 @@ public class ContainerManagerImpl extends CompositeService implements
     Configuration conf = getConfig();
     YarnRPC rpc = YarnRPC.create(conf);
 
-    InetSocketAddress initialAddress = NetUtils.createSocketAddr(conf.get(
-        YarnConfiguration.NM_ADDRESS, YarnConfiguration.DEFAULT_NM_ADDRESS),
-        YarnConfiguration.DEFAULT_NM_PORT,
-        YarnConfiguration.NM_ADDRESS);
+    InetSocketAddress initialAddress = conf.getSocketAddr(
+        YarnConfiguration.NM_ADDRESS,
+        YarnConfiguration.DEFAULT_NM_ADDRESS,
+        YarnConfiguration.DEFAULT_NM_PORT);
 
     server =
         rpc.getServer(ContainerManager.class, this, initialAddress, conf,
@@ -245,15 +244,10 @@ public class ContainerManagerImpl extends CompositeService implements
     }
     
     server.start();
-    try {
-      resolvedAddress = InetAddress.getLocalHost();
-    } catch (UnknownHostException e) {
-      throw new YarnException(e);
-    }
-    this.context.getNodeId().setHost(resolvedAddress.getCanonicalHostName());
-    this.context.getNodeId().setPort(server.getPort());
-    LOG.info("ContainerManager started at "
-        + this.context.getNodeId().toString());
+    InetSocketAddress connectAddress = NetUtils.getConnectAddress(server);
+    this.context.getNodeId().setHost(connectAddress.getHostName());
+    this.context.getNodeId().setPort(connectAddress.getPort());
+    LOG.info("ContainerManager started at " + connectAddress);
     super.start();
   }
 
@@ -330,6 +324,15 @@ public class ContainerManagerImpl extends CompositeService implements
                 + containerIDStr);
       } else {
 
+        // Ensure the token is not expired. 
+        // Token expiry is not checked for stopContainer/getContainerStatus
+        if (tokenId.getExpiryTimeStamp() < System.currentTimeMillis()) {
+          unauthorized = true;
+          messageBuilder.append("\nThis token is expired. current time is "
+              + System.currentTimeMillis() + " found "
+              + tokenId.getExpiryTimeStamp());
+        }
+        
         Resource resource = tokenId.getResource();
         if (!resource.equals(launchContext.getResource())) {
           unauthorized = true;
@@ -531,8 +534,8 @@ public class ContainerManagerImpl extends CompositeService implements
           (CMgrCompletedAppsEvent) event;
       for (ApplicationId appID : appsFinishedEvent.getAppsToCleanup()) {
         this.dispatcher.getEventHandler().handle(
-            new ApplicationEvent(appID,
-                ApplicationEventType.FINISH_APPLICATION));
+            new ApplicationFinishEvent(appID,
+                "Application Killed by ResourceManager"));
       }
       break;
     case FINISH_CONTAINERS:

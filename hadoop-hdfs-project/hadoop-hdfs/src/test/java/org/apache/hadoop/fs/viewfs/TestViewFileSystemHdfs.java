@@ -80,6 +80,7 @@ public class TestViewFileSystemHdfs extends ViewFileSystemBaseTest {
     cluster.shutdown();   
   }
 
+  @Override
   @Before
   public void setUp() throws Exception {
     // create the test root on local_fs
@@ -89,6 +90,7 @@ public class TestViewFileSystemHdfs extends ViewFileSystemBaseTest {
     super.setUp();
   }
 
+  @Override
   @After
   public void tearDown() throws Exception {
     super.tearDown();
@@ -105,17 +107,17 @@ public class TestViewFileSystemHdfs extends ViewFileSystemBaseTest {
   // additional mount.
   @Override
   int getExpectedDirPaths() {
-    return 7;
+    return 8;
   }
   
   @Override
   int getExpectedMountPoints() {
-    return 8;
+    return 9;
   }
 
   @Override
   int getExpectedDelegationTokenCount() {
-    return 8;
+    return 9;
   }
 
   @Override

@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.management.ManagementFactory;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.util.ArrayList;
@@ -122,6 +123,7 @@ public abstract class Storage extends StorageInfo {
       this.prevIndex = 0;
     }
     
+    @Override
     public boolean hasNext() {
       if (storageDirs.isEmpty() || nextIndex >= storageDirs.size())
         return false;
@@ -137,6 +139,7 @@ public abstract class Storage extends StorageInfo {
       return true;
     }
     
+    @Override
     public StorageDirectory next() {
       StorageDirectory sd = getStorageDir(nextIndex);
       prevIndex = nextIndex;
@@ -151,6 +154,7 @@ public abstract class Storage extends StorageInfo {
       return sd;
     }
     
+    @Override
     public void remove() {
       nextIndex = prevIndex; // restore previous state
       storageDirs.remove(prevIndex); // remove last returned element
@@ -158,6 +162,21 @@ public abstract class Storage extends StorageInfo {
     }
   }
   
+  /**
+   * @return A list of the given File in every available storage directory,
+   * regardless of whether it might exist.
+   */
+  public List<File> getFiles(StorageDirType dirType, String fileName) {
+    ArrayList<File> list = new ArrayList<File>();
+    Iterator<StorageDirectory> it =
+      (dirType == null) ? dirIterator() : dirIterator(dirType);
+    for ( ;it.hasNext(); ) {
+      list.add(new File(it.next().getCurrentDir(), fileName));
+    }
+    return list;
+  }
+
+
   /**
    * Return default iterator
    * This iterator returns all entries in storageDirs
@@ -600,14 +619,20 @@ public abstract class Storage extends StorageInfo {
         deletionHookAdded = true;
       }
       RandomAccessFile file = new RandomAccessFile(lockF, "rws");
+      String jvmName = ManagementFactory.getRuntimeMXBean().getName();
       FileLock res = null;
       try {
         res = file.getChannel().tryLock();
+        file.write(jvmName.getBytes());
+        LOG.info("Lock on " + lockF + " acquired by nodename " + jvmName);
       } catch(OverlappingFileLockException oe) {
+        LOG.error("It appears that another namenode " + file.readLine() 
+            + " has already locked the storage directory");
         file.close();
         return null;
       } catch(IOException e) {
-        LOG.error("Cannot create lock on " + lockF, e);
+        LOG.error("Failed to acquire lock on " + lockF + ". If this storage directory is mounted via NFS, " 
+            + "ensure that the appropriate nfs lock services are running.", e);
         file.close();
         throw e;
       }

@@ -19,19 +19,22 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
+import org.apache.hadoop.hdfs.server.blockmanagement.MutableBlockCollection;
 
 import com.google.common.base.Joiner;
 
 /**
  * I-node for file being written.
  */
-public class INodeFileUnderConstruction extends INodeFile {
+@InterfaceAudience.Private
+class INodeFileUnderConstruction extends INodeFile implements MutableBlockCollection {
   private  String clientName;         // lease holder
   private final String clientMachine;
   private final DatanodeDescriptor clientNode; // if client is a cluster node too.
@@ -43,7 +46,7 @@ public class INodeFileUnderConstruction extends INodeFile {
                              String clientName,
                              String clientMachine,
                              DatanodeDescriptor clientNode) {
-    super(permissions.applyUMask(UMASK), 0, replication,
+    super(permissions.applyUMask(UMASK), BlockInfo.EMPTY_ARRAY, replication,
         modTime, modTime, preferredBlockSize);
     this.clientName = clientName;
     this.clientMachine = clientMachine;
@@ -144,6 +147,7 @@ public class INodeFileUnderConstruction extends INodeFile {
    * Convert the last block of the file to an under-construction block.
    * Set its locations.
    */
+  @Override
   public BlockInfoUnderConstruction setLastBlock(BlockInfo lastBlock,
                                           DatanodeDescriptor[] targets)
   throws IOException {
@@ -154,7 +158,7 @@ public class INodeFileUnderConstruction extends INodeFile {
     BlockInfoUnderConstruction ucBlock =
       lastBlock.convertToBlockUnderConstruction(
           BlockUCState.UNDER_CONSTRUCTION, targets);
-    ucBlock.setINode(this);
+    ucBlock.setBlockCollection(this);
     setBlock(numBlocks()-1, ucBlock);
     return ucBlock;
   }

@@ -12,7 +12,10 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.hadoop</groupId>
@@ -99,6 +102,24 @@
       <groupId>org.apache.ant</groupId>
       <artifactId>ant</artifactId>
       <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>
+      <version>3.4.2</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>
+      <version>3.4.2</version>
+      <type>test-jar</type>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 
@@ -228,7 +249,7 @@
                 <echo file="target/compile-proto.sh">
                     PROTO_DIR=src/main/proto
                     JAVA_DIR=target/generated-sources/java
-                    which cygpath 2> /dev/null
+                    which cygpath 2&gt; /dev/null
                     if [ $? = 1 ]; then
                       IS_WIN=false
                     else
@@ -236,8 +257,8 @@
                       WIN_PROTO_DIR=`cygpath --windows $PROTO_DIR`
                       WIN_JAVA_DIR=`cygpath --windows $JAVA_DIR`
                     fi
-                    mkdir -p $JAVA_DIR 2> /dev/null
-                    for PROTO_FILE in `ls $PROTO_DIR/*.proto 2> /dev/null`
+                    mkdir -p $JAVA_DIR 2&gt; /dev/null
+                    for PROTO_FILE in `ls $PROTO_DIR/*.proto 2&gt; /dev/null`
                     do
                         if [ "$IS_WIN" = "true" ]; then
                           protoc -I$WIN_PROTO_DIR --java_out=$WIN_JAVA_DIR $PROTO_FILE
@@ -385,88 +406,39 @@
             <artifactId>maven-antrun-plugin</artifactId>
             <executions>
               <execution>
-                <id>compile</id>
+                <id>make</id>
                 <phase>compile</phase>
-                <goals>
-                  <goal>run</goal>
-                </goals>
+                <goals><goal>run</goal></goals>
                 <configuration>
                   <target>
-                    <copy toDir="${project.build.directory}/native">
-                      <fileset dir="${basedir}/src/main/native"/>
-                    </copy>
-                    <mkdir dir="${project.build.directory}/native/m4"/>
+                    <mkdir dir="${project.build.directory}/native"/>
+                    <exec executable="cmake" dir="${project.build.directory}/native" 
+                        failonerror="true">
+                      <arg line="${basedir}/src/ -DGENERATED_JAVAH=${project.build.directory}/native/javah -DJVM_ARCH_DATA_MODEL=${sun.arch.data.model}"/>
+                    </exec>
+                    <exec executable="make" dir="${project.build.directory}/native" failonerror="true">
+                      <arg line="VERBOSE=1"/>
+                    </exec>
                   </target>
                 </configuration>
               </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>make-maven-plugin</artifactId>
-            <executions>
               <execution>
-                <id>compile</id>
-                <phase>compile</phase>
-                <goals>
-                  <goal>autoreconf</goal>
-                  <goal>configure</goal>
-                  <goal>make-install</goal>
-                </goals>
-                <configuration>
-                  <!-- autoreconf settings -->
-                  <workDir>${project.build.directory}/native</workDir>
-                  <arguments>
-                    <argument>-i</argument>
-                    <argument>-f</argument>
-                  </arguments>
-
-                  <!-- configure settings -->
-                  <configureEnvironment>
-                    <property>
-                      <name>ac_cv_func_malloc_0_nonnull</name>
-                      <value>yes</value>
-                    </property>
-                    <property>
-                      <name>JVM_ARCH</name>
-                      <value>${sun.arch.data.model}</value>
-                    </property>
-                  </configureEnvironment>
-                  <configureOptions>
-                  </configureOptions>
-                  <configureWorkDir>${project.build.directory}/native</configureWorkDir>
-                  <prefix>/usr/local</prefix>
-
-                  <!-- make settings -->
-                  <installEnvironment>
-                    <property>
-                      <name>ac_cv_func_malloc_0_nonnull</name>
-                      <value>yes</value>
-                    </property>
-                    <property>
-                      <name>JVM_ARCH</name>
-                      <value>${sun.arch.data.model}</value>
-                    </property>
-                  </installEnvironment>
-
-                  <!-- configure & make settings -->
-                  <destDir>${project.build.directory}/native/target</destDir>
-
-                </configuration>
-              </execution>
-              
-              <!-- TODO wire here native testcases
-              <execution>
-                <id>test</id>
+                <id>native_tests</id>
                 <phase>test</phase>
-                <goals>
-                  <goal>test</goal>
-                </goals>
+                <goals><goal>run</goal></goals>
                 <configuration>
-                  <destDir>${project.build.directory}/native/target</destDir>
+                  <target>
+                    <property name="compile_classpath" refid="maven.compile.classpath"/>
+                    <property name="test_classpath" refid="maven.test.classpath"/>
+                    <exec executable="${project.build.directory}/native/test_libhdfs_threaded" dir="${project.build.directory}/native/" failonerror="true">
+                      <env key="CLASSPATH" value="${test_classpath}:${compile_classpath}"/>
+                    </exec>
+                    <exec executable="${project.build.directory}/native/test_native_mini_dfs" dir="${project.build.directory}/native/" failonerror="true">
+                      <env key="CLASSPATH" value="${test_classpath}:${compile_classpath}"/>
+                    </exec>
+                  </target>
                 </configuration>
               </execution>
-              -->
             </executions>
           </plugin>
         </plugins>
@@ -511,7 +483,7 @@
             <artifactId>maven-antrun-plugin</artifactId>
             <executions>
               <execution>
-                <id>compile</id>
+                <id>kdc</id>
                 <phase>compile</phase>
                 <goals>
                   <goal>run</goal>

@@ -21,7 +21,6 @@ package org.apache.hadoop.ipc;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
-import java.lang.reflect.Method;
 
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
@@ -41,8 +40,8 @@ import org.apache.commons.logging.*;
 
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.io.*;
+import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.Client.ConnectionId;
-import org.apache.hadoop.ipc.RpcPayloadHeader.RpcKind;
 import org.apache.hadoop.ipc.protobuf.ProtocolInfoProtos.ProtocolInfoService;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.SaslRpcServer;
@@ -51,6 +50,7 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.conf.*;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.Time;
 
 import com.google.protobuf.BlockingService;
 
@@ -73,6 +73,18 @@ import com.google.protobuf.BlockingService;
  * the protocol instance is transmitted.
  */
 public class RPC {
+  public enum RpcKind {
+    RPC_BUILTIN ((short) 1),         // Used for built in calls by tests
+    RPC_WRITABLE ((short) 2),        // Use WritableRpcEngine 
+    RPC_PROTOCOL_BUFFER ((short) 3); // Use ProtobufRpcEngine
+    final static short MAX_INDEX = RPC_PROTOCOL_BUFFER.value; // used for array size
+    private static final short FIRST_INDEX = RPC_BUILTIN.value;    
+    public final short value; //TODO make it private
+
+    RpcKind(short val) {
+      this.value = val;
+    } 
+  }
   
   interface RpcInvoker {   
     /**
@@ -315,7 +327,7 @@ public class RPC {
                              long clientVersion,
                              InetSocketAddress addr, Configuration conf,
                              long connTimeout) throws IOException { 
-    return waitForProtocolProxy(protocol, clientVersion, addr, conf, 0, connTimeout);
+    return waitForProtocolProxy(protocol, clientVersion, addr, conf, 0, null, connTimeout);
   }
   
   /**
@@ -336,7 +348,7 @@ public class RPC {
                              int rpcTimeout,
                              long timeout) throws IOException {
     return waitForProtocolProxy(protocol, clientVersion, addr,
-        conf, rpcTimeout, timeout).getProxy();
+        conf, rpcTimeout, null, timeout).getProxy();
   }
 
   /**
@@ -356,14 +368,15 @@ public class RPC {
                                long clientVersion,
                                InetSocketAddress addr, Configuration conf,
                                int rpcTimeout,
+                               RetryPolicy connectionRetryPolicy,
                                long timeout) throws IOException { 
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.now();
     IOException ioe;
     while (true) {
       try {
         return getProtocolProxy(protocol, clientVersion, addr, 
             UserGroupInformation.getCurrentUser(), conf, NetUtils
-            .getDefaultSocketFactory(conf), rpcTimeout);
+            .getDefaultSocketFactory(conf), rpcTimeout, connectionRetryPolicy);
       } catch(ConnectException se) {  // namenode has not been started
         LOG.info("Server at " + addr + " not available yet, Zzzzz...");
         ioe = se;
@@ -375,7 +388,7 @@ public class RPC {
         ioe = nrthe;
       }
       // check if timed out
-      if (System.currentTimeMillis()-timeout >= startTime) {
+      if (Time.now()-timeout >= startTime) {
         throw ioe;
       }
 
@@ -452,7 +465,7 @@ public class RPC {
                                 Configuration conf,
                                 SocketFactory factory) throws IOException {
     return getProtocolProxy(
-        protocol, clientVersion, addr, ticket, conf, factory, 0);
+        protocol, clientVersion, addr, ticket, conf, factory, 0, null);
   }
   
   /**
@@ -478,7 +491,7 @@ public class RPC {
                                 SocketFactory factory,
                                 int rpcTimeout) throws IOException {
     return getProtocolProxy(protocol, clientVersion, addr, ticket,
-             conf, factory, rpcTimeout).getProxy();
+             conf, factory, rpcTimeout, null).getProxy();
   }
   
   /**
@@ -501,12 +514,13 @@ public class RPC {
                                 UserGroupInformation ticket,
                                 Configuration conf,
                                 SocketFactory factory,
-                                int rpcTimeout) throws IOException {    
+                                int rpcTimeout,
+                                RetryPolicy connectionRetryPolicy) throws IOException {    
     if (UserGroupInformation.isSecurityEnabled()) {
       SaslRpcServer.init(conf);
     }
-    return getProtocolEngine(protocol,conf).getProxy(protocol,
-        clientVersion, addr, ticket, conf, factory, rpcTimeout);
+    return getProtocolEngine(protocol,conf).getProxy(protocol, clientVersion,
+        addr, ticket, conf, factory, rpcTimeout, connectionRetryPolicy);
   }
 
    /**
@@ -611,27 +625,6 @@ public class RPC {
         "Cannot close proxy - is not Closeable or "
             + "does not provide closeable invocation handler "
             + proxy.getClass());
-  }
-
-  /** 
-   * Expert: Make multiple, parallel calls to a set of servers.
-   * @deprecated Use {@link #call(Method, Object[][], InetSocketAddress[], UserGroupInformation, Configuration)} instead 
-   */
-  @Deprecated
-  public static Object[] call(Method method, Object[][] params,
-                              InetSocketAddress[] addrs, Configuration conf)
-    throws IOException, InterruptedException {
-    return call(method, params, addrs, null, conf);
-  }
-  
-  /** Expert: Make multiple, parallel calls to a set of servers. */
-  public static Object[] call(Method method, Object[][] params,
-                              InetSocketAddress[] addrs, 
-                              UserGroupInformation ticket, Configuration conf)
-    throws IOException, InterruptedException {
-
-    return getProtocolEngine(method.getDeclaringClass(), conf)
-      .call(method, params, addrs, ticket, conf);
   }
 
   /** Construct a server for a protocol implementation instance listening on a
@@ -777,7 +770,7 @@ public class RPC {
    ArrayList<Map<ProtoNameVer, ProtoClassProtoImpl>> protocolImplMapArray = 
        new ArrayList<Map<ProtoNameVer, ProtoClassProtoImpl>>(RpcKind.MAX_INDEX);
    
-   Map<ProtoNameVer, ProtoClassProtoImpl> getProtocolImplMap(RpcKind rpcKind) {
+   Map<ProtoNameVer, ProtoClassProtoImpl> getProtocolImplMap(RPC.RpcKind rpcKind) {
      if (protocolImplMapArray.size() == 0) {// initialize for all rpc kinds
        for (int i=0; i <= RpcKind.MAX_INDEX; ++i) {
          protocolImplMapArray.add(
@@ -821,7 +814,7 @@ public class RPC {
    
    
    @SuppressWarnings("unused") // will be useful later.
-   VerProtocolImpl[] getSupportedProtocolVersions(RpcKind rpcKind,
+   VerProtocolImpl[] getSupportedProtocolVersions(RPC.RpcKind rpcKind,
        String protocolName) {
      VerProtocolImpl[] resultk = 
          new  VerProtocolImpl[getProtocolImplMap(rpcKind).size()];
@@ -900,7 +893,7 @@ public class RPC {
     }
     
     @Override
-    public Writable call(RpcKind rpcKind, String protocol,
+    public Writable call(RPC.RpcKind rpcKind, String protocol,
         Writable rpcRequest, long receiveTime) throws Exception {
       return getRpcInvoker(rpcKind).call(this, protocol, rpcRequest,
           receiveTime);

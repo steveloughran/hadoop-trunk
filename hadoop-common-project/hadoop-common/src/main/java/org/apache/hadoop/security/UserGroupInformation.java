@@ -19,6 +19,7 @@ package org.apache.hadoop.security;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_SECURITY_AUTHENTICATION;
 
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.security.AccessControlContext;
@@ -32,6 +33,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,6 +64,7 @@ import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.Shell;
+import org.apache.hadoop.util.Time;
 
 /**
  * User and group information for Hadoop.
@@ -69,7 +72,7 @@ import org.apache.hadoop.util.Shell;
  * user's username and groups. It supports both the Windows, Unix and Kerberos 
  * login modules.
  */
-@InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
+@InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce", "HBase", "Hive", "Oozie"})
 @InterfaceStability.Evolving
 public class UserGroupInformation {
   private static final Log LOG =  LogFactory.getLog(UserGroupInformation.class);
@@ -258,6 +261,8 @@ public class UserGroupInformation {
    * group look up service.
    * @param conf the configuration to use
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public static void setConfiguration(Configuration conf) {
     initialize(conf, false);
   }
@@ -451,9 +456,28 @@ public class UserGroupInformation {
       return null;
     }
   }
-  
+
+  /**
+   * Represents a javax.security configuration that is created at runtime.
+   */
+  private static class DynamicConfiguration
+      extends javax.security.auth.login.Configuration {
+    private AppConfigurationEntry[] ace;
+    
+    DynamicConfiguration(AppConfigurationEntry[] ace) {
+      this.ace = ace;
+    }
+    
+    @Override
+    public AppConfigurationEntry[] getAppConfigurationEntry(String appName) {
+      return ace;
+    }
+  }
+
   private static LoginContext
-  newLoginContext(String appName, Subject subject) throws LoginException {
+  newLoginContext(String appName, Subject subject,
+    javax.security.auth.login.Configuration loginConf)
+      throws LoginException {
     // Temporarily switch the thread's ContextClassLoader to match this
     // class's classloader, so that we can properly load HadoopLoginModule
     // from the JAAS libraries.
@@ -461,7 +485,7 @@ public class UserGroupInformation {
     ClassLoader oldCCL = t.getContextClassLoader();
     t.setContextClassLoader(HadoopLoginModule.class.getClassLoader());
     try {
-      return new LoginContext(appName, subject, null, new HadoopConfiguration());
+      return new LoginContext(appName, subject, null, loginConf);
     } finally {
       t.setContextClassLoader(oldCCL);
     }
@@ -500,6 +524,8 @@ public class UserGroupInformation {
    * @return the current user
    * @throws IOException if login fails
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public synchronized
   static UserGroupInformation getCurrentUser() throws IOException {
     AccessControlContext context = AccessController.getContext();
@@ -512,10 +538,88 @@ public class UserGroupInformation {
   }
 
   /**
+   * Find the most appropriate UserGroupInformation to use
+   *
+   * @param ticketCachePath    The Kerberos ticket cache path, or NULL
+   *                           if none is specfied
+   * @param user               The user name, or NULL if none is specified.
+   *
+   * @return                   The most appropriate UserGroupInformation
+   */ 
+  public static UserGroupInformation getBestUGI(
+      String ticketCachePath, String user) throws IOException {
+    if (ticketCachePath != null) {
+      return getUGIFromTicketCache(ticketCachePath, user);
+    } else if (user == null) {
+      return getCurrentUser();
+    } else {
+      return createRemoteUser(user);
+    }    
+  }
+
+  /**
+   * Create a UserGroupInformation from a Kerberos ticket cache.
+   * 
+   * @param user                The principal name to load from the ticket
+   *                            cache
+   * @param ticketCachePath     the path to the ticket cache file
+   *
+   * @throws IOException        if the kerberos login fails
+   */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
+  public static UserGroupInformation getUGIFromTicketCache(
+            String ticketCache, String user) throws IOException {
+    if (!isSecurityEnabled()) {
+      return getBestUGI(null, user);
+    }
+    try {
+      Map<String,String> krbOptions = new HashMap<String,String>();
+      krbOptions.put("doNotPrompt", "true");
+      krbOptions.put("useTicketCache", "true");
+      krbOptions.put("useKeyTab", "false");
+      krbOptions.put("renewTGT", "false");
+      krbOptions.put("ticketCache", ticketCache);
+      krbOptions.putAll(HadoopConfiguration.BASIC_JAAS_OPTIONS);
+      AppConfigurationEntry ace = new AppConfigurationEntry(
+          KerberosUtil.getKrb5LoginModuleName(),
+          LoginModuleControlFlag.REQUIRED,
+          krbOptions);
+      DynamicConfiguration dynConf =
+          new DynamicConfiguration(new AppConfigurationEntry[]{ ace });
+      LoginContext login = newLoginContext(
+          HadoopConfiguration.USER_KERBEROS_CONFIG_NAME, null, dynConf);
+      login.login();
+
+      Subject loginSubject = login.getSubject();
+      Set<Principal> loginPrincipals = loginSubject.getPrincipals();
+      if (loginPrincipals.isEmpty()) {
+        throw new RuntimeException("No login principals found!");
+      }
+      if (loginPrincipals.size() != 1) {
+        LOG.warn("found more than one principal in the ticket cache file " +
+          ticketCache);
+      }
+      User ugiUser = new User(loginPrincipals.iterator().next().getName(),
+          AuthenticationMethod.KERBEROS, login);
+      loginSubject.getPrincipals().add(ugiUser);
+      UserGroupInformation ugi = new UserGroupInformation(loginSubject);
+      ugi.setLogin(login);
+      ugi.setAuthenticationMethod(AuthenticationMethod.KERBEROS);
+      return ugi;
+    } catch (LoginException le) {
+      throw new IOException("failure to login using ticket cache file " +
+          ticketCache, le);
+    }
+  }
+
+  /**
    * Get the currently logged in user.
    * @return the logged in user
    * @throws IOException if login fails
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public synchronized 
   static UserGroupInformation getLoginUser() throws IOException {
     if (loginUser == null) {
@@ -524,10 +628,10 @@ public class UserGroupInformation {
         LoginContext login;
         if (isSecurityEnabled()) {
           login = newLoginContext(HadoopConfiguration.USER_KERBEROS_CONFIG_NAME,
-              subject);
+              subject, new HadoopConfiguration());
         } else {
           login = newLoginContext(HadoopConfiguration.SIMPLE_CONFIG_NAME, 
-              subject);
+              subject, new HadoopConfiguration());
         }
         login.login();
         loginUser = new UserGroupInformation(subject);
@@ -607,7 +711,7 @@ public class UserGroupInformation {
             long nextRefresh = getRefreshTime(tgt);
             while (true) {
               try {
-                long now = System.currentTimeMillis();
+                long now = Time.now();
                 if(LOG.isDebugEnabled()) {
                   LOG.debug("Current time is " + now);
                   LOG.debug("Next refresh is " + nextRefresh);
@@ -652,6 +756,8 @@ public class UserGroupInformation {
    * @param path the path to the keytab file
    * @throws IOException if the keytab file can't be read
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public synchronized
   static void loginUserFromKeytab(String user,
                                   String path
@@ -665,17 +771,17 @@ public class UserGroupInformation {
     LoginContext login; 
     long start = 0;
     try {
-      login = 
-        newLoginContext(HadoopConfiguration.KEYTAB_KERBEROS_CONFIG_NAME, subject);
-      start = System.currentTimeMillis();
+      login = newLoginContext(HadoopConfiguration.KEYTAB_KERBEROS_CONFIG_NAME,
+            subject, new HadoopConfiguration());
+      start = Time.now();
       login.login();
-      metrics.loginSuccess.add(System.currentTimeMillis() - start);
+      metrics.loginSuccess.add(Time.now() - start);
       loginUser = new UserGroupInformation(subject);
       loginUser.setLogin(login);
       loginUser.setAuthenticationMethod(AuthenticationMethod.KERBEROS);
     } catch (LoginException le) {
       if (start > 0) {
-        metrics.loginFailure.add(System.currentTimeMillis() - start);
+        metrics.loginFailure.add(Time.now() - start);
       }
       throw new IOException("Login failure for " + user + " from keytab " + 
                             path, le);
@@ -695,7 +801,7 @@ public class UserGroupInformation {
         || !isKeytab)
       return;
     KerberosTicket tgt = getTGT();
-    if (tgt != null && System.currentTimeMillis() < getRefreshTime(tgt)) {
+    if (tgt != null && Time.now() < getRefreshTime(tgt)) {
       return;
     }
     reloginFromKeytab();
@@ -710,6 +816,8 @@ public class UserGroupInformation {
    * the new credentials.
    * @throws IOException on a failure
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public synchronized void reloginFromKeytab()
   throws IOException {
     if (!isSecurityEnabled() ||
@@ -717,7 +825,7 @@ public class UserGroupInformation {
          !isKeytab)
       return;
     
-    long now = System.currentTimeMillis();
+    long now = Time.now();
     if (!hasSufficientTimeElapsed(now)) {
       return;
     }
@@ -746,16 +854,17 @@ public class UserGroupInformation {
         // login and also update the subject field of this instance to
         // have the new credentials (pass it to the LoginContext constructor)
         login = newLoginContext(
-            HadoopConfiguration.KEYTAB_KERBEROS_CONFIG_NAME, getSubject());
+            HadoopConfiguration.KEYTAB_KERBEROS_CONFIG_NAME, getSubject(),
+            new HadoopConfiguration());
         LOG.info("Initiating re-login for " + keytabPrincipal);
-        start = System.currentTimeMillis();
+        start = Time.now();
         login.login();
-        metrics.loginSuccess.add(System.currentTimeMillis() - start);
+        metrics.loginSuccess.add(Time.now() - start);
         setLogin(login);
       }
     } catch (LoginException le) {
       if (start > 0) {
-        metrics.loginFailure.add(System.currentTimeMillis() - start);
+        metrics.loginFailure.add(Time.now() - start);
       }
       throw new IOException("Login failure for " + keytabPrincipal + 
           " from keytab " + keytabFile, le);
@@ -769,6 +878,8 @@ public class UserGroupInformation {
    * the new credentials.
    * @throws IOException on a failure
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public synchronized void reloginFromTicketCache()
   throws IOException {
     if (!isSecurityEnabled() || 
@@ -779,7 +890,7 @@ public class UserGroupInformation {
     if (login == null) {
       throw new IOException("login must be done first");
     }
-    long now = System.currentTimeMillis();
+    long now = Time.now();
     if (!hasSufficientTimeElapsed(now)) {
       return;
     }
@@ -795,7 +906,7 @@ public class UserGroupInformation {
       //have the new credentials (pass it to the LoginContext constructor)
       login = 
         newLoginContext(HadoopConfiguration.USER_KERBEROS_CONFIG_NAME, 
-            getSubject());
+            getSubject(), new HadoopConfiguration());
       LOG.info("Initiating re-login for " + getUserName());
       login.login();
       setLogin(login);
@@ -830,12 +941,13 @@ public class UserGroupInformation {
       keytabPrincipal = user;
       Subject subject = new Subject();
       
-      LoginContext login = 
-        newLoginContext(HadoopConfiguration.KEYTAB_KERBEROS_CONFIG_NAME, subject); 
+      LoginContext login = newLoginContext(
+          HadoopConfiguration.KEYTAB_KERBEROS_CONFIG_NAME, subject,
+          new HadoopConfiguration());
        
-      start = System.currentTimeMillis();
+      start = Time.now();
       login.login();
-      metrics.loginSuccess.add(System.currentTimeMillis() - start);
+      metrics.loginSuccess.add(Time.now() - start);
       UserGroupInformation newLoginUser = new UserGroupInformation(subject);
       newLoginUser.setLogin(login);
       newLoginUser.setAuthenticationMethod(AuthenticationMethod.KERBEROS);
@@ -843,7 +955,7 @@ public class UserGroupInformation {
       return newLoginUser;
     } catch (LoginException le) {
       if (start > 0) {
-        metrics.loginFailure.add(System.currentTimeMillis() - start);
+        metrics.loginFailure.add(Time.now() - start);
       }
       throw new IOException("Login failure for " + user + " from keytab " + 
                             path, le);
@@ -867,6 +979,8 @@ public class UserGroupInformation {
    * Did the login happen via keytab
    * @return true or false
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public synchronized static boolean isLoginKeytabBased() throws IOException {
     return getLoginUser().isKeytab;
   }
@@ -877,6 +991,8 @@ public class UserGroupInformation {
    * @param user the full user principal name, must not be empty or null
    * @return the UserGroupInformation for the remote user.
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public static UserGroupInformation createRemoteUser(String user) {
     if (user == null || "".equals(user)) {
       throw new IllegalArgumentException("Null user");
@@ -891,6 +1007,7 @@ public class UserGroupInformation {
   /**
    * existing types of authentications' methods
    */
+  @InterfaceAudience.Public
   @InterfaceStability.Evolving
   public static enum AuthenticationMethod {
     SIMPLE,
@@ -908,6 +1025,8 @@ public class UserGroupInformation {
    * @param realUser
    * @return proxyUser ugi
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public static UserGroupInformation createProxyUser(String user,
       UserGroupInformation realUser) {
     if (user == null || "".equals(user)) {
@@ -929,6 +1048,8 @@ public class UserGroupInformation {
    * get RealUser (vs. EffectiveUser)
    * @return realUser running over proxy user
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public UserGroupInformation getRealUser() {
     for (RealUser p: subject.getPrincipals(RealUser.class)) {
       return p.getRealUser();
@@ -974,7 +1095,8 @@ public class UserGroupInformation {
    * @param userGroups the names of the groups that the user belongs to
    * @return a fake user for running unit tests
    */
-  @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public static UserGroupInformation createUserForTesting(String user, 
                                                           String[] userGroups) {
     ensureInitialized();
@@ -1000,7 +1122,6 @@ public class UserGroupInformation {
    *          the names of the groups that the user belongs to
    * @return a fake user for running unit tests
    */
-  @InterfaceAudience.LimitedPrivate( { "HDFS", "MapReduce" })
   public static UserGroupInformation createProxyUserForTesting(String user,
       UserGroupInformation realUser, String[] userGroups) {
     ensureInitialized();
@@ -1029,6 +1150,8 @@ public class UserGroupInformation {
    * Get the user's full principal name.
    * @return the user's full principal name.
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public String getUserName() {
     return user.getName();
   }
@@ -1182,6 +1305,8 @@ public class UserGroupInformation {
    * @param action the method to execute
    * @return the value from the run method
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public <T> T doAs(PrivilegedAction<T> action) {
     logPrivilegedAction(subject, action);
     return Subject.doAs(subject, action);
@@ -1198,6 +1323,8 @@ public class UserGroupInformation {
    * @throws InterruptedException if the action throws an InterruptedException
    * @throws UndeclaredThrowableException if the action throws something else
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public <T> T doAs(PrivilegedExceptionAction<T> action
                     ) throws IOException, InterruptedException {
     try {

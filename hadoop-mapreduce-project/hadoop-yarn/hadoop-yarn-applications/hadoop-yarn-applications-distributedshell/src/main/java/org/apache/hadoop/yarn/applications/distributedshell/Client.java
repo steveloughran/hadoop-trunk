@@ -42,8 +42,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.SecurityInfo;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.ClientRMProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportRequest;
@@ -97,7 +95,7 @@ import org.apache.hadoop.yarn.util.Records;
  * 
  * <p> For the actual job submission, the client first has to create an {@link ApplicationSubmissionContext}. 
  * The {@link ApplicationSubmissionContext} defines the application details such as {@link ApplicationId} 
- * and application name, user submitting the application, the priority assigned to the application and the queue 
+ * and application name, the priority assigned to the application and the queue
  * to which this application needs to be assigned. In addition to this, the {@link ApplicationSubmissionContext}
  * also defines the {@link ContainerLaunchContext} which describes the <code>Container</code> with which 
  * the {@link ApplicationMaster} is launched. </p>
@@ -134,8 +132,6 @@ public class Client {
   private int amPriority = 0;
   // Queue for App master
   private String amQueue = "";
-  // User to run app master as
-  private String amUser = "";
   // Amt. of memory resource to request for to run the App Master
   private int amMemory = 10; 
 
@@ -199,10 +195,16 @@ public class Client {
 
   /**
    */
-  public Client() throws Exception  {
+  public Client(Configuration conf) throws Exception  {
     // Set up the configuration and RPC
-    conf = new Configuration();
+    this.conf = conf;
     rpc = YarnRPC.create(conf);
+  }
+
+  /**
+   */
+  public Client() throws Exception  {
+    this(new Configuration());
   }
 
   /**
@@ -217,6 +219,7 @@ public class Client {
    * Parse command line options
    * @param args Parsed command line options 
    * @return Whether the init was successful to run the client
+   * @throws ParseException
    */
   public boolean init(String[] args) throws ParseException {
 
@@ -224,7 +227,6 @@ public class Client {
     opts.addOption("appname", true, "Application Name. Default value - DistributedShell");
     opts.addOption("priority", true, "Application Priority. Default 0");
     opts.addOption("queue", true, "RM Queue in which this application is to be submitted");
-    opts.addOption("user", true, "User to run the application as");
     opts.addOption("timeout", true, "Application timeout in milliseconds");
     opts.addOption("master_memory", true, "Amount of memory in MB to be requested to run the application master");
     opts.addOption("jar", true, "Jar file containing the application master");
@@ -258,8 +260,7 @@ public class Client {
 
     appName = cliParser.getOptionValue("appname", "DistributedShell");
     amPriority = Integer.parseInt(cliParser.getOptionValue("priority", "0"));
-    amQueue = cliParser.getOptionValue("queue", "");
-    amUser = cliParser.getOptionValue("user", "");
+    amQueue = cliParser.getOptionValue("queue", "default");
     amMemory = Integer.parseInt(cliParser.getOptionValue("master_memory", "10"));		
 
     if (amMemory < 0) {
@@ -352,6 +353,7 @@ public class Client {
     }
 
     GetQueueInfoRequest queueInfoReq = Records.newRecord(GetQueueInfoRequest.class);
+    queueInfoReq.setQueueName(this.amQueue);
     GetQueueInfoResponse queueInfoResp = applicationsManager.getQueueInfo(queueInfoReq);		
     QueueInfo queueInfo = queueInfoResp.getQueueInfo();
     LOG.info("Queue info"
@@ -506,8 +508,9 @@ public class Client {
     // For now setting all required classpaths including
     // the classpath to "." for the application jar
     StringBuilder classPathEnv = new StringBuilder("${CLASSPATH}:./*");
-    for (String c : conf.get(YarnConfiguration.YARN_APPLICATION_CLASSPATH)
-        .split(",")) {
+    for (String c : conf.getStrings(
+        YarnConfiguration.YARN_APPLICATION_CLASSPATH,
+        YarnConfiguration.DEFAULT_YARN_APPLICATION_CLASSPATH)) {
       classPathEnv.append(':');
       classPathEnv.append(c.trim());
     }
@@ -563,10 +566,6 @@ public class Client {
     commands.add(command.toString());		
     amContainer.setCommands(commands);
 
-    // For launching an AM Container, setting user here is not needed
-    // Set user in ApplicationSubmissionContext
-    // amContainer.setUser(amUser);
-
     // Set up resource type requirements
     // For now, only memory is supported so we set memory requirements
     Resource capability = Records.newRecord(Resource.class);
@@ -590,9 +589,6 @@ public class Client {
 
     // Set the queue to which this application is to be submitted in the RM
     appContext.setQueue(amQueue);
-    // Set the user submitting this application 
-    // TODO can it be empty? 
-    appContext.setUser(amUser);
 
     // Create the request to send to the applications manager 
     SubmitApplicationRequest appRequest = Records.newRecord(SubmitApplicationRequest.class);
@@ -723,9 +719,10 @@ public class Client {
 		});
      */
     YarnConfiguration yarnConf = new YarnConfiguration(conf);
-    InetSocketAddress rmAddress = NetUtils.createSocketAddr(yarnConf.get(
+    InetSocketAddress rmAddress = yarnConf.getSocketAddr(
         YarnConfiguration.RM_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_ADDRESS));		
+        YarnConfiguration.DEFAULT_RM_ADDRESS,
+        YarnConfiguration.DEFAULT_RM_PORT);
     LOG.info("Connecting to ResourceManager at " + rmAddress);
     applicationsManager = ((ClientRMProtocol) rpc.getProxy(
         ClientRMProtocol.class, rmAddress, conf));

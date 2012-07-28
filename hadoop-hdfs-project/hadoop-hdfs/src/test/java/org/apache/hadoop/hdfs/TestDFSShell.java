@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.hdfs;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -33,8 +37,6 @@ import java.util.Random;
 import java.util.Scanner;
 import java.util.zip.GZIPOutputStream;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -48,14 +50,17 @@ import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.io.SequenceFile;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
+import org.junit.Test;
 
 /**
  * This class tests commands from DFSShell.
  */
-public class TestDFSShell extends TestCase {
+public class TestDFSShell {
   private static final Log LOG = LogFactory.getLog(TestDFSShell.class);
   
   static final String TEST_ROOT_DIR =
@@ -92,6 +97,7 @@ public class TestDFSShell extends TestCase {
     System.out.println(Thread.currentThread().getStackTrace()[2] + " " + s);
   }
 
+  @Test
   public void testZeroSizeFile() throws IOException {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
@@ -134,6 +140,7 @@ public class TestDFSShell extends TestCase {
     }
   }
   
+  @Test
   public void testRecrusiveRm() throws IOException {
 	  Configuration conf = new HdfsConfiguration();
 	  MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
@@ -159,6 +166,7 @@ public class TestDFSShell extends TestCase {
     }
   }
     
+  @Test
   public void testDu() throws IOException {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
@@ -208,6 +216,7 @@ public class TestDFSShell extends TestCase {
     }
                                   
   }
+  @Test
   public void testPut() throws IOException {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
@@ -229,6 +238,7 @@ public class TestDFSShell extends TestCase {
       show("begin");
       
       final Thread copy2ndFileThread = new Thread() {
+        @Override
         public void run() {
           try {
             show("copy local " + f2 + " to remote " + dst);
@@ -248,6 +258,7 @@ public class TestDFSShell extends TestCase {
       System.setSecurityManager(new SecurityManager() {
         private boolean firstTime = true;
   
+        @Override
         public void checkPermission(Permission perm) {
           if (firstTime) {
             Thread t = Thread.currentThread();
@@ -304,6 +315,7 @@ public class TestDFSShell extends TestCase {
 
 
   /** check command error outputs and exit statuses. */
+  @Test
   public void testErrOutPut() throws Exception {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = null;
@@ -444,6 +456,7 @@ public class TestDFSShell extends TestCase {
     }
   }
   
+  @Test
   public void testURIPaths() throws Exception {
     Configuration srcConf = new HdfsConfiguration();
     Configuration dstConf = new HdfsConfiguration();
@@ -536,6 +549,7 @@ public class TestDFSShell extends TestCase {
     }
   }
 
+  @Test
   public void testText() throws Exception {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = null;
@@ -545,7 +559,7 @@ public class TestDFSShell extends TestCase {
       textTest(new Path("/texttest").makeQualified(dfs.getUri(),
             dfs.getWorkingDirectory()), conf);
 
-      conf.set("fs.default.name", dfs.getUri().toString());
+      conf.set("fs.defaultFS", dfs.getUri().toString());
       final FileSystem lfs = FileSystem.getLocal(conf);
       textTest(new Path(TEST_ROOT_DIR, "texttest").makeQualified(lfs.getUri(),
             lfs.getWorkingDirectory()), conf);
@@ -564,6 +578,7 @@ public class TestDFSShell extends TestCase {
       OutputStream zout = new GZIPOutputStream(
           fs.create(new Path(root, "file.gz")));
       Random r = new Random();
+      bak = System.out;
       ByteArrayOutputStream file = new ByteArrayOutputStream();
       for (int i = 0; i < 1024; ++i) {
         char c = Character.forDigit(r.nextInt(26) + 10, 36);
@@ -572,7 +587,6 @@ public class TestDFSShell extends TestCase {
       }
       zout.close();
 
-      bak = System.out;
       ByteArrayOutputStream out = new ByteArrayOutputStream();
       System.setOut(new PrintStream(out));
 
@@ -581,10 +595,28 @@ public class TestDFSShell extends TestCase {
       argv[1] = new Path(root, "file.gz").toString();
       int ret = ToolRunner.run(new FsShell(conf), argv);
       assertEquals("'-text " + argv[1] + " returned " + ret, 0, ret);
-      file.reset();
-      out.reset();
       assertTrue("Output doesn't match input",
           Arrays.equals(file.toByteArray(), out.toByteArray()));
+
+      // Create a sequence file with a gz extension, to test proper
+      // container detection
+      SequenceFile.Writer writer = SequenceFile.createWriter(
+          conf,
+          SequenceFile.Writer.file(new Path(root, "file.gz")),
+          SequenceFile.Writer.keyClass(Text.class),
+          SequenceFile.Writer.valueClass(Text.class));
+      writer.append(new Text("Foo"), new Text("Bar"));
+      writer.close();
+      out = new ByteArrayOutputStream();
+      System.setOut(new PrintStream(out));
+      argv = new String[2];
+      argv[0] = "-text";
+      argv[1] = new Path(root, "file.gz").toString();
+      ret = ToolRunner.run(new FsShell(conf), argv);
+      assertEquals("'-text " + argv[1] + " returned " + ret, 0, ret);
+      assertTrue("Output doesn't match input",
+          Arrays.equals("Foo\tBar\n".getBytes(), out.toByteArray()));
+      out.reset();
     } finally {
       if (null != bak) {
         System.setOut(bak);
@@ -592,6 +624,7 @@ public class TestDFSShell extends TestCase {
     }
   }
 
+  @Test
   public void testCopyToLocal() throws IOException {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
@@ -689,6 +722,7 @@ public class TestDFSShell extends TestCase {
     return path;
   }
 
+  @Test
   public void testCount() throws Exception {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
@@ -855,6 +889,7 @@ public class TestDFSShell extends TestCase {
     }
   }
   
+  @Test
   public void testFilePermissions() throws IOException {
     Configuration conf = new HdfsConfiguration();
     
@@ -920,6 +955,7 @@ public class TestDFSShell extends TestCase {
   /**
    * Tests various options of DFSShell.
    */
+  @Test
   public void testDFSShell() throws IOException {
     Configuration conf = new HdfsConfiguration();
     /* This tests some properties of ChecksumFileSystem as well.
@@ -1187,6 +1223,7 @@ public class TestDFSShell extends TestCase {
     String run(int exitcode, String... options) throws IOException;
   }
 
+  @Test
   public void testRemoteException() throws Exception {
     UserGroupInformation tmpUGI = 
       UserGroupInformation.createUserForTesting("tmpname", new String[] {"mygroup"});
@@ -1230,6 +1267,7 @@ public class TestDFSShell extends TestCase {
     }
   }
   
+  @Test
   public void testGet() throws IOException {
     DFSTestUtil.setLogLevel2All(FSInputChecker.LOG);
     final Configuration conf = new HdfsConfiguration();
@@ -1249,6 +1287,7 @@ public class TestDFSShell extends TestCase {
       TestGetRunner runner = new TestGetRunner() {
         private int count = 0;
 
+        @Override
         public String run(int exitcode, String... options) throws IOException {
           String dst = TEST_ROOT_DIR + "/" + fname+ ++count;
           String[] args = new String[options.length + 3];
@@ -1289,6 +1328,7 @@ public class TestDFSShell extends TestCase {
     }
   }
 
+  @Test
   public void testLsr() throws Exception {
     final Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
@@ -1346,6 +1386,7 @@ public class TestDFSShell extends TestCase {
    * and return -1 exit code.
    * @throws Exception
    */
+  @Test
   public void testInvalidShell() throws Exception {
     Configuration conf = new Configuration(); // default FS (non-DFS)
     DFSAdmin admin = new DFSAdmin();
@@ -1355,6 +1396,7 @@ public class TestDFSShell extends TestCase {
   }
 
   // force Copy Option is -f
+  @Test
   public void testCopyCommandsWithForceOption() throws Exception {
     Configuration conf = new Configuration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)

@@ -34,8 +34,8 @@ import org.junit.Test;
 import java.security.PrivilegedExceptionAction;
 import java.util.concurrent.Semaphore;
 
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
-import static junit.framework.Assert.assertTrue;
 
 
 public class TestFileSystemCaching {
@@ -43,12 +43,71 @@ public class TestFileSystemCaching {
   @Test
   public void testCacheEnabled() throws Exception {
     Configuration conf = new Configuration();
-    conf.set("fs.cachedfile.impl", conf.get("fs.file.impl"));
+    conf.set("fs.cachedfile.impl", FileSystem.getFileSystemClass("file", null).getName());
     FileSystem fs1 = FileSystem.get(new URI("cachedfile://a"), conf);
     FileSystem fs2 = FileSystem.get(new URI("cachedfile://a"), conf);
     assertSame(fs1, fs2);
   }
 
+  static class DefaultFs extends LocalFileSystem {
+    URI uri;
+    @Override
+    public void initialize(URI uri, Configuration conf) {
+      this.uri = uri;
+    }
+    @Override
+    public URI getUri() {
+      return uri;
+    }
+  }
+  
+  @Test
+  public void testDefaultFsUris() throws Exception {
+    final Configuration conf = new Configuration();
+    conf.set("fs.defaultfs.impl", DefaultFs.class.getName());
+    final URI defaultUri = URI.create("defaultfs://host");
+    FileSystem.setDefaultUri(conf, defaultUri);
+    FileSystem fs = null;
+    
+    // sanity check default fs
+    final FileSystem defaultFs = FileSystem.get(conf);
+    assertEquals(defaultUri, defaultFs.getUri());
+    
+    // has scheme, no auth
+    fs = FileSystem.get(URI.create("defaultfs:/"), conf);
+    assertSame(defaultFs, fs);
+    fs = FileSystem.get(URI.create("defaultfs:///"), conf);
+    assertSame(defaultFs, fs);
+    
+    // has scheme, same auth
+    fs = FileSystem.get(URI.create("defaultfs://host"), conf);
+    assertSame(defaultFs, fs);
+    
+    // has scheme, different auth
+    fs = FileSystem.get(URI.create("defaultfs://host2"), conf);
+    assertNotSame(defaultFs, fs);
+    
+    // no scheme, no auth
+    fs = FileSystem.get(URI.create("/"), conf);
+    assertSame(defaultFs, fs);
+    
+    // no scheme, same auth
+    try {
+      fs = FileSystem.get(URI.create("//host"), conf);
+      fail("got fs with auth but no scheme");
+    } catch (Exception e) {
+      assertEquals("No FileSystem for scheme: null", e.getMessage());
+    }
+    
+    // no scheme, different auth
+    try {
+      fs = FileSystem.get(URI.create("//host2"), conf);
+      fail("got fs with auth but no scheme");
+    } catch (Exception e) {
+      assertEquals("No FileSystem for scheme: null", e.getMessage());
+    }
+  }
+  
   public static class InitializeForeverFileSystem extends LocalFileSystem {
     final static Semaphore sem = new Semaphore(0);
     public void initialize(URI uri, Configuration conf) throws IOException {
@@ -84,7 +143,7 @@ public class TestFileSystemCaching {
     // wait for InitializeForeverFileSystem to start initialization
     InitializeForeverFileSystem.sem.acquire();
     
-    conf.set("fs.cachedfile.impl", conf.get("fs.file.impl"));
+    conf.set("fs.cachedfile.impl", FileSystem.getFileSystemClass("file", null).getName());
     FileSystem.get(new URI("cachedfile://a"), conf);
     t.interrupt();
     t.join();
@@ -93,7 +152,7 @@ public class TestFileSystemCaching {
   @Test
   public void testCacheDisabled() throws Exception {
     Configuration conf = new Configuration();
-    conf.set("fs.uncachedfile.impl", conf.get("fs.file.impl"));
+    conf.set("fs.uncachedfile.impl", FileSystem.getFileSystemClass("file", null).getName());
     conf.setBoolean("fs.uncachedfile.impl.disable.cache", true);
     FileSystem fs1 = FileSystem.get(new URI("uncachedfile://a"), conf);
     FileSystem fs2 = FileSystem.get(new URI("uncachedfile://a"), conf);
@@ -104,7 +163,7 @@ public class TestFileSystemCaching {
   @Test
   public <T extends TokenIdentifier> void testCacheForUgi() throws Exception {
     final Configuration conf = new Configuration();
-    conf.set("fs.cachedfile.impl", conf.get("fs.file.impl"));
+    conf.set("fs.cachedfile.impl", FileSystem.getFileSystemClass("file", null).getName());
     UserGroupInformation ugiA = UserGroupInformation.createRemoteUser("foo");
     UserGroupInformation ugiB = UserGroupInformation.createRemoteUser("bar");
     FileSystem fsA = ugiA.doAs(new PrivilegedExceptionAction<FileSystem>() {
@@ -156,7 +215,7 @@ public class TestFileSystemCaching {
   @Test
   public void testUserFS() throws Exception {
     final Configuration conf = new Configuration();
-    conf.set("fs.cachedfile.impl", conf.get("fs.file.impl"));
+    conf.set("fs.cachedfile.impl", FileSystem.getFileSystemClass("file", null).getName());
     FileSystem fsU1 = FileSystem.get(new URI("cachedfile://a"), conf, "bar");
     FileSystem fsU2 = FileSystem.get(new URI("cachedfile://a"), conf, "foo");
     
@@ -166,7 +225,7 @@ public class TestFileSystemCaching {
   @Test
   public void testFsUniqueness() throws Exception {
     final Configuration conf = new Configuration();
-    conf.set("fs.cachedfile.impl", conf.get("fs.file.impl"));
+    conf.set("fs.cachedfile.impl", FileSystem.getFileSystemClass("file", null).getName());
     // multiple invocations of FileSystem.get return the same object.
     FileSystem fs1 = FileSystem.get(conf);
     FileSystem fs2 = FileSystem.get(conf);
@@ -183,7 +242,7 @@ public class TestFileSystemCaching {
   @Test
   public void testCloseAllForUGI() throws Exception {
     final Configuration conf = new Configuration();
-    conf.set("fs.cachedfile.impl", conf.get("fs.file.impl"));
+    conf.set("fs.cachedfile.impl", FileSystem.getFileSystemClass("file", null).getName());
     UserGroupInformation ugiA = UserGroupInformation.createRemoteUser("foo");
     FileSystem fsA = ugiA.doAs(new PrivilegedExceptionAction<FileSystem>() {
       public FileSystem run() throws Exception {

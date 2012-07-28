@@ -40,6 +40,7 @@ public class Block implements Writable, Comparable<Block> {
     WritableFactories.setFactory
       (Block.class,
        new WritableFactory() {
+         @Override
          public Writable newInstance() { return new Block(); }
        });
   }
@@ -146,6 +147,7 @@ public class Block implements Writable, Comparable<Block> {
 
   /**
    */
+  @Override
   public String toString() {
     return getBlockName() + "_" + getGenerationStamp();
   }
@@ -213,6 +215,17 @@ public class Block implements Writable, Comparable<Block> {
       return false;
     }
     return compareTo((Block)o) == 0;
+  }
+  
+  /**
+   * @return true if the two blocks have the same block ID and the same
+   * generation stamp, or if both blocks are null.
+   */
+  public static boolean matchingIdAndGenStamp(Block a, Block b) {
+    if (a == b) return true; // same block, or both null
+    if (a == null || b == null) return false; // only one null
+    return a.blockId == b.blockId &&
+           a.generationStamp == b.generationStamp;
   }
 
   @Override // Object

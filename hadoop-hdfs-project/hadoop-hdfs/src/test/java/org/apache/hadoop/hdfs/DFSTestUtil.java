@@ -55,10 +55,11 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DFSClient.DFSDataInputStream;
 import org.apache.hadoop.hdfs.MiniDFSCluster.NameNodeInfo;
+import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo.AdminStates;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -66,19 +67,23 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
+import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
+import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.TestTransferRbw;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.VersionInfo;
 
 import com.google.common.base.Joiner;
 
@@ -90,10 +95,10 @@ public class DFSTestUtil {
     "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"
   };
   
-  private int maxLevels;// = 3;
-  private int maxSize;// = 8*1024;
-  private int minSize = 1;
-  private int nFiles;
+  private final int maxLevels;
+  private final int maxSize;
+  private final int minSize;
+  private final int nFiles;
   private MyFile[] files;
   
   /** Creates a new instance of DFSTestUtil
@@ -103,10 +108,27 @@ public class DFSTestUtil {
    * @param maxLevels Maximum number of directory levels
    * @param maxSize Maximum size for file
    */
-  public DFSTestUtil(String testName, int nFiles, int maxLevels, int maxSize) {
+  private DFSTestUtil(int nFiles, int maxLevels, int maxSize, int minSize) {
     this.nFiles = nFiles;
     this.maxLevels = maxLevels;
     this.maxSize = maxSize;
+    this.minSize = minSize;
+  }
+
+  /** Creates a new instance of DFSTestUtil
+   *
+   * @param testName Name of the test from where this utility is used
+   * @param nFiles Number of files to be created
+   * @param maxLevels Maximum number of directory levels
+   * @param maxSize Maximum size for file
+   * @param minSize Minimum size for file
+   */
+  public DFSTestUtil(String testName, int nFiles, int maxLevels, int maxSize,
+      int minSize) {
+    this.nFiles = nFiles;
+    this.maxLevels = maxLevels;
+    this.maxSize = maxSize;
+    this.minSize = minSize;
   }
   
   /**
@@ -318,7 +340,7 @@ public class DFSTestUtil {
    */
   public static void waitCorruptReplicas(FileSystem fs, FSNamesystem ns,
       Path file, ExtendedBlock b, int corruptRepls)
-      throws IOException, TimeoutException {
+      throws IOException, TimeoutException, InterruptedException {
     int count = 0;
     final int ATTEMPTS = 50;
     int repls = ns.getBlockManager().numCorruptReplicas(b.getLocalBlock());
@@ -332,6 +354,7 @@ public class DFSTestUtil {
       System.out.println("Waiting for "+corruptRepls+" corrupt replicas");
       repls = ns.getBlockManager().numCorruptReplicas(b.getLocalBlock());
       count++;
+      Thread.sleep(1000);
     }
     if (count == ATTEMPTS) {
       throw new TimeoutException("Timed out waiting for corrupt replicas."
@@ -515,15 +538,14 @@ public class DFSTestUtil {
   }
   
   public static ExtendedBlock getFirstBlock(FileSystem fs, Path path) throws IOException {
-    DFSDataInputStream in = 
-      (DFSDataInputStream) ((DistributedFileSystem)fs).open(path);
+    HdfsDataInputStream in = (HdfsDataInputStream)((DistributedFileSystem)fs).open(path);
     in.readByte();
     return in.getCurrentBlock();
   }  
 
   public static List<LocatedBlock> getAllBlocks(FSDataInputStream in)
       throws IOException {
-    return ((DFSClient.DFSDataInputStream) in).getAllBlocks();
+    return ((HdfsDataInputStream) in).getAllBlocks();
   }
 
   public static Token<BlockTokenIdentifier> getBlockToken(
@@ -703,17 +725,112 @@ public class DFSTestUtil {
           info.nameserviceId), DFSUtil.createUri(HdfsConstants.HDFS_URI_SCHEME,
               info.nameNode.getNameNodeAddress()).toString());
     }
-    conf.set(DFSConfigKeys.DFS_FEDERATION_NAMESERVICES, Joiner.on(",")
+    conf.set(DFSConfigKeys.DFS_NAMESERVICES, Joiner.on(",")
         .join(nameservices));
   }
   
+  private static DatanodeID getDatanodeID(String ipAddr) {
+    return new DatanodeID(ipAddr, "localhost", "",
+        DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT,
+        DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+        DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
+  }
+
+  public static DatanodeID getLocalDatanodeID() {
+    return getDatanodeID("127.0.0.1");
+  }
+
+  public static DatanodeID getLocalDatanodeID(int port) {
+    return new DatanodeID("127.0.0.1", "localhost", "",
+        port, port, port);
+  }
+
   public static DatanodeDescriptor getLocalDatanodeDescriptor() {
-    return new DatanodeDescriptor(
-        new DatanodeID("127.0.0.1", DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT));
+    return new DatanodeDescriptor(getLocalDatanodeID());
   }
 
   public static DatanodeInfo getLocalDatanodeInfo() {
-    return new DatanodeInfo(
-        new DatanodeID("127.0.0.1", DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT));
+    return new DatanodeInfo(getLocalDatanodeID());
+  }
+
+  public static DatanodeInfo getDatanodeInfo(String ipAddr) {
+    return new DatanodeInfo(getDatanodeID(ipAddr));
+  }
+  
+  public static DatanodeInfo getLocalDatanodeInfo(int port) {
+    return new DatanodeInfo(getLocalDatanodeID(port));
+  }
+
+  public static DatanodeInfo getDatanodeInfo(String ipAddr, 
+      String host, int port) {
+    return new DatanodeInfo(new DatanodeID(ipAddr, host, "",
+        port, DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+        DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT));
+  }
+
+  public static DatanodeInfo getLocalDatanodeInfo(String ipAddr,
+      String hostname, AdminStates adminState) {
+    return new DatanodeInfo(ipAddr, hostname, "",
+        DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT,
+        DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+        DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT,
+        1, 2, 3, 4, 5, 6, "local", adminState);
+  }
+
+  public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
+      String rackLocation) {
+    return getDatanodeDescriptor(ipAddr, DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT,
+        rackLocation);
+  }
+
+  public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
+      int port, String rackLocation) {
+    DatanodeID dnId = new DatanodeID(ipAddr, "host", "", port,
+        DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+        DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
+    return new DatanodeDescriptor(dnId, rackLocation);
+  }
+  
+  public static DatanodeRegistration getLocalDatanodeRegistration() {
+    return new DatanodeRegistration(getLocalDatanodeID(),
+        new StorageInfo(), new ExportedBlockKeys(), VersionInfo.getVersion());
+  }
+
+  public static class Builder {
+    private int maxLevels = 3;
+    private int maxSize = 8*1024;
+    private int minSize = 1;
+    private int nFiles = 1;
+    
+    public Builder() {
+    }
+    
+    public Builder setName(String string) {
+      return this;
+    }
+
+    public Builder setNumFiles(int nFiles) {
+      this.nFiles = nFiles;
+      return this;
+    }
+    
+    public Builder setMaxLevels(int maxLevels) {
+      this.maxLevels = maxLevels;
+      return this;
+    }
+
+    public Builder setMaxSize(int maxSize) {
+      this.maxSize = maxSize;
+      return this;
+    }
+
+    public Builder setMinSize(int minSize) {
+      this.minSize = minSize;
+      return this;
+    }
+    
+    public DFSTestUtil build() {
+      return new DFSTestUtil(nFiles, maxLevels, maxSize, minSize);
+    }
   }
 }

@@ -55,6 +55,7 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
+import org.apache.hadoop.util.Time;
 
 /**
  * ViewFileSystem (extends the FileSystem interface) implements a client-side
@@ -146,7 +147,18 @@ public class ViewFileSystem extends FileSystem {
    */
   public ViewFileSystem() throws IOException {
     ugi = UserGroupInformation.getCurrentUser();
-    creationTime = System.currentTimeMillis();
+    creationTime = Time.now();
+  }
+
+  /**
+   * Return the protocol scheme for the FileSystem.
+   * <p/>
+   *
+   * @return <code>viewfs</code>
+   */
+  @Override
+  public String getScheme() {
+    return "viewfs";
   }
 
   /**
@@ -221,6 +233,11 @@ public class ViewFileSystem extends FileSystem {
     final InodeTree.ResolveResult<FileSystem> res = 
       fsState.resolve(getUriPath(f), true);
     return res.isInternalDir() ? null : res.targetFileSystem.getHomeDirectory();
+  }
+  
+  @Override
+  public String getCanonicalServiceName() {
+    return null;
   }
 
   @Override

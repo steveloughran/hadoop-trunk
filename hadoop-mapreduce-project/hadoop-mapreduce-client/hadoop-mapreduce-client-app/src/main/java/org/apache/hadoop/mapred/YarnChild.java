@@ -50,12 +50,15 @@ import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.security.token.JobTokenSecretManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.yarn.YarnUncaughtExceptionHandler;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.log4j.LogManager;
 
@@ -69,6 +72,7 @@ class YarnChild {
   static volatile TaskAttemptID taskid = null;
 
   public static void main(String[] args) throws Throwable {
+    Thread.setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
     LOG.debug("Child starting");
 
     final JobConf defaultConf = new JobConf();
@@ -77,7 +81,8 @@ class YarnChild {
 
     String host = args[0];
     int port = Integer.parseInt(args[1]);
-    final InetSocketAddress address = new InetSocketAddress(host, port);
+    final InetSocketAddress address =
+        NetUtils.createSocketAddrForHost(host, port);
     final TaskAttemptID firstTaskid = TaskAttemptID.forName(args[2]);
     int jvmIdInt = Integer.parseInt(args[3]);
     JVMId jvmId = new JVMId(firstTaskid.getJobID(),
@@ -214,8 +219,7 @@ class YarnChild {
     LOG.debug("loading token. # keys =" +credentials.numberOfSecretKeys() +
         "; from file=" + jobTokenFile);
     Token<JobTokenIdentifier> jt = TokenCache.getJobToken(credentials);
-    jt.setService(new Text(address.getAddress().getHostAddress() + ":"
-        + address.getPort()));
+    SecurityUtil.setTokenService(jt, address);
     UserGroupInformation current = UserGroupInformation.getCurrentUser();
     current.addToken(jt);
     for (Token<? extends TokenIdentifier> tok : credentials.getAllTokens()) {

@@ -31,6 +31,7 @@ import org.apache.hadoop.hdfs.protocol.proto.NamenodeProtocolProtos.ErrorReportR
 import org.apache.hadoop.hdfs.protocol.proto.NamenodeProtocolProtos.GetBlockKeysRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.NamenodeProtocolProtos.GetBlocksRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.NamenodeProtocolProtos.GetEditLogManifestRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.NamenodeProtocolProtos.GetMostRecentCheckpointTxIdRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.NamenodeProtocolProtos.GetTransactionIdRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.NamenodeProtocolProtos.RegisterRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.NamenodeProtocolProtos.RollEditLogRequestProto;
@@ -47,7 +48,6 @@ import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolMetaInterface;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RpcClientUtil;
-import org.apache.hadoop.ipc.RpcPayloadHeader.RpcKind;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -82,6 +82,7 @@ public class NamenodeProtocolTranslatorPB implements NamenodeProtocol,
     this.rpcProxy = rpcProxy;
   }
 
+  @Override
   public void close() {
     RPC.stopProxy(rpcProxy);
   }
@@ -115,6 +116,16 @@ public class NamenodeProtocolTranslatorPB implements NamenodeProtocol,
     try {
       return rpcProxy.getTransactionId(NULL_CONTROLLER, GET_TRANSACTIONID)
           .getTxId();
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  @Override
+  public long getMostRecentCheckpointTxId() throws IOException {
+    try {
+      return rpcProxy.getMostRecentCheckpointTxId(NULL_CONTROLLER,
+          GetMostRecentCheckpointTxIdRequestProto.getDefaultInstance()).getTxId();
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -209,7 +220,7 @@ public class NamenodeProtocolTranslatorPB implements NamenodeProtocol,
   @Override
   public boolean isMethodSupported(String methodName) throws IOException {
     return RpcClientUtil.isMethodSupported(rpcProxy, NamenodeProtocolPB.class,
-        RpcKind.RPC_PROTOCOL_BUFFER,
+        RPC.RpcKind.RPC_PROTOCOL_BUFFER,
         RPC.getProtocolVersion(NamenodeProtocolPB.class), methodName);
   }
 }

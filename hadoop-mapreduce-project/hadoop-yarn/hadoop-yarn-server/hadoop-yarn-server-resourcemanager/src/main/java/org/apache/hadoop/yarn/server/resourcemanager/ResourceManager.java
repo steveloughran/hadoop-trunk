@@ -31,8 +31,10 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.YarnException;
+import org.apache.hadoop.yarn.YarnUncaughtExceptionHandler;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -46,8 +48,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEventT
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.ApplicationMasterLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.Store;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.Store.RMState;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.StoreFactory;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.Store.RMState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
@@ -86,14 +88,19 @@ import org.apache.hadoop.yarn.webapp.WebApps.Builder;
  */
 @SuppressWarnings("unchecked")
 public class ResourceManager extends CompositeService implements Recoverable {
+
+  /**
+   * Priority of the ResourceManager shutdown hook.
+   */
+  public static final int SHUTDOWN_HOOK_PRIORITY = 30;
+
   private static final Log LOG = LogFactory.getLog(ResourceManager.class);
   public static final long clusterTimeStamp = System.currentTimeMillis();
 
   protected ClientToAMSecretManager clientToAMSecretManager =
       new ClientToAMSecretManager();
   
-  protected ContainerTokenSecretManager containerTokenSecretManager =
-      new ContainerTokenSecretManager();
+  protected ContainerTokenSecretManager containerTokenSecretManager;
 
   protected ApplicationTokenSecretManager appTokenSecretManager;
 
@@ -143,16 +150,21 @@ public class ResourceManager extends CompositeService implements Recoverable {
         this.rmDispatcher);
     addService(this.containerAllocationExpirer);
 
+    this.containerTokenSecretManager  = new ContainerTokenSecretManager(conf);
+
     AMLivelinessMonitor amLivelinessMonitor = createAMLivelinessMonitor();
     addService(amLivelinessMonitor);
+
+    AMLivelinessMonitor amFinishingMonitor = createAMLivelinessMonitor();
+    addService(amFinishingMonitor);
 
     DelegationTokenRenewer tokenRenewer = createDelegationTokenRenewer();
     addService(tokenRenewer);
     
-    this.rmContext =
-        new RMContextImpl(this.store, this.rmDispatcher,
-          this.containerAllocationExpirer, amLivelinessMonitor, tokenRenewer,
-          this.appTokenSecretManager);
+    this.rmContext = new RMContextImpl(this.store, this.rmDispatcher,
+        this.containerAllocationExpirer,
+        amLivelinessMonitor, amFinishingMonitor,
+        tokenRenewer, this.appTokenSecretManager);
 
     // Register event handler for NodesListManager
     this.nodesListManager = new NodesListManager(this.rmContext);
@@ -317,9 +329,17 @@ public class ResourceManager extends CompositeService implements Recoverable {
           try {
             scheduler.handle(event);
           } catch (Throwable t) {
+            // An error occurred, but we are shutting down anyway.
+            // If it was an InterruptedException, the very act of 
+            // shutdown could have caused it and is probably harmless.
+            if (stopped) {
+              LOG.warn("Exception during shutdown: ", t);
+              break;
+            }
             LOG.fatal("Error in handling event type " + event.getType()
                 + " to the scheduler", t);
-            if (shouldExitOnError) {
+            if (shouldExitOnError
+                && !ShutdownHookManager.get().isShutdownInProgress()) {
               LOG.info("Exiting, bbye..");
               System.exit(-1);
             }
@@ -443,14 +463,14 @@ public class ResourceManager extends CompositeService implements Recoverable {
       WebApps.$for("cluster", ApplicationMasterService.class, masterService, "ws").at(
           this.conf.get(YarnConfiguration.RM_WEBAPP_ADDRESS,
           YarnConfiguration.DEFAULT_RM_WEBAPP_ADDRESS)); 
+    String proxyHostAndPort = YarnConfiguration.getProxyHostAndPort(conf);
     if(YarnConfiguration.getRMWebAppHostAndPort(conf).
-        equals(YarnConfiguration.getProxyHostAndPort(conf))) {
+        equals(proxyHostAndPort)) {
       AppReportFetcher fetcher = new AppReportFetcher(conf, getClientRMService());
       builder.withServlet(ProxyUriUtils.PROXY_SERVLET_NAME, 
           ProxyUriUtils.PROXY_PATH_SPEC, WebAppProxyServlet.class);
       builder.withAttribute(WebAppProxy.FETCHER_ATTRIBUTE, fetcher);
-      String proxy = YarnConfiguration.getProxyHostAndPort(conf);
-      String[] proxyParts = proxy.split(":");
+      String[] proxyParts = proxyHostAndPort.split(":");
       builder.withAttribute(WebAppProxy.PROXY_HOST_ATTRIBUTE, proxyParts[0]);
 
     }
@@ -474,6 +494,15 @@ public class ResourceManager extends CompositeService implements Recoverable {
       rmDTSecretManager.startThreads();
     } catch(IOException ie) {
       throw new YarnException("Failed to start secret manager threads", ie);
+    }
+
+    if (getConfig().getBoolean(YarnConfiguration.IS_MINI_YARN_CLUSTER, false)) {
+      String hostname = getConfig().get(YarnConfiguration.RM_WEBAPP_ADDRESS,
+                                        YarnConfiguration.DEFAULT_RM_WEBAPP_ADDRESS);
+      hostname = (hostname.contains(":")) ? hostname.substring(0, hostname.indexOf(":")) : hostname;
+      int port = webApp.port();
+      String resolvedAddress = hostname + ":" + port;
+      conf.set(YarnConfiguration.RM_WEBAPP_ADDRESS, resolvedAddress);
     }
     
     super.start();
@@ -587,6 +616,11 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
 
   @Private
+  public ContainerTokenSecretManager getContainerTokenSecretManager() {
+    return this.containerTokenSecretManager;
+  }
+
+  @Private
   public ApplicationTokenSecretManager getApplicationTokenSecretManager(){
     return this.appTokenSecretManager;
   }
@@ -598,13 +632,15 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
   
   public static void main(String argv[]) {
+    Thread.setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
     StringUtils.startupShutdownMessage(ResourceManager.class, argv, LOG);
     try {
       Configuration conf = new YarnConfiguration();
       Store store =  StoreFactory.getStore(conf);
       ResourceManager resourceManager = new ResourceManager(store);
-      Runtime.getRuntime().addShutdownHook(
-          new CompositeServiceShutdownHook(resourceManager));
+      ShutdownHookManager.get().addShutdownHook(
+        new CompositeServiceShutdownHook(resourceManager),
+        SHUTDOWN_HOOK_PRIORITY);
       resourceManager.init(conf);
       //resourceManager.recover(store.restore());
       //store.doneWithRecovery();

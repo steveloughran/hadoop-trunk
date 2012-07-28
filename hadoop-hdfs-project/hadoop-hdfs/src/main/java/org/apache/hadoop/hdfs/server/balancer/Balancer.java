@@ -72,8 +72,10 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import static com.google.common.base.Preconditions.checkArgument;
 
 /** <p>The balancer is a tool that balances disk space usage on an HDFS cluster
  * when some datanodes become full or when new empty nodes join the cluster.
@@ -94,7 +96,7 @@ import org.apache.hadoop.util.ToolRunner;
  * </pre>
  * 
  * <p>DESCRIPTION
- * <p>The threshold parameter is a fraction in the range of (0%, 100%) with a 
+ * <p>The threshold parameter is a fraction in the range of (1%, 100%) with a 
  * default value of 10%. The threshold sets a target for whether the cluster 
  * is balanced. A cluster is balanced if for each datanode, the utilization 
  * of the node (ratio of used space at the node to total capacity of the node) 
@@ -205,6 +207,7 @@ public class Balancer {
   private Map<Block, BalancerBlock> globalBlockList
                  = new HashMap<Block, BalancerBlock>();
   private MovedBlocks movedBlocks = new MovedBlocks();
+  // Map storage IDs to BalancerDatanodes
   private Map<String, BalancerDatanode> datanodes
                  = new HashMap<String, BalancerDatanode>();
   
@@ -262,9 +265,9 @@ public class Balancer {
               if (LOG.isDebugEnabled()) {
                 LOG.debug("Decided to move block "+ block.getBlockId()
                     +" with a length of "+StringUtils.byteDesc(block.getNumBytes())
-                    + " bytes from " + source.getName() 
-                    + " to " + target.getName()
-                    + " using proxy source " + proxySource.getName() );
+                    + " bytes from " + source.getDisplayName()
+                    + " to " + target.getDisplayName()
+                    + " using proxy source " + proxySource.getDisplayName() );
               }
               return true;
             }
@@ -317,15 +320,15 @@ public class Balancer {
         receiveResponse(in);
         bytesMoved.inc(block.getNumBytes());
         LOG.info( "Moving block " + block.getBlock().getBlockId() +
-              " from "+ source.getName() + " to " +
-              target.getName() + " through " +
-              proxySource.getName() +
+              " from "+ source.getDisplayName() + " to " +
+              target.getDisplayName() + " through " +
+              proxySource.getDisplayName() +
               " is succeeded." );
       } catch (IOException e) {
         LOG.warn("Error moving block "+block.getBlockId()+
-            " from " + source.getName() + " to " +
-            target.getName() + " through " +
-            proxySource.getName() +
+            " from " + source.getDisplayName() + " to " +
+            target.getDisplayName() + " through " +
+            proxySource.getDisplayName() +
             ": "+e.getMessage());
       } finally {
         IOUtils.closeStream(out);
@@ -375,10 +378,12 @@ public class Balancer {
     /* start a thread to dispatch the block move */
     private void scheduleBlockMove() {
       moverExecutor.execute(new Runnable() {
+        @Override
         public void run() {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Starting moving "+ block.getBlockId() +
-                " from " + proxySource.getName() + " to " + target.getName());
+                " from " + proxySource.getDisplayName() + " to " +
+                target.getDisplayName());
           }
           dispatch();
         }
@@ -475,7 +480,7 @@ public class Balancer {
     
     @Override
     public String toString() {
-      return getClass().getSimpleName() + "[" + getName()
+      return getClass().getSimpleName() + "[" + datanode
           + ", utilization=" + utilization + "]";
     }
 
@@ -507,8 +512,8 @@ public class Balancer {
     }
     
     /** Get the name of the datanode */
-    protected String getName() {
-      return datanode.getName();
+    protected String getDisplayName() {
+      return datanode.toString();
     }
     
     /* Get the storage id of the datanode */
@@ -566,6 +571,7 @@ public class Balancer {
     /* A thread that initiates a block move 
      * and waits for block move to complete */
     private class BlockMoveDispatcher implements Runnable {
+      @Override
       public void run() {
         dispatchBlocks();
       }
@@ -620,8 +626,8 @@ public class Balancer {
         
           synchronized (block) {
             // update locations
-            for ( String location : blk.getDatanodes() ) {
-              BalancerDatanode datanode = datanodes.get(location);
+            for ( String storageID : blk.getStorageIDs() ) {
+              BalancerDatanode datanode = datanodes.get(storageID);
               if (datanode != null) { // not an unknown datanode
                 block.addLocation(datanode);
               }
@@ -707,7 +713,7 @@ public class Balancer {
      */ 
     private static final long MAX_ITERATION_TIME = 20*60*1000L; //20 mins
     private void dispatchBlocks() {
-      long startTime = Util.now();
+      long startTime = Time.now();
       this.blocksToReceive = 2*scheduledSize;
       boolean isTimeUp = false;
       while(!isTimeUp && scheduledSize>0 &&
@@ -736,7 +742,7 @@ public class Balancer {
         } 
         
         // check if time is up or not
-        if (Util.now()-startTime > MAX_ITERATION_TIME) {
+        if (Time.now()-startTime > MAX_ITERATION_TIME) {
           isTimeUp = true;
           continue;
         }
@@ -831,7 +837,7 @@ public class Balancer {
           this.aboveAvgUtilizedDatanodes.add((Source)datanodeS);
         } else {
           assert(isOverUtilized(datanodeS)) :
-            datanodeS.getName()+ "is not an overUtilized node";
+            datanodeS.getDisplayName()+ "is not an overUtilized node";
           this.overUtilizedDatanodes.add((Source)datanodeS);
           overLoadedBytes += (long)((datanodeS.utilization-avg
               -threshold)*datanodeS.datanode.getCapacity()/100.0);
@@ -842,7 +848,7 @@ public class Balancer {
           this.belowAvgUtilizedDatanodes.add(datanodeS);
         } else {
           assert isUnderUtilized(datanodeS) : "isUnderUtilized("
-              + datanodeS.getName() + ")=" + isUnderUtilized(datanodeS)
+              + datanodeS.getDisplayName() + ")=" + isUnderUtilized(datanodeS)
               + ", utilization=" + datanodeS.utilization; 
           this.underUtilizedDatanodes.add(datanodeS);
           underLoadedBytes += (long)((avg-threshold-
@@ -1141,7 +1147,7 @@ public class Balancer {
    * move blocks in current window to old window.
    */ 
   private static class MovedBlocks {
-    private long lastCleanupTime = System.currentTimeMillis();
+    private long lastCleanupTime = Time.now();
     final private static int CUR_WIN = 0;
     final private static int OLD_WIN = 1;
     final private static int NUM_WINS = 2;
@@ -1172,7 +1178,7 @@ public class Balancer {
 
     /* remove old blocks */
     synchronized private void cleanup() {
-      long curTime = System.currentTimeMillis();
+      long curTime = Time.now();
       // check if old win is older than winWidth
       if (lastCleanupTime + WIN_WIDTH <= curTime) {
         // purge the old window
@@ -1469,7 +1475,7 @@ public class Balancer {
     /** Parse arguments and then run Balancer */
     @Override
     public int run(String[] args) {
-      final long startTime = Util.now();
+      final long startTime = Time.now();
       final Configuration conf = getConf();
       WIN_WIDTH = conf.getLong(
           DFSConfigKeys.DFS_BALANCER_MOVEDWINWIDTH_KEY, 
@@ -1487,7 +1493,7 @@ public class Balancer {
         System.out.println(e + ".  Exiting ...");
         return ReturnStatus.INTERRUPTED.code;
       } finally {
-        System.out.println("Balancing took " + time2Str(Util.now()-startTime));
+        System.out.println("Balancing took " + time2Str(Time.now()-startTime));
       }
     }
 
@@ -1499,18 +1505,19 @@ public class Balancer {
       if (args != null) {
         try {
           for(int i = 0; i < args.length; i++) {
+            checkArgument(args.length >= 2, "args = " + Arrays.toString(args));           
             if ("-threshold".equalsIgnoreCase(args[i])) {
               i++;
               try {
                 threshold = Double.parseDouble(args[i]);
-                if (threshold < 0 || threshold > 100) {
-                  throw new NumberFormatException(
+                if (threshold < 1 || threshold > 100) {
+                  throw new IllegalArgumentException(
                       "Number out of range: threshold = " + threshold);
                 }
                 LOG.info( "Using a threshold of " + threshold );
-              } catch(NumberFormatException e) {
+              } catch(IllegalArgumentException e) {
                 System.err.println(
-                    "Expecting a number in the range of [0.0, 100.0]: "
+                    "Expecting a number in the range of [1.0, 100.0]: "
                     + args[i]);
                 throw e;
               }

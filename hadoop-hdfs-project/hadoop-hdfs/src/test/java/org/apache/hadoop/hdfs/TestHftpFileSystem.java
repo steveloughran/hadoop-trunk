@@ -18,17 +18,17 @@
 
 package org.apache.hadoop.hdfs;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.net.URI;
-import java.net.URL;
-import java.net.HttpURLConnection;
-import java.util.Random;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
-import org.junit.Test;
-import org.junit.BeforeClass;
-import org.junit.AfterClass;
-import static org.junit.Assert.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.Random;
 
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
@@ -37,12 +37,14 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.util.ServletUtil;
 import org.apache.log4j.Level;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 public class TestHftpFileSystem {
   private static final Random RAN = new Random();
@@ -234,6 +236,45 @@ public class TestHftpFileSystem {
     assertEquals('7', in.read());
   }
 
+  @Test
+  public void testReadClosedStream() throws IOException {
+    final Path testFile = new Path("/testfile+2");
+    FSDataOutputStream os = hdfs.create(testFile, true);
+    os.writeBytes("0123456789");
+    os.close();
+
+    // ByteRangeInputStream delays opens until reads.  Make sure it doesn't
+    // open a closed stream that has never been opened
+    FSDataInputStream in = hftpFs.open(testFile);
+    in.close();
+    checkClosedStream(in);
+    checkClosedStream(in.getWrappedStream());
+    
+    // force the stream to connect and then close it
+    in = hftpFs.open(testFile);
+    int ch = in.read(); 
+    assertEquals('0', ch);
+    in.close();
+    checkClosedStream(in);
+    checkClosedStream(in.getWrappedStream());
+    
+    // make sure seeking doesn't automagically reopen the stream
+    in.seek(4);
+    checkClosedStream(in);
+    checkClosedStream(in.getWrappedStream());
+  }
+  
+  private void checkClosedStream(InputStream is) {
+    IOException ioe = null;
+    try {
+      is.read();
+    } catch (IOException e) {
+      ioe = e;
+    }
+    assertNotNull("No exception on closed read", ioe);
+    assertEquals("Stream closed", ioe.getMessage());
+  }
+  
   public void resetFileSystem() throws IOException {
     // filesystem caching has a quirk/bug that it caches based on the user's
     // given uri.  the result is if a filesystem is instantiated with no port,

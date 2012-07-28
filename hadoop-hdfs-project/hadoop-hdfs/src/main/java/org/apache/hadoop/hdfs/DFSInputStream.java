@@ -118,7 +118,40 @@ public class DFSInputStream extends FSInputStream implements ByteBufferReadable 
    * Grab the open-file info from namenode
    */
   synchronized void openInfo() throws IOException, UnresolvedLinkException {
-    LocatedBlocks newInfo = DFSClient.callGetBlockLocations(dfsClient.namenode, src, 0, prefetchSize);
+    lastBlockBeingWrittenLength = fetchLocatedBlocksAndGetLastBlockLength();
+    int retriesForLastBlockLength = 3;
+    while (retriesForLastBlockLength > 0) {
+      // Getting last block length as -1 is a special case. When cluster
+      // restarts, DNs may not report immediately. At this time partial block
+      // locations will not be available with NN for getting the length. Lets
+      // retry for 3 times to get the length.
+      if (lastBlockBeingWrittenLength == -1) {
+        DFSClient.LOG.warn("Last block locations not available. "
+            + "Datanodes might not have reported blocks completely."
+            + " Will retry for " + retriesForLastBlockLength + " times");
+        waitFor(4000);
+        lastBlockBeingWrittenLength = fetchLocatedBlocksAndGetLastBlockLength();
+      } else {
+        break;
+      }
+      retriesForLastBlockLength--;
+    }
+    if (retriesForLastBlockLength == 0) {
+      throw new IOException("Could not obtain the last block locations.");
+    }
+  }
+
+  private void waitFor(int waitTime) throws IOException {
+    try {
+      Thread.sleep(waitTime);
+    } catch (InterruptedException e) {
+      throw new IOException(
+          "Interrupted while getting the last block length.");
+    }
+  }
+
+  private long fetchLocatedBlocksAndGetLastBlockLength() throws IOException {
+    LocatedBlocks newInfo = dfsClient.getLocatedBlocks(src, 0, prefetchSize);
     if (DFSClient.LOG.isDebugEnabled()) {
       DFSClient.LOG.debug("newInfo = " + newInfo);
     }
@@ -136,10 +169,13 @@ public class DFSInputStream extends FSInputStream implements ByteBufferReadable 
       }
     }
     locatedBlocks = newInfo;
-    lastBlockBeingWrittenLength = 0;
+    long lastBlockBeingWrittenLength = 0;
     if (!locatedBlocks.isLastBlockComplete()) {
       final LocatedBlock last = locatedBlocks.getLastLocatedBlock();
       if (last != null) {
+        if (last.getLocations().length == 0) {
+          return -1;
+        }
         final long len = readBlockLength(last);
         last.getBlock().setNumBytes(len);
         lastBlockBeingWrittenLength = len; 
@@ -147,13 +183,12 @@ public class DFSInputStream extends FSInputStream implements ByteBufferReadable 
     }
 
     currentNode = null;
+    return lastBlockBeingWrittenLength;
   }
 
   /** Read the block length from one of the datanodes. */
   private long readBlockLength(LocatedBlock locatedblock) throws IOException {
-    if (locatedblock == null || locatedblock.getLocations().length == 0) {
-      return 0;
-    }
+    assert locatedblock != null : "LocatedBlock cannot be null";
     int replicaNotFoundCount = locatedblock.getLocations().length;
     
     for(DatanodeInfo datanode : locatedblock.getLocations()) {
@@ -224,7 +259,7 @@ public class DFSInputStream extends FSInputStream implements ByteBufferReadable 
   /**
    * Return collection of blocks that has already been located.
    */
-  synchronized List<LocatedBlock> getAllBlocks() throws IOException {
+  public synchronized List<LocatedBlock> getAllBlocks() throws IOException {
     return getBlockRange(0, getFileLength());
   }
 
@@ -263,7 +298,7 @@ public class DFSInputStream extends FSInputStream implements ByteBufferReadable 
         targetBlockIdx = LocatedBlocks.getInsertIndex(targetBlockIdx);
         // fetch more blocks
         LocatedBlocks newBlocks;
-        newBlocks = DFSClient.callGetBlockLocations(dfsClient.namenode, src, offset, prefetchSize);
+        newBlocks = dfsClient.getLocatedBlocks(src, offset, prefetchSize);
         assert (newBlocks != null) : "Could not find target position " + offset;
         locatedBlocks.insertRange(targetBlockIdx, newBlocks.getLocatedBlocks());
       }
@@ -287,7 +322,7 @@ public class DFSInputStream extends FSInputStream implements ByteBufferReadable 
     }
     // fetch blocks
     LocatedBlocks newBlocks;
-    newBlocks = DFSClient.callGetBlockLocations(dfsClient.namenode, src, offset, prefetchSize);
+    newBlocks = dfsClient.getLocatedBlocks(src, offset, prefetchSize);
     if (newBlocks == null) {
       throw new IOException("Could not find target position " + offset);
     }
@@ -356,7 +391,7 @@ public class DFSInputStream extends FSInputStream implements ByteBufferReadable 
         blk = locatedBlocks.get(blockIdx);
       if (blk == null || curOff < blk.getStartOffset()) {
         LocatedBlocks newBlocks;
-        newBlocks = DFSClient.callGetBlockLocations(dfsClient.namenode, src, curOff, remaining);
+        newBlocks = dfsClient.getLocatedBlocks(src, curOff, remaining);
         locatedBlocks.insertRange(blockIdx, newBlocks.getLocatedBlocks());
         continue;
       }
@@ -829,7 +864,13 @@ public class DFSInputStream extends FSInputStream implements ByteBufferReadable 
     // Allow retry since there is no way of knowing whether the cached socket
     // is good until we actually use it.
     for (int retries = 0; retries <= nCachedConnRetry && fromCache; ++retries) {
-      Socket sock = socketCache.get(dnAddr);
+      Socket sock = null;
+      // Don't use the cache on the last attempt - it's possible that there
+      // are arbitrarily many unusable sockets in the cache, but we don't
+      // want to fail the read.
+      if (retries < nCachedConnRetry) {
+        sock = socketCache.get(dnAddr);
+      }
       if (sock == null) {
         fromCache = false;
 

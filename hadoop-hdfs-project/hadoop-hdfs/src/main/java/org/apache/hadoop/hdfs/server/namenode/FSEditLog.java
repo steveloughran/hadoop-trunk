@@ -17,13 +17,14 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.apache.hadoop.hdfs.server.common.Util.now;
+import static org.apache.hadoop.util.Time.now;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
@@ -36,6 +37,9 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
+
+import static org.apache.hadoop.util.ExitUtil.terminate;
+
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.AddOp;
@@ -63,6 +67,7 @@ import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.UpdateMasterKeyOp;
 import org.apache.hadoop.hdfs.server.namenode.JournalSet.JournalAndStream;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
+import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.hdfs.server.protocol.RemoteEditLogManifest;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
@@ -134,10 +139,6 @@ public class FSEditLog  {
   // is an automatic sync scheduled?
   private volatile boolean isAutoSyncScheduled = false;
   
-  // Used to exit in the event of a failure to sync to all journals. It's a
-  // member variable so it can be swapped out for testing.
-  private Runtime runtime = Runtime.getRuntime();
-
   // these are statistics counters.
   private long numTransactions;        // number of transactions
   private long numTransactionsBatchedInSync;
@@ -172,6 +173,7 @@ public class FSEditLog  {
 
   // stores the most current transactionId of this thread.
   private static final ThreadLocal<TransactionId> myTransactionId = new ThreadLocal<TransactionId>() {
+    @Override
     protected synchronized TransactionId initialValue() {
       return new TransactionId(Long.MAX_VALUE);
     }
@@ -230,6 +232,7 @@ public class FSEditLog  {
         DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_MINIMUM_DEFAULT);
 
     journalSet = new JournalSet(minimumRedundantJournals);
+
     for (URI u : dirs) {
       boolean required = FSNamesystem.getRequiredNamespaceEditsDirs(conf)
           .contains(u);
@@ -267,13 +270,14 @@ public class FSEditLog  {
     long segmentTxId = getLastWrittenTxId() + 1;
     // Safety check: we should never start a segment if there are
     // newer txids readable.
-    EditLogInputStream s = journalSet.getInputStream(segmentTxId, true);
-    try {
-      Preconditions.checkState(s == null,
-          "Cannot start writing at txid %s when there is a stream " +
-          "available for read: %s", segmentTxId, s);
-    } finally {
-      IOUtils.closeStream(s);
+    List<EditLogInputStream> streams = new ArrayList<EditLogInputStream>();
+    journalSet.selectInputStreams(streams, segmentTxId, true);
+    if (!streams.isEmpty()) {
+      String error = String.format("Cannot start writing at txid %s " +
+        "when there is a stream available for read: %s",
+        segmentTxId, streams.get(0));
+      IOUtils.cleanup(LOG, streams.toArray(new EditLogInputStream[0]));
+      throw new IllegalStateException(error);
     }
     
     startLogSegmentAndWriteHeaderTxn(segmentTxId);
@@ -318,7 +322,7 @@ public class FSEditLog  {
       endCurrentLogSegment(true);
     }
     
-    if (!journalSet.isEmpty()) {
+    if (journalSet != null && !journalSet.isEmpty()) {
       try {
         journalSet.close();
       } catch (IOException ioe) {
@@ -540,10 +544,12 @@ public class FSEditLog  {
             }
             editLogStream.setReadyToFlush();
           } catch (IOException e) {
-            LOG.fatal("Could not sync enough journals to persistent storage. "
-                + "Unsynced transactions: " + (txid - synctxid),
-                new Exception());
-            runtime.exit(1);
+            final String msg =
+                "Could not sync enough journals to persistent storage " +
+                "due to " + e.getMessage() + ". " +
+                "Unsynced transactions: " + (txid - synctxid);
+            LOG.fatal(msg, new Exception());
+            terminate(1, msg);
           }
         } finally {
           // Prevent RuntimeException from blocking other log edit write 
@@ -562,9 +568,11 @@ public class FSEditLog  {
         }
       } catch (IOException ex) {
         synchronized (this) {
-          LOG.fatal("Could not sync enough journals to persistent storage. "
-              + "Unsynced transactions: " + (txid - synctxid), new Exception());
-          runtime.exit(1);
+          final String msg =
+              "Could not sync enough journals to persistent storage. "
+              + "Unsynced transactions: " + (txid - synctxid);
+          LOG.fatal(msg, new Exception());
+          terminate(1, msg);
         }
       }
       long elapsed = now() - start;
@@ -837,15 +845,6 @@ public class FSEditLog  {
   }
   
   /**
-   * Used only by unit tests.
-   */
-  @VisibleForTesting
-  synchronized void setRuntimeForTesting(Runtime runtime) {
-    this.runtime = runtime;
-    this.journalSet.setRuntimeForTesting(runtime);
-  }
-
-  /**
    * Used only by tests.
    */
   @VisibleForTesting
@@ -1004,7 +1003,10 @@ public class FSEditLog  {
       minTxIdToKeep <= curSegmentTxId :
       "cannot purge logs older than txid " + minTxIdToKeep +
       " when current segment starts at " + curSegmentTxId;
-
+    if (minTxIdToKeep == 0) {
+      return;
+    }
+    
     // This could be improved to not need synchronization. But currently,
     // journalSet is not threadsafe, so we need to synchronize this method.
     try {
@@ -1136,10 +1138,10 @@ public class FSEditLog  {
       // All journals have failed, it is handled in logSync.
     }
   }
-  
-  Collection<EditLogInputStream> selectInputStreams(long fromTxId,
-      long toAtLeastTxId) throws IOException {
-    return selectInputStreams(fromTxId, toAtLeastTxId, true);
+
+  public Collection<EditLogInputStream> selectInputStreams(
+      long fromTxId, long toAtLeastTxId) throws IOException {
+    return selectInputStreams(fromTxId, toAtLeastTxId, null, true);
   }
 
   /**
@@ -1149,24 +1151,58 @@ public class FSEditLog  {
    * @param toAtLeast the selected streams must contain this transaction
    * @param inProgessOk set to true if in-progress streams are OK
    */
-  public synchronized Collection<EditLogInputStream> selectInputStreams(long fromTxId,
-      long toAtLeastTxId, boolean inProgressOk) throws IOException {
+  public synchronized Collection<EditLogInputStream> selectInputStreams(
+      long fromTxId, long toAtLeastTxId, MetaRecoveryContext recovery,
+      boolean inProgressOk) throws IOException {
     List<EditLogInputStream> streams = new ArrayList<EditLogInputStream>();
-    EditLogInputStream stream = journalSet.getInputStream(fromTxId, inProgressOk);
-    while (stream != null) {
-      streams.add(stream);
-      // We're now looking for a higher range, so reset the fromTxId
-      fromTxId = stream.getLastTxId() + 1;
-      stream = journalSet.getInputStream(fromTxId, inProgressOk);
-    }
-    
-    if (fromTxId <= toAtLeastTxId) {
-      closeAllStreams(streams);
-      throw new IOException(String.format("Gap in transactions. Expected to "
-          + "be able to read up until at least txid %d but unable to find any "
-          + "edit logs containing txid %d", toAtLeastTxId, fromTxId));
+    journalSet.selectInputStreams(streams, fromTxId, inProgressOk);
+
+    try {
+      checkForGaps(streams, fromTxId, toAtLeastTxId, inProgressOk);
+    } catch (IOException e) {
+      if (recovery != null) {
+        // If recovery mode is enabled, continue loading even if we know we
+        // can't load up to toAtLeastTxId.
+        LOG.error(e);
+      } else {
+        closeAllStreams(streams);
+        throw e;
+      }
     }
     return streams;
+  }
+  
+  /**
+   * Check for gaps in the edit log input stream list.
+   * Note: we're assuming that the list is sorted and that txid ranges don't
+   * overlap.  This could be done better and with more generality with an
+   * interval tree.
+   */
+  private void checkForGaps(List<EditLogInputStream> streams, long fromTxId,
+      long toAtLeastTxId, boolean inProgressOk) throws IOException {
+    Iterator<EditLogInputStream> iter = streams.iterator();
+    long txId = fromTxId;
+    while (true) {
+      if (txId > toAtLeastTxId) return;
+      if (!iter.hasNext()) break;
+      EditLogInputStream elis = iter.next();
+      if (elis.getFirstTxId() > txId) break;
+      long next = elis.getLastTxId();
+      if (next == HdfsConstants.INVALID_TXID) {
+        if (!inProgressOk) {
+          throw new RuntimeException("inProgressOk = false, but " +
+              "selectInputStreams returned an in-progress edit " +
+              "log input stream (" + elis + ")");
+        }
+        // We don't know where the in-progress stream ends.
+        // It could certainly go all the way up to toAtLeastTxId.
+        return;
+      }
+      txId = next + 1;
+    }
+    throw new IOException(String.format("Gap in transactions. Expected to "
+        + "be able to read up until at least txid %d but unable to find any "
+        + "edit logs containing txid %d", toAtLeastTxId, txId));
   }
 
   /** 
@@ -1220,8 +1256,9 @@ public class FSEditLog  {
 
     try {
       Constructor<? extends JournalManager> cons
-        = clazz.getConstructor(Configuration.class, URI.class);
-      return cons.newInstance(conf, uri);
+        = clazz.getConstructor(Configuration.class, URI.class,
+            NamespaceInfo.class);
+      return cons.newInstance(conf, uri, storage.getNamespaceInfo());
     } catch (Exception e) {
       throw new IllegalArgumentException("Unable to construct journal, "
                                          + uri, e);

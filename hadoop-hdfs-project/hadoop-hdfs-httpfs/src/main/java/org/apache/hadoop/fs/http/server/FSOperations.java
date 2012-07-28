@@ -42,27 +42,6 @@ import java.util.Map;
  */
 public class FSOperations {
 
-  /**
-   * Converts a Unix permission octal & symbolic representation
-   * (i.e. 655 or -rwxr--r--) into a FileSystemAccess permission.
-   *
-   * @param str Unix permission symbolic representation.
-   *
-   * @return the FileSystemAccess permission. If the given string was
-   *         'default', it returns <code>FsPermission.getDefault()</code>.
-   */
-  private static FsPermission getPermission(String str) {
-    FsPermission permission;
-    if (str.equals(HttpFSFileSystem.DEFAULT_PERMISSION)) {
-      permission = FsPermission.getDefault();
-    } else if (str.length() == 3) {
-      permission = new FsPermission(Short.parseShort(str, 8));
-    } else {
-      permission = FsPermission.valueOf(str);
-    }
-    return permission;
-  }
-
   @SuppressWarnings({"unchecked", "deprecation"})
   private static Map fileStatusToJSONRaw(FileStatus status, boolean emptyPathSuffix) {
     Map json = new LinkedHashMap();
@@ -254,7 +233,7 @@ public class FSOperations {
   public static class FSCreate implements FileSystemAccess.FileSystemExecutor<Void> {
     private InputStream is;
     private Path path;
-    private String permission;
+    private short permission;
     private boolean override;
     private short replication;
     private long blockSize;
@@ -269,7 +248,8 @@ public class FSOperations {
      * @param repl the replication factor for the file.
      * @param blockSize the block size for the file.
      */
-    public FSCreate(InputStream is, String path, String perm, boolean override, short repl, long blockSize) {
+    public FSCreate(InputStream is, String path, short perm, boolean override,
+                    short repl, long blockSize) {
       this.is = is;
       this.path = new Path(path);
       this.permission = perm;
@@ -290,12 +270,12 @@ public class FSOperations {
     @Override
     public Void execute(FileSystem fs) throws IOException {
       if (replication == -1) {
-        replication = fs.getDefaultReplication();
+        replication = fs.getDefaultReplication(path);
       }
       if (blockSize == -1) {
-        blockSize = fs.getDefaultBlockSize();
+        blockSize = fs.getDefaultBlockSize(path);
       }
-      FsPermission fsPermission = getPermission(permission);
+      FsPermission fsPermission = new FsPermission(permission);
       int bufferSize = fs.getConf().getInt("httpfs.buffer.size", 4096);
       OutputStream os = fs.create(path, fsPermission, override, bufferSize, replication, blockSize, null);
       IOUtils.copyBytes(is, os, bufferSize, true);
@@ -479,7 +459,7 @@ public class FSOperations {
   public static class FSMkdirs implements FileSystemAccess.FileSystemExecutor<JSONObject> {
 
     private Path path;
-    private String permission;
+    private short permission;
 
     /**
      * Creates a mkdirs executor.
@@ -487,7 +467,7 @@ public class FSOperations {
      * @param path directory path to create.
      * @param permission permission to use.
      */
-    public FSMkdirs(String path, String permission) {
+    public FSMkdirs(String path, short permission) {
       this.path = new Path(path);
       this.permission = permission;
     }
@@ -504,7 +484,7 @@ public class FSOperations {
      */
     @Override
     public JSONObject execute(FileSystem fs) throws IOException {
-      FsPermission fsPermission = getPermission(permission);
+      FsPermission fsPermission = new FsPermission(permission);
       boolean mkdirs = fs.mkdirs(path, fsPermission);
       return toJSON(HttpFSFileSystem.MKDIRS_JSON, mkdirs);
     }
@@ -623,7 +603,7 @@ public class FSOperations {
   public static class FSSetPermission implements FileSystemAccess.FileSystemExecutor<Void> {
 
     private Path path;
-    private String permission;
+    private short permission;
 
     /**
      * Creates a set-permission executor.
@@ -631,7 +611,7 @@ public class FSOperations {
      * @param path path to set the permission.
      * @param permission permission to set.
      */
-    public FSSetPermission(String path, String permission) {
+    public FSSetPermission(String path, short permission) {
       this.path = new Path(path);
       this.permission = permission;
     }
@@ -647,7 +627,7 @@ public class FSOperations {
      */
     @Override
     public Void execute(FileSystem fs) throws IOException {
-      FsPermission fsPermission = getPermission(permission);
+      FsPermission fsPermission = new FsPermission(permission);
       fs.setPermission(path, fsPermission);
       return null;
     }

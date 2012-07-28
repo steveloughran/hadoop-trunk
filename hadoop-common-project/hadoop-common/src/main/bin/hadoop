@@ -50,15 +50,16 @@ fi
 COMMAND=$1
 case $COMMAND in
   #hdfs commands
-  namenode|secondarynamenode|datanode|dfs|dfsadmin|fsck|balancer|fetchdt)
+  namenode|secondarynamenode|datanode|dfs|dfsadmin|fsck|balancer|fetchdt|oiv|dfsgroups)
     echo "DEPRECATED: Use of this script to execute hdfs command is deprecated." 1>&2
     echo "Instead use the hdfs command for it." 1>&2
     echo "" 1>&2
     #try to locate hdfs and if present, delegate to it.  
+    shift
     if [ -f "${HADOOP_HDFS_HOME}"/bin/hdfs ]; then
-      exec "${HADOOP_HDFS_HOME}"/bin/hdfs $*
+      exec "${HADOOP_HDFS_HOME}"/bin/hdfs ${COMMAND/dfsgroups/groups}  $*
     elif [ -f "${HADOOP_PREFIX}"/bin/hdfs ]; then
-      exec "${HADOOP_PREFIX}"/bin/hdfs $*
+      exec "${HADOOP_PREFIX}"/bin/hdfs ${COMMAND/dfsgroups/groups} $*
     else
       echo "HADOOP_HDFS_HOME not found!"
       exit 1
@@ -66,15 +67,16 @@ case $COMMAND in
     ;;
 
   #mapred commands for backwards compatibility
-  pipes|job|queue)
+  pipes|job|queue|mrgroups|mradmin|jobtracker|tasktracker)
     echo "DEPRECATED: Use of this script to execute mapred command is deprecated." 1>&2
     echo "Instead use the mapred command for it." 1>&2
     echo "" 1>&2
     #try to locate mapred and if present, delegate to it.
+    shift
     if [ -f "${HADOOP_MAPRED_HOME}"/bin/mapred ]; then
-      exec "${HADOOP_MAPRED_HOME}"/bin/mapred $*
+      exec "${HADOOP_MAPRED_HOME}"/bin/mapred ${COMMAND/mrgroups/groups} $*
     elif [ -f "${HADOOP_PREFIX}"/bin/mapred ]; then
-      exec "${HADOOP_PREFIX}"/bin/mapred $*
+      exec "${HADOOP_PREFIX}"/bin/mapred ${COMMAND/mrgroups/groups} $*
     else
       echo "HADOOP_MAPRED_HOME not found!"
       exit 1
@@ -94,33 +96,30 @@ case $COMMAND in
     # the core commands
     if [ "$COMMAND" = "fs" ] ; then
       CLASS=org.apache.hadoop.fs.FsShell
-      HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
     elif [ "$COMMAND" = "version" ] ; then
       CLASS=org.apache.hadoop.util.VersionInfo
-      HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
     elif [ "$COMMAND" = "jar" ] ; then
       CLASS=org.apache.hadoop.util.RunJar
     elif [ "$COMMAND" = "distcp" ] ; then
       CLASS=org.apache.hadoop.tools.DistCp
       CLASSPATH=${CLASSPATH}:${TOOL_PATH}
-      HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
     elif [ "$COMMAND" = "daemonlog" ] ; then
       CLASS=org.apache.hadoop.log.LogLevel
-      HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
     elif [ "$COMMAND" = "archive" ] ; then
       CLASS=org.apache.hadoop.tools.HadoopArchives
       CLASSPATH=${CLASSPATH}:${TOOL_PATH}
-      HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
     elif [[ "$COMMAND" = -*  ]] ; then
         # class and package names cannot begin with a -
         echo "Error: No command named \`$COMMAND' was found. Perhaps you meant \`hadoop ${COMMAND#-}'"
         exit 1
     else
-      HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
       CLASS=$COMMAND
     fi
     shift
     
+    # Always respect HADOOP_OPTS and HADOOP_CLIENT_OPTS
+    HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
+
     #make sure security appender is turned off
     HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.security.logger=${HADOOP_SECURITY_LOGGER:-INFO,NullAppender}"
 

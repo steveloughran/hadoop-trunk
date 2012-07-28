@@ -34,6 +34,7 @@ import javax.management.MBeanServer;
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 import javax.management.ReflectionException;
+import javax.management.RuntimeErrorException;
 import javax.management.RuntimeMBeanException;
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.CompositeType;
@@ -148,9 +149,8 @@ public class JMXJsonServlet extends HttpServlet {
   @Override
   public void doGet(HttpServletRequest request, HttpServletResponse response) {
     try {
-      // Do the authorization
-      if (!HttpServer.hasAdministratorAccess(getServletContext(), request,
-          response)) {
+      if (!HttpServer.isInstrumentationAccessAllowed(getServletContext(),
+                                                     request, response)) {
         return;
       }
       JsonGenerator jg = null;
@@ -317,6 +317,11 @@ public class JMXJsonServlet extends HttpServlet {
       } else {
         LOG.error("getting attribute "+attName+" of "+oname+" threw an exception", e);
       }
+      return;
+    } catch (RuntimeErrorException e) {
+      // RuntimeErrorException happens when an unexpected failure occurs in getAttribute
+      // for example https://issues.apache.org/jira/browse/DAEMON-120
+      LOG.debug("getting attribute "+attName+" of "+oname+" threw an exception", e);
       return;
     } catch (AttributeNotFoundException e) {
       //Ignored the attribute was not found, which should never happen because the bean

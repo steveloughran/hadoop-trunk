@@ -44,7 +44,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.AMRMProtocol;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.ContainerManager;
@@ -291,7 +290,10 @@ public class ApplicationMaster {
     Map<String, String> envs = System.getenv();
 
     appAttemptID = Records.newRecord(ApplicationAttemptId.class);
-    if (!envs.containsKey(ApplicationConstants.AM_CONTAINER_ID_ENV)) {
+    if (envs.containsKey(ApplicationConstants.AM_APP_ATTEMPT_ID_ENV)) {
+      appAttemptID = ConverterUtils.toApplicationAttemptId(envs
+          .get(ApplicationConstants.AM_APP_ATTEMPT_ID_ENV));
+    } else if (!envs.containsKey(ApplicationConstants.AM_CONTAINER_ID_ENV)) {
       if (cliParser.hasOption("app_attempt_id")) {
         String appIdStr = cliParser.getOptionValue("app_attempt_id", "");
         appAttemptID = ConverterUtils.toApplicationAttemptId(appIdStr);
@@ -635,12 +637,10 @@ public class ApplicationMaster {
       ctx.setContainerId(container.getId());
       ctx.setResource(container.getResource());
 
-      try {
-        ctx.setUser(UserGroupInformation.getCurrentUser().getShortUserName());
-      } catch (IOException e) {
-        LOG.info("Getting current user info failed when trying to launch the container"
-            + e.getMessage());
-      }
+      String jobUserName = System.getenv(ApplicationConstants.Environment.USER
+          .name());
+      ctx.setUser(jobUserName);
+      LOG.info("Setting user in ContainerLaunchContext to: " + jobUserName);
 
       // Set the environment 
       ctx.setEnvironment(shellEnv);
@@ -742,9 +742,10 @@ public class ApplicationMaster {
    */
   private AMRMProtocol connectToRM() {
     YarnConfiguration yarnConf = new YarnConfiguration(conf);
-    InetSocketAddress rmAddress = NetUtils.createSocketAddr(yarnConf.get(
+    InetSocketAddress rmAddress = yarnConf.getSocketAddr(
         YarnConfiguration.RM_SCHEDULER_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS));
+        YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS,
+        YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT);
     LOG.info("Connecting to ResourceManager at " + rmAddress);
     return ((AMRMProtocol) rpc.getProxy(AMRMProtocol.class, rmAddress, conf));
   }

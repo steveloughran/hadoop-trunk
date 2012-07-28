@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -49,6 +50,8 @@ import org.apache.hadoop.mapreduce.v2.api.records.Counters;
 import org.apache.hadoop.mapreduce.v2.api.records.JobReport;
 import org.apache.hadoop.mapreduce.v2.api.records.JobState;
 import org.apache.hadoop.mapreduce.v2.util.MRBuilderUtils;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
@@ -122,8 +125,7 @@ public class TestClientServiceDelegate {
 
     MRClientProtocol historyServerProxy = mock(MRClientProtocol.class);
     when(historyServerProxy.getJobReport(getJobReportRequest())).thenThrow(
-        new RuntimeException("1")).thenThrow(new RuntimeException("2"))
-        .thenThrow(new RuntimeException("3"))
+        new RuntimeException("1")).thenThrow(new RuntimeException("2"))       
         .thenReturn(getJobReportResponse());
 
     ResourceMgrDelegate rm = mock(ResourceMgrDelegate.class);
@@ -135,7 +137,7 @@ public class TestClientServiceDelegate {
 
     JobStatus jobStatus = clientServiceDelegate.getJobStatus(oldJobId);
     Assert.assertNotNull(jobStatus);
-    verify(historyServerProxy, times(4)).getJobReport(
+    verify(historyServerProxy, times(3)).getJobReport(
         any(GetJobReportRequest.class));
   }
 
@@ -242,7 +244,7 @@ public class TestClientServiceDelegate {
     // should use the same proxy to AM2 and so instantiateProxy shouldn't be
     // called.
     doReturn(firstGenAMProxy).doReturn(secondGenAMProxy).when(
-        clientServiceDelegate).instantiateAMProxy(any(String.class));
+        clientServiceDelegate).instantiateAMProxy(any(InetSocketAddress.class));
 
     JobStatus jobStatus = clientServiceDelegate.getJobStatus(oldJobId);
     Assert.assertNotNull(jobStatus);
@@ -257,7 +259,7 @@ public class TestClientServiceDelegate {
     Assert.assertEquals("jobName-secondGen", jobStatus.getJobName());
 
     verify(clientServiceDelegate, times(2)).instantiateAMProxy(
-        any(String.class));
+        any(InetSocketAddress.class));
   }
   
   @Test
@@ -286,19 +288,19 @@ public class TestClientServiceDelegate {
     Assert.assertEquals("N/A", jobStatus.getJobName());
     
     verify(clientServiceDelegate, times(0)).instantiateAMProxy(
-        any(String.class));
+        any(InetSocketAddress.class));
 
     // Should not reach AM even for second and third times too.
     jobStatus = clientServiceDelegate.getJobStatus(oldJobId);
     Assert.assertNotNull(jobStatus);
     Assert.assertEquals("N/A", jobStatus.getJobName());    
     verify(clientServiceDelegate, times(0)).instantiateAMProxy(
-        any(String.class));
+        any(InetSocketAddress.class));
     jobStatus = clientServiceDelegate.getJobStatus(oldJobId);
     Assert.assertNotNull(jobStatus);
     Assert.assertEquals("N/A", jobStatus.getJobName());    
     verify(clientServiceDelegate, times(0)).instantiateAMProxy(
-        any(String.class));
+        any(InetSocketAddress.class));
 
     // The third time around, app is completed, so should go to JHS
     JobStatus jobStatus1 = clientServiceDelegate.getJobStatus(oldJobId);
@@ -309,9 +311,77 @@ public class TestClientServiceDelegate {
     Assert.assertEquals(1.0f, jobStatus1.getReduceProgress());
     
     verify(clientServiceDelegate, times(0)).instantiateAMProxy(
-        any(String.class));
+        any(InetSocketAddress.class));
   }
   
+  @Test
+  public void testRMDownForJobStatusBeforeGetAMReport() throws IOException {
+    Configuration conf = new YarnConfiguration();
+    testRMDownForJobStatusBeforeGetAMReport(conf,
+        MRJobConfig.DEFAULT_MR_CLIENT_MAX_RETRIES);
+  }
+
+  @Test
+  public void testRMDownForJobStatusBeforeGetAMReportWithRetryTimes()
+      throws IOException {
+    Configuration conf = new YarnConfiguration();
+    conf.setInt(MRJobConfig.MR_CLIENT_MAX_RETRIES, 2);
+    testRMDownForJobStatusBeforeGetAMReport(conf, conf.getInt(
+        MRJobConfig.MR_CLIENT_MAX_RETRIES,
+        MRJobConfig.DEFAULT_MR_CLIENT_MAX_RETRIES));
+  }
+  
+  @Test
+  public void testRMDownRestoreForJobStatusBeforeGetAMReport()
+      throws IOException {
+    Configuration conf = new YarnConfiguration();
+    conf.setInt(MRJobConfig.MR_CLIENT_MAX_RETRIES, 3);
+
+    conf.set(MRConfig.FRAMEWORK_NAME, MRConfig.YARN_FRAMEWORK_NAME);
+    conf.setBoolean(MRJobConfig.JOB_AM_ACCESS_DISABLED,
+        !isAMReachableFromClient);
+    MRClientProtocol historyServerProxy = mock(MRClientProtocol.class);
+    when(historyServerProxy.getJobReport(any(GetJobReportRequest.class)))
+        .thenReturn(getJobReportResponse());
+    ResourceMgrDelegate rmDelegate = mock(ResourceMgrDelegate.class);
+    when(rmDelegate.getApplicationReport(jobId.getAppId())).thenThrow(
+        new java.lang.reflect.UndeclaredThrowableException(new IOException(
+            "Connection refuced1"))).thenThrow(
+        new java.lang.reflect.UndeclaredThrowableException(new IOException(
+            "Connection refuced2"))).thenReturn(getFinishedApplicationReport());
+    ClientServiceDelegate clientServiceDelegate = new ClientServiceDelegate(
+        conf, rmDelegate, oldJobId, historyServerProxy);
+    JobStatus jobStatus = clientServiceDelegate.getJobStatus(oldJobId);
+    verify(rmDelegate, times(3)).getApplicationReport(any(ApplicationId.class));
+    Assert.assertNotNull(jobStatus);
+  }
+
+  private void testRMDownForJobStatusBeforeGetAMReport(Configuration conf,
+      int noOfRetries) throws YarnRemoteException {
+    conf.set(MRConfig.FRAMEWORK_NAME, MRConfig.YARN_FRAMEWORK_NAME);
+    conf.setBoolean(MRJobConfig.JOB_AM_ACCESS_DISABLED,
+        !isAMReachableFromClient);
+    MRClientProtocol historyServerProxy = mock(MRClientProtocol.class);
+    ResourceMgrDelegate rmDelegate = mock(ResourceMgrDelegate.class);
+    when(rmDelegate.getApplicationReport(jobId.getAppId())).thenThrow(
+        new java.lang.reflect.UndeclaredThrowableException(new IOException(
+            "Connection refuced1"))).thenThrow(
+        new java.lang.reflect.UndeclaredThrowableException(new IOException(
+            "Connection refuced2"))).thenThrow(
+        new java.lang.reflect.UndeclaredThrowableException(new IOException(
+            "Connection refuced3")));
+    ClientServiceDelegate clientServiceDelegate = new ClientServiceDelegate(
+        conf, rmDelegate, oldJobId, historyServerProxy);
+    try {
+      clientServiceDelegate.getJobStatus(oldJobId);
+      Assert.fail("It should throw exception after retries");
+    } catch (IOException e) {
+      System.out.println("fail to get job status,and e=" + e.toString());
+    }
+    verify(rmDelegate, times(noOfRetries)).getApplicationReport(
+        any(ApplicationId.class));
+  }  
+
   private GetJobReportRequest getJobReportRequest() {
     GetJobReportRequest request = Records.newRecord(GetJobReportRequest.class);
     request.setJobId(jobId);
@@ -335,17 +405,23 @@ public class TestClientServiceDelegate {
   }
 
   private ApplicationReport getFinishedApplicationReport() {
-    return BuilderUtils.newApplicationReport(BuilderUtils.newApplicationId(
-        1234, 5), "user", "queue", "appname", "host", 124, null,
-        YarnApplicationState.FINISHED, "diagnostics", "url", 0, 0,
-        FinalApplicationStatus.SUCCEEDED, null, "N/A");
+    ApplicationId appId = BuilderUtils.newApplicationId(1234, 5);
+    ApplicationAttemptId attemptId = BuilderUtils.newApplicationAttemptId(
+        appId, 0);
+    return BuilderUtils.newApplicationReport(appId, attemptId, "user", "queue",
+        "appname", "host", 124, null, YarnApplicationState.FINISHED,
+        "diagnostics", "url", 0, 0, FinalApplicationStatus.SUCCEEDED, null,
+        "N/A");
   }
 
   private ApplicationReport getRunningApplicationReport(String host, int port) {
-    return BuilderUtils.newApplicationReport(BuilderUtils.newApplicationId(
-        1234, 5), "user", "queue", "appname", host, port, null,
-        YarnApplicationState.RUNNING, "diagnostics", "url", 0, 0,
-        FinalApplicationStatus.UNDEFINED, null, "N/A");
+    ApplicationId appId = BuilderUtils.newApplicationId(1234, 5);
+    ApplicationAttemptId attemptId = BuilderUtils.newApplicationAttemptId(
+        appId, 0);
+    return BuilderUtils.newApplicationReport(appId, attemptId, "user", "queue",
+        "appname", host, port, null, YarnApplicationState.RUNNING,
+        "diagnostics", "url", 0, 0, FinalApplicationStatus.UNDEFINED, null,
+        "N/A");
   }
 
   private ResourceMgrDelegate getRMDelegate() throws YarnRemoteException {

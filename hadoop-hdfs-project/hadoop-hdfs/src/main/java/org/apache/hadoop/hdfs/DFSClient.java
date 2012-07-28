@@ -78,8 +78,6 @@ import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsServerDefaults;
@@ -91,6 +89,8 @@ import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
+import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
@@ -136,7 +136,9 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Progressable;
+import org.apache.hadoop.util.Time;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.net.InetAddresses;
@@ -172,7 +174,7 @@ public class DFSClient implements java.io.Closeable {
   final ReplaceDatanodeOnFailure dtpReplaceDatanodeOnFailure;
   final FileSystem.Statistics stats;
   final int hdfsTimeout;    // timeout value for a DFS operation.
-  final LeaseRenewer leaserenewer;
+  private final String authority;
   final SocketCache socketCache;
   final Conf dfsClientConf;
   private Random r = new Random();
@@ -342,9 +344,9 @@ public class DFSClient implements java.io.Closeable {
     this.hdfsTimeout = Client.getTimeout(conf);
     this.ugi = UserGroupInformation.getCurrentUser();
     
-    final String authority = nameNodeUri == null? "null": nameNodeUri.getAuthority();
-    this.leaserenewer = LeaseRenewer.getInstance(authority, ugi, this);
-    this.clientName = leaserenewer.getClientName(dfsClientConf.taskId);
+    this.authority = nameNodeUri == null? "null": nameNodeUri.getAuthority();
+    this.clientName = "DFSClient_" + dfsClientConf.taskId + "_" + 
+        DFSUtil.getRandom().nextInt()  + "_" + Thread.currentThread().getId();
     
     this.socketCache = new SocketCache(dfsClientConf.socketCacheCapacity);
     
@@ -472,7 +474,30 @@ public class DFSClient implements java.io.Closeable {
     }
   }
 
-  /** Put a file. */
+  /** Return the lease renewer instance. The renewer thread won't start
+   *  until the first output stream is created. The same instance will
+   *  be returned until all output streams are closed.
+   */
+  public synchronized LeaseRenewer getLeaseRenewer() throws IOException {
+      return LeaseRenewer.getInstance(authority, ugi, this);
+  }
+
+  /** Get a lease and start automatic renewal */
+  private void beginFileLease(final String src, final DFSOutputStream out) 
+      throws IOException {
+    getLeaseRenewer().put(src, out, this);
+  }
+
+  /** Stop renewal of lease for the file. */
+  void endFileLease(final String src) throws IOException {
+    getLeaseRenewer().closeFile(src, this);
+  }
+    
+
+  /** Put a file. Only called from LeaseRenewer, where proper locking is
+   *  enforced to consistently update its local dfsclients array and 
+   *  client's filesBeingWritten map.
+   */
   void putFileBeingWritten(final String src, final DFSOutputStream out) {
     synchronized(filesBeingWritten) {
       filesBeingWritten.put(src, out);
@@ -485,7 +510,7 @@ public class DFSClient implements java.io.Closeable {
     }
   }
 
-  /** Remove a file. */
+  /** Remove a file. Only called from LeaseRenewer. */
   void removeFileBeingWritten(final String src) {
     synchronized(filesBeingWritten) {
       filesBeingWritten.remove(src);
@@ -516,7 +541,7 @@ public class DFSClient implements java.io.Closeable {
       if (filesBeingWritten.isEmpty()) {
         return;
       }
-      lastLeaseRenewal = System.currentTimeMillis();
+      lastLeaseRenewal = Time.now();
     }
   }
 
@@ -533,7 +558,7 @@ public class DFSClient implements java.io.Closeable {
         return true;
       } catch (IOException e) {
         // Abort if the lease has already expired. 
-        final long elapsed = System.currentTimeMillis() - getLastLeaseRenewal();
+        final long elapsed = Time.now() - getLastLeaseRenewal();
         if (elapsed > HdfsConstants.LEASE_SOFTLIMIT_PERIOD) {
           LOG.warn("Failed to renew lease for " + clientName + " for "
               + (elapsed/1000) + " seconds (>= soft-limit ="
@@ -560,6 +585,15 @@ public class DFSClient implements java.io.Closeable {
   void abort() {
     clientRunning = false;
     closeAllFilesBeingWritten(true);
+    socketCache.clear();
+
+    try {
+      // remove reference to this client and stop the renewer,
+      // if there is no more clients under the renewer.
+      getLeaseRenewer().closeClient(this);
+    } catch (IOException ioe) {
+       LOG.info("Exception occurred while aborting the client. " + ioe);
+    }
     closeConnectionToNamenode();
   }
 
@@ -594,11 +628,13 @@ public class DFSClient implements java.io.Closeable {
    * Close the file system, abandoning all of the leases and files being
    * created and close connections to the namenode.
    */
+  @Override
   public synchronized void close() throws IOException {
     if(clientRunning) {
       closeAllFilesBeingWritten(false);
+      socketCache.clear();
       clientRunning = false;
-      leaserenewer.closeClient(this);
+      getLeaseRenewer().closeClient(this);
       // close connections to the namenode
       closeConnectionToNamenode();
     }
@@ -629,7 +665,7 @@ public class DFSClient implements java.io.Closeable {
    * @see ClientProtocol#getServerDefaults()
    */
   public FsServerDefaults getServerDefaults() throws IOException {
-    long now = System.currentTimeMillis();
+    long now = Time.now();
     if (now - serverDefaultsLastUpdate > SERVER_DEFAULTS_VALIDITY_PERIOD) {
       serverDefaults = namenode.getServerDefaults();
       serverDefaultsLastUpdate = now;
@@ -830,6 +866,16 @@ public class DFSClient implements java.io.Closeable {
   public short getDefaultReplication() {
     return dfsClientConf.defaultReplication;
   }
+  
+  /*
+   * This is just a wrapper around callGetBlockLocations, but non-static so that
+   * we can stub it out for tests.
+   */
+  @VisibleForTesting
+  public LocatedBlocks getLocatedBlocks(String src, long start, long length)
+      throws IOException {
+    return callGetBlockLocations(namenode, src, start, length);
+  }
 
   /**
    * @see ClientProtocol#getBlockLocations(String, long, long)
@@ -877,7 +923,7 @@ public class DFSClient implements java.io.Closeable {
    */
   public BlockLocation[] getBlockLocations(String src, long start, 
     long length) throws IOException, UnresolvedLinkException {
-    LocatedBlocks blocks = callGetBlockLocations(namenode, src, start, length);
+    LocatedBlocks blocks = getLocatedBlocks(src, start, length);
     return DFSUtil.locatedBlocks2Locations(blocks);
   }
   
@@ -996,7 +1042,7 @@ public class DFSClient implements java.io.Closeable {
    * Call {@link #create(String, FsPermission, EnumSet, boolean, short, 
    * long, Progressable, int)} with <code>createParent</code> set to true.
    */
-  public OutputStream create(String src, 
+  public DFSOutputStream create(String src, 
                              FsPermission permission,
                              EnumSet<CreateFlag> flag, 
                              short replication,
@@ -1029,7 +1075,7 @@ public class DFSClient implements java.io.Closeable {
    * @see ClientProtocol#create(String, FsPermission, String, EnumSetWritable,
    * boolean, short, long) for detailed description of exceptions thrown
    */
-  public OutputStream create(String src, 
+  public DFSOutputStream create(String src, 
                              FsPermission permission,
                              EnumSet<CreateFlag> flag, 
                              boolean createParent,
@@ -1046,10 +1092,10 @@ public class DFSClient implements java.io.Closeable {
     if(LOG.isDebugEnabled()) {
       LOG.debug(src + ": masked=" + masked);
     }
-    final DFSOutputStream result = new DFSOutputStream(this, src, masked, flag,
-        createParent, replication, blockSize, progress, buffersize,
-        dfsClientConf.createChecksum());
-    leaserenewer.put(src, result, this);
+    final DFSOutputStream result = DFSOutputStream.newStreamForCreate(this,
+        src, masked, flag, createParent, replication, blockSize, progress,
+        buffersize, dfsClientConf.createChecksum());
+    beginFileLease(src, result);
     return result;
   }
   
@@ -1078,7 +1124,7 @@ public class DFSClient implements java.io.Closeable {
    *  Progressable, int)} except that the permission
    *  is absolute (ie has already been masked with umask.
    */
-  public OutputStream primitiveCreate(String src, 
+  public DFSOutputStream primitiveCreate(String src, 
                              FsPermission absPermission,
                              EnumSet<CreateFlag> flag,
                              boolean createParent,
@@ -1095,11 +1141,11 @@ public class DFSClient implements java.io.Closeable {
       DataChecksum checksum = DataChecksum.newDataChecksum(
           dfsClientConf.checksumType,
           bytesPerChecksum);
-      result = new DFSOutputStream(this, src, absPermission,
+      result = DFSOutputStream.newStreamForCreate(this, src, absPermission,
           flag, createParent, replication, blockSize, progress, buffersize,
           checksum);
     }
-    leaserenewer.put(src, result, this);
+    beginFileLease(src, result);
     return result;
   }
   
@@ -1154,7 +1200,7 @@ public class DFSClient implements java.io.Closeable {
                                      UnsupportedOperationException.class,
                                      UnresolvedPathException.class);
     }
-    return new DFSOutputStream(this, src, buffersize, progress,
+    return DFSOutputStream.newStreamForAppend(this, src, buffersize, progress,
         lastBlock, stat, dfsClientConf.createChecksum());
   }
   
@@ -1169,11 +1215,11 @@ public class DFSClient implements java.io.Closeable {
    * 
    * @see ClientProtocol#append(String, String) 
    */
-  public FSDataOutputStream append(final String src, final int buffersize,
+  public HdfsDataOutputStream append(final String src, final int buffersize,
       final Progressable progress, final FileSystem.Statistics statistics
       ) throws IOException {
     final DFSOutputStream out = append(src, buffersize, progress);
-    return new FSDataOutputStream(out, statistics, out.getInitialLen());
+    return new HdfsDataOutputStream(out, statistics, out.getInitialLen());
   }
 
   private DFSOutputStream append(String src, int buffersize, Progressable progress) 
@@ -1185,7 +1231,7 @@ public class DFSClient implements java.io.Closeable {
           + src + " on client " + clientName);
     }
     final DFSOutputStream result = callAppend(stat, src, buffersize, progress);
-    leaserenewer.put(src, result, this);
+    beginFileLease(src, result);
     return result;
   }
 
@@ -1809,41 +1855,13 @@ public class DFSClient implements java.io.Closeable {
   }
 
   /**
-   * The Hdfs implementation of {@link FSDataInputStream}
+   * @deprecated use {@link HdfsDataInputStream} instead.
    */
-  @InterfaceAudience.Private
-  public static class DFSDataInputStream extends FSDataInputStream {
-    public DFSDataInputStream(DFSInputStream in)
-      throws IOException {
-      super(in);
-    }
-      
-    /**
-     * Returns the datanode from which the stream is currently reading.
-     */
-    public DatanodeInfo getCurrentDatanode() {
-      return ((DFSInputStream)in).getCurrentDatanode();
-    }
-      
-    /**
-     * Returns the block containing the target position. 
-     */
-    public ExtendedBlock getCurrentBlock() {
-      return ((DFSInputStream)in).getCurrentBlock();
-    }
+  @Deprecated
+  public static class DFSDataInputStream extends HdfsDataInputStream {
 
-    /**
-     * Return collection of blocks that has already been located.
-     */
-    synchronized List<LocatedBlock> getAllBlocks() throws IOException {
-      return ((DFSInputStream)in).getAllBlocks();
-    }
-    
-    /**
-     * @return The visible length of the file.
-     */
-    public long getVisibleLength() throws IOException {
-      return ((DFSInputStream)in).getFileLength();
+    public DFSDataInputStream(DFSInputStream in) throws IOException {
+      super(in);
     }
   }
   

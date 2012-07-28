@@ -18,6 +18,7 @@
 package org.apache.hadoop.mapred;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.text.ParseException;
@@ -203,7 +204,39 @@ public class TestCounters {
     counters.incrCounter("group1", "counter2", 1);
     iterator.next();
   }
+
+  @Test
+  public void testFileSystemGroupIteratorConcurrency() {
+    Counters counters = new Counters();
+    // create 2 filesystem counter groups
+    counters.findCounter("fs1", FileSystemCounter.BYTES_READ).increment(1);
+    counters.findCounter("fs2", FileSystemCounter.BYTES_READ).increment(1);
+    
+    // Iterate over the counters in this group while updating counters in
+    // the group
+    Group group = counters.getGroup(FileSystemCounter.class.getName());
+    Iterator<Counter> iterator = group.iterator();
+    counters.findCounter("fs3", FileSystemCounter.BYTES_READ).increment(1);
+    assertTrue(iterator.hasNext());
+    iterator.next();
+    counters.findCounter("fs3", FileSystemCounter.BYTES_READ).increment(1);
+    assertTrue(iterator.hasNext());
+    iterator.next();
+  }
   
+  @Test
+  public void testMakeCompactString() {
+    final String GC1 = "group1.counter1:1";
+    final String GC2 = "group2.counter2:3";
+    Counters counters = new Counters();
+    counters.incrCounter("group1", "counter1", 1);
+    assertEquals("group1.counter1:1", counters.makeCompactString());
+    counters.incrCounter("group2", "counter2", 3);
+    String cs = counters.makeCompactString();
+    assertTrue("Bad compact string",
+        cs.equals(GC1 + ',' + GC2) || cs.equals(GC2 + ',' + GC1));
+  }
+
   public static void main(String[] args) throws IOException {
     new TestCounters().testCounters();
   }

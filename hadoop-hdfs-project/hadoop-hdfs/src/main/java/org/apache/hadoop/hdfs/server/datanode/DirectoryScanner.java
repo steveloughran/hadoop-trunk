@@ -46,6 +46,7 @@ import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.util.Daemon;
+import org.apache.hadoop.util.Time;
 
 /**
  * Periodically scans the data directories for block and block metadata files.
@@ -87,6 +88,7 @@ public class DirectoryScanner implements Runnable {
       this.bpid = bpid;
     }
     
+    @Override
     public String toString() {
       return "BlockPool " + bpid
       + " Total blocks: " + totalBlocks + ", missing metadata files:"
@@ -239,7 +241,7 @@ public class DirectoryScanner implements Runnable {
   void start() {
     shouldRun = true;
     long offset = DFSUtil.getRandom().nextInt((int) (scanPeriodMsecs/1000L)) * 1000L; //msec
-    long firstScanTime = System.currentTimeMillis() + offset;
+    long firstScanTime = Time.now() + offset;
     LOG.info("Periodic Directory Tree Verification scan starting at " 
         + firstScanTime + " with interval " + scanPeriodMsecs);
     masterThread.scheduleAtFixedRate(this, offset, scanPeriodMsecs, 
@@ -302,6 +304,22 @@ public class DirectoryScanner implements Runnable {
     shouldRun = false;
     if (masterThread != null) masterThread.shutdown();
     if (reportCompileThreadPool != null) reportCompileThreadPool.shutdown();
+    if (masterThread != null) {
+      try {
+        masterThread.awaitTermination(1, TimeUnit.MINUTES);
+      } catch (InterruptedException e) {
+        LOG.error("interrupted while waiting for masterThread to " +
+          "terminate", e);
+      }
+    }
+    if (reportCompileThreadPool != null) {
+      try {
+        reportCompileThreadPool.awaitTermination(1, TimeUnit.MINUTES);
+      } catch (InterruptedException e) {
+        LOG.error("interrupted while waiting for reportCompileThreadPool to " +
+          "terminate", e);
+      }
+    }
     if (!retainDiffs) clear();
   }
 

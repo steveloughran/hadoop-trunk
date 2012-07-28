@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import static org.apache.hadoop.hdfs.server.common.Util.now;
+import static org.apache.hadoop.util.Time.now;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -38,6 +38,7 @@ import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -66,10 +67,13 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetworkTopology;
+import org.apache.hadoop.net.Node;
+import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.HostsFileReader;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.InetAddresses;
@@ -100,11 +104,7 @@ public class DatanodeManager {
    * with the same storage id; and </li>
    * <li>removed if and only if an existing datanode is restarted to serve a
    * different storage id.</li>
-   * </ul> <br>
-   * The list of the {@link DatanodeDescriptor}s in the map is checkpointed
-   * in the namespace image file. Only the {@link DatanodeInfo} part is 
-   * persistent, the list of blocks is restored from the datanode block
-   * reports. 
+   * </ul> <br> 
    * <p>
    * Mapping: StorageID -> DatanodeDescriptor
    */
@@ -112,7 +112,7 @@ public class DatanodeManager {
       = new TreeMap<String, DatanodeDescriptor>();
 
   /** Cluster network topology */
-  private final NetworkTopology networktopology = new NetworkTopology();
+  private final NetworkTopology networktopology;
 
   /** Host names to datanode descriptors mapping. */
   private final Host2NodesMap host2DatanodeMap = new Host2NodesMap();
@@ -138,6 +138,12 @@ public class DatanodeManager {
       ) throws IOException {
     this.namesystem = namesystem;
     this.blockManager = blockManager;
+    
+    Class<? extends NetworkTopology> networkTopologyClass =
+        conf.getClass(CommonConfigurationKeysPublic.NET_TOPOLOGY_IMPL_KEY,
+            NetworkTopology.class, NetworkTopology.class);
+    networktopology = (NetworkTopology) ReflectionUtils.newInstance(
+        networkTopologyClass, conf);
 
     this.heartbeatManager = new HeartbeatManager(namesystem, blockManager, conf);
 
@@ -210,13 +216,22 @@ public class DatanodeManager {
   public void sortLocatedBlocks(final String targethost,
       final List<LocatedBlock> locatedblocks) {
     //sort the blocks
-    final DatanodeDescriptor client = getDatanodeByHost(targethost);
+    // As it is possible for the separation of node manager and datanode, 
+    // here we should get node but not datanode only .
+    Node client = getDatanodeByHost(targethost);
+    if (client == null) {
+      List<String> hosts = new ArrayList<String> (1);
+      hosts.add(targethost);
+      String rName = dnsToSwitchMapping.resolve(hosts).get(0);
+      if (rName != null)
+        client = new NodeBase(rName + NodeBase.PATH_SEPARATOR_STR + targethost);
+    }
     for (LocatedBlock b : locatedblocks) {
       networktopology.pseudoSortByDistance(client, b.getLocations());
       
       // Move decommissioned datanodes to the bottom
       Arrays.sort(b.getLocations(), DFSUtil.DECOM_COMPARATOR);
-    }    
+    }
   }
 
   CyclicIteration<String, DatanodeDescriptor> getDatanodeCyclicIteration(
@@ -324,7 +339,7 @@ public class DatanodeManager {
   /** Is the datanode dead? */
   boolean isDatanodeDead(DatanodeDescriptor node) {
     return (node.getLastUpdate() <
-            (Util.now() - heartbeatExpireInterval));
+            (Time.now() - heartbeatExpireInterval));
   }
 
   /** Add a datanode. */
@@ -651,7 +666,6 @@ public class DatanodeManager {
    * checks if any of the hosts have changed states:
    */
   public void refreshNodes(final Configuration conf) throws IOException {
-    namesystem.checkSuperuserPrivilege();
     refreshHostsReader(conf);
     namesystem.writeLock();
     try {
@@ -833,7 +847,9 @@ public class DatanodeManager {
 
     if (InetAddresses.isInetAddress(hostStr)) {
       // The IP:port is sufficient for listing in a report
-      dnId = new DatanodeID(hostStr, "", port);
+      dnId = new DatanodeID(hostStr, "", "", port,
+          DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+          DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
     } else {
       String ipAddr = "";
       try {
@@ -841,7 +857,9 @@ public class DatanodeManager {
       } catch (UnknownHostException e) {
         LOG.warn("Invalid hostname " + hostStr + " in hosts file");
       }
-      dnId = new DatanodeID(ipAddr, hostStr, port);
+      dnId = new DatanodeID(ipAddr, hostStr, "", port,
+          DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+          DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
     }
     return dnId;
   }
@@ -1036,11 +1054,16 @@ public class DatanodeManager {
     }
   }
 
-    /**
-     * Get the DNS to switch mapper; valid after initialization.
-     * @return the DNS to switch mapper
-     */
-    public DNSToSwitchMapping getDnsToSwitchMapping() {
-        return dnsToSwitchMapping;
-    }
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + ": " + host2DatanodeMap;
+  }
+
+  /**
+   * Get the DNS to switch mapper; valid after initialization.
+   * @return the DNS to switch mapper
+   */
+  public DNSToSwitchMapping getDnsToSwitchMapping() {
+    return dnsToSwitchMapping;
+  }
 }

@@ -282,8 +282,26 @@
       <!-- protobuf generated code -->
       <Class name="~org\.apache\.hadoop\.ipc\.protobuf\.IpcConnectionContextProtos.*"/>
     </Match>
+        <Match>
+      <!-- protobuf generated code -->
+      <Class name="~org\.apache\.hadoop\.ipc\.protobuf\.RpcPayloadHeaderProtos.*"/>
+    </Match>
     <Match>
       <!-- protobuf generated code -->
       <Class name="~org\.apache\.hadoop\.ha\.proto\.HAServiceProtocolProtos.*"/>
     </Match>
+    <Match>
+      <!-- protobuf generated code -->
+      <Class name="~org\.apache\.hadoop\.ha\.proto\.ZKFCProtocolProtos.*"/>
+    </Match>
+
+    <!--
+       Manually checked, misses child thread manually syncing on parent's intrinsic lock.
+    -->
+     <Match>
+       <Class name="org.apache.hadoop.metrics2.lib.MutableQuantiles" />
+       <Field name="previousSnapshot" />
+       <Bug pattern="IS2_INCONSISTENT_SYNC" />
+     </Match>
+
  </FindBugsFilter>

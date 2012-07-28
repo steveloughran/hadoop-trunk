@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.Stack;
 import java.util.TreeSet;
@@ -54,6 +55,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.ShutdownHookManager;
 
 /****************************************************************
  * An abstract base class for a fairly generic filesystem.  It
@@ -82,6 +84,11 @@ public abstract class FileSystem extends Configured implements Closeable {
                    CommonConfigurationKeys.FS_DEFAULT_NAME_DEFAULT;
 
   public static final Log LOG = LogFactory.getLog(FileSystem.class);
+
+  /**
+   * Priority of the FileSystem shutdown hook.
+   */
+  public static final int SHUTDOWN_HOOK_PRIORITY = 10;
 
   /** FileSystem cache */
   static final Cache CACHE = new Cache();
@@ -130,12 +137,10 @@ public abstract class FileSystem extends Configured implements Closeable {
    */
   public static FileSystem get(final URI uri, final Configuration conf,
         final String user) throws IOException, InterruptedException {
-    UserGroupInformation ugi;
-    if (user == null) {
-      ugi = UserGroupInformation.getCurrentUser();
-    } else {
-      ugi = UserGroupInformation.createRemoteUser(user);
-    }
+    String ticketCachePath =
+      conf.get(CommonConfigurationKeys.KERBEROS_TICKET_CACHE_PATH);
+    UserGroupInformation ugi =
+        UserGroupInformation.getBestUGI(ticketCachePath, user);
     return ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
       public FileSystem run() throws IOException {
         return get(uri, conf);
@@ -182,6 +187,17 @@ public abstract class FileSystem extends Configured implements Closeable {
    */
   public void initialize(URI name, Configuration conf) throws IOException {
     statistics = getStatistics(name.getScheme(), getClass());    
+  }
+
+  /**
+   * Return the protocol scheme for the FileSystem.
+   * <p/>
+   * This implementation throws an <code>UnsupportedOperationException</code>.
+   *
+   * @return the protocol scheme for the FileSystem.
+   */
+  public String getScheme() {
+    throw new UnsupportedOperationException("Not implemented by the " + getClass().getSimpleName() + " FileSystem implementation");
   }
 
   /** Returns a URI whose scheme and authority identify this FileSystem.*/
@@ -264,11 +280,11 @@ public abstract class FileSystem extends Configured implements Closeable {
     String scheme = uri.getScheme();
     String authority = uri.getAuthority();
 
-    if (scheme == null) {                       // no scheme: use default FS
+    if (scheme == null && authority == null) {     // use default FS
       return get(conf);
     }
 
-    if (authority == null) {                       // no authority
+    if (scheme != null && authority == null) {     // no authority
       URI defaultUri = getDefaultUri(conf);
       if (scheme.equals(defaultUri.getScheme())    // if scheme matches default
           && defaultUri.getAuthority() != null) {  // & default has authority
@@ -296,12 +312,10 @@ public abstract class FileSystem extends Configured implements Closeable {
    */
   public static FileSystem newInstance(final URI uri, final Configuration conf,
       final String user) throws IOException, InterruptedException {
-    UserGroupInformation ugi;
-    if (user == null) {
-      ugi = UserGroupInformation.getCurrentUser();
-    } else {
-      ugi = UserGroupInformation.createRemoteUser(user);
-    }
+    String ticketCachePath =
+      conf.get(CommonConfigurationKeys.KERBEROS_TICKET_CACHE_PATH);
+    UserGroupInformation ugi =
+        UserGroupInformation.getBestUGI(ticketCachePath, user);
     return ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
       public FileSystem run() throws IOException {
         return newInstance(uri,conf); 
@@ -558,7 +572,7 @@ public abstract class FileSystem extends Configured implements Closeable {
       throw new IllegalArgumentException("Invalid start or len parameter");
     }
 
-    if (file.getLen() < start) {
+    if (file.getLen() <= start) {
       return new BlockLocation[0];
 
     }
@@ -597,7 +611,9 @@ public abstract class FileSystem extends Configured implements Closeable {
    * Return a set of server default configuration values
    * @return server default configuration values
    * @throws IOException
+   * @deprecated use {@link #getServerDefaults(Path)} instead
    */
+  @Deprecated
   public FsServerDefaults getServerDefaults() throws IOException {
     Configuration conf = getConf();
     return new FsServerDefaults(getDefaultBlockSize(), 
@@ -810,6 +826,30 @@ public abstract class FileSystem extends Configured implements Closeable {
       long blockSize,
       Progressable progress) throws IOException;
   
+  /**
+   * Create an FSDataOutputStream at the indicated Path with write-progress
+   * reporting.
+   * @param f the file name to open
+   * @param permission
+   * @param flags {@link CreateFlag}s to use for this stream.
+   * @param bufferSize the size of the buffer to be used.
+   * @param replication required block replication for the file.
+   * @param blockSize
+   * @param progress
+   * @throws IOException
+   * @see #setPermission(Path, FsPermission)
+   */
+  public FSDataOutputStream create(Path f,
+      FsPermission permission,
+      EnumSet<CreateFlag> flags,
+      int bufferSize,
+      short replication,
+      long blockSize,
+      Progressable progress) throws IOException {
+    // only DFS support this
+    return create(f, permission, flags.contains(CreateFlag.OVERWRITE), bufferSize, replication, blockSize, progress);
+  }
+  
   
   /*.
    * This create has been added to support the FileContext that processes
@@ -934,9 +974,34 @@ public abstract class FileSystem extends Configured implements Closeable {
    public FSDataOutputStream createNonRecursive(Path f, FsPermission permission,
        boolean overwrite, int bufferSize, short replication, long blockSize,
        Progressable progress) throws IOException {
-     throw new IOException("createNonRecursive unsupported for this filesystem "
-         + this.getClass());
+     return createNonRecursive(f, permission,
+         overwrite ? EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)
+             : EnumSet.of(CreateFlag.CREATE), bufferSize,
+             replication, blockSize, progress);
    }
+
+   /**
+    * Opens an FSDataOutputStream at the indicated Path with write-progress
+    * reporting. Same as create(), except fails if parent directory doesn't
+    * already exist.
+    * @param f the file name to open
+    * @param permission
+    * @param flags {@link CreateFlag}s to use for this stream.
+    * @param bufferSize the size of the buffer to be used.
+    * @param replication required block replication for the file.
+    * @param blockSize
+    * @param progress
+    * @throws IOException
+    * @see #setPermission(Path, FsPermission)
+    * @deprecated API only for 0.20-append
+    */
+    @Deprecated
+    public FSDataOutputStream createNonRecursive(Path f, FsPermission permission,
+        EnumSet<CreateFlag> flags, int bufferSize, short replication, long blockSize,
+        Progressable progress) throws IOException {
+      throw new IOException("createNonRecursive unsupported for this filesystem "
+          + this.getClass());
+    }
 
   /**
    * Creates the given Path as a brand-new zero-length file.  If
@@ -1921,8 +1986,12 @@ public abstract class FileSystem extends Configured implements Closeable {
     return getFileStatus(f).getBlockSize();
   }
 
-  /** Return the number of bytes that large input files should be optimally
-   * be split into to minimize i/o time. */
+  /**
+   * Return the number of bytes that large input files should be optimally
+   * be split into to minimize i/o time.
+   * @deprecated use {@link #getDefaultBlockSize(Path)} instead
+   */
+  @Deprecated
   public long getDefaultBlockSize() {
     // default to 32MB: large enough to minimize the impact of seeks
     return getConf().getLong("fs.local.block.size", 32 * 1024 * 1024);
@@ -1940,7 +2009,9 @@ public abstract class FileSystem extends Configured implements Closeable {
 
   /**
    * Get the default replication.
+   * @deprecated use {@link #getDefaultReplication(Path)} instead
    */
+  @Deprecated
   public short getDefaultReplication() { return 1; }
 
   /**
@@ -2078,9 +2149,45 @@ public abstract class FileSystem extends Configured implements Closeable {
       ) throws IOException {
   }
 
+  // making it volatile to be able to do a double checked locking
+  private volatile static boolean FILE_SYSTEMS_LOADED = false;
+
+  private static final Map<String, Class<? extends FileSystem>>
+    SERVICE_FILE_SYSTEMS = new HashMap<String, Class<? extends FileSystem>>();
+
+  private static void loadFileSystems() {
+    synchronized (FileSystem.class) {
+      if (!FILE_SYSTEMS_LOADED) {
+        ServiceLoader<FileSystem> serviceLoader = ServiceLoader.load(FileSystem.class);
+        for (FileSystem fs : serviceLoader) {
+          SERVICE_FILE_SYSTEMS.put(fs.getScheme(), fs.getClass());
+        }
+        FILE_SYSTEMS_LOADED = true;
+      }
+    }
+  }
+
+  public static Class<? extends FileSystem> getFileSystemClass(String scheme,
+      Configuration conf) throws IOException {
+    if (!FILE_SYSTEMS_LOADED) {
+      loadFileSystems();
+    }
+    Class<? extends FileSystem> clazz = null;
+    if (conf != null) {
+      clazz = (Class<? extends FileSystem>) conf.getClass("fs." + scheme + ".impl", null);
+    }
+    if (clazz == null) {
+      clazz = SERVICE_FILE_SYSTEMS.get(scheme);
+    }
+    if (clazz == null) {
+      throw new IOException("No FileSystem for scheme: " + scheme);
+    }
+    return clazz;
+  }
+
   private static FileSystem createFileSystem(URI uri, Configuration conf
       ) throws IOException {
-    Class<?> clazz = conf.getClass("fs." + uri.getScheme() + ".impl", null);
+    Class<?> clazz = getFileSystemClass(uri.getScheme(), conf);
     if (clazz == null) {
       throw new IOException("No FileSystem for scheme: " + uri.getScheme());
     }
@@ -2128,8 +2235,8 @@ public abstract class FileSystem extends Configured implements Closeable {
         }
         
         // now insert the new file system into the map
-        if (map.isEmpty() && !clientFinalizer.isAlive()) {
-          Runtime.getRuntime().addShutdownHook(clientFinalizer);
+        if (map.isEmpty() ) {
+          ShutdownHookManager.get().addShutdownHook(clientFinalizer, SHUTDOWN_HOOK_PRIORITY);
         }
         fs.key = key;
         map.put(key, fs);
@@ -2144,13 +2251,7 @@ public abstract class FileSystem extends Configured implements Closeable {
       if (map.containsKey(key) && fs == map.get(key)) {
         map.remove(key);
         toAutoClose.remove(key);
-        if (map.isEmpty() && !clientFinalizer.isAlive()) {
-          if (!Runtime.getRuntime().removeShutdownHook(clientFinalizer)) {
-            LOG.info("Could not cancel cleanup thread, though no " +
-                     "FileSystems are open");
-          }
         }
-      }
     }
 
     synchronized void closeAll() throws IOException {
@@ -2194,7 +2295,7 @@ public abstract class FileSystem extends Configured implements Closeable {
       }
     }
 
-    private class ClientFinalizer extends Thread {
+    private class ClientFinalizer implements Runnable {
       public synchronized void run() {
         try {
           closeAll(true);

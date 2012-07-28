@@ -41,6 +41,7 @@ import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -52,10 +53,10 @@ import org.apache.hadoop.hdfs.protocolPB.ClientDatanodeProtocolTranslatorPB;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.RpcPayloadHeader.RpcKind;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -110,6 +111,7 @@ public class DFSUtil {
    * Address matcher for matching an address to local address
    */
   static final AddressMatcher LOCAL_ADDRESS_MATCHER = new AddressMatcher() {
+    @Override
     public boolean match(InetSocketAddress s) {
       return NetUtils.isLocalAddress(s.getAddress());
     };
@@ -117,7 +119,7 @@ public class DFSUtil {
   
   /**
    * Whether the pathname is valid.  Currently prohibits relative paths, 
-   * and names which contain a ":" or "/" 
+   * names which contain a ":" or "//", or other non-canonical paths.
    */
   public static boolean isValidName(String src) {
     // Path must be absolute.
@@ -126,48 +128,24 @@ public class DFSUtil {
     }
       
     // Check for ".." "." ":" "/"
-    StringTokenizer tokens = new StringTokenizer(src, Path.SEPARATOR);
-    while(tokens.hasMoreTokens()) {
-      String element = tokens.nextToken();
+    String[] components = StringUtils.split(src, '/');
+    for (int i = 0; i < components.length; i++) {
+      String element = components[i];
       if (element.equals("..") || 
           element.equals(".")  ||
           (element.indexOf(":") >= 0)  ||
           (element.indexOf("/") >= 0)) {
         return false;
       }
-    }
-    return true;
-  }
-
-  /**
-   * Utility class to facilitate junit test error simulation.
-   */
-  @InterfaceAudience.Private
-  public static class ErrorSimulator {
-    private static boolean[] simulation = null; // error simulation events
-    public static void initializeErrorSimulationEvent(int numberOfEvents) {
-      simulation = new boolean[numberOfEvents]; 
-      for (int i = 0; i < numberOfEvents; i++) {
-        simulation[i] = false;
+      
+      // The string may start or end with a /, but not have
+      // "//" in the middle.
+      if (element.isEmpty() && i != components.length - 1 &&
+          i != 0) {
+        return false;
       }
     }
-    
-    public static boolean getErrorSimulation(int index) {
-      if(simulation == null)
-        return false;
-      assert(index < simulation.length);
-      return simulation[index];
-    }
-    
-    public static void setErrorSimulation(int index) {
-      assert(index < simulation.length);
-      simulation[index] = true;
-    }
-    
-    public static void clearErrorSimulation(int index) {
-      assert(index < simulation.length);
-      simulation[index] = false;
-    }
+    return true;
   }
 
   /**
@@ -319,7 +297,7 @@ public class DFSUtil {
    * @return collection of nameservice Ids, or null if not specified
    */
   public static Collection<String> getNameServiceIds(Configuration conf) {
-    return conf.getTrimmedStringCollection(DFS_FEDERATION_NAMESERVICES);
+    return conf.getTrimmedStringCollection(DFS_NAMESERVICES);
   }
 
   /**
@@ -640,6 +618,14 @@ public class DFSUtil {
   public static Collection<URI> getNameServiceUris(Configuration conf,
       String... keys) {
     Set<URI> ret = new HashSet<URI>();
+    
+    // We're passed multiple possible configuration keys for any given NN or HA
+    // nameservice, and search the config in order of these keys. In order to
+    // make sure that a later config lookup (e.g. fs.defaultFS) doesn't add a
+    // URI for a config key for which we've already found a preferred entry, we
+    // keep track of non-preferred keys here.
+    Set<URI> nonPreferredUris = new HashSet<URI>();
+    
     for (String nsId : getNameServiceIds(conf)) {
       if (HAUtil.isHAEnabled(conf, nsId)) {
         // Add the logical URI of the nameservice.
@@ -650,24 +636,46 @@ public class DFSUtil {
         }
       } else {
         // Add the URI corresponding to the address of the NN.
+        boolean uriFound = false;
         for (String key : keys) {
           String addr = conf.get(concatSuffixes(key, nsId));
           if (addr != null) {
-            ret.add(createUri(HdfsConstants.HDFS_URI_SCHEME,
-                NetUtils.createSocketAddr(addr)));
-            break;
+            URI uri = createUri(HdfsConstants.HDFS_URI_SCHEME,
+                NetUtils.createSocketAddr(addr));
+            if (!uriFound) {
+              uriFound = true;
+              ret.add(uri);
+            } else {
+              nonPreferredUris.add(uri);
+            }
           }
         }
       }
     }
+    
     // Add the generic configuration keys.
+    boolean uriFound = false;
     for (String key : keys) {
       String addr = conf.get(key);
       if (addr != null) {
-        ret.add(createUri("hdfs", NetUtils.createSocketAddr(addr)));
-        break;
+        URI uri = createUri("hdfs", NetUtils.createSocketAddr(addr));
+        if (!uriFound) {
+          uriFound = true;
+          ret.add(uri);
+        } else {
+          nonPreferredUris.add(uri);
+        }
       }
     }
+    
+    // Add the default URI if it is an HDFS URI.
+    URI defaultUri = FileSystem.getDefaultUri(conf);
+    if (defaultUri != null &&
+        HdfsConstants.HDFS_URI_SCHEME.equals(defaultUri.getScheme()) &&
+        !nonPreferredUris.contains(defaultUri)) {
+      ret.add(defaultUri);
+    }
+    
     return ret;
   }
 
@@ -707,9 +715,10 @@ public class DFSUtil {
    * @param httpsAddress -If true, and if security is enabled, returns server 
    *                      https address. If false, returns server http address.
    * @return server http or https address
+   * @throws IOException 
    */
-  public static String getInfoServer(
-      InetSocketAddress namenodeAddr, Configuration conf, boolean httpsAddress) {
+  public static String getInfoServer(InetSocketAddress namenodeAddr,
+      Configuration conf, boolean httpsAddress) throws IOException {
     boolean securityOn = UserGroupInformation.isSecurityEnabled();
     String httpAddressKey = (securityOn && httpsAddress) ? 
         DFS_NAMENODE_HTTPS_ADDRESS_KEY : DFS_NAMENODE_HTTP_ADDRESS_KEY;
@@ -726,8 +735,14 @@ public class DFSUtil {
     } else {
       suffixes = new String[2];
     }
-
-    return getSuffixedConf(conf, httpAddressKey, httpAddressDefault, suffixes);
+    String configuredInfoAddr = getSuffixedConf(conf, httpAddressKey,
+        httpAddressDefault, suffixes);
+    if (namenodeAddr != null) {
+      return substituteForWildcardAddress(configuredInfoAddr,
+          namenodeAddr.getHostName());
+    } else {
+      return configuredInfoAddr;
+    }
   }
   
 
@@ -746,10 +761,13 @@ public class DFSUtil {
   public static String substituteForWildcardAddress(String configuredAddress,
       String defaultHost) throws IOException {
     InetSocketAddress sockAddr = NetUtils.createSocketAddr(configuredAddress);
+    InetSocketAddress defaultSockAddr = NetUtils.createSocketAddr(defaultHost
+        + ":0");
     if (sockAddr.getAddress().isAnyLocalAddress()) {
-      if(UserGroupInformation.isSecurityEnabled()) {
+      if (UserGroupInformation.isSecurityEnabled() &&
+          defaultSockAddr.getAddress().isAnyLocalAddress()) {
         throw new IOException("Cannot use a wildcard address with security. " +
-                              "Must explicitly set bind address for Kerberos");
+            "Must explicitly set bind address for Kerberos");
       }
       return defaultHost + ":" + sockAddr.getPort();
     } else {
@@ -871,7 +889,7 @@ public class DFSUtil {
    * Get the nameservice Id by matching the {@code addressKey} with the
    * the address of the local node. 
    * 
-   * If {@link DFSConfigKeys#DFS_FEDERATION_NAMESERVICE_ID} is not specifically
+   * If {@link DFSConfigKeys#DFS_NAMESERVICE_ID} is not specifically
    * configured, and more than one nameservice Id is configured, this method 
    * determines the nameservice Id by matching the local node's address with the
    * configured addresses. When a match is found, it returns the nameservice Id
@@ -883,7 +901,7 @@ public class DFSUtil {
    * @throws HadoopIllegalArgumentException on error
    */
   private static String getNameServiceId(Configuration conf, String addressKey) {
-    String nameserviceId = conf.get(DFS_FEDERATION_NAMESERVICE_ID);
+    String nameserviceId = conf.get(DFS_NAMESERVICE_ID);
     if (nameserviceId != null) {
       return nameserviceId;
     }
@@ -955,7 +973,7 @@ public class DFSUtil {
     if (found > 1) { // Only one address must match the local address
       String msg = "Configuration has multiple addresses that match "
           + "local node's address. Please configure the system with "
-          + DFS_FEDERATION_NAMESERVICE_ID + " and "
+          + DFS_NAMESERVICE_ID + " and "
           + DFS_HA_NAMENODE_ID_KEY;
       throw new HadoopIllegalArgumentException(msg);
     }
@@ -1010,7 +1028,7 @@ public class DFSUtil {
   public static void addPBProtocol(Configuration conf, Class<?> protocol,
       BlockingService service, RPC.Server server) throws IOException {
     RPC.setProtocolEngine(conf, protocol, ProtobufRpcEngine.class);
-    server.addProtocol(RpcKind.RPC_PROTOCOL_BUFFER, protocol, service);
+    server.addProtocol(RPC.RpcKind.RPC_PROTOCOL_BUFFER, protocol, service);
   }
 
   /**

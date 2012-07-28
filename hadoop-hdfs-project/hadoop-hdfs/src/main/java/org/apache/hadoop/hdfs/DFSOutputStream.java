@@ -44,7 +44,7 @@ import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
+import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -74,6 +74,9 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Progressable;
+import org.apache.hadoop.util.Time;
+
+import com.google.common.annotations.VisibleForTesting;
 
 
 /****************************************************************
@@ -99,7 +102,7 @@ import org.apache.hadoop.util.Progressable;
  * starts sending packets from the dataQueue.
 ****************************************************************/
 @InterfaceAudience.Private
-class DFSOutputStream extends FSOutputSummer implements Syncable {
+public class DFSOutputStream extends FSOutputSummer implements Syncable {
   private final DFSClient dfsClient;
   private static final int MAX_PACKETS = 80; // each packet 64K, total 5MB
   private Socket s;
@@ -129,11 +132,13 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
   private long initialFileSize = 0; // at time of file open
   private Progressable progress;
   private final short blockReplication; // replication factor of file
+  private boolean shouldSyncBlock = false; // force blocks to disk upon close
   
   private class Packet {
     long    seqno;               // sequencenumber of buffer in block
     long    offsetInBlock;       // offset in block
-    boolean lastPacketInBlock;   // is this the last packet in block?
+    private boolean lastPacketInBlock;   // is this the last packet in block?
+    boolean syncBlock;          // this packet forces the current block to disk
     int     numChunks;           // number of chunks currently in packet
     int     maxChunks;           // max chunks in packet
 
@@ -245,7 +250,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
       buffer.mark();
 
       PacketHeader header = new PacketHeader(
-        pktLen, offsetInBlock, seqno, lastPacketInBlock, dataLen);
+        pktLen, offsetInBlock, seqno, lastPacketInBlock, dataLen, syncBlock);
       header.putInBuffer(buffer);
       
       buffer.reset();
@@ -265,6 +270,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
       return seqno == HEART_BEAT_SEQNO;
     }
     
+    @Override
     public String toString() {
       return "packet seqno:" + this.seqno +
       " offsetInBlock:" + this.offsetInBlock + 
@@ -393,8 +399,9 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
      * streamer thread is the only thread that opens streams to datanode, 
      * and closes them. Any error recovery is also done by this thread.
      */
+    @Override
     public void run() {
-      long lastPacket = System.currentTimeMillis();
+      long lastPacket = Time.now();
       while (!streamerClosed && dfsClient.clientRunning) {
 
         // if the Responder encountered an error, shutdown Responder
@@ -418,7 +425,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
 
           synchronized (dataQueue) {
             // wait for a packet to be sent.
-            long now = System.currentTimeMillis();
+            long now = Time.now();
             while ((!streamerClosed && !hasError && dfsClient.clientRunning 
                 && dataQueue.size() == 0 && 
                 (stage != BlockConstructionStage.DATA_STREAMING || 
@@ -433,7 +440,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
               } catch (InterruptedException  e) {
               }
               doSleep = false;
-              now = System.currentTimeMillis();
+              now = Time.now();
             }
             if (streamerClosed || hasError || !dfsClient.clientRunning) {
               continue;
@@ -507,9 +514,16 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
           }
 
           // write out data to remote datanode
-          blockStream.write(buf.array(), buf.position(), buf.remaining());
-          blockStream.flush();
-          lastPacket = System.currentTimeMillis();
+          try {            
+            blockStream.write(buf.array(), buf.position(), buf.remaining());
+            blockStream.flush();   
+          } catch (IOException e) {
+            // HDFS-3398 treat primary DN is down since client is unable to 
+            // write to primary DN 
+            errorIndex = 0;
+            throw e;
+          }
+          lastPacket = Time.now();
           
           if (one.isHeartbeatPacket()) {  //heartbeat packet
           }
@@ -644,6 +658,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
         this.targets = targets;
       }
 
+      @Override
       public void run() {
 
         setName("ResponseProcessor for block " + block);
@@ -965,16 +980,19 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
       DatanodeInfo[] nodes = null;
       int count = dfsClient.getConf().nBlockWriteRetry;
       boolean success = false;
+      ExtendedBlock oldBlock = block;
       do {
         hasError = false;
         lastException = null;
         errorIndex = -1;
         success = false;
 
-        long startTime = System.currentTimeMillis();
-        DatanodeInfo[] w = excludedNodes.toArray(
+        long startTime = Time.now();
+        DatanodeInfo[] excluded = excludedNodes.toArray(
             new DatanodeInfo[excludedNodes.size()]);
-        lb = locateFollowingBlock(startTime, w.length > 0 ? w : null);
+        block = oldBlock;
+        lb = locateFollowingBlock(startTime,
+            excluded.length > 0 ? excluded : null);
         block = lb.getBlock();
         block.setNumBytes(0);
         accessToken = lb.getBlockToken();
@@ -1095,7 +1113,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
       int retries = dfsClient.getConf().nBlockWriteLocateFollowingRetry;
       long sleeptime = 400;
       while (true) {
-        long localstart = System.currentTimeMillis();
+        long localstart = Time.now();
         while (true) {
           try {
             return dfsClient.namenode.addBlock(src, dfsClient.clientName, block, excludedNodes);
@@ -1118,9 +1136,9 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
               } else {
                 --retries;
                 DFSClient.LOG.info("Exception while adding a block", e);
-                if (System.currentTimeMillis() - localstart > 5000) {
+                if (Time.now() - localstart > 5000) {
                   DFSClient.LOG.info("Waiting for replication for "
-                      + (System.currentTimeMillis() - localstart) / 1000
+                      + (Time.now() - localstart) / 1000
                       + " seconds");
                 }
                 try {
@@ -1194,7 +1212,8 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
   //
   // returns the list of targets, if any, that is being currently used.
   //
-  synchronized DatanodeInfo[] getPipeline() {
+  @VisibleForTesting
+  public synchronized DatanodeInfo[] getPipeline() {
     if (streamer == null) {
       return null;
     }
@@ -1233,15 +1252,13 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
     this.checksum = checksum;
   }
 
-  /**
-   * Create a new output stream to the given DataNode.
-   * @see ClientProtocol#create(String, FsPermission, String, EnumSetWritable, boolean, short, long)
-   */
-  DFSOutputStream(DFSClient dfsClient, String src, FsPermission masked, EnumSet<CreateFlag> flag,
-      boolean createParent, short replication, long blockSize, Progressable progress,
-      int buffersize, DataChecksum checksum) 
-      throws IOException {
+  /** Construct a new output stream for creating a file. */
+  private DFSOutputStream(DFSClient dfsClient, String src, FsPermission masked,
+      EnumSet<CreateFlag> flag, boolean createParent, short replication,
+      long blockSize, Progressable progress, int buffersize,
+      DataChecksum checksum) throws IOException {
     this(dfsClient, src, blockSize, progress, checksum, replication);
+    this.shouldSyncBlock = flag.contains(CreateFlag.SYNC_BLOCK);
 
     computePacketChunkSize(dfsClient.getConf().writePacketSize,
         checksum.getBytesPerChecksum());
@@ -1260,14 +1277,21 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
                                      UnresolvedPathException.class);
     }
     streamer = new DataStreamer();
-    streamer.start();
   }
 
-  /**
-   * Create a new output stream to the given DataNode.
-   * @see ClientProtocol#create(String, FsPermission, String, boolean, short, long)
-   */
-  DFSOutputStream(DFSClient dfsClient, String src, int buffersize, Progressable progress,
+  static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
+      FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
+      short replication, long blockSize, Progressable progress, int buffersize,
+      DataChecksum checksum) throws IOException {
+    final DFSOutputStream out = new DFSOutputStream(dfsClient, src, masked,
+        flag, createParent, replication, blockSize, progress, buffersize,
+        checksum);
+    out.streamer.start();
+    return out;
+  }
+
+  /** Construct a new output stream for append. */
+  private DFSOutputStream(DFSClient dfsClient, String src, int buffersize, Progressable progress,
       LocatedBlock lastBlock, HdfsFileStatus stat,
       DataChecksum checksum) throws IOException {
     this(dfsClient, src, stat.getBlockSize(), progress, checksum, stat.getReplication());
@@ -1285,7 +1309,15 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
           checksum.getBytesPerChecksum());
       streamer = new DataStreamer();
     }
-    streamer.start();
+  }
+
+  static DFSOutputStream newStreamForAppend(DFSClient dfsClient, String src,
+      int buffersize, Progressable progress, LocatedBlock lastBlock,
+      HdfsFileStatus stat, DataChecksum checksum) throws IOException {
+    final DFSOutputStream out = new DFSOutputStream(dfsClient, src, buffersize,
+        progress, lastBlock, stat, checksum);
+    out.streamer.start();
+    return out;
   }
 
   private void computePacketChunkSize(int psize, int csize) {
@@ -1409,6 +1441,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
         currentPacket = new Packet(PacketHeader.PKT_HEADER_LEN, 0, 
             bytesCurBlock);
         currentPacket.lastPacketInBlock = true;
+        currentPacket.syncBlock = shouldSyncBlock;
         waitAndQueueCurrentPacket();
         bytesCurBlock = 0;
         lastFlushOffset = 0;
@@ -1428,6 +1461,24 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
    */
   @Override
   public void hflush() throws IOException {
+    flushOrSync(false);
+  }
+
+  /**
+   * The expected semantics is all data have flushed out to all replicas 
+   * and all replicas have done posix fsync equivalent - ie the OS has 
+   * flushed it to the disk device (but the disk may have it in its cache).
+   * 
+   * Note that only the current block is flushed to the disk device.
+   * To guarantee durable sync across block boundaries the stream should
+   * be created with {@link CreateFlag#SYNC_BLOCK}.
+   */
+  @Override
+  public void hsync() throws IOException {
+    flushOrSync(true);
+  }
+
+  private void flushOrSync(boolean isSync) throws IOException {
     dfsClient.checkOpen();
     isClosed();
     try {
@@ -1455,7 +1506,13 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
           assert bytesCurBlock > lastFlushOffset;
           // record the valid offset of this flush
           lastFlushOffset = bytesCurBlock;
-          waitAndQueueCurrentPacket();
+          if (isSync && currentPacket == null) {
+            // Nothing to send right now,
+            // but sync was requested.
+            // Send an empty packet
+            currentPacket = new Packet(packetSize, chunksPerPacket,
+                bytesCurBlock);
+          }
         } else {
           // We already flushed up to this offset.
           // This means that we haven't written anything since the last flush
@@ -1465,8 +1522,21 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
           assert oldCurrentPacket == null :
             "Empty flush should not occur with a currentPacket";
 
-          // just discard the current packet since it is already been sent.
-          currentPacket = null;
+          if (isSync && bytesCurBlock > 0) {
+            // Nothing to send right now,
+            // and the block was partially written,
+            // and sync was requested.
+            // So send an empty sync packet.
+            currentPacket = new Packet(packetSize, chunksPerPacket,
+                bytesCurBlock);
+          } else {
+            // just discard the current packet since it is already been sent.
+            currentPacket = null;
+          }
+        }
+        if (currentPacket != null) {
+          currentPacket.syncBlock = isSync;
+          waitAndQueueCurrentPacket();          
         }
         // Restore state of stream. Record the last flush offset 
         // of the last full chunk that was flushed.
@@ -1518,26 +1588,20 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
   }
 
   /**
-   * The expected semantics is all data have flushed out to all replicas 
-   * and all replicas have done posix fsync equivalent - ie the OS has 
-   * flushed it to the disk device (but the disk may have it in its cache).
-   * 
-   * Right now by default it is implemented as hflush
+   * @deprecated use {@link HdfsDataOutputStream#getCurrentBlockReplication()}.
    */
-  @Override
-  public synchronized void hsync() throws IOException {
-    hflush();
+  @Deprecated
+  public synchronized int getNumCurrentReplicas() throws IOException {
+    return getCurrentBlockReplication();
   }
 
   /**
-   * Returns the number of replicas of current block. This can be different
-   * from the designated replication factor of the file because the NameNode
-   * does not replicate the block to which a client is currently writing to.
-   * The client continues to write to a block even if a few datanodes in the
-   * write pipeline have failed. 
+   * Note that this is not a public API;
+   * use {@link HdfsDataOutputStream#getCurrentBlockReplication()} instead.
+   * 
    * @return the number of valid replicas of the current block
    */
-  public synchronized int getNumCurrentReplicas() throws IOException {
+  public synchronized int getCurrentBlockReplication() throws IOException {
     dfsClient.checkOpen();
     isClosed();
     if (streamer == null) {
@@ -1601,6 +1665,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
     streamer.setLastException(new IOException("Lease timeout of " +
                              (dfsClient.hdfsTimeout/1000) + " seconds expired."));
     closeThreads(true);
+    dfsClient.endFileLease(src);
   }
 
   // shutdown datastreamer and responseprocessor threads.
@@ -1647,6 +1712,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
         currentPacket = new Packet(PacketHeader.PKT_HEADER_LEN, 0, 
             bytesCurBlock);
         currentPacket.lastPacketInBlock = true;
+        currentPacket.syncBlock = shouldSyncBlock;
       }
 
       flushInternal();             // flush all data to Datanodes
@@ -1654,7 +1720,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
       ExtendedBlock lastBlock = streamer.getBlock();
       closeThreads(false);
       completeFile(lastBlock);
-      dfsClient.leaserenewer.closeFile(src, dfsClient);
+      dfsClient.endFileLease(src);
     } finally {
       closed = true;
     }
@@ -1663,14 +1729,14 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
   // should be called holding (this) lock since setTestFilename() may 
   // be called during unit tests
   private void completeFile(ExtendedBlock last) throws IOException {
-    long localstart = System.currentTimeMillis();
+    long localstart = Time.now();
     boolean fileComplete = false;
     while (!fileComplete) {
       fileComplete = dfsClient.namenode.complete(src, dfsClient.clientName, last);
       if (!fileComplete) {
         if (!dfsClient.clientRunning ||
               (dfsClient.hdfsTimeout > 0 &&
-               localstart + dfsClient.hdfsTimeout < System.currentTimeMillis())) {
+               localstart + dfsClient.hdfsTimeout < Time.now())) {
             String msg = "Unable to close file because dfsclient " +
                           " was unable to contact the HDFS servers." +
                           " clientRunning " + dfsClient.clientRunning +
@@ -1680,7 +1746,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
         }
         try {
           Thread.sleep(400);
-          if (System.currentTimeMillis() - localstart > 5000) {
+          if (Time.now() - localstart > 5000) {
             DFSClient.LOG.info("Could not complete file " + src + " retrying...");
           }
         } catch (InterruptedException ie) {
@@ -1689,11 +1755,13 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
     }
   }
 
-  void setArtificialSlowdown(long period) {
+  @VisibleForTesting
+  public void setArtificialSlowdown(long period) {
     artificialSlowdown = period;
   }
 
-  synchronized void setChunksPerPacket(int value) {
+  @VisibleForTesting
+  public synchronized void setChunksPerPacket(int value) {
     chunksPerPacket = Math.min(chunksPerPacket, value);
     packetSize = PacketHeader.PKT_HEADER_LEN +
                  (checksum.getBytesPerChecksum() + 

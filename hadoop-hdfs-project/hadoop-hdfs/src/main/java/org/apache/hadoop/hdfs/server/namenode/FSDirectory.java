@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.apache.hadoop.hdfs.server.common.Util.now;
+import static org.apache.hadoop.util.Time.now;
 
 import java.io.Closeable;
 import java.io.FileNotFoundException;
@@ -187,6 +187,7 @@ public class FSDirectory implements Closeable {
   /**
    * Shutdown the filestore
    */
+  @Override
   public void close() throws IOException {
     fsImage.close();
   }
@@ -229,8 +230,15 @@ public class FSDirectory implements Closeable {
 
     // Always do an implicit mkdirs for parent directory tree.
     long modTime = now();
-    if (!mkdirs(new Path(path).getParent().toString(), permissions, true,
-        modTime)) {
+    
+    Path parent = new Path(path).getParent();
+    if (parent == null) {
+      // Trying to add "/" as a file - this path has no
+      // parent -- avoids an NPE below.
+      return null;
+    }
+    
+    if (!mkdirs(parent.toString(), permissions, true, modTime)) {
       return null;
     }
     INodeFileUnderConstruction newNode = new INodeFileUnderConstruction(
@@ -277,7 +285,7 @@ public class FSDirectory implements Closeable {
           preferredBlockSize, modificationTime, clientName, 
           clientMachine, null);
     } else {
-      newNode = new INodeFile(permissions, 0, replication,
+      newNode = new INodeFile(permissions, BlockInfo.EMPTY_ARRAY, replication,
                               modificationTime, atime, preferredBlockSize);
     }
 
@@ -309,7 +317,7 @@ public class FSDirectory implements Closeable {
         INodeFile newF = (INodeFile)newNode;
         BlockInfo[] blocks = newF.getBlocks();
         for (int i = 0; i < blocks.length; i++) {
-          newF.setBlock(i, getBlockManager().addINode(blocks[i], newF));
+          newF.setBlock(i, getBlockManager().addBlockCollection(blocks[i], newF));
         }
       }
     } finally {
@@ -346,7 +354,7 @@ public class FSDirectory implements Closeable {
             fileINode.getReplication(),
             BlockUCState.UNDER_CONSTRUCTION,
             targets);
-      getBlockManager().addINode(blockInfo, fileINode);
+      getBlockManager().addBlockCollection(blockInfo, fileINode);
       fileINode.addBlock(blockInfo);
 
       if(NameNode.stateChangeLog.isDebugEnabled()) {
@@ -1127,7 +1135,7 @@ public class FSDirectory implements Closeable {
 
       int index = 0;
       for (BlockInfo b : newnode.getBlocks()) {
-        BlockInfo info = getBlockManager().addINode(b, newnode);
+        BlockInfo info = getBlockManager().addBlockCollection(b, newnode);
         newnode.setBlock(index, info); // inode refers to the block in BlocksMap
         index++;
       }

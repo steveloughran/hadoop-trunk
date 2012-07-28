@@ -41,6 +41,7 @@ import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.namenode.FSImageTestUtil;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.util.Time;
 
 import com.google.common.base.Supplier;
 
@@ -72,8 +73,8 @@ public abstract class HATestUtil {
     
     active.getRpcServer().rollEditLog();
     
-    long start = System.currentTimeMillis();
-    while (System.currentTimeMillis() - start < TestEditLogTailer.NN_LAG_TIMEOUT) {
+    long start = Time.now();
+    while (Time.now() - start < TestEditLogTailer.NN_LAG_TIMEOUT) {
       long nn2HighestTxId = standby.getNamesystem().getFSImage()
         .getLastAppliedTxId();
       if (nn2HighestTxId >= activeTxId) {
@@ -167,6 +168,15 @@ public abstract class HATestUtil {
       Configuration conf, String logicalName, int nsIndex) {
     InetSocketAddress nnAddr1 = cluster.getNameNode(2 * nsIndex).getNameNodeAddress();
     InetSocketAddress nnAddr2 = cluster.getNameNode(2 * nsIndex + 1).getNameNodeAddress();
+    setFailoverConfigurations(conf, logicalName, nnAddr1, nnAddr2);
+  }
+
+  /**
+   * Sets the required configurations for performing failover
+   */
+  public static void setFailoverConfigurations(Configuration conf,
+      String logicalName, InetSocketAddress nnAddr1,
+      InetSocketAddress nnAddr2) {
     String nameNodeId1 = "nn1";
     String nameNodeId2 = "nn2";
     String address1 = "hdfs://" + nnAddr1.getHostName() + ":" + nnAddr1.getPort();
@@ -176,7 +186,7 @@ public abstract class HATestUtil {
     conf.set(DFSUtil.addKeySuffixes(DFS_NAMENODE_RPC_ADDRESS_KEY,
         logicalName, nameNodeId2), address2);
     
-    conf.set(DFSConfigKeys.DFS_FEDERATION_NAMESERVICES, logicalName);
+    conf.set(DFSConfigKeys.DFS_NAMESERVICES, logicalName);
     conf.set(DFSUtil.addKeySuffixes(DFS_HA_NAMENODES_KEY_PREFIX, logicalName),
         nameNodeId1 + "," + nameNodeId2);
     conf.set(DFS_CLIENT_FAILOVER_PROXY_PROVIDER_KEY_PREFIX + "." + logicalName,
@@ -197,13 +207,13 @@ public abstract class HATestUtil {
   
   public static void waitForCheckpoint(MiniDFSCluster cluster, int nnIdx,
       List<Integer> txids) throws InterruptedException {
-    long start = System.currentTimeMillis();
+    long start = Time.now();
     while (true) {
       try {
         FSImageTestUtil.assertNNHasCheckpoints(cluster, nnIdx, txids);
         return;
       } catch (AssertionError err) {
-        if (System.currentTimeMillis() - start > 10000) {
+        if (Time.now() - start > 10000) {
           throw err;
         } else {
           Thread.sleep(300);

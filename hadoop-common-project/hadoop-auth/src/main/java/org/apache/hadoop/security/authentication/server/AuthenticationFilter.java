@@ -327,6 +327,8 @@ public class AuthenticationFilter implements Filter {
   @Override
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain filterChain)
       throws IOException, ServletException {
+    boolean unauthorizedResponse = true;
+    String unauthorizedMsg = "";
     HttpServletRequest httpRequest = (HttpServletRequest) request;
     HttpServletResponse httpResponse = (HttpServletResponse) response;
     try {
@@ -339,56 +341,62 @@ public class AuthenticationFilter implements Filter {
         LOG.warn("AuthenticationToken ignored: " + ex.getMessage());
         token = null;
       }
-      if (token == null) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Request [{}] triggering authentication", getRequestURL(httpRequest));
-        }
-        token = authHandler.authenticate(httpRequest, httpResponse);
-        if (token != null && token != AuthenticationToken.ANONYMOUS) {
-          token.setExpires(System.currentTimeMillis() + getValidity() * 1000);
-        }
-        newToken = true;
-      }
-      if (token != null) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Request [{}] user [{}] authenticated", getRequestURL(httpRequest), token.getUserName());
-        }
-        final AuthenticationToken authToken = token;
-        httpRequest = new HttpServletRequestWrapper(httpRequest) {
-
-          @Override
-          public String getAuthType() {
-            return authToken.getType();
+      if (authHandler.managementOperation(token, httpRequest, httpResponse)) {
+        if (token == null) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Request [{}] triggering authentication", getRequestURL(httpRequest));
           }
-
-          @Override
-          public String getRemoteUser() {
-            return authToken.getUserName();
+          token = authHandler.authenticate(httpRequest, httpResponse);
+          if (token != null && token.getExpires() != 0 &&
+              token != AuthenticationToken.ANONYMOUS) {
+            token.setExpires(System.currentTimeMillis() + getValidity() * 1000);
           }
-
-          @Override
-          public Principal getUserPrincipal() {
-            return (authToken != AuthenticationToken.ANONYMOUS) ? authToken : null;
-          }
-        };
-        if (newToken && token != AuthenticationToken.ANONYMOUS) {
-          String signedToken = signer.sign(token.toString());
-          Cookie cookie = createCookie(signedToken);
-          httpResponse.addCookie(cookie);
+          newToken = true;
         }
-        filterChain.doFilter(httpRequest, httpResponse);
-      }
-      else {
-        throw new AuthenticationException("Missing AuthenticationToken");
+        if (token != null) {
+          unauthorizedResponse = false;
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Request [{}] user [{}] authenticated", getRequestURL(httpRequest), token.getUserName());
+          }
+          final AuthenticationToken authToken = token;
+          httpRequest = new HttpServletRequestWrapper(httpRequest) {
+
+            @Override
+            public String getAuthType() {
+              return authToken.getType();
+            }
+
+            @Override
+            public String getRemoteUser() {
+              return authToken.getUserName();
+            }
+
+            @Override
+            public Principal getUserPrincipal() {
+              return (authToken != AuthenticationToken.ANONYMOUS) ? authToken : null;
+            }
+          };
+          if (newToken && !token.isExpired() && token != AuthenticationToken.ANONYMOUS) {
+            String signedToken = signer.sign(token.toString());
+            Cookie cookie = createCookie(signedToken);
+            httpResponse.addCookie(cookie);
+          }
+          filterChain.doFilter(httpRequest, httpResponse);
+        }
+      } else {
+        unauthorizedResponse = false;
       }
     } catch (AuthenticationException ex) {
+      unauthorizedMsg = ex.toString();
+      LOG.warn("Authentication exception: " + ex.getMessage(), ex);
+    }
+    if (unauthorizedResponse) {
       if (!httpResponse.isCommitted()) {
         Cookie cookie = createCookie("");
         cookie.setMaxAge(0);
         httpResponse.addCookie(cookie);
-        httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, ex.getMessage());
+        httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, unauthorizedMsg);
       }
-      LOG.warn("Authentication exception: " + ex.getMessage(), ex);
     }
   }
 

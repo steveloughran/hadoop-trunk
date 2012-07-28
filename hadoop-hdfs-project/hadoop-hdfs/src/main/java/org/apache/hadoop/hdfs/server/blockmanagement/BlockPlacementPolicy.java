@@ -21,15 +21,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.namenode.FSClusterStats;
-import org.apache.hadoop.hdfs.server.namenode.FSInodeInfo;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -111,11 +112,11 @@ public abstract class BlockPlacementPolicy {
    * choose <i>numOfReplicas</i> data nodes for <i>writer</i>
    * If not, return as many as we can.
    * The base implemenatation extracts the pathname of the file from the
-   * specified srcInode, but this could be a costly operation depending on the
+   * specified srcBC, but this could be a costly operation depending on the
    * file system implementation. Concrete implementations of this class should
    * override this method to avoid this overhead.
    * 
-   * @param srcInode The inode of the file for which chooseTarget is being invoked.
+   * @param srcBC block collection of file for which chooseTarget is invoked.
    * @param numOfReplicas additional number of replicas wanted.
    * @param writer the writer's machine, null if not in the cluster.
    * @param chosenNodes datanodes that have been chosen as targets.
@@ -123,13 +124,13 @@ public abstract class BlockPlacementPolicy {
    * @return array of DatanodeDescriptor instances chosen as target 
    * and sorted as a pipeline.
    */
-  DatanodeDescriptor[] chooseTarget(FSInodeInfo srcInode,
+  DatanodeDescriptor[] chooseTarget(BlockCollection srcBC,
                                     int numOfReplicas,
                                     DatanodeDescriptor writer,
                                     List<DatanodeDescriptor> chosenNodes,
                                     HashMap<Node, Node> excludedNodes,
                                     long blocksize) {
-    return chooseTarget(srcInode.getFullPathName(), numOfReplicas, writer,
+    return chooseTarget(srcBC.getName(), numOfReplicas, writer,
                         chosenNodes, excludedNodes, blocksize);
   }
 
@@ -150,7 +151,7 @@ public abstract class BlockPlacementPolicy {
    * Decide whether deleting the specified replica of the block still makes 
    * the block conform to the configured block placement policy.
    * 
-   * @param srcInode The inode of the file to which the block-to-be-deleted belongs
+   * @param srcBC block collection of file to which block-to-be-deleted belongs
    * @param block The block to be deleted
    * @param replicationFactor The required number of replicas for this block
    * @param existingReplicas The replica locations of this block that are present
@@ -159,7 +160,7 @@ public abstract class BlockPlacementPolicy {
                    listed in the previous parameter.
    * @return the replica that is the best candidate for deletion
    */
-  abstract public DatanodeDescriptor chooseReplicaToDelete(FSInodeInfo srcInode,
+  abstract public DatanodeDescriptor chooseReplicaToDelete(BlockCollection srcBC,
                                       Block block, 
                                       short replicationFactor,
                                       Collection<DatanodeDescriptor> existingReplicas,
@@ -241,6 +242,81 @@ public abstract class BlockPlacementPolicy {
                         new ArrayList<DatanodeDescriptor>(),
                         excludedNodes,
                         blocksize);
+  }
+  
+  /**
+   * Adjust rackmap, moreThanOne, and exactlyOne after removing replica on cur.
+   *
+   * @param rackMap a map from rack to replica
+   * @param moreThanOne The List of replica nodes on rack which has more than 
+   *        one replica
+   * @param exactlyOne The List of replica nodes on rack with only one replica
+   * @param cur current replica to remove
+   */
+  public void adjustSetsWithChosenReplica(final Map<String, 
+      List<DatanodeDescriptor>> rackMap,
+      final List<DatanodeDescriptor> moreThanOne,
+      final List<DatanodeDescriptor> exactlyOne, final DatanodeInfo cur) {
+    
+    String rack = getRack(cur);
+    final List<DatanodeDescriptor> datanodes = rackMap.get(rack);
+    datanodes.remove(cur);
+    if (datanodes.isEmpty()) {
+      rackMap.remove(rack);
+    }
+    if (moreThanOne.remove(cur)) {
+      if (datanodes.size() == 1) {
+        moreThanOne.remove(datanodes.get(0));
+        exactlyOne.add(datanodes.get(0));
+      }
+    } else {
+      exactlyOne.remove(cur);
+    }
+  }
+
+  /**
+   * Get rack string from a data node
+   * @param datanode
+   * @return rack of data node
+   */
+  protected String getRack(final DatanodeInfo datanode) {
+    return datanode.getNetworkLocation();
+  }
+  
+  /**
+   * Split data nodes into two sets, one set includes nodes on rack with
+   * more than one  replica, the other set contains the remaining nodes.
+   * 
+   * @param dataNodes
+   * @param rackMap a map from rack to datanodes
+   * @param moreThanOne contains nodes on rack with more than one replica
+   * @param exactlyOne remains contains the remaining nodes
+   */
+  public void splitNodesWithRack(
+      Collection<DatanodeDescriptor> dataNodes,
+      final Map<String, List<DatanodeDescriptor>> rackMap,
+      final List<DatanodeDescriptor> moreThanOne,
+      final List<DatanodeDescriptor> exactlyOne) {
+    for(DatanodeDescriptor node : dataNodes) {
+      final String rackName = getRack(node);
+      List<DatanodeDescriptor> datanodeList = rackMap.get(rackName);
+      if (datanodeList == null) {
+        datanodeList = new ArrayList<DatanodeDescriptor>();
+        rackMap.put(rackName, datanodeList);
+      }
+      datanodeList.add(node);
+    }
+    
+    // split nodes into two sets
+    for(List<DatanodeDescriptor> datanodeList : rackMap.values()) {
+      if (datanodeList.size() == 1) {
+        // exactlyOne contains nodes on rack with only one replica
+        exactlyOne.add(datanodeList.get(0));
+      } else {
+        // moreThanOne contains nodes on rack with more than one replica
+        moreThanOne.addAll(datanodeList);
+      }
+    }
   }
 
 }

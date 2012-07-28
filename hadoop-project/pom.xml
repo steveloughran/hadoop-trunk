@@ -12,7 +12,10 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.hadoop</groupId>
@@ -212,6 +215,11 @@
         <artifactId>hadoop-mapreduce-examples</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-gridmix</artifactId>
+        <version>${project.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -230,6 +238,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-datajoin</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-rumen</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -244,6 +257,7 @@
         <artifactId>hadoop-client</artifactId>
         <version>${project.version}</version>
       </dependency>
+
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-minicluster</artifactId>
@@ -367,7 +381,7 @@
       <dependency>
         <groupId>org.jboss.netty</groupId>
         <artifactId>netty</artifactId>
-        <version>3.2.3.Final</version>
+        <version>3.2.4.Final</version>
       </dependency>
 
       <dependency>
@@ -604,12 +618,6 @@
       </dependency>
 
       <dependency>
-        <groupId>com.cenqua.clover</groupId>
-        <artifactId>clover</artifactId>
-        <version>3.0.2</version>
-      </dependency>
-
-      <dependency>
         <groupId>org.apache.zookeeper</groupId>
         <artifactId>zookeeper</artifactId>
         <version>3.4.2</version>
@@ -635,7 +643,12 @@
         <version>4.0.0</version>
         <scope>compile</scope>
       </dependency>
-
+      <dependency>
+        <groupId>com.cenqua.clover</groupId>
+        <artifactId>clover</artifactId>
+        <!-- Use the version needed by maven-clover-plugin -->
+        <version>3.0.2</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -649,7 +662,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>2.3.2</version>
+          <version>2.5.1</version>
           <configuration>
             <source>1.6</source>
             <target>1.6</target>
@@ -684,11 +697,6 @@
               <exclude>mrapp-generated-classpath</exclude>
             </excludes>
           </configuration>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-assembly-plugin</artifactId>
-          <version>2.2.1</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -902,6 +910,7 @@
             <groupId>com.atlassian.maven.plugins</groupId>
             <artifactId>maven-clover2-plugin</artifactId>
             <configuration>
+              <includesAllSourceRoots>true</includesAllSourceRoots>
               <includesTestSourceRoots>true</includesTestSourceRoots>
               <licenseLocation>${cloverLicenseLocation}</licenseLocation>
               <cloverDatabase>${cloverDatabase}</cloverDatabase>
@@ -912,8 +921,8 @@
             </configuration>
             <executions>
               <execution>
-                <id>setup</id>
-                <phase>generate-sources</phase>
+                <id>clover-setup</id>
+                <phase>process-sources</phase>
                 <goals>
                   <goal>setup</goal>
                 </goals>

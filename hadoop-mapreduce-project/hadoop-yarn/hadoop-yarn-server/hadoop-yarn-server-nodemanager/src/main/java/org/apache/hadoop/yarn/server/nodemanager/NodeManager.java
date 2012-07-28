@@ -30,8 +30,10 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.YarnException;
+import org.apache.hadoop.yarn.YarnUncaughtExceptionHandler;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeHealthStatus;
@@ -54,6 +56,12 @@ import org.apache.hadoop.yarn.util.Records;
 
 public class NodeManager extends CompositeService implements
     ServiceStateChangeListener {
+
+  /**
+   * Priority of the NodeManager shutdown hook.
+   */
+  public static final int SHUTDOWN_HOOK_PRIORITY = 30;
+
   private static final Log LOG = LogFactory.getLog(NodeManager.class);
   protected final NodeManagerMetrics metrics = NodeManagerMetrics.create();
   protected ContainerTokenSecretManager containerTokenSecretManager;
@@ -108,7 +116,7 @@ public class NodeManager extends CompositeService implements
     if (UserGroupInformation.isSecurityEnabled()) {
       LOG.info("Security is enabled on NodeManager. "
           + "Creating ContainerTokenSecretManager");
-      this.containerTokenSecretManager = new ContainerTokenSecretManager();
+      this.containerTokenSecretManager = new ContainerTokenSecretManager(conf);
     }
 
     this.aclsManager = new ApplicationACLsManager(conf);
@@ -250,11 +258,12 @@ public class NodeManager extends CompositeService implements
 
       // Remove the old hook if we are rebooting.
       if (hasToReboot && null != nodeManagerShutdownHook) {
-        Runtime.getRuntime().removeShutdownHook(nodeManagerShutdownHook);
+        ShutdownHookManager.get().removeShutdownHook(nodeManagerShutdownHook);
       }
 
       nodeManagerShutdownHook = new CompositeServiceShutdownHook(this);
-      Runtime.getRuntime().addShutdownHook(nodeManagerShutdownHook);
+      ShutdownHookManager.get().addShutdownHook(nodeManagerShutdownHook,
+                                                SHUTDOWN_HOOK_PRIORITY);
 
       YarnConfiguration conf = new YarnConfiguration();
       this.init(conf);
@@ -271,6 +280,7 @@ public class NodeManager extends CompositeService implements
   }
 
   public static void main(String[] args) {
+    Thread.setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
     StringUtils.startupShutdownMessage(NodeManager.class, args, LOG);
     NodeManager nodeManager = new NodeManager();
     nodeManager.initAndStartNodeManager(false);

@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.apache.hadoop.hdfs.server.common.Util.now;
+import static org.apache.hadoop.util.Time.now;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -51,6 +51,7 @@ import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.VersionUtil;
 
@@ -226,7 +227,7 @@ class BPServiceActor implements Runnable {
    */
   void scheduleBlockReport(long delay) {
     if (delay > 0) { // send BR after random delay
-      lastBlockReport = System.currentTimeMillis()
+      lastBlockReport = Time.now()
       - ( dnConf.blockReportInterval - DFSUtil.getRandom().nextInt((int)(delay)));
     } else { // send at next heartbeat
       lastBlockReport = lastHeartbeat - dnConf.blockReportInterval;
@@ -235,6 +236,9 @@ class BPServiceActor implements Runnable {
   }
 
   void reportBadBlocks(ExtendedBlock block) {
+    if (bpRegistration == null) {
+      return;
+    }
     DatanodeInfo[] dnArr = { new DatanodeInfo(bpRegistration) };
     LocatedBlock[] blocks = { new LocatedBlock(block, dnArr) }; 
     
@@ -558,7 +562,7 @@ class BPServiceActor implements Runnable {
         // or work arrives, and then iterate again.
         //
         long waitTime = dnConf.heartBeatInterval - 
-        (System.currentTimeMillis() - lastHeartbeat);
+        (Time.now() - lastHeartbeat);
         synchronized(pendingIncrementalBR) {
           if (waitTime > 0 && pendingReceivedRequests == 0) {
             try {

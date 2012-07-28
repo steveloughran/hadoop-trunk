@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hdfs.server.balancer;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -25,8 +28,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeoutException;
-
-import junit.framework.TestCase;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -43,14 +44,16 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
+import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
+import org.apache.hadoop.util.Time;
+import org.junit.Test;
 
 /**
  * This class tests if a balancer schedules tasks correctly.
  */
-public class TestBalancer extends TestCase {
+public class TestBalancer {
   private static final Log LOG = LogFactory.getLog(
   "org.apache.hadoop.hdfs.TestBalancer");
   
@@ -220,7 +223,7 @@ public class TestBalancer extends TestCase {
   throws IOException, TimeoutException {
     long timeout = TIMEOUT;
     long failtime = (timeout <= 0L) ? Long.MAX_VALUE
-             : System.currentTimeMillis() + timeout;
+             : Time.now() + timeout;
     
     while (true) {
       long[] status = client.getStats();
@@ -232,7 +235,7 @@ public class TestBalancer extends TestCase {
           && usedSpaceVariance < CAPACITY_ALLOWED_VARIANCE)
         break; //done
 
-      if (System.currentTimeMillis() > failtime) {
+      if (Time.now() > failtime) {
         throw new TimeoutException("Cluster failed to reached expected values of "
             + "totalSpace (current: " + status[0] 
             + ", expected: " + expectedTotalSpace 
@@ -258,7 +261,7 @@ public class TestBalancer extends TestCase {
   throws IOException, TimeoutException {
     long timeout = TIMEOUT;
     long failtime = (timeout <= 0L) ? Long.MAX_VALUE
-        : System.currentTimeMillis() + timeout;
+        : Time.now() + timeout;
     final double avgUtilization = ((double)totalUsedSpace) / totalCapacity;
     boolean balanced;
     do {
@@ -271,7 +274,7 @@ public class TestBalancer extends TestCase {
             / datanode.getCapacity();
         if (Math.abs(avgUtilization - nodeUtilization) > BALANCE_ALLOWED_VARIANCE) {
           balanced = false;
-          if (System.currentTimeMillis() > failtime) {
+          if (Time.now() > failtime) {
             throw new TimeoutException(
                 "Rebalancing expected avg utilization to become "
                 + avgUtilization + ", but on datanode " + datanode
@@ -365,8 +368,33 @@ public class TestBalancer extends TestCase {
     oneNodeTest(conf);
   }
   
+  /**
+   * Test parse method in Balancer#Cli class with threshold value out of
+   * boundaries.
+   */
+  @Test
+  public void testBalancerCliParseWithThresholdOutOfBoundaries() {
+    String parameters[] = new String[] { "-threshold", "0" };
+    String reason = "IllegalArgumentException is expected when threshold value"
+        + " is out of boundary.";
+    try {
+      Balancer.Cli.parse(parameters);
+      fail(reason);
+    } catch (IllegalArgumentException e) {
+      assertEquals("Number out of range: threshold = 0.0", e.getMessage());
+    }
+    parameters = new String[] { "-threshold", "101" };
+    try {
+      Balancer.Cli.parse(parameters);
+      fail(reason);
+    } catch (IllegalArgumentException e) {
+      assertEquals("Number out of range: threshold = 101.0", e.getMessage());
+    }
+  }
+  
   /** Test a cluster with even distribution, 
    * then a new empty node is added to the cluster*/
+  @Test
   public void testBalancer0() throws Exception {
     Configuration conf = new HdfsConfiguration();
     initConf(conf);
@@ -375,6 +403,7 @@ public class TestBalancer extends TestCase {
   }
 
   /** Test unevenly distributed cluster */
+  @Test
   public void testBalancer1() throws Exception {
     Configuration conf = new HdfsConfiguration();
     initConf(conf);
@@ -384,6 +413,7 @@ public class TestBalancer extends TestCase {
         new String[] {RACK0, RACK1});
   }
   
+  @Test
   public void testBalancer2() throws Exception {
     Configuration conf = new HdfsConfiguration();
     initConf(conf);
@@ -424,6 +454,39 @@ public class TestBalancer extends TestCase {
       cluster.shutdown();
     }
   }
+
+  /**
+   * Test parse method in Balancer#Cli class with wrong number of params
+   */
+
+  @Test
+  public void testBalancerCliParseWithWrongParams() {
+    String parameters[] = new String[] { "-threshold" };
+    String reason =
+        "IllegalArgumentException is expected when value is not specified";
+    try {
+      Balancer.Cli.parse(parameters);
+      fail(reason);
+    } catch (IllegalArgumentException e) {
+
+    }
+    parameters = new String[] { "-policy" };
+    try {
+      Balancer.Cli.parse(parameters);
+      fail(reason);
+    } catch (IllegalArgumentException e) {
+
+    }
+    parameters = new String[] { "-threshold 1 -policy" };
+    try {
+      Balancer.Cli.parse(parameters);
+      fail(reason);
+    } catch (IllegalArgumentException e) {
+
+    }
+
+  }
+
 
   /**
    * @param args

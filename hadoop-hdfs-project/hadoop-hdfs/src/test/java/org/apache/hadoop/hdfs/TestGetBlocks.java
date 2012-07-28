@@ -17,28 +17,35 @@
  */
 package org.apache.hadoop.hdfs;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
-import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.ipc.RemoteException;
-import junit.framework.TestCase;
+import org.junit.Test;
 /**
  * This class tests if block replacement request to data nodes work correctly.
  */
-public class TestGetBlocks extends TestCase {
+public class TestGetBlocks {
   /** test getBlocks */
+  @Test
   public void testGetBlocks() throws Exception {
     final Configuration CONF = new HdfsConfiguration();
 
@@ -101,18 +108,18 @@ public class TestGetBlocks extends TestCase {
       BlockWithLocations[] locs;
       locs = namenode.getBlocks(dataNodes[0], fileLen).getBlocks();
       assertEquals(locs.length, 2);
-      assertEquals(locs[0].getDatanodes().length, 2);
-      assertEquals(locs[1].getDatanodes().length, 2);
+      assertEquals(locs[0].getStorageIDs().length, 2);
+      assertEquals(locs[1].getStorageIDs().length, 2);
 
       // get blocks of size BlockSize from dataNodes[0]
       locs = namenode.getBlocks(dataNodes[0], DEFAULT_BLOCK_SIZE).getBlocks();
       assertEquals(locs.length, 1);
-      assertEquals(locs[0].getDatanodes().length, 2);
+      assertEquals(locs[0].getStorageIDs().length, 2);
 
       // get blocks of size 1 from dataNodes[0]
       locs = namenode.getBlocks(dataNodes[0], 1).getBlocks();
       assertEquals(locs.length, 1);
-      assertEquals(locs[0].getDatanodes().length, 2);
+      assertEquals(locs[0].getStorageIDs().length, 2);
 
       // get blocks of size 0 from dataNodes[0]
       getBlocksWithException(namenode, dataNodes[0], 0);     
@@ -121,8 +128,7 @@ public class TestGetBlocks extends TestCase {
       getBlocksWithException(namenode, dataNodes[0], -1);
 
       // get blocks of size BlockSize from a non-existent datanode
-      DatanodeInfo info = DFSTestUtil.getLocalDatanodeInfo();
-      info.setIpAddr("1.2.3.4");
+      DatanodeInfo info = DFSTestUtil.getDatanodeInfo("1.2.3.4");
       getBlocksWithException(namenode, info, 2);
     } finally {
       cluster.shutdown();
@@ -142,6 +148,7 @@ public class TestGetBlocks extends TestCase {
     assertTrue(getException);
   }
  
+  @Test
   public void testBlockKey() {
     Map<Block, Long> map = new HashMap<Block, Long>();
     final Random RAN = new Random();

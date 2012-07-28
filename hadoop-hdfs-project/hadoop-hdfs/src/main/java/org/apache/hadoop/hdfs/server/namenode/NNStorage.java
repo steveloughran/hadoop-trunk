@@ -17,13 +17,10 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.io.OutputStream;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -31,6 +28,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -47,24 +45,28 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NodeType;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.InconsistentFSStateException;
 import org.apache.hadoop.hdfs.server.common.Storage;
+import org.apache.hadoop.hdfs.server.common.StorageErrorReporter;
 import org.apache.hadoop.hdfs.server.common.UpgradeManager;
 import org.apache.hadoop.hdfs.server.common.Util;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
-import org.apache.hadoop.hdfs.util.AtomicFileOutputStream;
+import org.apache.hadoop.hdfs.util.PersistentLongFile;
 
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.DNS;
+import org.apache.hadoop.util.Time;
 
 import com.google.common.base.Preconditions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * NNStorage is responsible for management of the StorageDirectories used by
  * the NameNode.
  */
 @InterfaceAudience.Private
-public class NNStorage extends Storage implements Closeable {
+public class NNStorage extends Storage implements Closeable,
+    StorageErrorReporter {
   private static final Log LOG = LogFactory.getLog(NNStorage.class.getName());
 
   static final String DEPRECATED_MESSAGE_DIGEST_PROPERTY = "imageMD5Digest";
@@ -99,10 +101,12 @@ public class NNStorage extends Storage implements Closeable {
     EDITS,
     IMAGE_AND_EDITS;
 
+    @Override
     public StorageDirType getStorageDirType() {
       return this;
     }
 
+    @Override
     public boolean isOfType(StorageDirType type) {
       if ((this == IMAGE_AND_EDITS) && (type == IMAGE || type == EDITS))
         return true;
@@ -420,18 +424,7 @@ public class NNStorage extends Storage implements Closeable {
    */
   static long readTransactionIdFile(StorageDirectory sd) throws IOException {
     File txidFile = getStorageFile(sd, NameNodeFile.SEEN_TXID);
-    long txid = 0L;
-    if (txidFile.exists() && txidFile.canRead()) {
-      BufferedReader br = new BufferedReader(new FileReader(txidFile));
-      try {
-        txid = Long.valueOf(br.readLine());
-        br.close();
-        br = null;
-      } finally {
-        IOUtils.cleanup(LOG, br);
-      }
-    }
-    return txid;
+    return PersistentLongFile.readFile(txidFile, 0);
   }
   
   /**
@@ -444,15 +437,7 @@ public class NNStorage extends Storage implements Closeable {
     Preconditions.checkArgument(txid >= 0, "bad txid: " + txid);
     
     File txIdFile = getStorageFile(sd, NameNodeFile.SEEN_TXID);
-    OutputStream fos = new AtomicFileOutputStream(txIdFile);
-    try {
-      fos.write(String.valueOf(txid).getBytes());
-      fos.write('\n');
-      fos.close();
-      fos = null;
-    } finally {
-      IOUtils.cleanup(LOG, fos);
-    }
+    PersistentLongFile.writeFile(txIdFile, txid);
   }
 
   /**
@@ -771,20 +756,6 @@ public class NNStorage extends Storage implements Closeable {
   }
 
   /**
-   * @return A list of the given File in every available storage directory,
-   * regardless of whether it might exist.
-   */
-  List<File> getFiles(NameNodeDirType dirType, String fileName) {
-    ArrayList<File> list = new ArrayList<File>();
-    Iterator<StorageDirectory> it =
-      (dirType == null) ? dirIterator() : dirIterator(dirType);
-    for ( ;it.hasNext(); ) {
-      list.add(new File(it.next().getCurrentDir(), fileName));
-    }
-    return list;
-  }
-
-  /**
    * Set the upgrade manager for use in a distributed upgrade.
    * @param um The upgrade manager
    */
@@ -882,7 +853,7 @@ public class NNStorage extends Storage implements Closeable {
    * @param sd A storage directory to mark as errored.
    * @throws IOException
    */
-  void reportErrorsOnDirectory(StorageDirectory sd) {
+  private void reportErrorsOnDirectory(StorageDirectory sd) {
     LOG.error("Error reported on storage directory " + sd);
 
     String lsd = listStorageDirectories();
@@ -943,7 +914,8 @@ public class NNStorage extends Storage implements Closeable {
    * Report that an IOE has occurred on some file which may
    * or may not be within one of the NN image storage directories.
    */
-  void reportErrorOnFile(File f) {
+  @Override
+  public void reportErrorOnFile(File f) {
     // We use getAbsolutePath here instead of getCanonicalPath since we know
     // that there is some IO problem on that drive.
     // getCanonicalPath may need to call stat() or readlink() and it's likely
@@ -1027,7 +999,7 @@ public class NNStorage extends Storage implements Closeable {
     }
     
     int rand = DFSUtil.getSecureRandom().nextInt(Integer.MAX_VALUE);
-    String bpid = "BP-" + rand + "-"+ ip + "-" + System.currentTimeMillis();
+    String bpid = "BP-" + rand + "-"+ ip + "-" + Time.now();
     return bpid;
   }
 
@@ -1076,13 +1048,14 @@ public class NNStorage extends Storage implements Closeable {
    * inspected each directory.
    * 
    * <b>Note:</b> this can mutate the storage info fields (ctime, version, etc).
-   * @throws IOException if no valid storage dirs are found
+   * @throws IOException if no valid storage dirs are found or no valid layout version
    */
   FSImageStorageInspector readAndInspectDirs()
       throws IOException {
-    int minLayoutVersion = Integer.MAX_VALUE; // the newest
-    int maxLayoutVersion = Integer.MIN_VALUE; // the oldest
-    
+    Integer layoutVersion = null;
+    boolean multipleLV = false;
+    StringBuilder layoutVersions = new StringBuilder();
+
     // First determine what range of layout versions we're going to inspect
     for (Iterator<StorageDirectory> it = dirIterator();
          it.hasNext();) {
@@ -1092,29 +1065,43 @@ public class NNStorage extends Storage implements Closeable {
         continue;
       }
       readProperties(sd); // sets layoutVersion
-      minLayoutVersion = Math.min(minLayoutVersion, getLayoutVersion());
-      maxLayoutVersion = Math.max(maxLayoutVersion, getLayoutVersion());
+      int lv = getLayoutVersion();
+      if (layoutVersion == null) {
+        layoutVersion = Integer.valueOf(lv);
+      } else if (!layoutVersion.equals(lv)) {
+        multipleLV = true;
+      }
+      layoutVersions.append("(").append(sd.getRoot()).append(", ").append(lv).append(") ");
     }
     
-    if (minLayoutVersion > maxLayoutVersion) {
+    if (layoutVersion == null) {
       throw new IOException("No storage directories contained VERSION information");
     }
-    assert minLayoutVersion <= maxLayoutVersion;
-    
-    // If we have any storage directories with the new layout version
+    if (multipleLV) {            
+      throw new IOException(
+          "Storage directories contain multiple layout versions: "
+              + layoutVersions);
+    }
+    // If the storage directories are with the new layout version
     // (ie edits_<txnid>) then use the new inspector, which will ignore
     // the old format dirs.
     FSImageStorageInspector inspector;
-    if (LayoutVersion.supports(Feature.TXID_BASED_LAYOUT, minLayoutVersion)) {
+    if (LayoutVersion.supports(Feature.TXID_BASED_LAYOUT, getLayoutVersion())) {
       inspector = new FSImageTransactionalStorageInspector();
-      if (!LayoutVersion.supports(Feature.TXID_BASED_LAYOUT, maxLayoutVersion)) {
-        FSImage.LOG.warn("Ignoring one or more storage directories with old layouts");
-      }
     } else {
       inspector = new FSImagePreTransactionalStorageInspector();
     }
     
     inspectStorageDirs(inspector);
     return inspector;
+  }
+
+  public NamespaceInfo getNamespaceInfo() {
+    return new NamespaceInfo(
+        getNamespaceID(),
+        getClusterID(),
+        getBlockPoolID(),
+        getCTime(),
+        getDistributedUpgradeVersion());
   }
 }

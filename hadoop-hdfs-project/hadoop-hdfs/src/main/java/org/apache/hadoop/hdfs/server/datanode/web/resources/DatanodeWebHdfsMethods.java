@@ -19,7 +19,6 @@ package org.apache.hadoop.hdfs.server.datanode.web.resources;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -40,7 +39,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.StreamingOutput;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -50,7 +48,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSClient;
-import org.apache.hadoop.hdfs.DFSClient.DFSDataInputStream;
+import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
@@ -97,6 +95,10 @@ public class DatanodeWebHdfsMethods {
     if (LOG.isTraceEnabled()) {
       LOG.trace("HTTP " + op.getValue().getType() + ": " + op + ", " + path
           + ", ugi=" + ugi + Param.toSortedString(", ", parameters));
+    }
+    if (nnRpcAddr == null) {
+      throw new IllegalArgumentException(NamenodeRpcAddressParam.NAME
+          + " is not specified.");
     }
 
     //clear content type
@@ -398,41 +400,19 @@ public class DatanodeWebHdfsMethods {
     {
       final int b = bufferSize.getValue(conf);
       final DFSClient dfsclient = new DFSClient(nnRpcAddr, conf);
-      DFSDataInputStream in = null;
+      HdfsDataInputStream in = null;
       try {
-        in = new DFSClient.DFSDataInputStream(
-            dfsclient.open(fullpath, b, true));
+        in = new HdfsDataInputStream(dfsclient.open(fullpath, b, true));
         in.seek(offset.getValue());
       } catch(IOException ioe) {
         IOUtils.cleanup(LOG, in);
         IOUtils.cleanup(LOG, dfsclient);
         throw ioe;
       }
-      final DFSDataInputStream dis = in;
-      final StreamingOutput streaming = new StreamingOutput() {
-        @Override
-        public void write(final OutputStream out) throws IOException {
-          final Long n = length.getValue();
-          DFSDataInputStream dfsin = dis;
-          DFSClient client = dfsclient;
-          try {
-            if (n == null) {
-              IOUtils.copyBytes(dfsin, out, b);
-            } else {
-              IOUtils.copyBytes(dfsin, out, n, false);
-            }
-            dfsin.close();
-            dfsin = null;
-            dfsclient.close();
-            client = null;
-          } finally {
-            IOUtils.cleanup(LOG, dfsin);
-            IOUtils.cleanup(LOG, client);
-          }
-        }
-      };
-
-      return Response.ok(streaming).type(
+      
+      final long n = length.getValue() != null? length.getValue()
+          : in.getVisibleLength();
+      return Response.ok(new OpenEntity(in, n, dfsclient)).type(
           MediaType.APPLICATION_OCTET_STREAM).build();
     }
     case GETFILECHECKSUM:

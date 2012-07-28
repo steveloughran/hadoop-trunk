@@ -33,6 +33,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -42,6 +43,7 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.file.tfile.TFile.Reader.Scanner.Entry;
+import org.apache.hadoop.util.Time;
 
 public class TestTFileSeqFileComparison extends TestCase {
   MyOptions options;
@@ -86,12 +88,12 @@ public class TestTFileSeqFileComparison extends TestCase {
   }
 
   public void startTime() throws IOException {
-    startTimeEpoch = System.currentTimeMillis();
+    startTimeEpoch = Time.now();
     System.out.println(formatTime() + " Started timing.");
   }
 
   public void stopTime() throws IOException {
-    finishTimeEpoch = System.currentTimeMillis();
+    finishTimeEpoch = Time.now();
     System.out.println(formatTime() + " Stopped timing.");
   }
 
@@ -111,7 +113,7 @@ public class TestTFileSeqFileComparison extends TestCase {
   }
 
   public String formatTime() {
-    return formatTime(System.currentTimeMillis());
+    return formatTime(Time.now());
   }
 
   private interface KVAppendable {
@@ -237,7 +239,8 @@ public class TestTFileSeqFileComparison extends TestCase {
     public SeqFileAppendable(FileSystem fs, Path path, int osBufferSize,
         String compress, int minBlkSize) throws IOException {
       Configuration conf = new Configuration();
-      conf.setBoolean("hadoop.native.lib", true);
+      conf.setBoolean(CommonConfigurationKeys.IO_NATIVE_LIB_AVAILABLE_KEY,
+                      true);
 
       CompressionCodec codec = null;
       if ("lzo".equals(compress)) {

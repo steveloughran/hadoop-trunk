@@ -72,11 +72,10 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.ipc.RPC.RpcInvoker;
 import org.apache.hadoop.ipc.RPC.VersionMismatch;
-import org.apache.hadoop.ipc.RpcPayloadHeader.RpcKind;
-import org.apache.hadoop.ipc.RpcPayloadHeader.RpcPayloadOperation;
 import org.apache.hadoop.ipc.metrics.RpcDetailedMetrics;
 import org.apache.hadoop.ipc.metrics.RpcMetrics;
 import org.apache.hadoop.ipc.protobuf.IpcConnectionContextProtos.IpcConnectionContextProto;
+import org.apache.hadoop.ipc.protobuf.RpcPayloadHeaderProtos.*;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SaslRpcServer;
@@ -96,6 +95,7 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.ProtoUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -170,8 +170,8 @@ public abstract class Server {
       this.rpcRequestWrapperClass = rpcRequestWrapperClass;
     }   
   }
-  static Map<RpcKind, RpcKindMapValue> rpcKindMap = new
-      HashMap<RpcKind, RpcKindMapValue>(4);
+  static Map<RPC.RpcKind, RpcKindMapValue> rpcKindMap = new
+      HashMap<RPC.RpcKind, RpcKindMapValue>(4);
   
   
 
@@ -185,7 +185,7 @@ public abstract class Server {
    *  @param rpcInvoker - use to process the calls on SS.
    */
   
-  public static void registerProtocolEngine(RpcKind rpcKind, 
+  public static void registerProtocolEngine(RPC.RpcKind rpcKind, 
           Class<? extends Writable> rpcRequestWrapperClass,
           RpcInvoker rpcInvoker) {
     RpcKindMapValue  old = 
@@ -201,14 +201,14 @@ public abstract class Server {
   }
   
   public Class<? extends Writable> getRpcRequestWrapper(
-      RpcKind rpcKind) {
+      RpcKindProto rpcKind) {
     if (rpcRequestClass != null)
        return rpcRequestClass;
-    RpcKindMapValue val = rpcKindMap.get(rpcKind);
+    RpcKindMapValue val = rpcKindMap.get(ProtoUtil.convert(rpcKind));
     return (val == null) ? null : val.rpcRequestWrapperClass; 
   }
   
-  public static RpcInvoker  getRpcInvoker(RpcKind rpcKind) {
+  public static RpcInvoker  getRpcInvoker(RPC.RpcKind rpcKind) {
     RpcKindMapValue val = rpcKindMap.get(rpcKind);
     return (val == null) ? null : val.rpcInvoker; 
   }
@@ -218,7 +218,7 @@ public abstract class Server {
   public static final Log AUDITLOG = 
     LogFactory.getLog("SecurityLogger."+Server.class.getName());
   private static final String AUTH_FAILED_FOR = "Auth failed for ";
-  private static final String AUTH_SUCCESSFULL_FOR = "Auth successfull for ";
+  private static final String AUTH_SUCCESSFUL_FOR = "Auth successful for ";
   
   private static final ThreadLocal<Server> SERVER = new ThreadLocal<Server>();
 
@@ -403,16 +403,16 @@ public abstract class Server {
     private long timestamp;               // time received when response is null
                                           // time served when response is not null
     private ByteBuffer rpcResponse;       // the response for this call
-    private final RpcKind rpcKind;
+    private final RPC.RpcKind rpcKind;
 
     public Call(int id, Writable param, Connection connection) {
-      this( id,  param,  connection, RpcKind.RPC_BUILTIN );    
+      this( id,  param,  connection, RPC.RpcKind.RPC_BUILTIN );    
     }
-    public Call(int id, Writable param, Connection connection, RpcKind kind) { 
+    public Call(int id, Writable param, Connection connection, RPC.RpcKind kind) { 
       this.callId = id;
       this.rpcRequest = param;
       this.connection = connection;
-      this.timestamp = System.currentTimeMillis();
+      this.timestamp = Time.now();
       this.rpcResponse = null;
       this.rpcKind = kind;
     }
@@ -562,7 +562,7 @@ public abstract class Server {
      */
     private void cleanupConnections(boolean force) {
       if (force || numConnections > thresholdIdleConnections) {
-        long currentTime = System.currentTimeMillis();
+        long currentTime = Time.now();
         if (!force && (currentTime - lastCleanupRunTime) < cleanupInterval) {
           return;
         }
@@ -598,7 +598,7 @@ public abstract class Server {
           }
           else i++;
         }
-        lastCleanupRunTime = System.currentTimeMillis();
+        lastCleanupRunTime = Time.now();
       }
     }
 
@@ -683,7 +683,7 @@ public abstract class Server {
         try {
           reader.startAdd();
           SelectionKey readKey = reader.registerChannel(channel);
-          c = new Connection(readKey, channel, System.currentTimeMillis());
+          c = new Connection(readKey, channel, Time.now());
           readKey.attach(c);
           synchronized (connectionList) {
             connectionList.add(numConnections, c);
@@ -705,7 +705,7 @@ public abstract class Server {
       if (c == null) {
         return;  
       }
-      c.setLastContact(System.currentTimeMillis());
+      c.setLastContact(Time.now());
       
       try {
         count = c.readAndProcess();
@@ -727,7 +727,7 @@ public abstract class Server {
         c = null;
       }
       else {
-        c.setLastContact(System.currentTimeMillis());
+        c.setLastContact(Time.now());
       }
     }   
 
@@ -806,7 +806,7 @@ public abstract class Server {
               LOG.info(getName() + ": doAsyncWrite threw exception " + e);
             }
           }
-          long now = System.currentTimeMillis();
+          long now = Time.now();
           if (now < lastPurgeTime + PURGE_INTERVAL) {
             continue;
           }
@@ -952,7 +952,7 @@ public abstract class Server {
             
             if (inHandler) {
               // set the serve time when the response has to be sent later
-              call.timestamp = System.currentTimeMillis();
+              call.timestamp = Time.now();
               
               incPending();
               try {
@@ -1235,7 +1235,7 @@ public abstract class Server {
             LOG.debug("SASL server successfully authenticated client: " + user);
           }
           rpcMetrics.incrAuthenticationSuccesses();
-          AUDITLOG.info(AUTH_SUCCESSFULL_FOR + user);
+          AUDITLOG.info(AUTH_SUCCESSFUL_FOR + user);
           saslContextEstablished = true;
         }
       } else {
@@ -1340,7 +1340,7 @@ public abstract class Server {
               + CommonConfigurationKeys.HADOOP_SECURITY_AUTHENTICATION
               + ") is configured as simple. Please configure another method "
               + "like kerberos or digest.");
-            setupResponse(authFailedResponse, authFailedCall, Status.FATAL,
+            setupResponse(authFailedResponse, authFailedCall, RpcStatusProto.FATAL,
                 null, ae.getClass().getName(), ae.getMessage());
             responder.doRespond(authFailedCall);
             throw ae;
@@ -1366,7 +1366,6 @@ public abstract class Server {
         if (data == null) {
           dataLengthBuffer.flip();
           dataLength = dataLengthBuffer.getInt();
-       
           if ((dataLength == Client.PING_CALL_ID) && (!useWrap)) {
             // covers the !useSasl too
             dataLengthBuffer.clear();
@@ -1422,7 +1421,7 @@ public abstract class Server {
         Call fakeCall =  new Call(-1, null, this);
         // Versions 3 and greater can interpret this exception
         // response in the same manner
-        setupResponse(buffer, fakeCall, Status.FATAL,
+        setupResponseOldVersionFatal(buffer, fakeCall,
             null, VersionMismatch.class.getName(), errMsg);
 
         responder.doRespond(fakeCall);
@@ -1445,7 +1444,7 @@ public abstract class Server {
       ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 
       Call fakeCall = new Call(-1, null, this);
-      setupResponse(buffer, fakeCall, Status.FATAL, null,
+      setupResponse(buffer, fakeCall, RpcStatusProto.FATAL, null,
           IpcException.class.getName(), errMsg);
       responder.doRespond(fakeCall);
     }
@@ -1555,30 +1554,35 @@ public abstract class Server {
     private void processData(byte[] buf) throws  IOException, InterruptedException {
       DataInputStream dis =
         new DataInputStream(new ByteArrayInputStream(buf));
-      RpcPayloadHeader header = new RpcPayloadHeader();
-      header.readFields(dis);           // Read the RpcPayload header
+      RpcPayloadHeaderProto header = RpcPayloadHeaderProto.parseDelimitedFrom(dis);
         
       if (LOG.isDebugEnabled())
         LOG.debug(" got #" + header.getCallId());
-      if (header.getOperation() != RpcPayloadOperation.RPC_FINAL_PAYLOAD) {
+      if (!header.hasRpcOp()) {
+        throw new IOException(" IPC Server: No rpc op in rpcPayloadHeader");
+      }
+      if (header.getRpcOp() != RpcPayloadOperationProto.RPC_FINAL_PAYLOAD) {
         throw new IOException("IPC Server does not implement operation" + 
-              header.getOperation());
+              header.getRpcOp());
       }
       // If we know the rpc kind, get its class so that we can deserialize
       // (Note it would make more sense to have the handler deserialize but 
       // we continue with this original design.
+      if (!header.hasRpcKind()) {
+        throw new IOException(" IPC Server: No rpc kind in rpcPayloadHeader");
+      }
       Class<? extends Writable> rpcRequestClass = 
-          getRpcRequestWrapper(header.getkind());
+          getRpcRequestWrapper(header.getRpcKind());
       if (rpcRequestClass == null) {
-        LOG.warn("Unknown rpc kind "  + header.getkind() + 
+        LOG.warn("Unknown rpc kind "  + header.getRpcKind() + 
             " from client " + getHostAddress());
         final Call readParamsFailedCall = 
             new Call(header.getCallId(), null, this);
         ByteArrayOutputStream responseBuffer = new ByteArrayOutputStream();
 
-        setupResponse(responseBuffer, readParamsFailedCall, Status.FATAL, null,
+        setupResponse(responseBuffer, readParamsFailedCall, RpcStatusProto.FATAL, null,
             IOException.class.getName(),
-            "Unknown rpc kind "  + header.getkind());
+            "Unknown rpc kind "  + header.getRpcKind());
         responder.doRespond(readParamsFailedCall);
         return;   
       }
@@ -1589,19 +1593,20 @@ public abstract class Server {
       } catch (Throwable t) {
         LOG.warn("Unable to read call parameters for client " +
                  getHostAddress() + "on connection protocol " +
-            this.protocolName + " for rpcKind " + header.getkind(),  t);
+            this.protocolName + " for rpcKind " + header.getRpcKind(),  t);
         final Call readParamsFailedCall = 
             new Call(header.getCallId(), null, this);
         ByteArrayOutputStream responseBuffer = new ByteArrayOutputStream();
 
-        setupResponse(responseBuffer, readParamsFailedCall, Status.FATAL, null,
+        setupResponse(responseBuffer, readParamsFailedCall, RpcStatusProto.FATAL, null,
             t.getClass().getName(),
             "IPC server unable to read call parameters: " + t.getMessage());
         responder.doRespond(readParamsFailedCall);
         return;
       }
         
-      Call call = new Call(header.getCallId(), rpcRequest, this, header.getkind());
+      Call call = new Call(header.getCallId(), rpcRequest, this, 
+          ProtoUtil.convert(header.getRpcKind()));
       callQueue.put(call);              // queue the call; maybe blocked here
       incRpcCount();  // Increment the rpc count
     }
@@ -1623,7 +1628,7 @@ public abstract class Server {
         rpcMetrics.incrAuthorizationSuccesses();
       } catch (AuthorizationException ae) {
         rpcMetrics.incrAuthorizationFailures();
-        setupResponse(authFailedResponse, authFailedCall, Status.FATAL, null,
+        setupResponse(authFailedResponse, authFailedCall, RpcStatusProto.FATAL, null,
             ae.getClass().getName(), ae.getMessage());
         responder.doRespond(authFailedCall);
         return false;
@@ -1638,7 +1643,7 @@ public abstract class Server {
       if (!channel.isOpen())
         return;
       try {socket.shutdownOutput();} catch(Exception e) {
-        LOG.warn("Ignoring socket shutdown exception");
+        LOG.debug("Ignoring socket shutdown exception", e);
       }
       if (channel.isOpen()) {
         try {channel.close();} catch(Exception e) {}
@@ -1721,8 +1726,8 @@ public abstract class Server {
             // responder.doResponse() since setupResponse may use
             // SASL to encrypt response data and SASL enforces
             // its own message ordering.
-            setupResponse(buf, call, (error == null) ? Status.SUCCESS
-                : Status.ERROR, value, errorClass, error);
+            setupResponse(buf, call, (error == null) ? RpcStatusProto.SUCCESS
+                : RpcStatusProto.ERROR, value, errorClass, error);
             
             // Discard the large buf and reset it back to smaller size 
             // to free up heap
@@ -1772,7 +1777,7 @@ public abstract class Server {
    * from configuration. Otherwise the configuration will be picked up.
    * 
    * If rpcRequestClass is null then the rpcRequestClass must have been 
-   * registered via {@link #registerProtocolEngine(RpcPayloadHeader.RpcKind,
+   * registered via {@link #registerProtocolEngine(RPC.RpcKind,
    *  Class, RPC.RpcInvoker)}
    * This parameter has been retained for compatibility with existing tests
    * and usage.
@@ -1855,40 +1860,79 @@ public abstract class Server {
   /**
    * Setup response for the IPC Call.
    * 
-   * @param response buffer to serialize the response into
+   * @param responseBuf buffer to serialize the response into
    * @param call {@link Call} to which we are setting up the response
-   * @param status {@link Status} of the IPC call
+   * @param status of the IPC call
    * @param rv return value for the IPC Call, if the call was successful
    * @param errorClass error class, if the the call failed
    * @param error error message, if the call failed
    * @throws IOException
    */
-  private void setupResponse(ByteArrayOutputStream response, 
-                             Call call, Status status, 
+  private void setupResponse(ByteArrayOutputStream responseBuf,
+                             Call call, RpcStatusProto status, 
                              Writable rv, String errorClass, String error) 
   throws IOException {
-    response.reset();
-    DataOutputStream out = new DataOutputStream(response);
-    out.writeInt(call.callId);                // write call id
-    out.writeInt(status.state);           // write status
+    responseBuf.reset();
+    DataOutputStream out = new DataOutputStream(responseBuf);
+    RpcResponseHeaderProto.Builder response =  
+        RpcResponseHeaderProto.newBuilder();
+    response.setCallId(call.callId);
+    response.setStatus(status);
 
-    if (status == Status.SUCCESS) {
+
+    if (status == RpcStatusProto.SUCCESS) {
       try {
+        response.build().writeDelimitedTo(out);
         rv.write(out);
       } catch (Throwable t) {
         LOG.warn("Error serializing call response for call " + call, t);
         // Call back to same function - this is OK since the
         // buffer is reset at the top, and since status is changed
         // to ERROR it won't infinite loop.
-        setupResponse(response, call, Status.ERROR,
+        setupResponse(responseBuf, call, RpcStatusProto.ERROR,
             null, t.getClass().getName(),
             StringUtils.stringifyException(t));
         return;
       }
     } else {
+      if (status == RpcStatusProto.FATAL) {
+        response.setServerIpcVersionNum(Server.CURRENT_VERSION);
+      }
+      response.build().writeDelimitedTo(out);
       WritableUtils.writeString(out, errorClass);
       WritableUtils.writeString(out, error);
     }
+    if (call.connection.useWrap) {
+      wrapWithSasl(responseBuf, call);
+    }
+    call.setResponse(ByteBuffer.wrap(responseBuf.toByteArray()));
+  }
+  
+  /**
+   * Setup response for the IPC Call on Fatal Error from a 
+   * client that is using old version of Hadoop.
+   * The response is serialized using the previous protocol's response
+   * layout.
+   * 
+   * @param response buffer to serialize the response into
+   * @param call {@link Call} to which we are setting up the response
+   * @param rv return value for the IPC Call, if the call was successful
+   * @param errorClass error class, if the the call failed
+   * @param error error message, if the call failed
+   * @throws IOException
+   */
+  private void setupResponseOldVersionFatal(ByteArrayOutputStream response, 
+                             Call call,
+                             Writable rv, String errorClass, String error) 
+  throws IOException {
+    final int OLD_VERSION_FATAL_STATUS = -1;
+    response.reset();
+    DataOutputStream out = new DataOutputStream(response);
+    out.writeInt(call.callId);                // write call id
+    out.writeInt(OLD_VERSION_FATAL_STATUS);   // write FATAL_STATUS
+    WritableUtils.writeString(out, errorClass);
+    WritableUtils.writeString(out, error);
+
     if (call.connection.useWrap) {
       wrapWithSasl(response, call);
     }
@@ -1986,16 +2030,16 @@ public abstract class Server {
   
   /** 
    * Called for each call. 
-   * @deprecated Use  {@link #call(RpcPayloadHeader.RpcKind, String,
+   * @deprecated Use  {@link #call(RPC.RpcKind, String,
    *  Writable, long)} instead
    */
   @Deprecated
   public Writable call(Writable param, long receiveTime) throws Exception {
-    return call(RpcKind.RPC_BUILTIN, null, param, receiveTime);
+    return call(RPC.RpcKind.RPC_BUILTIN, null, param, receiveTime);
   }
   
   /** Called for each call. */
-  public abstract Writable call(RpcKind rpcKind, String protocol,
+  public abstract Writable call(RPC.RpcKind rpcKind, String protocol,
       Writable param, long receiveTime) throws Exception;
   
   /**

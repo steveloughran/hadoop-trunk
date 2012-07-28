@@ -44,6 +44,7 @@ import org.apache.hadoop.security.token.delegation.DelegationKey;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.ArrayWritable;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableFactories;
@@ -75,6 +76,10 @@ import java.io.EOFException;
 public abstract class FSEditLogOp {
   public final FSEditLogOpCodes opCode;
   long txid;
+  /**
+   * Opcode size is limited to 1.5 megabytes
+   */
+  public static final int MAX_OP_SIZE = (3 * 1024 * 1024) / 2;
 
 
   @SuppressWarnings("deprecation")
@@ -178,6 +183,7 @@ public abstract class FSEditLogOp {
       return (T)this;
     }
     
+    @Override
     public String getPath() {
       return path;
     }
@@ -203,10 +209,15 @@ public abstract class FSEditLogOp {
     }
 
     <T extends AddCloseOp> T setBlocks(Block[] blocks) {
+      if (blocks.length > MAX_BLOCKS) {
+        throw new RuntimeException("Can't have more than " + MAX_BLOCKS +
+            " in an AddCloseOp.");
+      }
       this.blocks = blocks;
       return (T)this;
     }
     
+    @Override
     public Block[] getBlocks() {
       return blocks;
     }
@@ -296,10 +307,18 @@ public abstract class FSEditLogOp {
       }
     }
 
+    static final public int MAX_BLOCKS = 1024 * 1024 * 64;
+    
     private static Block[] readBlocks(
         DataInputStream in,
         int logVersion) throws IOException {
       int numBlocks = in.readInt();
+      if (numBlocks < 0) {
+        throw new IOException("invalid negative number of blocks");
+      } else if (numBlocks > MAX_BLOCKS) {
+        throw new IOException("invalid number of blocks: " + numBlocks +
+            ".  The maximum number of blocks per file is " + MAX_BLOCKS);
+      }
       Block[] blocks = new Block[numBlocks];
       for (int i = 0; i < numBlocks; i++) {
         Block blk = new Block();
@@ -392,6 +411,7 @@ public abstract class FSEditLogOp {
       return (AddOp)cache.get(OP_ADD);
     }
 
+    @Override
     public boolean shouldCompleteLastBlock() {
       return false;
     }
@@ -414,6 +434,7 @@ public abstract class FSEditLogOp {
       return (CloseOp)cache.get(OP_CLOSE);
     }
 
+    @Override
     public boolean shouldCompleteLastBlock() {
       return true;
     }
@@ -445,6 +466,7 @@ public abstract class FSEditLogOp {
       return this;
     }
     
+    @Override
     public String getPath() {
       return path;
     }
@@ -454,6 +476,7 @@ public abstract class FSEditLogOp {
       return this;
     }
     
+    @Override
     public Block[] getBlocks() {
       return blocks;
     }
@@ -579,6 +602,7 @@ public abstract class FSEditLogOp {
     String trg;
     String[] srcs;
     long timestamp;
+    final static public int MAX_CONCAT_SRC = 1024 * 1024;
 
     private ConcatDeleteOp() {
       super(OP_CONCAT_DELETE);
@@ -594,7 +618,12 @@ public abstract class FSEditLogOp {
     }
 
     ConcatDeleteOp setSources(String[] srcs) {
+      if (srcs.length > MAX_CONCAT_SRC) {
+        throw new RuntimeException("ConcatDeleteOp can only have " +
+            MAX_CONCAT_SRC + " sources at most.");
+      }
       this.srcs = srcs;
+
       return this;
     }
 
@@ -624,8 +653,8 @@ public abstract class FSEditLogOp {
       if (!LayoutVersion.supports(Feature.EDITLOG_OP_OPTIMIZATION, logVersion)) {
         this.length = in.readInt();
         if (length < 3) { // trg, srcs.., timestamp
-          throw new IOException("Incorrect data format. "
-              + "Concat delete operation.");
+          throw new IOException("Incorrect data format " +
+              "for ConcatDeleteOp.");
         }
       }
       this.trg = FSImageSerialization.readString(in);
@@ -634,6 +663,15 @@ public abstract class FSEditLogOp {
         srcSize = in.readInt();
       } else {
         srcSize = this.length - 1 - 1; // trg and timestamp
+      }
+      if (srcSize < 0) {
+          throw new IOException("Incorrect data format. "
+              + "ConcatDeleteOp cannot have a negative number of data " +
+              " sources.");
+      } else if (srcSize > MAX_CONCAT_SRC) {
+          throw new IOException("Incorrect data format. "
+              + "ConcatDeleteOp can have at most " + MAX_CONCAT_SRC +
+              " sources, but we tried to have " + (length - 3) + " sources.");
       }
       this.srcs = new String [srcSize];
       for(int i=0; i<srcSize;i++) {
@@ -1160,7 +1198,9 @@ public abstract class FSEditLogOp {
     @Override
     protected void toXml(ContentHandler contentHandler) throws SAXException {
       XMLUtils.addSaxString(contentHandler, "SRC", src);
-      XMLUtils.addSaxString(contentHandler, "USERNAME", username);
+      if (username != null) {
+        XMLUtils.addSaxString(contentHandler, "USERNAME", username);
+      }
       if (groupname != null) {
         XMLUtils.addSaxString(contentHandler, "GROUPNAME", groupname);
       }
@@ -1168,12 +1208,10 @@ public abstract class FSEditLogOp {
     
     @Override void fromXml(Stanza st) throws InvalidXmlException {
       this.src = st.getValue("SRC");
-      this.username = st.getValue("USERNAME");
-      if (st.hasChildren("GROUPNAME")) {
-        this.groupname = st.getValue("GROUPNAME");
-      } else {
-        this.groupname = null;
-      }
+      this.username = (st.hasChildren("USERNAME")) ? 
+          st.getValue("USERNAME") : null;
+      this.groupname = (st.hasChildren("GROUPNAME")) ? 
+          st.getValue("GROUPNAME") : null;
     }
   }
 
@@ -2050,6 +2088,7 @@ public abstract class FSEditLogOp {
       return (LogSegmentOp)cache.get(code);
     }
 
+    @Override
     public void readFields(DataInputStream in, int logVersion)
         throws IOException {
       // no data stored in these ops yet
@@ -2142,6 +2181,7 @@ public abstract class FSEditLogOp {
       WritableFactories.setFactory
         (BlockTwo.class,
          new WritableFactory() {
+           @Override
            public Writable newInstance() { return new BlockTwo(); }
          });
     }
@@ -2154,11 +2194,13 @@ public abstract class FSEditLogOp {
     /////////////////////////////////////
     // Writable
     /////////////////////////////////////
+    @Override
     public void write(DataOutput out) throws IOException {
       out.writeLong(blkid);
       out.writeLong(len);
     }
 
+    @Override
     public void readFields(DataInput in) throws IOException {
       this.blkid = in.readLong();
       this.len = in.readLong();
@@ -2201,6 +2243,7 @@ public abstract class FSEditLogOp {
    */
   public static class Reader {
     private final DataInputStream in;
+    private final StreamLimiter limiter;
     private final int logVersion;
     private final Checksum checksum;
     private final OpInstanceCache cache;
@@ -2211,7 +2254,7 @@ public abstract class FSEditLogOp {
      * @param logVersion The version of the data coming from the stream.
      */
     @SuppressWarnings("deprecation")
-    public Reader(DataInputStream in, int logVersion) {
+    public Reader(DataInputStream in, StreamLimiter limiter, int logVersion) {
       this.logVersion = logVersion;
       if (LayoutVersion.supports(Feature.EDITS_CHESKUM, logVersion)) {
         this.checksum = new PureJavaCrc32();
@@ -2225,6 +2268,7 @@ public abstract class FSEditLogOp {
       } else {
         this.in = in;
       }
+      this.limiter = limiter;
       this.cache = new OpInstanceCache();
     }
 
@@ -2236,36 +2280,93 @@ public abstract class FSEditLogOp {
      * 
      * @param skipBrokenEdits    If true, attempt to skip over damaged parts of
      * the input stream, rather than throwing an IOException
-     * @return the operation read from the stream, or null at the end of the file
-     * @throws IOException on error.
+     * @return the operation read from the stream, or null at the end of the 
+     *         file
+     * @throws IOException on error.  This function should only throw an
+     *         exception when skipBrokenEdits is false.
      */
     public FSEditLogOp readOp(boolean skipBrokenEdits) throws IOException {
-      FSEditLogOp op = null;
       while (true) {
         try {
-          in.mark(in.available());
-          try {
-            op = decodeOp();
-          } finally {
-            // If we encountered an exception or an end-of-file condition,
-            // do not advance the input stream.
-            if (op == null) {
-              in.reset();
-            }
-          }
-          return op;
+          return decodeOp();
         } catch (IOException e) {
+          in.reset();
           if (!skipBrokenEdits) {
             throw e;
           }
-          if (in.skip(1) < 1) {
-            return null;
+        } catch (RuntimeException e) {
+          // FSEditLogOp#decodeOp is not supposed to throw RuntimeException.
+          // However, we handle it here for recovery mode, just to be more
+          // robust.
+          in.reset();
+          if (!skipBrokenEdits) {
+            throw e;
+          }
+        } catch (Throwable e) {
+          in.reset();
+          if (!skipBrokenEdits) {
+            throw new IOException("got unexpected exception " +
+                e.getMessage(), e);
+          }
+        }
+        // Move ahead one byte and re-try the decode process.
+        if (in.skip(1) < 1) {
+          return null;
+        }
+      }
+    }
+
+    private void verifyTerminator() throws IOException {
+      /** The end of the edit log should contain only 0x00 or 0xff bytes.
+       * If it contains other bytes, the log itself may be corrupt.
+       * It is important to check this; if we don't, a stray OP_INVALID byte 
+       * could make us stop reading the edit log halfway through, and we'd never
+       * know that we had lost data.
+       */
+      byte[] buf = new byte[4096];
+      limiter.clearLimit();
+      int numRead = -1, idx = 0;
+      while (true) {
+        try {
+          numRead = -1;
+          idx = 0;
+          numRead = in.read(buf);
+          if (numRead == -1) {
+            return;
+          }
+          while (idx < numRead) {
+            if ((buf[idx] != (byte)0) && (buf[idx] != (byte)-1)) {
+              throw new IOException("Read extra bytes after " +
+                "the terminator!");
+            }
+            idx++;
+          }
+        } finally {
+          // After reading each group of bytes, we reposition the mark one
+          // byte before the next group.  Similarly, if there is an error, we
+          // want to reposition the mark one byte before the error
+          if (numRead != -1) { 
+            in.reset();
+            IOUtils.skipFully(in, idx);
+            in.mark(buf.length + 1);
+            IOUtils.skipFully(in, 1);
           }
         }
       }
     }
 
+    /**
+     * Read an opcode from the input stream.
+     *
+     * @return   the opcode, or null on EOF.
+     *
+     * If an exception is thrown, the stream's mark will be set to the first
+     * problematic byte.  This usually means the beginning of the opcode.
+     */
     private FSEditLogOp decodeOp() throws IOException {
+      limiter.setLimit(MAX_OP_SIZE);
+      in.mark(MAX_OP_SIZE);
+
       if (checksum != null) {
         checksum.reset();
       }
@@ -2279,8 +2380,10 @@ public abstract class FSEditLogOp {
       }
 
       FSEditLogOpCodes opCode = FSEditLogOpCodes.fromByte(opCodeByte);
-      if (opCode == OP_INVALID)
+      if (opCode == OP_INVALID) {
+        verifyTerminator();
         return null;
+      }
 
       FSEditLogOp op = cache.get(opCode);
       if (op == null) {
@@ -2346,7 +2449,7 @@ public abstract class FSEditLogOp {
         Long.valueOf(block.getBlockId()).toString());
     XMLUtils.addSaxString(contentHandler, "NUM_BYTES",
         Long.valueOf(block.getNumBytes()).toString());
-    XMLUtils.addSaxString(contentHandler, "GENERATION_STAMP",
+    XMLUtils.addSaxString(contentHandler, "GENSTAMP",
         Long.valueOf(block.getGenerationStamp()).toString());
     contentHandler.endElement("", "", "BLOCK");
   }
@@ -2355,7 +2458,7 @@ public abstract class FSEditLogOp {
       throws InvalidXmlException {
     long blockId = Long.valueOf(st.getValue("BLOCK_ID"));
     long numBytes = Long.valueOf(st.getValue("NUM_BYTES"));
-    long generationStamp = Long.valueOf(st.getValue("GENERATION_STAMP"));
+    long generationStamp = Long.valueOf(st.getValue("GENSTAMP"));
     return new Block(blockId, numBytes, generationStamp);
   }
 
@@ -2450,4 +2553,4 @@ public abstract class FSEditLogOp {
     short mode = Short.valueOf(st.getValue("MODE"));
     return new PermissionStatus(username, groupname, new FsPermission(mode));
   }
-		}
+}

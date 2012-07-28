@@ -88,9 +88,9 @@ class NameNodeConnector {
       LOG.info("Block token params received from NN: keyUpdateInterval="
           + blockKeyUpdateInterval / (60 * 1000) + " min(s), tokenLifetime="
           + blockTokenLifetime / (60 * 1000) + " min(s)");
-      this.blockTokenSecretManager = new BlockTokenSecretManager(false,
+      this.blockTokenSecretManager = new BlockTokenSecretManager(
           blockKeyUpdateInterval, blockTokenLifetime);
-      this.blockTokenSecretManager.setKeys(keys);
+      this.blockTokenSecretManager.addKeys(keys);
       /*
        * Balancer should sync its block keys with NN more frequently than NN
        * updates its block keys
@@ -189,18 +189,19 @@ class NameNodeConnector {
    * Periodically updates access keys.
    */
   class BlockKeyUpdater implements Runnable {
+    @Override
     public void run() {
       try {
         while (shouldRun) {
           try {
-            blockTokenSecretManager.setKeys(namenode.getBlockKeys());
+            blockTokenSecretManager.addKeys(namenode.getBlockKeys());
           } catch (IOException e) {
             LOG.error("Failed to set keys", e);
           }
           Thread.sleep(keyUpdaterInterval);
         }
       } catch (InterruptedException e) {
-        LOG.info("InterruptedException in block key updater thread", e);
+        LOG.debug("InterruptedException in block key updater thread", e);
       } catch (Throwable e) {
         LOG.error("Exception in block key updater thread", e);
         shouldRun = false;

@@ -31,7 +31,6 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.util.StringUtils;
@@ -57,7 +56,6 @@ import org.apache.hadoop.yarn.ipc.RPCUtil;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger.AuditConstants;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.AMLivelinessMonitor;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
@@ -100,13 +98,10 @@ public class ApplicationMasterService extends AbstractService implements
     Configuration conf = getConfig();
     YarnRPC rpc = YarnRPC.create(conf);
 
-    String bindAddressStr =
-        conf.get(YarnConfiguration.RM_SCHEDULER_ADDRESS,
-          YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS);
-    InetSocketAddress masterServiceAddress =
-        NetUtils.createSocketAddr(bindAddressStr,
-          YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT,
-          YarnConfiguration.RM_SCHEDULER_ADDRESS);
+    InetSocketAddress masterServiceAddress = conf.getSocketAddr(
+        YarnConfiguration.RM_SCHEDULER_ADDRESS,
+        YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS,
+        YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT);
 
     this.server =
       rpc.getServer(AMRMProtocol.class, this, masterServiceAddress,
@@ -122,11 +117,9 @@ public class ApplicationMasterService extends AbstractService implements
     }
     
     this.server.start();
-
     this.bindAddress =
-        NetUtils.createSocketAddr(masterServiceAddress.getHostName(),
-          this.server.getPort());
-
+        conf.updateConnectAddr(YarnConfiguration.RM_SCHEDULER_ADDRESS,
+                               server.getListenerAddress());
     super.start();
   }
 
@@ -308,7 +301,7 @@ public class ApplicationMasterService extends AbstractService implements
             numContainers = schedulerNodeReport.getNumContainers();
           }
           NodeReport report = BuilderUtils.newNodeReport(rmNode.getNodeID(),
-              RMNodeState.toNodeState(rmNode.getState()),
+              rmNode.getState(),
               rmNode.getHttpAddress(), rmNode.getRackName(), used,
               rmNode.getTotalCapability(), numContainers,
               rmNode.getNodeHealthStatus());

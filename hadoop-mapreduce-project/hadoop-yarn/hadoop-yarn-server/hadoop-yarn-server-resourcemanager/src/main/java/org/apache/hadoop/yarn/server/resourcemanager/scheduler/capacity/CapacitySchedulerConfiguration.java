@@ -30,6 +30,7 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.QueueACL;
 import org.apache.hadoop.yarn.api.records.QueueState;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.Resources;
 
 public class CapacitySchedulerConfiguration extends Configuration {
@@ -46,12 +47,20 @@ public class CapacitySchedulerConfiguration extends Configuration {
   public static final String DOT = ".";
   
   @Private
+  public static final String MAXIMUM_APPLICATIONS_SUFFIX =
+    "maximum-applications";
+  
+  @Private
   public static final String MAXIMUM_SYSTEM_APPLICATIONS =
-    PREFIX + "maximum-applications";
+    PREFIX + MAXIMUM_APPLICATIONS_SUFFIX;
+  
+  @Private
+  public static final String MAXIMUM_AM_RESOURCE_SUFFIX =
+    "maximum-am-resource-percent";
   
   @Private
   public static final String MAXIMUM_APPLICATION_MASTERS_RESOURCE_PERCENT =
-    PREFIX + "maximum-am-resource-percent";
+    PREFIX + MAXIMUM_AM_RESOURCE_SUFFIX;
   
   @Private
   public static final String QUEUES = "queues";
@@ -71,18 +80,6 @@ public class CapacitySchedulerConfiguration extends Configuration {
   @Private
   public static final String STATE = "state";
 
-  private static final int MINIMUM_MEMORY = 1024;
-
-  @Private
-  public static final String MINIMUM_ALLOCATION = 
-    PREFIX + "minimum-allocation-mb";
-
-  private static final int MAXIMUM_MEMORY = 10240;
-
-  @Private
-  public static final String MAXIMUM_ALLOCATION = 
-    PREFIX + "maximum-allocation-mb";
-
   @Private
   public static final int DEFAULT_MAXIMUM_SYSTEM_APPLICATIIONS = 10000;
   
@@ -91,13 +88,13 @@ public class CapacitySchedulerConfiguration extends Configuration {
   DEFAULT_MAXIMUM_APPLICATIONMASTERS_RESOURCE_PERCENT = 0.1f;
   
   @Private
-  public static final int UNDEFINED = -1;
+  public static final float UNDEFINED = -1;
   
   @Private
-  public static final int MINIMUM_CAPACITY_VALUE = 1;
+  public static final float MINIMUM_CAPACITY_VALUE = 1;
   
   @Private
-  public static final int MAXIMUM_CAPACITY_VALUE = 100;
+  public static final float MAXIMUM_CAPACITY_VALUE = 100;
   
   @Private
   public static final int DEFAULT_USER_LIMIT = 100;
@@ -142,9 +139,33 @@ public class CapacitySchedulerConfiguration extends Configuration {
     return getFloat(MAXIMUM_APPLICATION_MASTERS_RESOURCE_PERCENT, 
         DEFAULT_MAXIMUM_APPLICATIONMASTERS_RESOURCE_PERCENT);
   }
+
+
+  /**
+   * Get the maximum applications per queue setting.
+   * @param queue name of the queue
+   * @return setting specified or -1 if not set
+   */
+  public int getMaximumApplicationsPerQueue(String queue) {
+    int maxApplicationsPerQueue = 
+      getInt(getQueuePrefix(queue) + MAXIMUM_APPLICATIONS_SUFFIX, 
+          (int)UNDEFINED);
+    return maxApplicationsPerQueue;
+  }
+
+  /**
+   * Get the maximum am resource percent per queue setting.
+   * @param queue name of the queue
+   * @return per queue setting or defaults to the global am-resource-percent 
+   *         setting if per queue setting not present
+   */
+  public float getMaximumApplicationMasterResourcePerQueuePercent(String queue) {
+    return getFloat(getQueuePrefix(queue) + MAXIMUM_AM_RESOURCE_SUFFIX, 
+    		getMaximumApplicationMasterResourcePercent());
+  }
   
-  public int getCapacity(String queue) {
-    int capacity = getInt(getQueuePrefix(queue) + CAPACITY, UNDEFINED);
+  public float getCapacity(String queue) {
+    float capacity = getFloat(getQueuePrefix(queue) + CAPACITY, UNDEFINED);
     if (capacity < MINIMUM_CAPACITY_VALUE || capacity > MAXIMUM_CAPACITY_VALUE) {
       throw new IllegalArgumentException("Illegal " +
       		"capacity of " + capacity + " for queue " + queue);
@@ -154,31 +175,31 @@ public class CapacitySchedulerConfiguration extends Configuration {
     return capacity;
   }
   
-  public void setCapacity(String queue, int capacity) {
-    setInt(getQueuePrefix(queue) + CAPACITY, capacity);
+  public void setCapacity(String queue, float capacity) {
+    setFloat(getQueuePrefix(queue) + CAPACITY, capacity);
     LOG.debug("CSConf - setCapacity: queuePrefix=" + getQueuePrefix(queue) + 
         ", capacity=" + capacity);
   }
 
-  public int getMaximumCapacity(String queue) {
-    int maxCapacity = 
-      getInt(getQueuePrefix(queue) + MAXIMUM_CAPACITY, MAXIMUM_CAPACITY_VALUE);
+  public float getMaximumCapacity(String queue) {
+    float maxCapacity = getFloat(getQueuePrefix(queue) + MAXIMUM_CAPACITY,
+        MAXIMUM_CAPACITY_VALUE);
     return maxCapacity;
   }
   
-  public void setMaximumCapacity(String queue, int maxCapacity) {
+  public void setMaximumCapacity(String queue, float maxCapacity) {
     if (maxCapacity > MAXIMUM_CAPACITY_VALUE) {
       throw new IllegalArgumentException("Illegal " +
           "maximum-capacity of " + maxCapacity + " for queue " + queue);
     }
-    setInt(getQueuePrefix(queue) + MAXIMUM_CAPACITY, maxCapacity);
+    setFloat(getQueuePrefix(queue) + MAXIMUM_CAPACITY, maxCapacity);
     LOG.debug("CSConf - setMaxCapacity: queuePrefix=" + getQueuePrefix(queue) + 
         ", maxCapacity=" + maxCapacity);
   }
   
   public int getUserLimit(String queue) {
-    int userLimit = 
-      getInt(getQueuePrefix(queue) + USER_LIMIT, DEFAULT_USER_LIMIT);
+    int userLimit = getInt(getQueuePrefix(queue) + USER_LIMIT,
+        DEFAULT_USER_LIMIT);
     return userLimit;
   }
 
@@ -253,12 +274,16 @@ public class CapacitySchedulerConfiguration extends Configuration {
   }
   
   public Resource getMinimumAllocation() {
-    int minimumMemory = getInt(MINIMUM_ALLOCATION, MINIMUM_MEMORY);
+    int minimumMemory = getInt(
+        YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
+        YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB);
     return Resources.createResource(minimumMemory);
   }
 
   public Resource getMaximumAllocation() {
-    int maximumMemory = getInt(MAXIMUM_ALLOCATION, MAXIMUM_MEMORY);
+    int maximumMemory = getInt(
+        YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_MB,
+        YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB);
     return Resources.createResource(maximumMemory);
   }
 

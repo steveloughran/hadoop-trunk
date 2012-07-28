@@ -30,6 +30,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -275,10 +276,10 @@ public class BuilderUtils {
     containerToken.setKind(ContainerTokenIdentifier.KIND.toString());
     containerToken.setPassword(password);
     // RPC layer client expects ip:port as service for tokens
-    InetSocketAddress addr = NetUtils.createSocketAddr(nodeId.getHost(),
+    InetSocketAddress addr = NetUtils.createSocketAddrForHost(nodeId.getHost(),
         nodeId.getPort());
-    containerToken.setService(addr.getAddress().getHostAddress() + ":"
-        + addr.getPort());
+    // NOTE: use SecurityUtil.setTokenService if this becomes a "real" token 
+    containerToken.setService(SecurityUtil.buildTokenService(addr).toString());
     return containerToken;
   }
 
@@ -330,14 +331,16 @@ public class BuilderUtils {
   }
 
   public static ApplicationReport newApplicationReport(
-      ApplicationId applicationId, String user, String queue, String name,
-      String host, int rpcPort, String clientToken, YarnApplicationState state,
-      String diagnostics, String url, long startTime, long finishTime,
-      FinalApplicationStatus finalStatus, ApplicationResourceUsageReport appResources,
-      String origTrackingUrl) {
+      ApplicationId applicationId, ApplicationAttemptId applicationAttemptId,
+      String user, String queue, String name, String host, int rpcPort,
+      String clientToken, YarnApplicationState state, String diagnostics,
+      String url, long startTime, long finishTime,
+      FinalApplicationStatus finalStatus,
+      ApplicationResourceUsageReport appResources, String origTrackingUrl) {
     ApplicationReport report = recordFactory
         .newRecordInstance(ApplicationReport.class);
     report.setApplicationId(applicationId);
+    report.setCurrentApplicationAttemptId(applicationAttemptId);
     report.setUser(user);
     report.setQueue(queue);
     report.setName(name);

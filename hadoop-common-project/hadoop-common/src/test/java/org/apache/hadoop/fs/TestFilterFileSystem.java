@@ -74,6 +74,11 @@ public class TestFilterFileSystem {
         Progressable progress) throws IOException {
       return null;
     }
+    public FSDataOutputStream createNonRecursive(Path f, FsPermission permission,
+            EnumSet<CreateFlag> flags, int bufferSize, short replication, long blockSize,
+            Progressable progress) throws IOException {
+      return null;
+    }
     public boolean mkdirs(Path f) { return false; }
     public FSDataInputStream open(Path f) { return null; }
     public FSDataOutputStream create(Path f) { return null; }
@@ -123,6 +128,15 @@ public class TestFilterFileSystem {
         Progressable progress) {
       return null;
     }
+    public FSDataOutputStream create(Path f,
+        FsPermission permission,
+        EnumSet<CreateFlag> flags,
+        int bufferSize,
+        short replication,
+        long blockSize,
+        Progressable progress) throws IOException {
+      return null;
+    }
     public String getName() { return null; }
     public boolean delete(Path f) { return false; }
     public short getReplication(Path src) { return 0 ; }
@@ -165,7 +179,10 @@ public class TestFilterFileSystem {
     public Token<?> getDelegationToken(String renewer) throws IOException {
       return null;
     }
-    
+
+    public String getScheme() {
+      return "dontcheck";
+    }
   }
   
   @Test

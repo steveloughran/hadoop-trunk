@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+#include "config.h"
 #include "configuration.h"
 #include "container-executor.h"
 
@@ -29,10 +30,14 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#define _STRINGIFY(X) #X
-#define STRINGIFY(X) _STRINGIFY(X)
 #define CONF_FILENAME "container-executor.cfg"
 
+// When building as part of a Maven build this value gets defined by using
+// container-executor.conf.dir property. See:
+//   hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/pom.xml
+// for details.
+// NOTE: if this ends up being a relative path it gets resolved relative to
+//       the location of the container-executor binary itself, not getwd(3)
 #ifndef HADOOP_CONF_DIR
   #error HADOOP_CONF_DIR must be defined
 #endif
@@ -95,8 +100,8 @@ int main(int argc, char **argv) {
 
   char *executable_file = get_executable();
 
-  char *orig_conf_file = STRINGIFY(HADOOP_CONF_DIR) "/" CONF_FILENAME;
-  char *conf_file = realpath(orig_conf_file, NULL);
+  char *orig_conf_file = HADOOP_CONF_DIR "/" CONF_FILENAME;
+  char *conf_file = resolve_config_path(orig_conf_file, argv[0]);
   char *local_dirs, *log_dirs;
 
   if (conf_file == NULL) {

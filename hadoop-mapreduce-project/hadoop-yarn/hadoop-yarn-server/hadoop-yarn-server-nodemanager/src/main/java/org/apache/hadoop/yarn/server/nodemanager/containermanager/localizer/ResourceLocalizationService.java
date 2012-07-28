@@ -69,7 +69,6 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.YarnException;
 import org.apache.hadoop.yarn.event.Dispatcher;
@@ -207,10 +206,10 @@ public class ResourceLocalizationService extends CompositeService
       conf.getLong(YarnConfiguration.NM_LOCALIZER_CACHE_TARGET_SIZE_MB, YarnConfiguration.DEFAULT_NM_LOCALIZER_CACHE_TARGET_SIZE_MB) << 20;
     cacheCleanupPeriod =
       conf.getLong(YarnConfiguration.NM_LOCALIZER_CACHE_CLEANUP_INTERVAL_MS, YarnConfiguration.DEFAULT_NM_LOCALIZER_CACHE_CLEANUP_INTERVAL_MS);
-    localizationServerAddress = NetUtils.createSocketAddr(
-      conf.get(YarnConfiguration.NM_LOCALIZER_ADDRESS, YarnConfiguration.DEFAULT_NM_LOCALIZER_ADDRESS),
-      YarnConfiguration.DEFAULT_NM_LOCALIZER_PORT,
-      YarnConfiguration.NM_LOCALIZER_ADDRESS);
+    localizationServerAddress = conf.getSocketAddr(
+        YarnConfiguration.NM_LOCALIZER_ADDRESS,
+        YarnConfiguration.DEFAULT_NM_LOCALIZER_ADDRESS,
+        YarnConfiguration.DEFAULT_NM_LOCALIZER_PORT);
     localizerTracker = createLocalizerTracker(conf);
     addService(localizerTracker);
     dispatcher.register(LocalizerEventType.class, localizerTracker);
@@ -228,13 +227,9 @@ public class ResourceLocalizationService extends CompositeService
         cacheCleanupPeriod, cacheCleanupPeriod, TimeUnit.MILLISECONDS);
     server = createServer();
     server.start();
-    String host = getConfig().get(YarnConfiguration.NM_LOCALIZER_ADDRESS)
-        .split(":")[0];
-    getConfig().set(YarnConfiguration.NM_LOCALIZER_ADDRESS, host + ":" 
-        + server.getPort());
-    localizationServerAddress = NetUtils.createSocketAddr(
-        getConfig().get(YarnConfiguration.NM_LOCALIZER_ADDRESS, 
-            YarnConfiguration.DEFAULT_NM_LOCALIZER_ADDRESS));
+    localizationServerAddress =
+        getConfig().updateConnectAddr(YarnConfiguration.NM_LOCALIZER_ADDRESS,
+                                      server.getListenerAddress());
     LOG.info("Localizer started on port " + server.getPort());
     super.start();
   }

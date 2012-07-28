@@ -20,6 +20,9 @@ package org.apache.hadoop.io;
 
 import java.io.*;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.WritableByteChannel;
 
 import org.apache.commons.logging.Log;
 
@@ -151,6 +154,28 @@ public class IOUtils {
   }
   
   /**
+   * Utility wrapper for reading from {@link InputStream}. It catches any errors
+   * thrown by the underlying stream (either IO or decompression-related), and
+   * re-throws as an IOException.
+   * 
+   * @param is - InputStream to be read from
+   * @param buf - buffer the data is read into
+   * @param off - offset within buf
+   * @param len - amount of data to be read
+   * @return number of bytes read
+   */
+  public static int wrappedReadForCompressedData(InputStream is, byte[] buf,
+      int off, int len) throws IOException {
+    try {
+      return is.read(buf, off, len);
+    } catch (IOException ie) {
+      throw ie;
+    } catch (Throwable t) {
+      throw new IOException("Error while reading compressed data", t);
+    }
+  }
+
+  /**
    * Reads len bytes in a loop.
    *
    * @param in InputStream to read from
@@ -245,4 +270,34 @@ public class IOUtils {
     public void write(int b) throws IOException {
     }
   }  
+  
+  /**
+   * Write a ByteBuffer to a WritableByteChannel, handling short writes.
+   * 
+   * @param bc               The WritableByteChannel to write to
+   * @param buf              The input buffer
+   * @throws IOException     On I/O error
+   */
+  public static void writeFully(WritableByteChannel bc, ByteBuffer buf)
+      throws IOException {
+    do {
+      bc.write(buf);
+    } while (buf.remaining() > 0);
+  }
+
+  /**
+   * Write a ByteBuffer to a FileChannel at a given offset, 
+   * handling short writes.
+   * 
+   * @param fc               The FileChannel to write to
+   * @param buf              The input buffer
+   * @param offset           The offset in the file to start writing at
+   * @throws IOException     On I/O error
+   */
+  public static void writeFully(FileChannel fc, ByteBuffer buf,
+      long offset) throws IOException {
+    do {
+      offset += fc.write(buf, offset);
+    } while (buf.remaining() > 0);
+  }
 }

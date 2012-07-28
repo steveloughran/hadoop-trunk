@@ -25,19 +25,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.lang.Math;
 
+import javax.servlet.ServletOutputStream;
+import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.server.common.StorageErrorReporter;
+import org.apache.hadoop.hdfs.server.common.Storage;
+import org.apache.hadoop.hdfs.server.common.Util;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeDirType;
 import org.apache.hadoop.hdfs.server.protocol.RemoteEditLog;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.hdfs.DFSUtil.ErrorSimulator;
 import org.apache.hadoop.io.MD5Hash;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import com.google.common.collect.Lists;
 
@@ -61,7 +65,7 @@ public class TransferFsImage {
   }
 
   public static MD5Hash downloadImageToStorage(
-      String fsName, long imageTxId, NNStorage dstStorage, boolean needDigest)
+      String fsName, long imageTxId, Storage dstStorage, boolean needDigest)
       throws IOException {
     String fileid = GetImageServlet.getParamStringForImage(
         imageTxId, dstStorage);
@@ -117,7 +121,7 @@ public class TransferFsImage {
    */
   public static void uploadImageFromStorage(String fsName,
       InetSocketAddress imageListenAddress,
-      NNStorage storage, long txid) throws IOException {
+      Storage storage, long txid) throws IOException {
     
     String fileid = GetImageServlet.getParamStringToPutImage(
         txid, imageListenAddress, storage);
@@ -146,22 +150,19 @@ public class TransferFsImage {
    * A server-side method to respond to a getfile http request
    * Copies the contents of the local file into the output stream.
    */
-  static void getFileServer(OutputStream outstream, File localfile,
+  public static void getFileServer(ServletResponse response, File localfile,
+      FileInputStream infile,
       DataTransferThrottler throttler) 
     throws IOException {
     byte buf[] = new byte[HdfsConstants.IO_FILE_BUFFER_SIZE];
-    FileInputStream infile = null;
+    ServletOutputStream out = null;
     try {
-      infile = new FileInputStream(localfile);
-      if (ErrorSimulator.getErrorSimulation(2)
-          && localfile.getAbsolutePath().contains("secondary")) {
-        // throw exception only when the secondary sends its image
-        throw new IOException("If this exception is not caught by the " +
-            "name-node fs image will be truncated.");
-      }
-      
-      if (ErrorSimulator.getErrorSimulation(3)
-          && localfile.getAbsolutePath().contains("fsimage")) {
+      CheckpointFaultInjector.getInstance()
+          .aboutToSendFile(localfile);
+      out = response.getOutputStream();
+
+      if (CheckpointFaultInjector.getInstance().
+            shouldSendShortFile(localfile)) {
           // Test sending image shorter than localfile
           long len = localfile.length();
           buf = new byte[(int)Math.min(len/2, HdfsConstants.IO_FILE_BUFFER_SIZE)];
@@ -175,21 +176,21 @@ public class TransferFsImage {
         if (num <= 0) {
           break;
         }
-
-        if (ErrorSimulator.getErrorSimulation(4)) {
+        if (CheckpointFaultInjector.getInstance()
+              .shouldCorruptAByte(localfile)) {
           // Simulate a corrupted byte on the wire
           LOG.warn("SIMULATING A CORRUPT BYTE IN IMAGE TRANSFER!");
           buf[0]++;
         }
         
-        outstream.write(buf, 0, num);
+        out.write(buf, 0, num);
         if (throttler != null) {
           throttler.throttle(num);
         }
       }
     } finally {
-      if (infile != null) {
-        infile.close();
+      if (out != null) {
+        out.close();
       }
     }
   }
@@ -203,21 +204,23 @@ public class TransferFsImage {
    */
   static MD5Hash getFileClient(String nnHostPort,
       String queryString, List<File> localPaths,
-      NNStorage dstStorage, boolean getChecksum) throws IOException {
-    byte[] buf = new byte[HdfsConstants.IO_FILE_BUFFER_SIZE];
-    String proto = UserGroupInformation.isSecurityEnabled() ? "https://" : "http://";
-    StringBuilder str = new StringBuilder(proto+nnHostPort+"/getimage?");
-    str.append(queryString);
+      Storage dstStorage, boolean getChecksum) throws IOException {
 
+    String str = "http://" + nnHostPort + "/getimage?" + queryString;
+    LOG.info("Opening connection to " + str);
     //
     // open connection to remote server
     //
-    URL url = new URL(str.toString());
-    
-    // Avoid Krb bug with cross-realm hosts
-    SecurityUtil.fetchServiceTicket(url);
-    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-    
+    URL url = new URL(str);
+    return doGetUrl(url, localPaths, dstStorage, getChecksum);
+  }
+  
+  public static MD5Hash doGetUrl(URL url, List<File> localPaths,
+      Storage dstStorage, boolean getChecksum) throws IOException {
+    long startTime = Time.monotonicNow();
+    HttpURLConnection connection = (HttpURLConnection)
+      SecurityUtil.openSecureHttpConnection(url);
+
     if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
       throw new HttpGetFailedException(
           "Image transfer servlet at " + url +
@@ -232,7 +235,7 @@ public class TransferFsImage {
       advertisedSize = Long.parseLong(contentLength);
     } else {
       throw new IOException(CONTENT_LENGTH + " header is not provided " +
-                            "by the namenode when trying to fetch " + str);
+                            "by the namenode when trying to fetch " + url);
     }
     
     if (localPaths != null) {
@@ -273,15 +276,16 @@ public class TransferFsImage {
           try {
             if (f.exists()) {
               LOG.warn("Overwriting existing file " + f
-                  + " with file downloaded from " + str);
+                  + " with file downloaded from " + url);
             }
             outputStreams.add(new FileOutputStream(f));
           } catch (IOException ioe) {
             LOG.warn("Unable to download file " + f, ioe);
             // This will be null if we're downloading the fsimage to a file
             // outside of an NNStorage directory.
-            if (dstStorage != null) {
-              dstStorage.reportErrorOnFile(f);
+            if (dstStorage != null &&
+                (dstStorage instanceof StorageErrorReporter)) {
+              ((StorageErrorReporter)dstStorage).reportErrorOnFile(f);
             }
           }
         }
@@ -293,6 +297,7 @@ public class TransferFsImage {
       }
       
       int num = 1;
+      byte[] buf = new byte[HdfsConstants.IO_FILE_BUFFER_SIZE];
       while (num > 0) {
         num = stream.read(buf);
         if (num > 0) {
@@ -313,18 +318,23 @@ public class TransferFsImage {
         // only throw this exception if we think we read all of it on our end
         // -- otherwise a client-side IOException would be masked by this
         // exception that makes it look like a server-side problem!
-        throw new IOException("File " + str + " received length " + received +
+        throw new IOException("File " + url + " received length " + received +
                               " is not of the advertised size " +
                               advertisedSize);
       }
     }
+    double xferSec = Math.max(
+        ((float)(Time.monotonicNow() - startTime)) / 1000.0, 0.001);
+    long xferKb = received / 1024;
+    LOG.info(String.format("Transfer took %.2fs at %.2f KB/s",
+        xferSec, xferKb / xferSec));
 
     if (digester != null) {
       MD5Hash computedDigest = new MD5Hash(digester.digest());
       
       if (advertisedDigest != null &&
           !computedDigest.equals(advertisedDigest)) {
-        throw new IOException("File " + str + " computed digest " +
+        throw new IOException("File " + url + " computed digest " +
             computedDigest + " does not match advertised digest " + 
             advertisedDigest);
       }

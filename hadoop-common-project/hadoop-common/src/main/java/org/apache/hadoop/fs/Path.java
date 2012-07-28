@@ -139,7 +139,7 @@ public class Path implements Comparable {
    * Construct a path from a URI
    */
   public Path(URI aUri) {
-    uri = aUri;
+    uri = aUri.normalize();
   }
   
   /** Construct a Path from components. */
@@ -221,6 +221,13 @@ public class Path implements Comparable {
    */
   public boolean isAbsolute() {
      return isUriPathAbsolute();
+  }
+
+  /**
+   * @return true if and only if this path represents the root of a file system
+   */
+  public boolean isRoot() {
+    return getParent() == null;
   }
 
   /** Returns the final component of this path.*/

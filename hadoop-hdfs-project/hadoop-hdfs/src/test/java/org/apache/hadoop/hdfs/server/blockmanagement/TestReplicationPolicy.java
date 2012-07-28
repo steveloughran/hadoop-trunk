@@ -17,13 +17,16 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-import java.io.IOException;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
@@ -34,59 +37,59 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class TestReplicationPolicy {
-  private Random random= DFSUtil.getRandom();
+  private Random random = DFSUtil.getRandom();
   private static final int BLOCK_SIZE = 1024;
   private static final int NUM_OF_DATANODES = 6;
-  private static final Configuration CONF = new HdfsConfiguration();
-  private static final NetworkTopology cluster;
-  private static final NameNode namenode;
-  private static final BlockPlacementPolicy replicator;
+  private static NetworkTopology cluster;
+  private static NameNode namenode;
+  private static BlockPlacementPolicy replicator;
   private static final String filename = "/dummyfile.txt";
-  private static final DatanodeDescriptor dataNodes[] = 
-    new DatanodeDescriptor[] {
-      new DatanodeDescriptor(new DatanodeID("h1", 5020), "/d1/r1"),
-      new DatanodeDescriptor(new DatanodeID("h2", 5020), "/d1/r1"),
-      new DatanodeDescriptor(new DatanodeID("h3", 5020), "/d1/r2"),
-      new DatanodeDescriptor(new DatanodeID("h4", 5020), "/d1/r2"),
-      new DatanodeDescriptor(new DatanodeID("h5", 5020), "/d2/r3"),
-      new DatanodeDescriptor(new DatanodeID("h6", 5020), "/d2/r3")
-    };
-   
-  private final static DatanodeDescriptor NODE = 
-    new DatanodeDescriptor(new DatanodeID("h7", 5020), "/d2/r4");
-  
-  static {
-    try {
-      FileSystem.setDefaultUri(CONF, "hdfs://localhost:0");
-      CONF.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "0.0.0.0:0");
-      DFSTestUtil.formatNameNode(CONF);
-      namenode = new NameNode(CONF);
-    } catch (IOException e) {
-      e.printStackTrace();
-      throw (RuntimeException)new RuntimeException().initCause(e);
-    }
+  private static DatanodeDescriptor dataNodes[];
+
+  @BeforeClass
+  public static void setupCluster() throws Exception {
+    Configuration conf = new HdfsConfiguration();
+    dataNodes = new DatanodeDescriptor[] {
+        DFSTestUtil.getDatanodeDescriptor("1.1.1.1", "/d1/r1"),
+        DFSTestUtil.getDatanodeDescriptor("2.2.2.2", "/d1/r1"),
+        DFSTestUtil.getDatanodeDescriptor("3.3.3.3", "/d1/r2"),
+        DFSTestUtil.getDatanodeDescriptor("4.4.4.4", "/d1/r2"),
+        DFSTestUtil.getDatanodeDescriptor("5.5.5.5", "/d2/r3"),
+        DFSTestUtil.getDatanodeDescriptor("6.6.6.6", "/d2/r3")
+      };
+
+    FileSystem.setDefaultUri(conf, "hdfs://localhost:0");
+    conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "0.0.0.0:0");
+    File baseDir = new File(System.getProperty(
+        "test.build.data", "build/test/data"), "dfs/");
+    conf.set(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY,
+        new File(baseDir, "name").getPath());
+
+    DFSTestUtil.formatNameNode(conf);
+    namenode = new NameNode(conf);
+
     final BlockManager bm = namenode.getNamesystem().getBlockManager();
     replicator = bm.getBlockPlacementPolicy();
     cluster = bm.getDatanodeManager().getNetworkTopology();
     // construct network topology
-    for(int i=0; i<NUM_OF_DATANODES; i++) {
+    for (int i=0; i < NUM_OF_DATANODES; i++) {
       cluster.add(dataNodes[i]);
     }
-    for(int i=0; i<NUM_OF_DATANODES; i++) {
+    for (int i=0; i < NUM_OF_DATANODES; i++) {
       dataNodes[i].updateHeartbeat(
           2*HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L,
           2*HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L, 0, 0);
-    }
+    }    
   }
-  
+
   /**
    * In this testcase, client is dataNodes[0]. So the 1st replica should be
    * placed on dataNodes[0], the 2nd replica should be placed on 
@@ -328,6 +331,7 @@ public class TestReplicationPolicy {
           HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L, 0, 0);
     }
   }
+
   /**
    * In this testcase, client is is a node outside of file system.
    * So the 1st replica can be placed on any node. 
@@ -337,22 +341,25 @@ public class TestReplicationPolicy {
    */
   @Test
   public void testChooseTarget5() throws Exception {
+    DatanodeDescriptor writerDesc =
+      DFSTestUtil.getDatanodeDescriptor("7.7.7.7", "/d2/r4");
+
     DatanodeDescriptor[] targets;
     targets = replicator.chooseTarget(filename,
-                                      0, NODE, BLOCK_SIZE);
+                                      0, writerDesc, BLOCK_SIZE);
     assertEquals(targets.length, 0);
     
     targets = replicator.chooseTarget(filename,
-                                      1, NODE, BLOCK_SIZE);
+                                      1, writerDesc, BLOCK_SIZE);
     assertEquals(targets.length, 1);
     
     targets = replicator.chooseTarget(filename,
-                                      2, NODE, BLOCK_SIZE);
+                                      2, writerDesc, BLOCK_SIZE);
     assertEquals(targets.length, 2);
     assertFalse(cluster.isOnSameRack(targets[0], targets[1]));
     
     targets = replicator.chooseTarget(filename,
-                                      3, NODE, BLOCK_SIZE);
+                                      3, writerDesc, BLOCK_SIZE);
     assertEquals(targets.length, 3);
     assertTrue(cluster.isOnSameRack(targets[1], targets[2]));
     assertFalse(cluster.isOnSameRack(targets[0], targets[1]));    
@@ -581,5 +588,51 @@ public class TestReplicationPolicy {
         "Not returned the expected number of QUEUE_WITH_CORRUPT_BLOCKS blocks",
         fifthPrioritySize, chosenBlocks.get(
             UnderReplicatedBlocks.QUEUE_WITH_CORRUPT_BLOCKS).size());
+  }
+  
+  /**
+   * Test for the chooseReplicaToDelete are processed based on 
+   * block locality and free space
+   */
+  @Test
+  public void testChooseReplicaToDelete() throws Exception {
+    List<DatanodeDescriptor> replicaNodeList = new 
+        ArrayList<DatanodeDescriptor>();
+    final Map<String, List<DatanodeDescriptor>> rackMap
+        = new HashMap<String, List<DatanodeDescriptor>>();
+    
+    dataNodes[0].setRemaining(4*1024*1024);
+    replicaNodeList.add(dataNodes[0]);
+    
+    dataNodes[1].setRemaining(3*1024*1024);
+    replicaNodeList.add(dataNodes[1]);
+    
+    dataNodes[2].setRemaining(2*1024*1024);
+    replicaNodeList.add(dataNodes[2]);
+    
+    dataNodes[5].setRemaining(1*1024*1024);
+    replicaNodeList.add(dataNodes[5]);
+    
+    List<DatanodeDescriptor> first = new ArrayList<DatanodeDescriptor>();
+    List<DatanodeDescriptor> second = new ArrayList<DatanodeDescriptor>();
+    replicator.splitNodesWithRack(
+        replicaNodeList, rackMap, first, second);
+    // dataNodes[0] and dataNodes[1] are in first set as their rack has two 
+    // replica nodes, while datanodes[2] and dataNodes[5] are in second set.
+    assertEquals(2, first.size());
+    assertEquals(2, second.size());
+    DatanodeDescriptor chosenNode = replicator.chooseReplicaToDelete(
+        null, null, (short)3, first, second);
+    // Within first set, dataNodes[1] with less free space
+    assertEquals(chosenNode, dataNodes[1]);
+
+    replicator.adjustSetsWithChosenReplica(
+        rackMap, first, second, chosenNode);
+    assertEquals(0, first.size());
+    assertEquals(3, second.size());
+    // Within second set, dataNodes[5] with less free space
+    chosenNode = replicator.chooseReplicaToDelete(
+        null, null, (short)2, first, second);
+    assertEquals(chosenNode, dataNodes[5]);
   }
 }

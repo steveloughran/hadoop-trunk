@@ -19,6 +19,7 @@
 package org.apache.hadoop.security.token.delegation;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
@@ -39,12 +40,15 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecretManager.DelegationTokenInformation;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -170,6 +174,52 @@ public class TestDelegationToken {
   }
 
   @Test
+  public void testGetUserNullOwner() {
+    TestDelegationTokenIdentifier ident =
+        new TestDelegationTokenIdentifier(null, null, null);
+    UserGroupInformation ugi = ident.getUser();
+    assertNull(ugi);
+  }
+  
+  @Test
+  public void testGetUserWithOwner() {
+    TestDelegationTokenIdentifier ident =
+        new TestDelegationTokenIdentifier(new Text("owner"), null, null);
+    UserGroupInformation ugi = ident.getUser();
+    assertNull(ugi.getRealUser());
+    assertEquals("owner", ugi.getUserName());
+    assertEquals(AuthenticationMethod.TOKEN, ugi.getAuthenticationMethod());
+  }
+
+  @Test
+  public void testGetUserWithOwnerEqualsReal() {
+    Text owner = new Text("owner");
+    TestDelegationTokenIdentifier ident =
+        new TestDelegationTokenIdentifier(owner, null, owner);
+    UserGroupInformation ugi = ident.getUser();
+    assertNull(ugi.getRealUser());
+    assertEquals("owner", ugi.getUserName());
+    assertEquals(AuthenticationMethod.TOKEN, ugi.getAuthenticationMethod());
+  }
+
+  @Test
+  public void testGetUserWithOwnerAndReal() {
+    Text owner = new Text("owner");
+    Text realUser = new Text("realUser");
+    TestDelegationTokenIdentifier ident =
+        new TestDelegationTokenIdentifier(owner, null, realUser);
+    UserGroupInformation ugi = ident.getUser();
+    assertNotNull(ugi.getRealUser());
+    assertNull(ugi.getRealUser().getRealUser());
+    assertEquals("owner", ugi.getUserName());
+    assertEquals("realUser", ugi.getRealUser().getUserName());
+    assertEquals(AuthenticationMethod.PROXY,
+                 ugi.getAuthenticationMethod());
+    assertEquals(AuthenticationMethod.TOKEN,
+                 ugi.getRealUser().getAuthenticationMethod());
+  }
+
+  @Test
   public void testDelegationTokenSecretManager() throws Exception {
     final TestDelegationTokenSecretManager dtSecretManager = 
       new TestDelegationTokenSecretManager(24*60*60*1000,
@@ -187,7 +237,7 @@ public class TestDelegationToken {
         }
       }, AccessControlException.class);
       long time = dtSecretManager.renewToken(token, "JobTracker");
-      assertTrue("renew time is in future", time > System.currentTimeMillis());
+      assertTrue("renew time is in future", time > Time.now());
       TestDelegationTokenIdentifier identifier = 
         new TestDelegationTokenIdentifier();
       byte[] tokenId = token.getIdentifier();
@@ -387,4 +437,46 @@ public class TestDelegationToken {
     }
   }
 
+  private boolean testDelegationTokenIdentiferSerializationRoundTrip(Text owner,
+      Text renewer, Text realUser) throws IOException {
+    TestDelegationTokenIdentifier dtid = new TestDelegationTokenIdentifier(
+        owner, renewer, realUser);
+    DataOutputBuffer out = new DataOutputBuffer();
+    dtid.writeImpl(out);
+    DataInputBuffer in = new DataInputBuffer();
+    in.reset(out.getData(), out.getLength());
+    try {
+      TestDelegationTokenIdentifier dtid2 =
+          new TestDelegationTokenIdentifier();
+      dtid2.readFields(in);
+      assertTrue(dtid.equals(dtid2));
+      return true;
+    } catch(IOException e){
+      return false;
+    }
+  }
+      
+  @Test
+  public void testSimpleDtidSerialization() throws IOException {
+    assertTrue(testDelegationTokenIdentiferSerializationRoundTrip(
+        new Text("owner"), new Text("renewer"), new Text("realUser")));
+    assertTrue(testDelegationTokenIdentiferSerializationRoundTrip(
+        new Text(""), new Text(""), new Text("")));
+    assertTrue(testDelegationTokenIdentiferSerializationRoundTrip(
+        new Text(""), new Text("b"), new Text("")));
+  }
+  
+  @Test
+  public void testOverlongDtidSerialization() throws IOException {
+    byte[] bigBuf = new byte[Text.DEFAULT_MAX_LEN + 1];
+    for (int i = 0; i < bigBuf.length; i++) {
+      bigBuf[i] = 0;
+    }
+    assertFalse(testDelegationTokenIdentiferSerializationRoundTrip(
+        new Text(bigBuf), new Text("renewer"), new Text("realUser")));
+    assertFalse(testDelegationTokenIdentiferSerializationRoundTrip(
+        new Text("owner"), new Text(bigBuf), new Text("realUser")));
+    assertFalse(testDelegationTokenIdentiferSerializationRoundTrip(
+        new Text("owner"), new Text("renewer"), new Text(bigBuf)));
+  }
 }

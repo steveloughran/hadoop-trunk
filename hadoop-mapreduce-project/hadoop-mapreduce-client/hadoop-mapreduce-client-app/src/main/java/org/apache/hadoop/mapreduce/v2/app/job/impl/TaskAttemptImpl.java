@@ -84,6 +84,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptContainerLaunched
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptDiagnosticsUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
+import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptKillEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptStatusUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptStatusUpdateEvent.TaskAttemptStatus;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEventType;
@@ -253,6 +254,10 @@ public abstract class TaskAttemptImpl implements
      .addTransition(TaskAttemptState.RUNNING,
          TaskAttemptState.FAIL_CONTAINER_CLEANUP,
          TaskAttemptEventType.TA_TIMED_OUT, CLEANUP_CONTAINER_TRANSITION)
+     // if container killed by AM shutting down
+     .addTransition(TaskAttemptState.RUNNING,
+         TaskAttemptState.KILLED,
+         TaskAttemptEventType.TA_CONTAINER_CLEANED, new KilledTransition())
      // Kill handling
      .addTransition(TaskAttemptState.RUNNING,
          TaskAttemptState.KILL_CONTAINER_CLEANUP, TaskAttemptEventType.TA_KILL,
@@ -272,6 +277,10 @@ public abstract class TaskAttemptImpl implements
      .addTransition(TaskAttemptState.COMMIT_PENDING,
          TaskAttemptState.KILL_CONTAINER_CLEANUP, TaskAttemptEventType.TA_KILL,
          CLEANUP_CONTAINER_TRANSITION)
+     // if container killed by AM shutting down
+     .addTransition(TaskAttemptState.COMMIT_PENDING,
+         TaskAttemptState.KILLED,
+         TaskAttemptEventType.TA_CONTAINER_CLEANED, new KilledTransition())
      .addTransition(TaskAttemptState.COMMIT_PENDING,
          TaskAttemptState.FAIL_CONTAINER_CLEANUP,
          TaskAttemptEventType.TA_FAILMSG, CLEANUP_CONTAINER_TRANSITION)
@@ -363,6 +372,7 @@ public abstract class TaskAttemptImpl implements
              TaskAttemptEventType.TA_COMMIT_PENDING,
              TaskAttemptEventType.TA_DONE,
              TaskAttemptEventType.TA_FAILMSG,
+             TaskAttemptEventType.TA_CONTAINER_CLEANED,
              // Container launch events can arrive late
              TaskAttemptEventType.TA_CONTAINER_LAUNCHED,
              TaskAttemptEventType.TA_CONTAINER_LAUNCH_FAILED))
@@ -384,6 +394,7 @@ public abstract class TaskAttemptImpl implements
              TaskAttemptEventType.TA_COMMIT_PENDING,
              TaskAttemptEventType.TA_DONE,
              TaskAttemptEventType.TA_FAILMSG,
+             TaskAttemptEventType.TA_CONTAINER_CLEANED,
              // Container launch events can arrive late
              TaskAttemptEventType.TA_CONTAINER_LAUNCHED,
              TaskAttemptEventType.TA_CONTAINER_LAUNCH_FAILED))
@@ -394,14 +405,18 @@ public abstract class TaskAttemptImpl implements
          TaskAttemptEventType.TA_TOO_MANY_FETCH_FAILURE,
          new TooManyFetchFailureTransition())
      .addTransition(
+         TaskAttemptState.SUCCEEDED, TaskAttemptState.KILLED,
+         TaskAttemptEventType.TA_KILL,
+         new KilledAfterSuccessTransition())
+     .addTransition(
          TaskAttemptState.SUCCEEDED, TaskAttemptState.SUCCEEDED,
          TaskAttemptEventType.TA_DIAGNOSTICS_UPDATE,
          DIAGNOSTIC_INFORMATION_UPDATE_TRANSITION)
      // Ignore-able events for SUCCEEDED state
      .addTransition(TaskAttemptState.SUCCEEDED,
          TaskAttemptState.SUCCEEDED,
-         EnumSet.of(TaskAttemptEventType.TA_KILL,
-             TaskAttemptEventType.TA_FAILMSG,
+         EnumSet.of(TaskAttemptEventType.TA_FAILMSG,
+             TaskAttemptEventType.TA_CONTAINER_CLEANED,
              TaskAttemptEventType.TA_CONTAINER_COMPLETED))
 
      // Transitions from FAILED state
@@ -417,6 +432,7 @@ public abstract class TaskAttemptImpl implements
              // Container launch events can arrive late
              TaskAttemptEventType.TA_CONTAINER_LAUNCHED,
              TaskAttemptEventType.TA_CONTAINER_LAUNCH_FAILED,
+             TaskAttemptEventType.TA_CONTAINER_CLEANED,
              TaskAttemptEventType.TA_COMMIT_PENDING,
              TaskAttemptEventType.TA_DONE,
              TaskAttemptEventType.TA_FAILMSG))
@@ -434,6 +450,7 @@ public abstract class TaskAttemptImpl implements
              // Container launch events can arrive late
              TaskAttemptEventType.TA_CONTAINER_LAUNCHED,
              TaskAttemptEventType.TA_CONTAINER_LAUNCH_FAILED,
+             TaskAttemptEventType.TA_CONTAINER_CLEANED,
              TaskAttemptEventType.TA_COMMIT_PENDING,
              TaskAttemptEventType.TA_DONE,
              TaskAttemptEventType.TA_FAILMSG))
@@ -805,6 +822,16 @@ public abstract class TaskAttemptImpl implements
     }
   }
 
+  @Override 
+  public NodeId getNodeId() {
+    readLock.lock();
+    try {
+      return containerNodeId;
+    } finally {
+      readLock.unlock();
+    }
+  }
+  
   /**If container Assigned then return the node's address, otherwise null.
    */
   @Override
@@ -986,7 +1013,7 @@ public abstract class TaskAttemptImpl implements
   }
 
   private static JobCounterUpdateEvent createJobCounterUpdateEventTAFailed(
-      TaskAttemptImpl taskAttempt) {
+      TaskAttemptImpl taskAttempt, boolean taskAlreadyCompleted) {
     TaskType taskType = taskAttempt.getID().getTaskId().getTaskType();
     JobCounterUpdateEvent jce = new JobCounterUpdateEvent(taskAttempt.getID().getTaskId().getJobId());
     
@@ -994,16 +1021,22 @@ public abstract class TaskAttemptImpl implements
     
     if (taskType == TaskType.MAP) {
       jce.addCounterUpdate(JobCounter.NUM_FAILED_MAPS, 1);
-      jce.addCounterUpdate(JobCounter.SLOTS_MILLIS_MAPS, slotMillisIncrement);
+      if(!taskAlreadyCompleted) {
+        // dont double count the elapsed time
+        jce.addCounterUpdate(JobCounter.SLOTS_MILLIS_MAPS, slotMillisIncrement);
+      }
     } else {
       jce.addCounterUpdate(JobCounter.NUM_FAILED_REDUCES, 1);
-      jce.addCounterUpdate(JobCounter.SLOTS_MILLIS_REDUCES, slotMillisIncrement);
+      if(!taskAlreadyCompleted) {
+        // dont double count the elapsed time
+        jce.addCounterUpdate(JobCounter.SLOTS_MILLIS_REDUCES, slotMillisIncrement);
+      }
     }
     return jce;
   }
   
   private static JobCounterUpdateEvent createJobCounterUpdateEventTAKilled(
-      TaskAttemptImpl taskAttempt) {
+      TaskAttemptImpl taskAttempt, boolean taskAlreadyCompleted) {
     TaskType taskType = taskAttempt.getID().getTaskId().getTaskType();
     JobCounterUpdateEvent jce = new JobCounterUpdateEvent(taskAttempt.getID().getTaskId().getJobId());
     
@@ -1011,10 +1044,16 @@ public abstract class TaskAttemptImpl implements
     
     if (taskType == TaskType.MAP) {
       jce.addCounterUpdate(JobCounter.NUM_KILLED_MAPS, 1);
-      jce.addCounterUpdate(JobCounter.SLOTS_MILLIS_MAPS, slotMillisIncrement);
+      if(!taskAlreadyCompleted) {
+        // dont double count the elapsed time
+        jce.addCounterUpdate(JobCounter.SLOTS_MILLIS_MAPS, slotMillisIncrement);
+      }
     } else {
       jce.addCounterUpdate(JobCounter.NUM_KILLED_REDUCES, 1);
-      jce.addCounterUpdate(JobCounter.SLOTS_MILLIS_REDUCES, slotMillisIncrement);
+      if(!taskAlreadyCompleted) {
+        // dont double count the elapsed time
+        jce.addCounterUpdate(JobCounter.SLOTS_MILLIS_REDUCES, slotMillisIncrement);
+      }
     }
     return jce;
   }  
@@ -1246,10 +1285,10 @@ public abstract class TaskAttemptImpl implements
                 finalState);
         if(finalState == TaskAttemptState.FAILED) {
           taskAttempt.eventHandler
-            .handle(createJobCounterUpdateEventTAFailed(taskAttempt));
+            .handle(createJobCounterUpdateEventTAFailed(taskAttempt, false));
         } else if(finalState == TaskAttemptState.KILLED) {
           taskAttempt.eventHandler
-          .handle(createJobCounterUpdateEventTAKilled(taskAttempt));
+          .handle(createJobCounterUpdateEventTAKilled(taskAttempt, false));
         }
         taskAttempt.eventHandler.handle(new JobHistoryEvent(
             taskAttempt.attemptId.getTaskId().getJobId(), tauce));
@@ -1381,7 +1420,7 @@ public abstract class TaskAttemptImpl implements
       
       if (taskAttempt.getLaunchTime() != 0) {
         taskAttempt.eventHandler
-            .handle(createJobCounterUpdateEventTAFailed(taskAttempt));
+            .handle(createJobCounterUpdateEventTAFailed(taskAttempt, false));
         TaskAttemptUnsuccessfulCompletionEvent tauce =
             createTaskAttemptUnsuccessfulCompletionEvent(taskAttempt,
                 TaskAttemptState.FAILED);
@@ -1450,7 +1489,7 @@ public abstract class TaskAttemptImpl implements
       
       if (taskAttempt.getLaunchTime() != 0) {
         taskAttempt.eventHandler
-            .handle(createJobCounterUpdateEventTAFailed(taskAttempt));
+            .handle(createJobCounterUpdateEventTAFailed(taskAttempt, true));
         TaskAttemptUnsuccessfulCompletionEvent tauce =
             createTaskAttemptUnsuccessfulCompletionEvent(taskAttempt,
                 TaskAttemptState.FAILED);
@@ -1462,6 +1501,32 @@ public abstract class TaskAttemptImpl implements
       }
       taskAttempt.eventHandler.handle(new TaskTAttemptEvent(
           taskAttempt.attemptId, TaskEventType.T_ATTEMPT_FAILED));
+    }
+  }
+  
+  private static class KilledAfterSuccessTransition implements
+      SingleArcTransition<TaskAttemptImpl, TaskAttemptEvent> {
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public void transition(TaskAttemptImpl taskAttempt, 
+        TaskAttemptEvent event) {
+      TaskAttemptKillEvent msgEvent = (TaskAttemptKillEvent) event;
+      //add to diagnostic
+      taskAttempt.addDiagnosticInfo(msgEvent.getMessage());
+
+      // not setting a finish time since it was set on success
+      assert (taskAttempt.getFinishTime() != 0);
+
+      assert (taskAttempt.getLaunchTime() != 0);
+      taskAttempt.eventHandler
+          .handle(createJobCounterUpdateEventTAKilled(taskAttempt, true));
+      TaskAttemptUnsuccessfulCompletionEvent tauce = createTaskAttemptUnsuccessfulCompletionEvent(
+          taskAttempt, TaskAttemptState.KILLED);
+      taskAttempt.eventHandler.handle(new JobHistoryEvent(taskAttempt.attemptId
+          .getTaskId().getJobId(), tauce));
+      taskAttempt.eventHandler.handle(new TaskTAttemptEvent(
+          taskAttempt.attemptId, TaskEventType.T_ATTEMPT_KILLED));
     }
   }
 
@@ -1476,7 +1541,7 @@ public abstract class TaskAttemptImpl implements
       taskAttempt.setFinishTime();
       if (taskAttempt.getLaunchTime() != 0) {
         taskAttempt.eventHandler
-            .handle(createJobCounterUpdateEventTAKilled(taskAttempt));
+            .handle(createJobCounterUpdateEventTAKilled(taskAttempt, false));
         TaskAttemptUnsuccessfulCompletionEvent tauce =
             createTaskAttemptUnsuccessfulCompletionEvent(taskAttempt,
                 TaskAttemptState.KILLED);

@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.junit.Test;
 
@@ -85,6 +86,7 @@ public class TestDistributedFileSystem {
   /**
    * Tests DFSClient.close throws no ConcurrentModificationException if 
    * multiple files are open.
+   * Also tests that any cached sockets are closed. (HDFS-3359)
    */
   @Test
   public void testDFSClose() throws Exception {
@@ -94,11 +96,23 @@ public class TestDistributedFileSystem {
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
       FileSystem fileSys = cluster.getFileSystem();
       
-      // create two files
+      // create two files, leaving them open
       fileSys.create(new Path("/test/dfsclose/file-0"));
       fileSys.create(new Path("/test/dfsclose/file-1"));
+      
+      // create another file, close it, and read it, so
+      // the client gets a socket in its SocketCache
+      Path p = new Path("/non-empty-file");
+      DFSTestUtil.createFile(fileSys, p, 1L, (short)1, 0L);
+      DFSTestUtil.readFile(fileSys, p);
+      
+      DFSClient client = ((DistributedFileSystem)fileSys).dfs;
+      SocketCache cache = client.socketCache;
+      assertEquals(1, cache.size());
 
       fileSys.close();
+      
+      assertEquals(0, cache.size());
     } finally {
       if (cluster != null) {cluster.shutdown();}
     }
@@ -156,82 +170,82 @@ public class TestDistributedFileSystem {
       for(int i = 0; i < filepaths.length; i++) {
         filepaths[i] = new Path(filepathstring + i);
       }
-      final long millis = System.currentTimeMillis();
+      final long millis = Time.now();
 
       {
         DistributedFileSystem dfs = (DistributedFileSystem)cluster.getFileSystem();
-        dfs.dfs.leaserenewer.setGraceSleepPeriod(grace);
-        assertFalse(dfs.dfs.leaserenewer.isRunning());
+        dfs.dfs.getLeaseRenewer().setGraceSleepPeriod(grace);
+        assertFalse(dfs.dfs.getLeaseRenewer().isRunning());
   
         {
           //create a file
           final FSDataOutputStream out = dfs.create(filepaths[0]);
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
           //write something
           out.writeLong(millis);
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
           //close
           out.close();
           Thread.sleep(grace/4*3);
           //within grace period
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
           for(int i = 0; i < 3; i++) {
-            if (dfs.dfs.leaserenewer.isRunning()) {
+            if (dfs.dfs.getLeaseRenewer().isRunning()) {
               Thread.sleep(grace/2);
             }
           }
           //passed grace period
-          assertFalse(dfs.dfs.leaserenewer.isRunning());
+          assertFalse(dfs.dfs.getLeaseRenewer().isRunning());
         }
 
         {
           //create file1
           final FSDataOutputStream out1 = dfs.create(filepaths[1]);
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
           //create file2
           final FSDataOutputStream out2 = dfs.create(filepaths[2]);
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
 
           //write something to file1
           out1.writeLong(millis);
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
           //close file1
           out1.close();
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
 
           //write something to file2
           out2.writeLong(millis);
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
           //close file2
           out2.close();
           Thread.sleep(grace/4*3);
           //within grace period
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
         }
 
         {
           //create file3
           final FSDataOutputStream out3 = dfs.create(filepaths[3]);
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
           Thread.sleep(grace/4*3);
           //passed previous grace period, should still running
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
           //write something to file3
           out3.writeLong(millis);
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
           //close file3
           out3.close();
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
           Thread.sleep(grace/4*3);
           //within grace period
-          assertTrue(dfs.dfs.leaserenewer.isRunning());
+          assertTrue(dfs.dfs.getLeaseRenewer().isRunning());
           for(int i = 0; i < 3; i++) {
-            if (dfs.dfs.leaserenewer.isRunning()) {
+            if (dfs.dfs.getLeaseRenewer().isRunning()) {
               Thread.sleep(grace/2);
             }
           }
           //passed grace period
-          assertFalse(dfs.dfs.leaserenewer.isRunning());
+          assertFalse(dfs.dfs.getLeaseRenewer().isRunning());
         }
 
         dfs.close();
@@ -260,15 +274,15 @@ public class TestDistributedFileSystem {
 
       {
         DistributedFileSystem dfs = (DistributedFileSystem)cluster.getFileSystem();
-        assertFalse(dfs.dfs.leaserenewer.isRunning());
+        assertFalse(dfs.dfs.getLeaseRenewer().isRunning());
 
         //open and check the file
         FSDataInputStream in = dfs.open(filepaths[0]);
-        assertFalse(dfs.dfs.leaserenewer.isRunning());
+        assertFalse(dfs.dfs.getLeaseRenewer().isRunning());
         assertEquals(millis, in.readLong());
-        assertFalse(dfs.dfs.leaserenewer.isRunning());
+        assertFalse(dfs.dfs.getLeaseRenewer().isRunning());
         in.close();
-        assertFalse(dfs.dfs.leaserenewer.isRunning());
+        assertFalse(dfs.dfs.getLeaseRenewer().isRunning());
         dfs.close();
       }
       

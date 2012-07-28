@@ -63,7 +63,7 @@ public class HdfsConfiguration extends Configuration {
   }
 
   private static void deprecate(String oldKey, String newKey) {
-    Configuration.addDeprecation(oldKey, new String[]{newKey});
+    Configuration.addDeprecation(oldKey, newKey);
   }
 
   private static void addDeprecatedKeys() {
@@ -81,7 +81,6 @@ public class HdfsConfiguration extends Configuration {
     deprecate("dfs.safemode.extension", DFSConfigKeys.DFS_NAMENODE_SAFEMODE_EXTENSION_KEY);
     deprecate("dfs.safemode.threshold.pct", DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY);
     deprecate("dfs.secondary.http.address", DFSConfigKeys.DFS_NAMENODE_SECONDARY_HTTP_ADDRESS_KEY);
-    deprecate("dfs.secondary.https.port", DFSConfigKeys.DFS_NAMENODE_SECONDARY_HTTPS_PORT_KEY);
     deprecate("dfs.socket.timeout", DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY);
     deprecate("fs.checkpoint.dir", DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_DIR_KEY);
     deprecate("fs.checkpoint.edits.dir", DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_EDITS_DIR_KEY);
@@ -103,5 +102,7 @@ public class HdfsConfiguration extends Configuration {
     deprecate("dfs.block.size", DFSConfigKeys.DFS_BLOCK_SIZE_KEY);
     deprecate("dfs.datanode.max.xcievers", DFSConfigKeys.DFS_DATANODE_MAX_RECEIVER_THREADS_KEY);
     deprecate("io.bytes.per.checksum", DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY);
+    deprecate("dfs.federation.nameservices", DFSConfigKeys.DFS_NAMESERVICES);
+    deprecate("dfs.federation.nameservice.id", DFSConfigKeys.DFS_NAMESERVICE_ID);
   }
 }

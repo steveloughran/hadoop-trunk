@@ -20,6 +20,7 @@ package org.apache.hadoop.io;
 
 import junit.framework.TestCase;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.util.Random;
@@ -107,7 +108,6 @@ public class TestText extends TestCase {
     }
   }
   
-  
   public void testIO() throws Exception {
     DataOutputBuffer out = new DataOutputBuffer();
     DataInputBuffer in = new DataInputBuffer();
@@ -135,6 +135,40 @@ public class TestText extends TestCase {
                                  out.getLength()-strLenSize, "UTF-8");
       assertTrue(before.equals(after2));
     }
+  }
+  
+  public void doTestLimitedIO(String str, int len) throws IOException {
+    DataOutputBuffer out = new DataOutputBuffer();
+    DataInputBuffer in = new DataInputBuffer();
+
+    out.reset();
+    try {
+      Text.writeString(out, str, len);
+      fail("expected writeString to fail when told to write a string " +
+          "that was too long!  The string was '" + str + "'");
+    } catch (IOException e) {
+    }
+    Text.writeString(out, str, len + 1);
+
+    // test that it reads correctly
+    in.reset(out.getData(), out.getLength());
+    in.mark(len);
+    String after;
+    try {
+      after = Text.readString(in, len);
+      fail("expected readString to fail when told to read a string " +
+          "that was too long!  The string was '" + str + "'");
+    } catch (IOException e) {
+    }
+    in.reset();
+    after = Text.readString(in, len + 1);
+    assertTrue(str.equals(after));
+  }
+  
+  public void testLimitedIO() throws Exception {
+    doTestLimitedIO("abcd", 3);
+    doTestLimitedIO("foo bar baz", 10);
+    doTestLimitedIO("1", 0);
   }
 
   public void testCompare() throws Exception {
@@ -192,16 +226,6 @@ public class TestText extends TestCase {
     assertTrue(text.find("\u20ac", 5)==11);
   }
 
-  public void testClear() {
-	Text text = new Text();
-	assertEquals("", text.toString());
-	assertEquals(0, text.getBytes().length);
-	text = new Text("abcd\u20acbdcd\u20ac");
-	text.clear();
-	assertEquals("", text.toString());
-	assertEquals(0, text.getBytes().length);
-  }
-
   public void testFindAfterUpdatingContents() throws Exception {
     Text text = new Text("abcd");
     text.set("a".getBytes());
@@ -215,6 +239,30 @@ public class TestText extends TestCase {
     byte [] utf8 = text.getBytes();
     int length = text.getLength();
     Text.validateUTF8(utf8, 0, length);
+  }
+
+  public void testClear() throws Exception {
+    // Test lengths on an empty text object
+    Text text = new Text();
+    assertEquals(
+        "Actual string on an empty text object must be an empty string",
+        "", text.toString());
+    assertEquals("Underlying byte array length must be zero",
+        0, text.getBytes().length);
+    assertEquals("String's length must be zero",
+        0, text.getLength());
+
+    // Test if clear works as intended
+    text = new Text("abcd\u20acbdcd\u20ac");
+    int len = text.getLength();
+    text.clear();
+    assertEquals("String must be empty after clear()",
+        "", text.toString());
+    assertTrue(
+        "Length of the byte array must not decrease after clear()",
+        text.getBytes().length >= len);
+    assertEquals("Length of the string must be reset to 0 after clear()",
+        0, text.getLength());
   }
 
   public void testTextText() throws CharacterCodingException {

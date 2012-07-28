@@ -27,6 +27,9 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.SecurityUtil;
 
 import org.apache.commons.logging.Log;
@@ -34,17 +37,24 @@ import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
+import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.protocol.RemoteEditLog;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.hdfs.util.MD5FileUtils;
+import org.apache.hadoop.http.HttpServer;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.ServletUtil;
 import org.apache.hadoop.util.StringUtils;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.net.InetAddresses;
 
 /**
  * This class is used in Namesystem's jetty to retrieve a file.
@@ -69,6 +79,7 @@ public class GetImageServlet extends HttpServlet {
   private static Set<Long> currentlyDownloadingCheckpoints =
     Collections.<Long>synchronizedSet(new HashSet<Long>());
   
+  @Override
   public void doGet(final HttpServletRequest request,
                     final HttpServletResponse response
                     ) throws ServletException, IOException {
@@ -79,12 +90,13 @@ public class GetImageServlet extends HttpServlet {
       final Configuration conf = 
         (Configuration)getServletContext().getAttribute(JspHelper.CURRENT_CONF);
       
-      if(UserGroupInformation.isSecurityEnabled() && 
-          !isValidRequestor(request.getRemoteUser(), conf)) {
+      if (UserGroupInformation.isSecurityEnabled() && 
+          !isValidRequestor(context, request.getUserPrincipal().getName(), conf)) {
         response.sendError(HttpServletResponse.SC_FORBIDDEN, 
-            "Only Namenode and Secondary Namenode may access this servlet");
-        LOG.warn("Received non-NN/SNN request for image or edits from " 
-            + request.getRemoteHost());
+            "Only Namenode, Secondary Namenode, and administrators may access " +
+            "this servlet");
+        LOG.warn("Received non-NN/SNN/administrator request for image or edits from " 
+            + request.getUserPrincipal().getName() + " at " + request.getRemoteHost());
         return;
       }
       
@@ -116,23 +128,15 @@ public class GetImageServlet extends HttpServlet {
             if (imageFile == null) {
               throw new IOException(errorMessage);
             }
-            setFileNameHeaders(response, imageFile);
-            setVerificationHeaders(response, imageFile);
-            // send fsImage
-            TransferFsImage.getFileServer(response.getOutputStream(), imageFile,
-                getThrottler(conf)); 
+            CheckpointFaultInjector.getInstance().beforeGetImageSetsHeaders();
+            serveFile(imageFile);
           } else if (parsedParams.isGetEdit()) {
             long startTxId = parsedParams.getStartTxId();
             long endTxId = parsedParams.getEndTxId();
             
             File editFile = nnImage.getStorage()
                 .findFinalizedEditsFile(startTxId, endTxId);
-            setVerificationHeaders(response, editFile);
-            
-            setFileNameHeaders(response, editFile);
-            // send edits
-            TransferFsImage.getFileServer(response.getOutputStream(), editFile,
-                getThrottler(conf));
+            serveFile(editFile);
           } else if (parsedParams.isPutImage()) {
             final long txid = parsedParams.getTxId();
 
@@ -151,16 +155,16 @@ public class GetImageServlet extends HttpServlet {
                 return null;
               }
               
+              // We may have lost our ticket since last checkpoint, log in again, just in case
+              if (UserGroupInformation.isSecurityEnabled()) {
+                UserGroupInformation.getCurrentUser().reloginFromKeytab();
+              }
+              
               // issue a HTTP get request to download the new fsimage 
-              MD5Hash downloadImageDigest = reloginIfNecessary().doAs(
-                  new PrivilegedExceptionAction<MD5Hash>() {
-                  @Override
-                  public MD5Hash run() throws Exception {
-                    return TransferFsImage.downloadImageToStorage(
+              MD5Hash downloadImageDigest =
+                TransferFsImage.downloadImageToStorage(
                         parsedParams.getInfoServer(), txid,
                         nnImage.getStorage(), true);
-                    }
-              });
               nnImage.saveDigestAndRenameCheckpointImage(txid, downloadImageDigest);
               
               // Now that we have a new checkpoint, we might be able to
@@ -172,22 +176,32 @@ public class GetImageServlet extends HttpServlet {
           }
           return null;
         }
-        
-        // We may have lost our ticket since the last time we tried to open
-        // an http connection, so log in just in case.
-        private UserGroupInformation reloginIfNecessary() throws IOException {
-          // This method is only called on the NN, therefore it is safe to
-          // use these key values.
-          return UserGroupInformation.loginUserFromKeytabAndReturnUGI(
-                  SecurityUtil.getServerPrincipal(conf
-                      .get(DFSConfigKeys.DFS_NAMENODE_KRB_HTTPS_USER_NAME_KEY),
-                      NameNode.getAddress(conf).getHostName()),
-              conf.get(DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY));
-        }       
+
+        private void serveFile(File file) throws IOException {
+          FileInputStream fis = new FileInputStream(file);
+          try {
+            setVerificationHeaders(response, file);
+            setFileNameHeaders(response, file);
+            if (!file.exists()) {
+              // Potential race where the file was deleted while we were in the
+              // process of setting headers!
+              throw new FileNotFoundException(file.toString());
+              // It's possible the file could be deleted after this point, but
+              // we've already opened the 'fis' stream.
+              // It's also possible length could change, but this would be
+              // detected by the client side as an inaccurate length header.
+            }
+            // send file
+            TransferFsImage.getFileServer(response, file, fis,
+                getThrottler(conf));
+          } finally {
+            IOUtils.closeStream(fis);
+          }
+        }
       });
       
-    } catch (Exception ie) {
-      String errMsg = "GetImage failed. " + StringUtils.stringifyException(ie);
+    } catch (Throwable t) {
+      String errMsg = "GetImage failed. " + StringUtils.stringifyException(t);
       response.sendError(HttpServletResponse.SC_GONE, errMsg);
       throw new IOException(errMsg);
     } finally {
@@ -195,7 +209,7 @@ public class GetImageServlet extends HttpServlet {
     }
   }
   
-  private static void setFileNameHeaders(HttpServletResponse response,
+  public static void setFileNameHeaders(HttpServletResponse response,
       File file) {
     response.setHeader(CONTENT_DISPOSITION, "attachment; filename=" +
         file.getName());
@@ -207,7 +221,7 @@ public class GetImageServlet extends HttpServlet {
    * @param conf configuration
    * @return a data transfer throttler
    */
-  private final DataTransferThrottler getThrottler(Configuration conf) {
+  public final static DataTransferThrottler getThrottler(Configuration conf) {
     long transferBandwidth = 
       conf.getLong(DFSConfigKeys.DFS_IMAGE_TRANSFER_RATE_KEY,
                    DFSConfigKeys.DFS_IMAGE_TRANSFER_RATE_DEFAULT);
@@ -218,34 +232,46 @@ public class GetImageServlet extends HttpServlet {
     return throttler;
   }
   
-  protected boolean isValidRequestor(String remoteUser, Configuration conf)
-      throws IOException {
+  @VisibleForTesting
+  static boolean isValidRequestor(ServletContext context, String remoteUser,
+      Configuration conf) throws IOException {
     if(remoteUser == null) { // This really shouldn't happen...
       LOG.warn("Received null remoteUser while authorizing access to getImage servlet");
       return false;
     }
+    
+    Set<String> validRequestors = new HashSet<String>();
 
-    String[] validRequestors = {
-        SecurityUtil.getServerPrincipal(conf
-            .get(DFSConfigKeys.DFS_NAMENODE_KRB_HTTPS_USER_NAME_KEY), NameNode
-            .getAddress(conf).getHostName()),
+    validRequestors.add(
         SecurityUtil.getServerPrincipal(conf
             .get(DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY), NameNode
-            .getAddress(conf).getHostName()),
-        SecurityUtil.getServerPrincipal(conf
-            .get(DFSConfigKeys.DFS_SECONDARY_NAMENODE_KRB_HTTPS_USER_NAME_KEY),
-            SecondaryNameNode.getHttpAddress(conf).getHostName()),
+            .getAddress(conf).getHostName()));
+    validRequestors.add(
         SecurityUtil.getServerPrincipal(conf
             .get(DFSConfigKeys.DFS_SECONDARY_NAMENODE_USER_NAME_KEY),
-            SecondaryNameNode.getHttpAddress(conf).getHostName()) };
+            SecondaryNameNode.getHttpAddress(conf).getHostName()));
+
+    if (HAUtil.isHAEnabled(conf, DFSUtil.getNamenodeNameServiceId(conf))) {
+      Configuration otherNnConf = HAUtil.getConfForOtherNode(conf);
+      validRequestors.add(
+          SecurityUtil.getServerPrincipal(otherNnConf
+              .get(DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY),
+              NameNode.getAddress(otherNnConf).getHostName()));
+    }
 
     for(String v : validRequestors) {
       if(v != null && v.equals(remoteUser)) {
-        if(LOG.isDebugEnabled()) LOG.debug("isValidRequestor is allowing: " + remoteUser);
+        LOG.info("GetImageServlet allowing checkpointer: " + remoteUser);
         return true;
       }
     }
-    if(LOG.isDebugEnabled()) LOG.debug("isValidRequestor is rejecting: " + remoteUser);
+    
+    if (HttpServer.userHasAdministratorAccess(context, remoteUser)) {
+      LOG.info("GetImageServlet allowing administrator: " + remoteUser);
+      return true;
+    }
+    
+    LOG.info("GetImageServlet rejecting: " + remoteUser);
     return false;
   }
   
@@ -253,7 +279,7 @@ public class GetImageServlet extends HttpServlet {
    * Set headers for content length, and, if available, md5.
    * @throws IOException 
    */
-  private void setVerificationHeaders(HttpServletResponse response, File file)
+  public static void setVerificationHeaders(HttpServletResponse response, File file)
   throws IOException {
     response.setHeader(TransferFsImage.CONTENT_LENGTH,
         String.valueOf(file.length()));
@@ -283,13 +309,12 @@ public class GetImageServlet extends HttpServlet {
   }
   
   static String getParamStringToPutImage(long txid,
-      InetSocketAddress imageListenAddress, NNStorage storage) {
+      InetSocketAddress imageListenAddress, Storage storage) {
     
     return "putimage=1" +
       "&" + TXID_PARAM + "=" + txid +
       "&port=" + imageListenAddress.getPort() +
-      "&machine=" + imageListenAddress.getHostName()
-      + "&" + STORAGEINFO_PARAM + "=" +
+      "&" + STORAGEINFO_PARAM + "=" +
       storage.toColonSeparatedString();
   }
 
@@ -316,7 +341,10 @@ public class GetImageServlet extends HttpServlet {
       Map<String, String[]> pmap = request.getParameterMap();
       isGetImage = isGetEdit = isPutImage = fetchLatest = false;
       remoteport = 0;
-      machineName = null;
+      machineName = request.getRemoteHost();
+      if (InetAddresses.isInetAddress(machineName)) {
+        machineName = NetUtils.getHostNameOfIP(machineName);
+      }
 
       for (Map.Entry<String, String[]> entry : pmap.entrySet()) {
         String key = entry.getKey();
@@ -324,7 +352,7 @@ public class GetImageServlet extends HttpServlet {
         if (key.equals("getimage")) { 
           isGetImage = true;
           try {
-            txId = parseLongParam(request, TXID_PARAM);
+            txId = ServletUtil.parseLongParam(request, TXID_PARAM);
           } catch (NumberFormatException nfe) {
             if (request.getParameter(TXID_PARAM).equals(LATEST_FSIMAGE_VALUE)) {
               fetchLatest = true;
@@ -334,15 +362,13 @@ public class GetImageServlet extends HttpServlet {
           }
         } else if (key.equals("getedit")) { 
           isGetEdit = true;
-          startTxId = parseLongParam(request, START_TXID_PARAM);
-          endTxId = parseLongParam(request, END_TXID_PARAM);
+          startTxId = ServletUtil.parseLongParam(request, START_TXID_PARAM);
+          endTxId = ServletUtil.parseLongParam(request, END_TXID_PARAM);
         } else if (key.equals("putimage")) { 
           isPutImage = true;
-          txId = parseLongParam(request, TXID_PARAM);
+          txId = ServletUtil.parseLongParam(request, TXID_PARAM);
         } else if (key.equals("port")) { 
           remoteport = new Integer(val[0]).intValue();
-        } else if (key.equals("machine")) { 
-          machineName = val[0];
         } else if (key.equals(STORAGEINFO_PARAM)) {
           storageInfoString = val[0];
         }
@@ -396,16 +422,5 @@ public class GetImageServlet extends HttpServlet {
       return fetchLatest;
     }
     
-    private static long parseLongParam(HttpServletRequest request, String param)
-        throws IOException {
-      // Parse the 'txid' parameter which indicates which image is to be
-      // fetched.
-      String paramStr = request.getParameter(param);
-      if (paramStr == null) {
-        throw new IOException("Invalid request has no " + param + " parameter");
-      }
-      
-      return Long.valueOf(paramStr);
-    }
   }
 }

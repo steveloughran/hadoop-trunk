@@ -43,7 +43,7 @@ import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageState;
 import org.apache.hadoop.hdfs.server.common.Util;
-import static org.apache.hadoop.hdfs.server.common.Util.now;
+import static org.apache.hadoop.util.Time.now;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 
@@ -54,12 +54,15 @@ import org.apache.hadoop.hdfs.server.protocol.NamenodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
+import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.MD5FileUtils;
 import org.apache.hadoop.io.MD5Hash;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HAUtil;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -87,9 +90,6 @@ public class FSImage implements Closeable {
   final private Configuration conf;
 
   private final NNStorageRetentionManager archivalManager;
-
-  private SaveNamespaceContext curSaveNamespaceContext = null; 
-
 
   /**
    * Construct an FSImage
@@ -127,12 +127,6 @@ public class FSImage implements Closeable {
     }
 
     this.editLog = new FSEditLog(conf, storage, editsDirs);
-    String nameserviceId = DFSUtil.getNamenodeNameServiceId(conf);
-    if (!HAUtil.isHAEnabled(conf, nameserviceId)) {
-      editLog.initJournalsForWrite();
-    } else {
-      editLog.initSharedJournalsForRead();
-    }
     
     archivalManager = new NNStorageRetentionManager(conf, storage, editLog);
   }
@@ -512,6 +506,7 @@ public class FSImage implements Closeable {
     // return back the real image
     realImage.getStorage().setStorageInfo(ckptImage.getStorage());
     realImage.getEditLog().setNextTxId(ckptImage.getEditLog().getLastWrittenTxId()+1);
+    realImage.initEditLog();
 
     target.dir.fsImage = realImage;
     realImage.getStorage().setBlockPoolID(ckptImage.getBlockPoolID());
@@ -536,6 +531,11 @@ public class FSImage implements Closeable {
     return editLog;
   }
 
+  @VisibleForTesting
+  void setEditLogForTesting(FSEditLog newLog) {
+    editLog = newLog;
+  }
+
   void openEditLogForWrite() throws IOException {
     assert editLog != null : "editLog must be initialized";
     editLog.openForWrite();
@@ -555,7 +555,7 @@ public class FSImage implements Closeable {
 
   /**
    * Choose latest image from one of the directories,
-   * load it and merge with the edits from that directory.
+   * load it and merge with the edits.
    * 
    * Saving and loading fsimage should never trigger symlink resolution. 
    * The paths that are persisted do not have *intermediate* symlinks 
@@ -580,10 +580,8 @@ public class FSImage implements Closeable {
 
     Iterable<EditLogInputStream> editStreams = null;
 
-    if (editLog.isOpenForWrite()) {
-      // We only want to recover streams if we're going into Active mode.
-      editLog.recoverUnclosedStreams();
-    }
+    initEditLog();
+
     if (LayoutVersion.supports(Feature.TXID_BASED_LAYOUT, 
                                getLayoutVersion())) {
       // If we're open for write, we're either non-HA or we're the active NN, so
@@ -591,7 +589,7 @@ public class FSImage implements Closeable {
       // OK to not be able to read all of edits right now.
       long toAtLeastTxId = editLog.isOpenForWrite() ? inspector.getMaxSeenTxId() : 0;
       editStreams = editLog.selectInputStreams(imageFile.getCheckpointTxId() + 1,
-          toAtLeastTxId, false);
+          toAtLeastTxId, recovery, false);
     } else {
       editStreams = FSImagePreTransactionalStorageInspector
         .getEditLogStreams(storage);
@@ -599,7 +597,10 @@ public class FSImage implements Closeable {
  
     LOG.debug("Planning to load image :\n" + imageFile);
     for (EditLogInputStream l : editStreams) {
-      LOG.debug("\t Planning to load edit stream: " + l);
+      LOG.debug("Planning to load edit log stream: " + l);
+    }
+    if (!editStreams.iterator().hasNext()) {
+      LOG.info("No edit log streams selected.");
     }
     
     try {
@@ -638,6 +639,17 @@ public class FSImage implements Closeable {
     return needToSave;
   }
 
+  public void initEditLog() {
+    Preconditions.checkState(getNamespaceID() != 0,
+        "Must know namespace ID before initting edit log");
+    String nameserviceId = DFSUtil.getNamenodeNameServiceId(conf);
+    if (!HAUtil.isHAEnabled(conf, nameserviceId)) {
+      editLog.initJournalsForWrite();
+      editLog.recoverUnclosedStreams();
+    } else {
+      editLog.initSharedJournalsForRead();
+    }
+  }
 
   /**
    * @param imageFile the image file that was loaded
@@ -653,7 +665,7 @@ public class FSImage implements Closeable {
     final long checkpointTxnCount = conf.getLong(
         DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_TXNS_KEY, 
         DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_TXNS_DEFAULT);
-    long checkpointAge = System.currentTimeMillis() - imageFile.lastModified();
+    long checkpointAge = Time.now() - imageFile.lastModified();
 
     return (checkpointAge > checkpointPeriod * 1000) ||
            (numEditsLoaded > checkpointTxnCount);
@@ -750,7 +762,7 @@ public class FSImage implements Closeable {
     saver.save(newFile, compression);
     
     MD5FileUtils.saveMD5File(dstFile, saver.getSavedDigest());
-    storage.setMostRecentCheckpointInfo(txid, Util.now());
+    storage.setMostRecentCheckpointInfo(txid, Time.now());
   }
 
   /**
@@ -773,6 +785,7 @@ public class FSImage implements Closeable {
       this.sd = sd;
     }
 
+    @Override
     public void run() {
       try {
         saveFSImage(context, sd);
@@ -786,6 +799,7 @@ public class FSImage implements Closeable {
       }
     }
     
+    @Override
     public String toString() {
       return "FSImageSaver for " + sd.getRoot() +
              " of type " + sd.getStorageDirType();
@@ -798,17 +812,28 @@ public class FSImage implements Closeable {
         try {
           thread.join();
         } catch (InterruptedException iex) {
-          LOG.error("Caught exception while waiting for thread " +
+          LOG.error("Caught interrupted exception while waiting for thread " +
                     thread.getName() + " to finish. Retrying join");
         }        
       }
     }
   }
+  
+  /**
+   * @see #saveNamespace(FSNamesystem, Canceler)
+   */
+  public synchronized void saveNamespace(FSNamesystem source)
+      throws IOException {
+    saveNamespace(source, null);
+  }
+  
   /**
    * Save the contents of the FS image to a new image file in each of the
    * current storage directories.
+   * @param canceler 
    */
-  public synchronized void saveNamespace(FSNamesystem source) throws IOException {
+  public synchronized void saveNamespace(FSNamesystem source,
+      Canceler canceler) throws IOException {
     assert editLog != null : "editLog must be initialized";
     storage.attemptRestoreRemovedStorage();
 
@@ -819,7 +844,7 @@ public class FSImage implements Closeable {
     }
     long imageTxId = getLastAppliedOrWrittenTxId();
     try {
-      saveFSImageInAllDirs(source, imageTxId);
+      saveFSImageInAllDirs(source, imageTxId, canceler);
       storage.writeAll();
     } finally {
       if (editLogWasOpen) {
@@ -831,27 +856,27 @@ public class FSImage implements Closeable {
         storage.writeTransactionIdFileToStorage(imageTxId + 1);
       }
     }
-    
-  }
-  
-  public void cancelSaveNamespace(String reason)
-      throws InterruptedException {
-    SaveNamespaceContext ctx = curSaveNamespaceContext;
-    if (ctx != null) {
-      ctx.cancel(reason); // waits until complete
-    }
   }
 
-  
+  /**
+   * @see #saveFSImageInAllDirs(FSNamesystem, long, Canceler)
+   */
   protected synchronized void saveFSImageInAllDirs(FSNamesystem source, long txid)
+      throws IOException {
+    saveFSImageInAllDirs(source, txid, null);
+  }
+
+  protected synchronized void saveFSImageInAllDirs(FSNamesystem source, long txid,
+      Canceler canceler)
       throws IOException {    
     if (storage.getNumStorageDirs(NameNodeDirType.IMAGE) == 0) {
       throw new IOException("No image directories available!");
     }
-    
+    if (canceler == null) {
+      canceler = new Canceler();
+    }
     SaveNamespaceContext ctx = new SaveNamespaceContext(
-        source, txid);
-    curSaveNamespaceContext = ctx;
+        source, txid, canceler);
     
     try {
       List<Thread> saveThreads = new ArrayList<Thread>();
@@ -872,7 +897,7 @@ public class FSImage implements Closeable {
         throw new IOException(
           "Failed to save in any storage directories while saving namespace.");
       }
-      if (ctx.isCancelled()) {
+      if (canceler.isCancelled()) {
         deleteCancelledCheckpoint(txid);
         ctx.checkCancelled(); // throws
         assert false : "should have thrown above!";
@@ -1054,10 +1079,11 @@ public class FSImage implements Closeable {
     // advertise it as such to other checkpointers
     // from now on
     if (txid > storage.getMostRecentCheckpointTxId()) {
-      storage.setMostRecentCheckpointInfo(txid, Util.now());
+      storage.setMostRecentCheckpointInfo(txid, Time.now());
     }
   }
 
+  @Override
   synchronized public void close() throws IOException {
     if (editLog != null) { // 2NN doesn't have any edit log
       getEditLog().close();

@@ -38,7 +38,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.QueueACL;
@@ -136,8 +135,9 @@ class JobSubmitter {
       short replication) throws IOException {
     Configuration conf = job.getConfiguration();
     if (!(conf.getBoolean(Job.USED_GENERIC_PARSER, false))) {
-      LOG.warn("Use GenericOptionsParser for parsing the arguments. " +
-               "Applications should implement Tool for the same.");
+      LOG.warn("Hadoop command-line option parsing not performed. " +
+               "Implement the Tool interface and execute your application " +
+               "with ToolRunner to remedy this.");
     }
 
     // get all the command line arguments passed in by the user conf
@@ -433,8 +433,7 @@ class JobSubmitter {
       LOG.debug("Printing tokens for job: " + jobId);
       for(Token<?> token: credentials.getAllTokens()) {
         if (token.getKind().toString().equals("HDFS_DELEGATION_TOKEN")) {
-          LOG.debug("Submitting with " +
-              org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier.stringifyToken(token));
+          LOG.debug("Submitting with " + token);
         }
       }
     }

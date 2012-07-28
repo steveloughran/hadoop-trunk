@@ -121,6 +121,9 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.common.Util;
+
+import static org.apache.hadoop.util.ExitUtil.terminate;
+
 import org.apache.hadoop.hdfs.server.datanode.SecureDataNodeStarter.SecureResources;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
@@ -160,9 +163,11 @@ import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 import org.mortbay.util.ajax.JSON;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.BlockingService;
@@ -251,6 +256,7 @@ public class DataNode extends Configured
   
   boolean isBlockTokenEnabled;
   BlockPoolTokenSecretManager blockPoolTokenSecretManager;
+  private boolean hasAnyBlockPoolRegistered = false;
   
   volatile DataBlockScanner blockScanner = null;
   private DirectoryScanner directoryScanner = null;
@@ -667,23 +673,16 @@ public class DataNode extends Configured
    * @param nsInfo the namespace info from the first part of the NN handshake
    */
   DatanodeRegistration createBPRegistration(NamespaceInfo nsInfo) {
-    final String xferIp = streamingAddr.getAddress().getHostAddress();
-    DatanodeRegistration bpRegistration = new DatanodeRegistration(xferIp, getXferPort());
-    bpRegistration.setInfoPort(getInfoPort());
-    bpRegistration.setIpcPort(getIpcPort());
-    bpRegistration.setHostName(hostName);
-    bpRegistration.setStorageID(getStorageId());
-    bpRegistration.setSoftwareVersion(VersionInfo.getVersion());
-
     StorageInfo storageInfo = storage.getBPStorage(nsInfo.getBlockPoolID());
     if (storageInfo == null) {
       // it's null in the case of SimulatedDataSet
-      bpRegistration.getStorageInfo().layoutVersion = HdfsConstants.LAYOUT_VERSION;
-      bpRegistration.setStorageInfo(nsInfo);
-    } else {
-      bpRegistration.setStorageInfo(storageInfo);
+      storageInfo = new StorageInfo(nsInfo);
     }
-    return bpRegistration;
+    DatanodeID dnId = new DatanodeID(
+        streamingAddr.getAddress().getHostAddress(), hostName, 
+        getStorageId(), getXferPort(), getInfoPort(), getIpcPort());
+    return new DatanodeRegistration(dnId, storageInfo, 
+        new ExportedBlockKeys(), VersionInfo.getVersion());
   }
 
   /**
@@ -721,10 +720,19 @@ public class DataNode extends Configured
    * @param blockPoolId
    * @throws IOException
    */
-  private void registerBlockPoolWithSecretManager(DatanodeRegistration bpRegistration,
-      String blockPoolId) throws IOException {
+  private synchronized void registerBlockPoolWithSecretManager(
+      DatanodeRegistration bpRegistration, String blockPoolId) throws IOException {
     ExportedBlockKeys keys = bpRegistration.getExportedKeys();
-    isBlockTokenEnabled = keys.isBlockTokenEnabled();
+    if (!hasAnyBlockPoolRegistered) {
+      hasAnyBlockPoolRegistered = true;
+      isBlockTokenEnabled = keys.isBlockTokenEnabled();
+    } else {
+      if (isBlockTokenEnabled != keys.isBlockTokenEnabled()) {
+        throw new RuntimeException("Inconsistent configuration of block access"
+            + " tokens. Either all block pools must be configured to use block"
+            + " tokens, or none may be.");
+      }
+    }
     // TODO should we check that all federated nns are either enabled or
     // disabled?
     if (!isBlockTokenEnabled) return;
@@ -738,13 +746,9 @@ public class DataNode extends Configured
           + " min(s), tokenLifetime=" + blockTokenLifetime / (60 * 1000)
           + " min(s)");
       final BlockTokenSecretManager secretMgr = 
-        new BlockTokenSecretManager(false, 0, blockTokenLifetime);
+        new BlockTokenSecretManager(0, blockTokenLifetime);
       blockPoolTokenSecretManager.addBlockPool(blockPoolId, secretMgr);
     }
-    
-    blockPoolTokenSecretManager.setKeys(blockPoolId,
-        bpRegistration.getExportedKeys());
-    bpRegistration.setExportedKeys(ExportedBlockKeys.DUMMY_KEYS);
   }
 
   /**
@@ -860,7 +864,7 @@ public class DataNode extends Configured
    */
   public String getDisplayName() {
     // NB: our DatanodeID may not be set yet
-    return hostName + ":" + getIpcPort();
+    return hostName + ":" + getXferPort();
   }
 
   /**
@@ -877,7 +881,6 @@ public class DataNode extends Configured
   /**
    * @return the datanode's IPC port
    */
-  @VisibleForTesting
   public int getIpcPort() {
     return ipcServer.getListenerAddress().getPort();
   }
@@ -925,6 +928,7 @@ public class DataNode extends Configured
     try {
       return loginUgi
           .doAs(new PrivilegedExceptionAction<InterDatanodeProtocol>() {
+            @Override
             public InterDatanodeProtocol run() throws IOException {
               return new InterDatanodeProtocolTranslatorPB(addr, loginUgi,
                   conf, NetUtils.getDefaultSocketFactory(conf), socketTimeout);
@@ -966,7 +970,7 @@ public class DataNode extends Configured
     
     int rand = DFSUtil.getSecureRandom().nextInt(Integer.MAX_VALUE);
     return "DS-" + rand + "-" + ip + "-" + port + "-"
-        + System.currentTimeMillis();
+        + Time.now();
   }
   
   /** Ensure the authentication method is kerberos */
@@ -1364,6 +1368,7 @@ public class DataNode extends Configured
     /**
      * Do the deed, write the bytes
      */
+    @Override
     public void run() {
       xmitsInProgress.getAndIncrement();
       Socket sock = null;
@@ -1513,11 +1518,6 @@ public class DataNode extends Configured
       printUsage();
       return null;
     }
-    if (conf.get("dfs.network.script") != null) {
-      LOG.error("This configuration for rack identification is not supported" +
-          " anymore. RackID resolution is handled by the NameNode.");
-      System.exit(-1);
-    }
     Collection<URI> dataDirs = getStorageDirs(conf);
     UserGroupInformation.setConfiguration(conf);
     SecurityUtil.login(conf, DFS_DATANODE_KEYTAB_FILE_KEY,
@@ -1648,7 +1648,7 @@ public class DataNode extends Configured
       if ("-r".equalsIgnoreCase(cmd) || "--rack".equalsIgnoreCase(cmd)) {
         LOG.error("-r, --rack arguments are not supported anymore. RackID " +
             "resolution is handled by the NameNode.");
-        System.exit(-1);
+        terminate(1);
       } else if ("-rollback".equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.ROLLBACK;
       } else if ("-regular".equalsIgnoreCase(cmd)) {
@@ -1703,15 +1703,15 @@ public class DataNode extends Configured
       if (datanode != null)
         datanode.join();
     } catch (Throwable e) {
-      LOG.error("Exception in secureMain", e);
-      System.exit(-1);
+      LOG.fatal("Exception in secureMain", e);
+      terminate(1, e);
     } finally {
-      // We need to add System.exit here because either shutdown was called or
-      // some disk related conditions like volumes tolerated or volumes required
+      // We need to terminate the process here because either shutdown was called
+      // or some disk related conditions like volumes tolerated or volumes required
       // condition was not met. Also, In secure mode, control will go to Jsvc
-      // and Datanode process hangs without System.exit.
+      // and Datanode process hangs if it does not exit.
       LOG.warn("Exiting Datanode");
-      System.exit(0);
+      terminate(0);
     }
   }
   
@@ -1719,13 +1719,17 @@ public class DataNode extends Configured
     secureMain(args, null);
   }
 
-  public Daemon recoverBlocks(final Collection<RecoveringBlock> blocks) {
+  public Daemon recoverBlocks(
+      final String who,
+      final Collection<RecoveringBlock> blocks) {
+    
     Daemon d = new Daemon(threadGroup, new Runnable() {
       /** Recover a list of blocks. It is run by the primary datanode. */
+      @Override
       public void run() {
         for(RecoveringBlock b : blocks) {
           try {
-            logRecoverBlock("NameNode", b.getBlock(), b.getLocations());
+            logRecoverBlock(who, b);
             recoverBlock(b);
           } catch (IOException e) {
             LOG.warn("recoverBlocks FAILED: " + b, e);
@@ -1986,14 +1990,13 @@ public class DataNode extends Configured
         datanodes, storages);
   }
   
-  private static void logRecoverBlock(String who,
-      ExtendedBlock block, DatanodeID[] targets) {
-    StringBuilder msg = new StringBuilder(targets[0].toString());
-    for (int i = 1; i < targets.length; i++) {
-      msg.append(", " + targets[i]);
-    }
+  private static void logRecoverBlock(String who, RecoveringBlock rb) {
+    ExtendedBlock block = rb.getBlock();
+    DatanodeInfo[] targets = rb.getLocations();
+    
     LOG.info(who + " calls recoverBlock(block=" + block
-        + ", targets=[" + msg + "])");
+        + ", targets=[" + Joiner.on(", ").join(targets) + "]"
+        + ", newGenerationStamp=" + rb.getNewGenerationStamp() + ")");
   }
 
   @Override // ClientDataNodeProtocol
@@ -2038,6 +2041,18 @@ public class DataNode extends Configured
 
     //get replica information
     synchronized(data) {
+      Block storedBlock = data.getStoredBlock(b.getBlockPoolId(),
+          b.getBlockId());
+      if (null == storedBlock) {
+        throw new IOException(b + " not found in datanode.");
+      }
+      storedGS = storedBlock.getGenerationStamp();
+      if (storedGS < b.getGenerationStamp()) {
+        throw new IOException(storedGS
+            + " = storedGS < b.getGenerationStamp(), b=" + b);
+      }
+      // Update the genstamp with storedGS
+      b.setGenerationStamp(storedGS);
       if (data.isValidRbw(b)) {
         stage = BlockConstructionStage.TRANSFER_RBW;
       } else if (data.isValidBlock(b)) {
@@ -2046,18 +2061,9 @@ public class DataNode extends Configured
         final String r = data.getReplicaString(b.getBlockPoolId(), b.getBlockId());
         throw new IOException(b + " is neither a RBW nor a Finalized, r=" + r);
       }
-
-      storedGS = data.getStoredBlock(b.getBlockPoolId(),
-          b.getBlockId()).getGenerationStamp();
-      if (storedGS < b.getGenerationStamp()) {
-        throw new IOException(
-            storedGS + " = storedGS < b.getGenerationStamp(), b=" + b);        
-      }
       visible = data.getReplicaVisibleLength(b);
     }
-
-    //set storedGS and visible length
-    b.setGenerationStamp(storedGS);
+    //set visible length
     b.setNumBytes(visible);
 
     if (targets.length > 0) {
@@ -2206,6 +2212,11 @@ public class DataNode extends Configured
   @VisibleForTesting
   public DatanodeID getDatanodeId() {
     return id;
+  }
+  
+  @VisibleForTesting
+  public void clearAllBlockSecretKeys() {
+    blockPoolTokenSecretManager.clearAllKeysForTesting();
   }
 
   /**

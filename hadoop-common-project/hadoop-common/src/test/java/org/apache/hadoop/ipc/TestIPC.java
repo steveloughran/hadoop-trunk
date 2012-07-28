@@ -25,7 +25,6 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.ipc.RpcPayloadHeader.RpcKind;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.net.NetUtils;
 
@@ -99,7 +98,7 @@ public class TestIPC {
     }
 
     @Override
-    public Writable call(RpcKind rpcKind, String protocol, Writable param,
+    public Writable call(RPC.RpcKind rpcKind, String protocol, Writable param,
         long receiveTime) throws IOException {
       if (sleep) {
         // sleep a bit
@@ -150,41 +149,6 @@ public class TestIPC {
     }
   }
 
-  private static class ParallelCaller extends Thread {
-    private Client client;
-    private int count;
-    private InetSocketAddress[] addresses;
-    private boolean failed;
-    
-    public ParallelCaller(Client client, InetSocketAddress[] addresses,
-                          int count) {
-      this.client = client;
-      this.addresses = addresses;
-      this.count = count;
-    }
-
-    public void run() {
-      for (int i = 0; i < count; i++) {
-        try {
-          Writable[] params = new Writable[addresses.length];
-          for (int j = 0; j < addresses.length; j++)
-            params[j] = new LongWritable(RANDOM.nextLong());
-          Writable[] values = client.call(params, addresses, null, null, conf);
-          for (int j = 0; j < addresses.length; j++) {
-            if (!params[j].equals(values[j])) {
-              LOG.fatal("Call failed!");
-              failed = true;
-              break;
-            }
-          }
-        } catch (Exception e) {
-          LOG.fatal("Caught: " + StringUtils.stringifyException(e));
-          failed = true;
-        }
-      }
-    }
-  }
-
   @Test
   public void testSerial() throws Exception {
     testSerial(3, false, 2, 5, 100);
@@ -219,51 +183,7 @@ public class TestIPC {
   }
 	
   @Test
-  public void testParallel() throws Exception {
-    testParallel(10, false, 2, 4, 2, 4, 100);
-  }
-
-  public void testParallel(int handlerCount, boolean handlerSleep,
-                           int serverCount, int addressCount,
-                           int clientCount, int callerCount, int callCount)
-    throws Exception {
-    Server[] servers = new Server[serverCount];
-    for (int i = 0; i < serverCount; i++) {
-      servers[i] = new TestServer(handlerCount, handlerSleep);
-      servers[i].start();
-    }
-
-    InetSocketAddress[] addresses = new InetSocketAddress[addressCount];
-    for (int i = 0; i < addressCount; i++) {
-      addresses[i] = NetUtils.getConnectAddress(servers[i%serverCount]);
-    }
-
-    Client[] clients = new Client[clientCount];
-    for (int i = 0; i < clientCount; i++) {
-      clients[i] = new Client(LongWritable.class, conf);
-    }
-    
-    ParallelCaller[] callers = new ParallelCaller[callerCount];
-    for (int i = 0; i < callerCount; i++) {
-      callers[i] =
-        new ParallelCaller(clients[i%clientCount], addresses, callCount);
-      callers[i].start();
-    }
-    for (int i = 0; i < callerCount; i++) {
-      callers[i].join();
-      assertFalse(callers[i].failed);
-    }
-    for (int i = 0; i < clientCount; i++) {
-      clients[i].stop();
-    }
-    for (int i = 0; i < serverCount; i++) {
-      servers[i].stop();
-    }
-  }
-	
-  @Test
   public void testStandAloneClient() throws Exception {
-    testParallel(10, false, 2, 4, 2, 4, 100);
     Client client = new Client(LongWritable.class, conf);
     InetSocketAddress address = new InetSocketAddress("127.0.0.1", 10);
     try {
@@ -782,13 +702,4 @@ public class TestIPC {
       Ints.toByteArray(HADOOP0_21_ERROR_MSG.length()),
       HADOOP0_21_ERROR_MSG.getBytes());
   }
-
-  public static void main(String[] args) throws Exception {
-
-    //new TestIPC().testSerial(5, false, 2, 10, 1000);
-
-    new TestIPC().testParallel(10, false, 2, 4, 2, 4, 1000);
-
-  }
-
 }

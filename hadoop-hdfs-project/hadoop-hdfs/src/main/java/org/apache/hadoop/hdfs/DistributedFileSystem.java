@@ -33,7 +33,6 @@ import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsServerDefaults;
@@ -45,7 +44,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.DFSClient.DFSDataInputStream;
+import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
+import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -86,6 +86,17 @@ public class DistributedFileSystem extends FileSystem {
   }
 
   public DistributedFileSystem() {
+  }
+
+  /**
+   * Return the protocol scheme for the FileSystem.
+   * <p/>
+   *
+   * @return <code>hdfs</code>
+   */
+  @Override
+  public String getScheme() {
+    return HdfsConstants.HDFS_URI_SCHEME;
   }
 
   @Deprecated
@@ -194,8 +205,9 @@ public class DistributedFileSystem extends FileSystem {
     return dfs.recoverLease(getPathName(f));
   }
 
+  @SuppressWarnings("deprecation")
   @Override
-  public FSDataInputStream open(Path f, int bufferSize) throws IOException {
+  public HdfsDataInputStream open(Path f, int bufferSize) throws IOException {
     statistics.incrementReadOps(1);
     return new DFSClient.DFSDataInputStream(
           dfs.open(getPathName(f), bufferSize, verifyChecksum));
@@ -203,31 +215,40 @@ public class DistributedFileSystem extends FileSystem {
 
   /** This optional operation is not yet supported. */
   @Override
-  public FSDataOutputStream append(Path f, int bufferSize,
+  public HdfsDataOutputStream append(Path f, int bufferSize,
       Progressable progress) throws IOException {
     statistics.incrementWriteOps(1);
     return dfs.append(getPathName(f), bufferSize, progress, statistics);
   }
 
   @Override
-  public FSDataOutputStream create(Path f, FsPermission permission,
-    boolean overwrite, int bufferSize, short replication, long blockSize,
+  public HdfsDataOutputStream create(Path f, FsPermission permission,
+      boolean overwrite, int bufferSize, short replication, long blockSize,
+      Progressable progress) throws IOException {
+    return create(f, permission,
+        overwrite ? EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)
+            : EnumSet.of(CreateFlag.CREATE), bufferSize, replication,
+        blockSize, progress);
+  }
+  
+  @Override
+  public HdfsDataOutputStream create(Path f, FsPermission permission,
+    EnumSet<CreateFlag> cflags, int bufferSize, short replication, long blockSize,
     Progressable progress) throws IOException {
     statistics.incrementWriteOps(1);
-    return new FSDataOutputStream(dfs.create(getPathName(f), permission,
-        overwrite ? EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)
-            : EnumSet.of(CreateFlag.CREATE), replication, blockSize, progress,
-        bufferSize), statistics);
+    final DFSOutputStream out = dfs.create(getPathName(f), permission, cflags,
+        replication, blockSize, progress, bufferSize);
+    return new HdfsDataOutputStream(out, statistics);
   }
   
   @SuppressWarnings("deprecation")
   @Override
-  protected FSDataOutputStream primitiveCreate(Path f,
+  protected HdfsDataOutputStream primitiveCreate(Path f,
     FsPermission absolutePermission, EnumSet<CreateFlag> flag, int bufferSize,
     short replication, long blockSize, Progressable progress,
     int bytesPerChecksum) throws IOException {
     statistics.incrementReadOps(1);
-    return new FSDataOutputStream(dfs.primitiveCreate(getPathName(f),
+    return new HdfsDataOutputStream(dfs.primitiveCreate(getPathName(f),
         absolutePermission, flag, true, replication, blockSize,
         progress, bufferSize, bytesPerChecksum),statistics);
    } 
@@ -235,14 +256,15 @@ public class DistributedFileSystem extends FileSystem {
   /**
    * Same as create(), except fails if parent directory doesn't already exist.
    */
-  public FSDataOutputStream createNonRecursive(Path f, FsPermission permission,
+  @Override
+  public HdfsDataOutputStream createNonRecursive(Path f, FsPermission permission,
       EnumSet<CreateFlag> flag, int bufferSize, short replication,
       long blockSize, Progressable progress) throws IOException {
     statistics.incrementWriteOps(1);
     if (flag.contains(CreateFlag.OVERWRITE)) {
       flag.add(CreateFlag.CREATE);
     }
-    return new FSDataOutputStream(dfs.create(getPathName(f), permission, flag,
+    return new HdfsDataOutputStream(dfs.create(getPathName(f), permission, flag,
         false, replication, blockSize, progress, bufferSize), statistics);
   }
 
@@ -499,56 +521,12 @@ public class DistributedFileSystem extends FileSystem {
     return dfs;
   }        
   
-  /** @deprecated Use {@link org.apache.hadoop.fs.FsStatus} instead */
-  @InterfaceAudience.Private
-  @Deprecated
-  public static class DiskStatus extends FsStatus {
-    public DiskStatus(FsStatus stats) {
-      super(stats.getCapacity(), stats.getUsed(), stats.getRemaining());
-    }
-
-    public DiskStatus(long capacity, long dfsUsed, long remaining) {
-      super(capacity, dfsUsed, remaining);
-    }
-
-    public long getDfsUsed() {
-      return super.getUsed();
-    }
-  }
-  
   @Override
   public FsStatus getStatus(Path p) throws IOException {
     statistics.incrementReadOps(1);
     return dfs.getDiskStatus();
   }
 
-  /** Return the disk usage of the filesystem, including total capacity,
-   * used space, and remaining space 
-   * @deprecated Use {@link org.apache.hadoop.fs.FileSystem#getStatus()} 
-   * instead */
-   @Deprecated
-  public DiskStatus getDiskStatus() throws IOException {
-    return new DiskStatus(dfs.getDiskStatus());
-  }
-  
-  /** Return the total raw capacity of the filesystem, disregarding
-   * replication.
-   * @deprecated Use {@link org.apache.hadoop.fs.FileSystem#getStatus()} 
-   * instead */
-   @Deprecated
-  public long getRawCapacity() throws IOException{
-    return dfs.getDiskStatus().getCapacity();
-  }
-
-  /** Return the total raw used space in the filesystem, disregarding
-   * replication.
-   * @deprecated Use {@link org.apache.hadoop.fs.FileSystem#getStatus()} 
-   * instead */
-   @Deprecated
-  public long getRawUsed() throws IOException{
-    return dfs.getDiskStatus().getUsed();
-  }
-   
   /**
    * Returns count of blocks with no good replicas left. Normally should be
    * zero.
@@ -671,14 +649,14 @@ public class DistributedFileSystem extends FileSystem {
     FSDataInputStream in, long inPos, 
     FSDataInputStream sums, long sumsPos) {
     
-    if(!(in instanceof DFSDataInputStream && sums instanceof DFSDataInputStream))
-      throw new IllegalArgumentException("Input streams must be types " +
-                                         "of DFSDataInputStream");
+    if(!(in instanceof HdfsDataInputStream && sums instanceof HdfsDataInputStream))
+      throw new IllegalArgumentException(
+          "Input streams must be types of HdfsDataInputStream");
     
     LocatedBlock lblocks[] = new LocatedBlock[2];
 
     // Find block in data stream.
-    DFSClient.DFSDataInputStream dfsIn = (DFSClient.DFSDataInputStream) in;
+    HdfsDataInputStream dfsIn = (HdfsDataInputStream) in;
     ExtendedBlock dataBlock = dfsIn.getCurrentBlock();
     if (dataBlock == null) {
       LOG.error("Error: Current block in data stream is null! ");
@@ -691,7 +669,7 @@ public class DistributedFileSystem extends FileSystem {
         + dataNode[0]);
 
     // Find block in checksum stream
-    DFSClient.DFSDataInputStream dfsSums = (DFSClient.DFSDataInputStream) sums;
+    HdfsDataInputStream dfsSums = (HdfsDataInputStream) sums;
     ExtendedBlock sumsBlock = dfsSums.getCurrentBlock();
     if (sumsBlock == null) {
       LOG.error("Error: Current block in checksum stream is null! ");

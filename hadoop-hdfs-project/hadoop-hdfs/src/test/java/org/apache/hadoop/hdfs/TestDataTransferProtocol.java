@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.hdfs;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -28,8 +32,6 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.Random;
-
-import junit.framework.TestCase;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -67,7 +69,7 @@ import org.mockito.Mockito;
  * This tests data transfer protocol handling in the Datanode. It sends
  * various forms of wrong data and verifies that Datanode handles it well.
  */
-public class TestDataTransferProtocol extends TestCase {
+public class TestDataTransferProtocol {
   
   private static final Log LOG = LogFactory.getLog(
                     "org.apache.hadoop.hdfs.TestDataTransferProtocol");
@@ -159,7 +161,8 @@ public class TestDataTransferProtocol extends TestCase {
       block.getNumBytes(), // OffsetInBlock
       100,                 // sequencenumber
       true,                // lastPacketInBlock
-      0);                  // chunk length
+      0,                   // chunk length
+      false);               // sync block
     hdr.write(sendOut);
     sendOut.writeInt(0);           // zero checksum
 
@@ -204,7 +207,8 @@ public class TestDataTransferProtocol extends TestCase {
     }
   }
   
-  @Test public void testOpWrite() throws IOException {
+  @Test 
+  public void testOpWrite() throws IOException {
     int numDataNodes = 1;
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
@@ -332,7 +336,8 @@ public class TestDataTransferProtocol extends TestCase {
     }
   }
   
-@Test  public void testDataTransferProtocol() throws IOException {
+  @Test  
+  public void testDataTransferProtocol() throws IOException {
     Random random = new Random();
     int oneMil = 1024*1024;
     Path file = new Path("dataprotocol.dat");
@@ -402,7 +407,8 @@ public class TestDataTransferProtocol extends TestCase {
       0,     // offset in block,
       100,   // seqno
       false, // last packet
-      -1 - random.nextInt(oneMil)); // bad datalen
+      -1 - random.nextInt(oneMil), // bad datalen
+      false);
     hdr.write(sendOut);
 
     sendResponse(Status.SUCCESS, "", null, recvOut);
@@ -424,7 +430,8 @@ public class TestDataTransferProtocol extends TestCase {
       0,     // OffsetInBlock
       100,   // sequencenumber
       true,  // lastPacketInBlock
-      0);    // chunk length
+      0,     // chunk length
+      false);    
     hdr.write(sendOut);
     sendOut.writeInt(0);           // zero checksum
     sendOut.flush();
@@ -508,8 +515,8 @@ public class TestDataTransferProtocol extends TestCase {
       1024,                // OffsetInBlock
       100,                 // sequencenumber
       false,               // lastPacketInBlock
-      4096);               // chunk length
-
+      4096,                // chunk length
+      false);
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     hdr.write(new DataOutputStream(baos));
 

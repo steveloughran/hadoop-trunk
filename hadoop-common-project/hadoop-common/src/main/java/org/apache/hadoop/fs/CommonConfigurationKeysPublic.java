@@ -63,7 +63,9 @@ public class CommonConfigurationKeysPublic {
   /** See <a href="{@docRoot}/../core-default.html">core-default.xml</a> */
   public static final String  NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY =
     "net.topology.node.switch.mapping.impl";
-  
+  /** See <a href="{@docRoot}/../core-default.html">core-default.xml</a> */
+  public static final String  NET_TOPOLOGY_IMPL_KEY =
+    "net.topology.impl";
   /** See <a href="{@docRoot}/../core-default.html">core-default.xml</a> */
   public static final String  NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY =
     "net.topology.table.file.name";
@@ -228,7 +230,14 @@ public class CommonConfigurationKeysPublic {
   public static final String HADOOP_SECURITY_AUTHORIZATION =
     "hadoop.security.authorization";
   /** See <a href="{@docRoot}/../core-default.html">core-default.xml</a> */
+  public static final String HADOOP_SECURITY_INSTRUMENTATION_REQUIRES_ADMIN =
+    "hadoop.security.instrumentation.requires.admin";
+  /** See <a href="{@docRoot}/../core-default.html">core-default.xml</a> */
   public static final String  HADOOP_SECURITY_SERVICE_USER_NAME_KEY =
     "hadoop.security.service.user.name.key";
+  /** See <a href="{@docRoot}/../core-default.html">core-default.xml</a> */
+  public static final String  HADOOP_SECURITY_AUTH_TO_LOCAL =
+    "hadoop.security.auth_to_local";
+
 }
 

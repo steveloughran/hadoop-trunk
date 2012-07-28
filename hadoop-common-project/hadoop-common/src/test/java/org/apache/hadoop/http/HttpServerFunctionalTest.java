@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.http;
 
+import org.apache.hadoop.security.authorize.AccessControlList;
 import org.junit.Assert;
 import org.apache.hadoop.conf.Configuration;
 
@@ -70,6 +71,12 @@ public class HttpServerFunctionalTest extends Assert {
     return createServer(TEST, conf);
   }
 
+  public static HttpServer createTestServer(Configuration conf, AccessControlList adminsAcl)
+      throws IOException {
+    prepareTestWebapp();
+    return createServer(TEST, conf, adminsAcl);
+  }
+
   /**
    * Create but do not start the test webapp server. The test webapp dir is
    * prepared/checked in advance.
@@ -100,6 +107,19 @@ public class HttpServerFunctionalTest extends Assert {
   }
 
   /**
+   * Create an HttpServer instance on the given address for the given webapp
+   * @param host to bind
+   * @param port to bind
+   * @return the server
+   * @throws IOException if it could not be created
+   */
+  public static HttpServer createServer(String host, int port)
+      throws IOException {
+    prepareTestWebapp();
+    return new HttpServer(TEST, host, port, true);
+  }
+
+  /**
    * Create an HttpServer instance for the given webapp
    * @param webapp the webapp to work with
    * @return the server
@@ -118,6 +138,11 @@ public class HttpServerFunctionalTest extends Assert {
   public static HttpServer createServer(String webapp, Configuration conf)
       throws IOException {
     return new HttpServer(webapp, "0.0.0.0", 0, true, conf);
+  }
+
+  public static HttpServer createServer(String webapp, Configuration conf, AccessControlList adminsAcl)
+      throws IOException {
+    return new HttpServer(webapp, "0.0.0.0", 0, true, conf, adminsAcl);
   }
   /**
    * Create an HttpServer instance for the given webapp

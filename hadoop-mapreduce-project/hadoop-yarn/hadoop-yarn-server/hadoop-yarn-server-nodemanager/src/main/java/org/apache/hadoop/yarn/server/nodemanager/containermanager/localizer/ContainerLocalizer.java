@@ -50,6 +50,7 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.yarn.YarnUncaughtExceptionHandler;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.exceptions.YarnRemoteException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
@@ -91,6 +92,7 @@ public class ContainerLocalizer {
   private final LocalDirAllocator userDirs;
   private final RecordFactory recordFactory;
   private final Map<LocalResource,Future<Path>> pendingResources;
+  private final String appCacheDirContextName;
 
   public ContainerLocalizer(FileContext lfs, String user, String appId,
       String localizerId, List<Path> localDirs,
@@ -108,10 +110,9 @@ public class ContainerLocalizer {
     this.localizerId = localizerId;
     this.recordFactory = recordFactory;
     this.conf = new Configuration();
-    this.appDirs =
-      new LocalDirAllocator(String.format(APPCACHE_CTXT_FMT, appId));
-    this.userDirs =
-      new LocalDirAllocator(String.format(USERCACHE_CTXT_FMT, appId));
+    this.appCacheDirContextName = String.format(APPCACHE_CTXT_FMT, appId);
+    this.appDirs = new LocalDirAllocator(appCacheDirContextName);
+    this.userDirs = new LocalDirAllocator(String.format(USERCACHE_CTXT_FMT, user));
     this.pendingResources = new HashMap<LocalResource,Future<Path>>();
   }
 
@@ -121,6 +122,7 @@ public class ContainerLocalizer {
       rpc.getProxy(LocalizationProtocol.class, nmAddr, conf);
   }
 
+  @SuppressWarnings("deprecation")
   public int runLocalization(final InetSocketAddress nmAddr)
       throws IOException, InterruptedException {
     // load credentials
@@ -177,6 +179,7 @@ public class ContainerLocalizer {
       if (exec != null) {
         exec.shutdownNow();
       }
+      LocalDirAllocator.removeContext(appCacheDirContextName);
     }
   }
 
@@ -313,6 +316,7 @@ public class ContainerLocalizer {
   }
 
   public static void main(String[] argv) throws Throwable {
+    Thread.setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
     // usage: $0 user appId locId host port app_log_dir user_dir [user_dir]*
     // let $x = $x/usercache for $local.dir
     // MKDIR $x/$user/appcache/$appid
@@ -373,7 +377,7 @@ public class ContainerLocalizer {
       lfs.mkdir(appFileCacheDir, null, false);
     }
     conf.setStrings(String.format(APPCACHE_CTXT_FMT, appId), appsFileCacheDirs);
-    conf.setStrings(String.format(USERCACHE_CTXT_FMT, appId), usersFileCacheDirs);
+    conf.setStrings(String.format(USERCACHE_CTXT_FMT, user), usersFileCacheDirs);
   }
 
 }

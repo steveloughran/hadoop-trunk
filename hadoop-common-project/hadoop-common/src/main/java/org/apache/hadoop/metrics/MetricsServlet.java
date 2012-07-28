@@ -60,12 +60,14 @@ public class MetricsServlet extends HttpServlet {
       this.metricMap = metricMap;
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public void fromJSON(Map map) {
       throw new UnsupportedOperationException();
     }
 
     /** Converts to JSON by providing an array. */
+    @Override
     public void toJSON(Output out) {
       out.add(new Object[] { tagMap, metricMap });
     }
@@ -106,9 +108,8 @@ public class MetricsServlet extends HttpServlet {
   public void doGet(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
 
-    // Do the authorization
-    if (!HttpServer.hasAdministratorAccess(getServletContext(), request,
-        response)) {
+    if (!HttpServer.isInstrumentationAccessAllowed(getServletContext(),
+                                                   request, response)) {
       return;
     }
 

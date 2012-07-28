@@ -254,7 +254,7 @@ public class FileStatus implements Writable, Comparable {
   // Writable
   //////////////////////////////////////////////////
   public void write(DataOutput out) throws IOException {
-    Text.writeString(out, getPath().toString());
+    Text.writeString(out, getPath().toString(), Text.DEFAULT_MAX_LEN);
     out.writeLong(getLen());
     out.writeBoolean(isDirectory());
     out.writeShort(getReplication());
@@ -262,16 +262,16 @@ public class FileStatus implements Writable, Comparable {
     out.writeLong(getModificationTime());
     out.writeLong(getAccessTime());
     getPermission().write(out);
-    Text.writeString(out, getOwner());
-    Text.writeString(out, getGroup());
+    Text.writeString(out, getOwner(), Text.DEFAULT_MAX_LEN);
+    Text.writeString(out, getGroup(), Text.DEFAULT_MAX_LEN);
     out.writeBoolean(isSymlink());
     if (isSymlink()) {
-      Text.writeString(out, getSymlink().toString());
+      Text.writeString(out, getSymlink().toString(), Text.DEFAULT_MAX_LEN);
     }
   }
 
   public void readFields(DataInput in) throws IOException {
-    String strPath = Text.readString(in);
+    String strPath = Text.readString(in, Text.DEFAULT_MAX_LEN);
     this.path = new Path(strPath);
     this.length = in.readLong();
     this.isdir = in.readBoolean();
@@ -280,10 +280,10 @@ public class FileStatus implements Writable, Comparable {
     modification_time = in.readLong();
     access_time = in.readLong();
     permission.readFields(in);
-    owner = Text.readString(in);
-    group = Text.readString(in);
+    owner = Text.readString(in, Text.DEFAULT_MAX_LEN);
+    group = Text.readString(in, Text.DEFAULT_MAX_LEN);
     if (in.readBoolean()) {
-      this.symlink = new Path(Text.readString(in));
+      this.symlink = new Path(Text.readString(in, Text.DEFAULT_MAX_LEN));
     } else {
       this.symlink = null;
     }

@@ -64,6 +64,7 @@ public class TestFifoScheduler {
 
   @After
   public void tearDown() throws Exception {
+    resourceManager.stop();
   }
   
   private org.apache.hadoop.yarn.server.resourcemanager.NodeManager
@@ -85,8 +86,8 @@ public class TestFifoScheduler {
   @Test
   public void testAppAttemptMetrics() throws Exception {
     AsyncDispatcher dispatcher = new InlineDispatcher();
-    RMContext rmContext =
-        new RMContextImpl(null, dispatcher, null, null, null, null);
+    RMContext rmContext = new RMContextImpl(null, dispatcher, null,
+        null, null, null, null);
 
     FifoScheduler schedular = new FifoScheduler();
     schedular.reinitialize(new Configuration(), null, rmContext);

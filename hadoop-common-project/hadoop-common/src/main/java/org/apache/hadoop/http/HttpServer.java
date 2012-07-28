@@ -52,9 +52,9 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.jmx.JMXJsonServlet;
 import org.apache.hadoop.log.LogLevel;
 import org.apache.hadoop.metrics.MetricsServlet;
-import org.apache.hadoop.security.Krb5AndCertsSslSocketConnector;
-import org.apache.hadoop.security.Krb5AndCertsSslSocketConnector.MODE;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.mortbay.io.Buffer;
@@ -98,7 +98,8 @@ public class HttpServer implements FilterContainer {
   // The ServletContext attribute where the daemon Configuration
   // gets stored.
   public static final String CONF_CONTEXT_ATTRIBUTE = "hadoop.conf";
-  static final String ADMINS_ACL = "admins.acl";
+  public static final String ADMINS_ACL = "admins.acl";
+  public static final String SPNEGO_FILTER = "SpnegoFilter";
 
   public static final String BIND_ADDRESS = "bind.address";
 
@@ -237,11 +238,7 @@ public class HttpServer implements FilterContainer {
     webServer.addHandler(webAppContext);
 
     addDefaultApps(contexts, appDir, conf);
-    
-    defineFilter(webAppContext, "krb5Filter", 
-        Krb5AndCertsSslSocketConnector.Krb5SslFilter.class.getName(), 
-        null, null);
-    
+        
     addGlobalFilter("safety", QuotingInputFilter.class.getName(), null);
     final FilterInitializer[] initializers = getFilterInitializers(conf); 
     if (initializers != null) {
@@ -424,12 +421,13 @@ public class HttpServer implements FilterContainer {
    * protect with Kerberos authentication. 
    * Note: This method is to be used for adding servlets that facilitate
    * internal communication and not for user facing functionality. For
-   * servlets added using this method, filters (except internal Kerberized
+   +   * servlets added using this method, filters (except internal Kerberos
    * filters) are not enabled. 
    * 
    * @param name The name of the servlet (can be passed as null)
    * @param pathSpec The path spec for the servlet
    * @param clazz The servlet class
+   * @param requireAuth Require Kerberos authenticate to access servlet
    */
   public void addInternalServlet(String name, String pathSpec, 
       Class<? extends HttpServlet> clazz, boolean requireAuth) {
@@ -440,11 +438,11 @@ public class HttpServer implements FilterContainer {
     webAppContext.addServlet(holder, pathSpec);
     
     if(requireAuth && UserGroupInformation.isSecurityEnabled()) {
-       LOG.info("Adding Kerberos filter to " + name);
+       LOG.info("Adding Kerberos (SPNEGO) filter to " + name);
        ServletHandler handler = webAppContext.getServletHandler();
        FilterMapping fmap = new FilterMapping();
        fmap.setPathSpec(pathSpec);
-       fmap.setFilterName("krb5Filter");
+       fmap.setFilterName(SPNEGO_FILTER);
        fmap.setDispatches(Handler.ALL);
        handler.addFilterMapping(fmap);
     }
@@ -584,22 +582,10 @@ public class HttpServer implements FilterContainer {
    * Configure an ssl listener on the server.
    * @param addr address to listen on
    * @param sslConf conf to retrieve ssl options
-   * @param needClientAuth whether client authentication is required
-   */
-  public void addSslListener(InetSocketAddress addr, Configuration sslConf,
-      boolean needClientAuth) throws IOException {
-    addSslListener(addr, sslConf, needClientAuth, false);
-  }
-
-  /**
-   * Configure an ssl listener on the server.
-   * @param addr address to listen on
-   * @param sslConf conf to retrieve ssl options
    * @param needCertsAuth whether x509 certificate authentication is required
-   * @param needKrbAuth whether to allow kerberos auth
    */
   public void addSslListener(InetSocketAddress addr, Configuration sslConf,
-      boolean needCertsAuth, boolean needKrbAuth) throws IOException {
+      boolean needCertsAuth) throws IOException {
     if (webServer.isStarted()) {
       throw new IOException("Failed to add ssl listener");
     }
@@ -612,15 +598,7 @@ public class HttpServer implements FilterContainer {
       System.setProperty("javax.net.ssl.trustStoreType", sslConf.get(
           "ssl.server.truststore.type", "jks"));
     }
-    Krb5AndCertsSslSocketConnector.MODE mode;
-    if(needCertsAuth && needKrbAuth)
-      mode = MODE.BOTH;
-    else if (!needCertsAuth && needKrbAuth)
-      mode = MODE.KRB;
-    else // Default to certificates
-      mode = MODE.CERTS;
-
-    SslSocketConnector sslListener = new Krb5AndCertsSslSocketConnector(mode);
+    SslSocketConnector sslListener = new SslSocketConnector();
     sslListener.setHost(addr.getHostName());
     sslListener.setPort(addr.getPort());
     sslListener.setKeystore(sslConf.get("ssl.server.keystore.location"));
@@ -630,86 +608,40 @@ public class HttpServer implements FilterContainer {
     sslListener.setNeedClientAuth(needCertsAuth);
     webServer.addConnector(sslListener);
   }
+  
+  protected void initSpnego(Configuration conf,
+      String usernameConfKey, String keytabConfKey) throws IOException {
+    Map<String, String> params = new HashMap<String, String>();
+    String principalInConf = conf.get(usernameConfKey);
+    if (principalInConf != null && !principalInConf.isEmpty()) {
+      params.put("kerberos.principal",
+                 SecurityUtil.getServerPrincipal(principalInConf, listener.getHost()));
+    }
+    String httpKeytab = conf.get(keytabConfKey);
+    if (httpKeytab != null && !httpKeytab.isEmpty()) {
+      params.put("kerberos.keytab", httpKeytab);
+    }
+    params.put(AuthenticationFilter.AUTH_TYPE, "kerberos");
+  
+    defineFilter(webAppContext, SPNEGO_FILTER,
+                 AuthenticationFilter.class.getName(), params, null);
+  }
 
   /**
    * Start the server. Does not wait for the server to start.
    */
   public void start() throws IOException {
     try {
-      if(listenerStartedExternally) { // Expect that listener was started securely
-        if(listener.getLocalPort() == -1) // ... and verify
-          throw new Exception("Exepected webserver's listener to be started " +
-             "previously but wasn't");
-        // And skip all the port rolling issues.
+      try {
+        openListener();
+        LOG.info("Jetty bound to port " + listener.getLocalPort());
         webServer.start();
-      } else {
-        int port = 0;
-        int oriPort = listener.getPort(); // The original requested port
-        while (true) {
-          try {
-            port = webServer.getConnectors()[0].getLocalPort();
-            LOG.debug("Port returned by webServer.getConnectors()[0]." +
-            		"getLocalPort() before open() is "+ port + 
-            		". Opening the listener on " + oriPort);
-            listener.open();
-            port = listener.getLocalPort();
-            LOG.debug("listener.getLocalPort() returned " + listener.getLocalPort() + 
-                  " webServer.getConnectors()[0].getLocalPort() returned " +
-                  webServer.getConnectors()[0].getLocalPort());
-            //Workaround to handle the problem reported in HADOOP-4744
-            if (port < 0) {
-              Thread.sleep(100);
-              int numRetries = 1;
-              while (port < 0) {
-                LOG.warn("listener.getLocalPort returned " + port);
-                if (numRetries++ > MAX_RETRIES) {
-                  throw new Exception(" listener.getLocalPort is returning " +
-                  		"less than 0 even after " +numRetries+" resets");
-                }
-                for (int i = 0; i < 2; i++) {
-                  LOG.info("Retrying listener.getLocalPort()");
-                  port = listener.getLocalPort();
-                  if (port > 0) {
-                    break;
-                  }
-                  Thread.sleep(200);
-                }
-                if (port > 0) {
-                  break;
-                }
-                LOG.info("Bouncing the listener");
-                listener.close();
-                Thread.sleep(1000);
-                listener.setPort(oriPort == 0 ? 0 : (oriPort += 1));
-                listener.open();
-                Thread.sleep(100);
-                port = listener.getLocalPort();
-              }
-            } //Workaround end
-            LOG.info("Jetty bound to port " + port);
-            webServer.start();
-            break;
-          } catch (IOException ex) {
-            // if this is a bind exception,
-            // then try the next port number.
-            if (ex instanceof BindException) {
-              if (!findPort) {
-                BindException be = new BindException(
-                        "Port in use: " + listener.getHost()
-                                + ":" + listener.getPort());
-                be.initCause(ex);
-                throw be;
-              }
-            } else {
-              LOG.info("HttpServer.start() threw a non Bind IOException"); 
-              throw ex;
-            }
-          } catch (MultiException ex) {
-            LOG.info("HttpServer.start() threw a MultiException"); 
-            throw ex;
-          }
-          listener.setPort((oriPort += 1));
-        }
+      } catch (IOException ex) {
+        LOG.info("HttpServer.start() threw a non Bind IOException", ex);
+        throw ex;
+      } catch (MultiException ex) {
+        LOG.info("HttpServer.start() threw a MultiException", ex);
+        throw ex;
       }
       // Make sure there is no handler failures.
       Handler[] handlers = webServer.getHandlers();
@@ -729,6 +661,52 @@ public class HttpServer implements FilterContainer {
     }
   }
 
+  /**
+   * Open the main listener for the server
+   * @throws Exception
+   */
+  void openListener() throws Exception {
+    if (listener.getLocalPort() != -1) { // it's already bound
+      return;
+    }
+    if (listenerStartedExternally) { // Expect that listener was started securely
+      throw new Exception("Expected webserver's listener to be started " +
+          "previously but wasn't");
+    }
+    int port = listener.getPort();
+    while (true) {
+      // jetty has a bug where you can't reopen a listener that previously
+      // failed to open w/o issuing a close first, even if the port is changed
+      try {
+        listener.close();
+        listener.open();
+        break;
+      } catch (BindException ex) {
+        if (port == 0 || !findPort) {
+          BindException be = new BindException(
+              "Port in use: " + listener.getHost() + ":" + listener.getPort());
+          be.initCause(ex);
+          throw be;
+        }
+      }
+      // try the next port number
+      listener.setPort(++port);
+      Thread.sleep(100);
+    }
+  }
+  
+  /**
+   * Return the bind address of the listener.
+   * @return InetSocketAddress of the listener
+   */
+  public InetSocketAddress getListenerAddress() {
+    int port = listener.getLocalPort();
+    if (port == -1) { // not bound, return requested port
+      port = listener.getPort();
+    }
+    return new InetSocketAddress(listener.getHost(), port);
+  }
+  
   /**
    * stop the server
    */
@@ -798,12 +776,43 @@ public class HttpServer implements FilterContainer {
   }
 
   /**
+   * Checks the user has privileges to access to instrumentation servlets.
+   * <p/>
+   * If <code>hadoop.security.instrumentation.requires.admin</code> is set to FALSE
+   * (default value) it always returns TRUE.
+   * <p/>
+   * If <code>hadoop.security.instrumentation.requires.admin</code> is set to TRUE
+   * it will check that if the current user is in the admin ACLS. If the user is
+   * in the admin ACLs it returns TRUE, otherwise it returns FALSE.
+   *
+   * @param servletContext the servlet context.
+   * @param request the servlet request.
+   * @param response the servlet response.
+   * @return TRUE/FALSE based on the logic decribed above.
+   */
+  public static boolean isInstrumentationAccessAllowed(
+    ServletContext servletContext, HttpServletRequest request,
+    HttpServletResponse response) throws IOException {
+    Configuration conf =
+      (Configuration) servletContext.getAttribute(CONF_CONTEXT_ATTRIBUTE);
+
+    boolean access = true;
+    boolean adminAccess = conf.getBoolean(
+      CommonConfigurationKeys.HADOOP_SECURITY_INSTRUMENTATION_REQUIRES_ADMIN,
+      false);
+    if (adminAccess) {
+      access = hasAdministratorAccess(servletContext, request, response);
+    }
+    return access;
+  }
+
+  /**
    * Does the user sending the HttpServletRequest has the administrator ACLs? If
    * it isn't the case, response will be modified to send an error to the user.
    * 
    * @param servletContext
    * @param request
-   * @param response
+   * @param response used to send the error response if user does not have admin access.
    * @return true if admin-authorized, false otherwise
    * @throws IOException
    */
@@ -812,7 +821,6 @@ public class HttpServer implements FilterContainer {
       HttpServletResponse response) throws IOException {
     Configuration conf =
         (Configuration) servletContext.getAttribute(CONF_CONTEXT_ATTRIBUTE);
-
     // If there is no authorization, anybody has administrator access.
     if (!conf.getBoolean(
         CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION, false)) {
@@ -821,22 +829,38 @@ public class HttpServer implements FilterContainer {
 
     String remoteUser = request.getRemoteUser();
     if (remoteUser == null) {
-      return true;
+      response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                         "Unauthenticated users are not " +
+                         "authorized to access this page.");
+      return false;
     }
+    
+    if (servletContext.getAttribute(ADMINS_ACL) != null &&
+        !userHasAdministratorAccess(servletContext, remoteUser)) {
+      response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User "
+          + remoteUser + " is unauthorized to access this page.");
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Get the admin ACLs from the given ServletContext and check if the given
+   * user is in the ACL.
+   * 
+   * @param servletContext the context containing the admin ACL.
+   * @param remoteUser the remote user to check for.
+   * @return true if the user is present in the ACL, false if no ACL is set or
+   *         the user is not present
+   */
+  public static boolean userHasAdministratorAccess(ServletContext servletContext,
+      String remoteUser) {
     AccessControlList adminsAcl = (AccessControlList) servletContext
         .getAttribute(ADMINS_ACL);
     UserGroupInformation remoteUserUGI =
         UserGroupInformation.createRemoteUser(remoteUser);
-    if (adminsAcl != null) {
-      if (!adminsAcl.isUserAllowed(remoteUserUGI)) {
-        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User "
-            + remoteUser + " is unauthorized to access this page. "
-            + "AccessControlList for accessing this page : "
-            + adminsAcl.toString());
-        return false;
-      }
-    }
-    return true;
+    return adminsAcl != null && adminsAcl.isUserAllowed(remoteUserUGI);
   }
 
   /**
@@ -851,12 +875,11 @@ public class HttpServer implements FilterContainer {
     @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
-      response.setContentType("text/plain; charset=UTF-8");
-      // Do the authorization
-      if (!HttpServer.hasAdministratorAccess(getServletContext(), request,
-          response)) {
+      if (!HttpServer.isInstrumentationAccessAllowed(getServletContext(),
+                                                     request, response)) {
         return;
       }
+      response.setContentType("text/plain; charset=UTF-8");
       PrintWriter out = response.getWriter();
       ReflectionUtils.printThreadInfo(out, "");
       out.close();

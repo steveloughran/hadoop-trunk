@@ -66,6 +66,7 @@
       <item name="Writing Yarn Applications" href="hadoop-yarn/hadoop-yarn-site/WritingYarnApplications.html"/>
       <item name="Capacity Scheduler" href="hadoop-yarn/hadoop-yarn-site/CapacityScheduler.html"/>
       <item name="Web Application Proxy" href="hadoop-yarn/hadoop-yarn-site/WebApplicationProxy.html"/>
+      <item name="Encrypted Shuffle" href="hadoop-yarn/hadoop-yarn-site/EncryptedShuffle.html"/>
       <item name="Yarn Commands" href="hadoop-yarn/hadoop-yarn-site/YarnCommands.html"/>
     </menu>
 
@@ -95,7 +96,7 @@
     <menu name="Configuration" inherit="top">
       <item name="core-default.xml" href="hadoop-project-dist/hadoop-common/core-default.xml"/>
       <item name="hdfs-default.xml" href="hadoop-project-dist/hadoop-hdfs/hdfs-default.xml"/>
-      <item name="yarn-default.xml" href="hadoop-yarn/hadoop-yarn-common/src/main/resources/yarn-default.xml"/>
+      <item name="yarn-default.xml" href="hadoop-yarn/hadoop-yarn-common/yarn-default.xml"/>
       <item name="mapred-default.xml" href="hadoop-mapreduce-client/hadoop-mapreduce-client-core/mapred-default.xml"/>
       <item name="Deprecated Properties" href="hadoop-project-dist/hadoop-common/DeprecatedProperties.html"/>
     </menu>

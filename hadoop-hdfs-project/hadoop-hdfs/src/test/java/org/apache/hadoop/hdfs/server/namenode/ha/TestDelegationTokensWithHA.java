@@ -17,7 +17,12 @@
  */
 package org.apache.hadoop.hdfs.server.namenode.ha;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -32,6 +37,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.AbstractFileSystem;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -76,7 +82,7 @@ public class TestDelegationTokensWithHA {
   public static void setupCluster() throws Exception {
     conf.setBoolean(
         DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_KEY, true);
-    conf.set("hadoop.security.auth_to_local",
+    conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTH_TO_LOCAL,
         "RULE:[2:$1@$0](JobTracker@.*FOO.COM)s/@.*//" + "DEFAULT");
 
     cluster = new MiniDFSCluster.Builder(conf)
@@ -158,6 +164,7 @@ public class TestDelegationTokensWithHA {
     final UserGroupInformation shortUgi = UserGroupInformation
         .createRemoteUser("JobTracker");
     longUgi.doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
       public Void run() throws Exception {
         DistributedFileSystem dfs = (DistributedFileSystem)
             HATestUtil.configureFailoverFs(cluster, conf);
@@ -167,6 +174,7 @@ public class TestDelegationTokensWithHA {
       }
     });
     shortUgi.doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
       public Void run() throws Exception {
         DistributedFileSystem dfs = (DistributedFileSystem)
             HATestUtil.configureFailoverFs(cluster, conf);
@@ -175,6 +183,7 @@ public class TestDelegationTokensWithHA {
       }
     });
     longUgi.doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
       public Void run() throws Exception {
         DistributedFileSystem dfs = (DistributedFileSystem)
             HATestUtil.configureFailoverFs(cluster, conf);

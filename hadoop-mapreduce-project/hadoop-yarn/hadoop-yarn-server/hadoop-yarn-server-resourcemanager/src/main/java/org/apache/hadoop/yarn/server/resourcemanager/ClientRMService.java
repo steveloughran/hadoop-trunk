@@ -33,7 +33,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authorize.PolicyProvider;
@@ -80,7 +79,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeState;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeReport;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.authorize.RMPolicyProvider;
@@ -104,7 +102,6 @@ public class ClientRMService extends AbstractService implements
   final private RMContext rmContext;
   private final RMAppManager rmAppManager;
 
-  private String clientServiceBindAddress;
   private Server server;
   private RMDelegationTokenSecretManager rmDTSecretManager;
 
@@ -126,13 +123,10 @@ public class ClientRMService extends AbstractService implements
   
   @Override
   public void init(Configuration conf) {
-    clientServiceBindAddress =
-      conf.get(YarnConfiguration.RM_ADDRESS,
-          YarnConfiguration.DEFAULT_RM_ADDRESS);
-    clientBindAddress =
-      NetUtils.createSocketAddr(clientServiceBindAddress,
-          YarnConfiguration.DEFAULT_RM_PORT,
-          YarnConfiguration.RM_ADDRESS);
+    clientBindAddress = conf.getSocketAddr(
+        YarnConfiguration.RM_ADDRESS,
+        YarnConfiguration.DEFAULT_RM_ADDRESS,
+        YarnConfiguration.DEFAULT_RM_PORT);
     super.init(conf);
   }
   
@@ -155,6 +149,8 @@ public class ClientRMService extends AbstractService implements
     }
     
     this.server.start();
+    clientBindAddress = conf.updateConnectAddr(YarnConfiguration.RM_ADDRESS,
+                                               server.getListenerAddress());
     super.start();
   }
 
@@ -393,7 +389,9 @@ public class ClientRMService extends AbstractService implements
         appReports = new ArrayList<ApplicationReport>(
             apps.size());
         for (RMApp app : apps) {
-          appReports.add(app.createAndGetApplicationReport(true));
+          if (app.getQueue().equals(queueInfo.getQueueName())) {
+            appReports.add(app.createAndGetApplicationReport(true));
+          }
         }
       }
       queueInfo.setApplications(appReports);
@@ -417,7 +415,7 @@ public class ClientRMService extends AbstractService implements
     } 
     
     NodeReport report = BuilderUtils.newNodeReport(rmNode.getNodeID(),
-        RMNodeState.toNodeState(rmNode.getState()),
+        rmNode.getState(),
         rmNode.getHttpAddress(), rmNode.getRackName(), used,
         rmNode.getTotalCapability(), numContainers,
         rmNode.getNodeHealthStatus());
@@ -468,8 +466,7 @@ public class ClientRMService extends AbstractService implements
               realRMDTtoken.getIdentifier(),
               realRMDTtoken.getKind().toString(),
               realRMDTtoken.getPassword(),
-              clientBindAddress.getAddress().getHostAddress() + ":"
-              + clientBindAddress.getPort()
+              realRMDTtoken.getService().toString()
               ));
       return response;
     } catch(IOException io) {

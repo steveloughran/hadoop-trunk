@@ -45,18 +45,19 @@ public abstract class EditLogInputStream implements Closeable {
   /** 
    * @return the first transaction which will be found in this stream
    */
-  public abstract long getFirstTxId() throws IOException;
+  public abstract long getFirstTxId();
   
   /** 
    * @return the last transaction which will be found in this stream
    */
-  public abstract long getLastTxId() throws IOException;
+  public abstract long getLastTxId();
 
 
   /**
    * Close the stream.
    * @throws IOException if an error occurred while closing
    */
+  @Override
   public abstract void close() throws IOException;
 
   /** 
@@ -73,14 +74,14 @@ public abstract class EditLogInputStream implements Closeable {
     }
     return nextOp();
   }
-
+  
   /** 
    * Position the stream so that a valid operation can be read from it with
    * readOp().
    * 
    * This method can be used to skip over corrupted sections of edit logs.
    */
-  public void resync() throws IOException {
+  public void resync() {
     if (cachedOp != null) {
       return;
     }
@@ -109,7 +110,7 @@ public abstract class EditLogInputStream implements Closeable {
     // error recovery will want to override this.
     try {
       return nextOp();
-    } catch (IOException e) {
+    } catch (Throwable e) {
       return null;
     }
   }

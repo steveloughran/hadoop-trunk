@@ -42,6 +42,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -69,6 +70,7 @@ import org.apache.hadoop.security.SaslRpcServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -159,8 +161,8 @@ public class TestBlockToken {
   @Test
   public void testWritable() throws Exception {
     TestWritable.testWritable(new BlockTokenIdentifier());
-    BlockTokenSecretManager sm = new BlockTokenSecretManager(true,
-        blockKeyUpdateInterval, blockTokenLifetime);
+    BlockTokenSecretManager sm = new BlockTokenSecretManager(
+        blockKeyUpdateInterval, blockTokenLifetime, 0);
     TestWritable.testWritable(generateTokenId(sm, block1,
         EnumSet.allOf(BlockTokenSecretManager.AccessMode.class)));
     TestWritable.testWritable(generateTokenId(sm, block2,
@@ -198,18 +200,18 @@ public class TestBlockToken {
   /** test block key and token handling */
   @Test
   public void testBlockTokenSecretManager() throws Exception {
-    BlockTokenSecretManager masterHandler = new BlockTokenSecretManager(true,
-        blockKeyUpdateInterval, blockTokenLifetime);
-    BlockTokenSecretManager slaveHandler = new BlockTokenSecretManager(false,
+    BlockTokenSecretManager masterHandler = new BlockTokenSecretManager(
+        blockKeyUpdateInterval, blockTokenLifetime, 0);
+    BlockTokenSecretManager slaveHandler = new BlockTokenSecretManager(
         blockKeyUpdateInterval, blockTokenLifetime);
     ExportedBlockKeys keys = masterHandler.exportKeys();
-    slaveHandler.setKeys(keys);
+    slaveHandler.addKeys(keys);
     tokenGenerationAndVerification(masterHandler, slaveHandler);
     // key updating
     masterHandler.updateKeys();
     tokenGenerationAndVerification(masterHandler, slaveHandler);
     keys = masterHandler.exportKeys();
-    slaveHandler.setKeys(keys);
+    slaveHandler.addKeys(keys);
     tokenGenerationAndVerification(masterHandler, slaveHandler);
   }
 
@@ -235,8 +237,8 @@ public class TestBlockToken {
 
   @Test
   public void testBlockTokenRpc() throws Exception {
-    BlockTokenSecretManager sm = new BlockTokenSecretManager(true,
-        blockKeyUpdateInterval, blockTokenLifetime);
+    BlockTokenSecretManager sm = new BlockTokenSecretManager(
+        blockKeyUpdateInterval, blockTokenLifetime, 0);
     Token<BlockTokenIdentifier> token = sm.generateToken(block3,
         EnumSet.allOf(BlockTokenSecretManager.AccessMode.class));
 
@@ -270,8 +272,8 @@ public class TestBlockToken {
   @Test
   public void testBlockTokenRpcLeak() throws Exception {
     Assume.assumeTrue(FD_DIR.exists());
-    BlockTokenSecretManager sm = new BlockTokenSecretManager(true,
-        blockKeyUpdateInterval, blockTokenLifetime);
+    BlockTokenSecretManager sm = new BlockTokenSecretManager(
+        blockKeyUpdateInterval, blockTokenLifetime, 0);
     Token<BlockTokenIdentifier> token = sm.generateToken(block3,
         EnumSet.allOf(BlockTokenSecretManager.AccessMode.class));
 
@@ -279,8 +281,7 @@ public class TestBlockToken {
     server.start();
 
     final InetSocketAddress addr = NetUtils.getConnectAddress(server);
-    DatanodeID fakeDnId = new DatanodeID("localhost",
-        "localhost", "fake-storage", addr.getPort(), 0, addr.getPort());
+    DatanodeID fakeDnId = DFSTestUtil.getLocalDatanodeID(addr.getPort());
 
     ExtendedBlock b = new ExtendedBlock("fake-pool", new Block(12345L));
     LocatedBlock fakeBlock = new LocatedBlock(b, new DatanodeInfo[0]);
@@ -300,8 +301,8 @@ public class TestBlockToken {
 
     int fdsAtStart = countOpenFileDescriptors();
     try {
-      long endTime = System.currentTimeMillis() + 3000;
-      while (System.currentTimeMillis() < endTime) {
+      long endTime = Time.now() + 3000;
+      while (Time.now() < endTime) {
         proxy = DFSUtil.createClientDatanodeProtocolProxy(fakeDnId, conf, 1000,
             fakeBlock);
         assertEquals(block3.getBlockId(), proxy.getReplicaVisibleLength(block3));
@@ -340,21 +341,21 @@ public class TestBlockToken {
     // Test BlockPoolSecretManager with upto 10 block pools
     for (int i = 0; i < 10; i++) {
       String bpid = Integer.toString(i);
-      BlockTokenSecretManager masterHandler = new BlockTokenSecretManager(true,
-          blockKeyUpdateInterval, blockTokenLifetime);
-      BlockTokenSecretManager slaveHandler = new BlockTokenSecretManager(false,
+      BlockTokenSecretManager masterHandler = new BlockTokenSecretManager(
+          blockKeyUpdateInterval, blockTokenLifetime, 0);
+      BlockTokenSecretManager slaveHandler = new BlockTokenSecretManager(
           blockKeyUpdateInterval, blockTokenLifetime);
       bpMgr.addBlockPool(bpid, slaveHandler);
 
       ExportedBlockKeys keys = masterHandler.exportKeys();
-      bpMgr.setKeys(bpid, keys);
+      bpMgr.addKeys(bpid, keys);
       tokenGenerationAndVerification(masterHandler, bpMgr.get(bpid));
 
       // Test key updating
       masterHandler.updateKeys();
       tokenGenerationAndVerification(masterHandler, bpMgr.get(bpid));
       keys = masterHandler.exportKeys();
-      bpMgr.setKeys(bpid, keys);
+      bpMgr.addKeys(bpid, keys);
       tokenGenerationAndVerification(masterHandler, bpMgr.get(bpid));
     }
   }
