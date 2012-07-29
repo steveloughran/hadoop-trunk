@@ -91,6 +91,8 @@ public class TestJobTrackerQuiescence {
     JobConf jtConf = new JobConf();
     jtConf.setInt("mapred.tasktracker.map.tasks.maximum", maxMapTasks);
     jtConf.setInt("mapred.tasktracker.reduce.tasks.maximum", 1);
+    jtConf.setBoolean(JobTracker.JT_HDFS_MONITOR_ENABLE, true);
+    jtConf.setInt(JobTracker.JT_HDFS_MONITOR_THREAD_INTERVAL, 1000);
     mr = new MiniMRCluster(1, namenode, 1, null, null, jtConf);
     mr.waitUntilIdle();
     mr.setInlineCleanupThreads();
@@ -109,6 +111,89 @@ public class TestJobTrackerQuiescence {
         dfs.shutdown();
       } catch (Exception e) {}
     }
+  }
+  
+  @Test
+  public void testHDFSMonitor() throws Exception {
+    /*
+     * Try 'automatic' safe-mode 
+     */
+    // Put HDFS in safe-mode
+    dfs.getNameNode().setSafeMode(
+        org.apache.hadoop.hdfs.protocol.FSConstants.SafeModeAction.SAFEMODE_ENTER);
+    int numTries = 20;
+    while (!jt.isInSafeMode() && numTries > 0) {
+      Thread.sleep(1000);
+      --numTries;
+    }
+    
+    // By now JT should be in safe-mode
+    assertEquals(true, jt.isInSafeMode());
+      
+    // Remove HDFS from safe-mode
+    dfs.getNameNode().setSafeMode(
+        org.apache.hadoop.hdfs.protocol.FSConstants.SafeModeAction.SAFEMODE_LEAVE);
+    
+    numTries = 20;
+    while (jt.isInSafeMode() && numTries > 0) {
+      Thread.sleep(1000);
+      --numTries;
+    }
+    
+    // By now JT should not be in safe-mode
+    assertEquals(false, jt.isInSafeMode());
+      
+    /*
+     * Now ensure 'automatic' mode doesn't interfere with 'admin set' safe-mode
+     */
+    dfs.getNameNode().setSafeMode(
+        org.apache.hadoop.hdfs.protocol.FSConstants.SafeModeAction.SAFEMODE_ENTER);
+    numTries = 20;
+    while (!jt.isInSafeMode() && numTries > 0) {
+      Thread.sleep(1000);
+      --numTries;
+    }
+    
+    // By now JT should be in safe-mode
+    assertEquals(true, jt.isInSafeMode());
+
+    // Now, put JT in admin set safe-mode
+    enterSafeMode();
+    
+    // Bring HDFS back from safe-mode
+    dfs.getNameNode().setSafeMode(
+        org.apache.hadoop.hdfs.protocol.FSConstants.SafeModeAction.SAFEMODE_LEAVE);
+    
+    numTries = 20;
+    while (jt.isInSafeMode() && numTries > 0) {
+      Thread.sleep(1000);
+      --numTries;
+    }
+    
+    // But now JT should *still* be in safe-mode
+    assertEquals(true, jt.isInSafeMode());
+    assertEquals(true, jt.isInAdminSafeMode());
+    
+    // Leave JT safe-mode
+    leaveSafeMode();
+    assertEquals(false, jt.isInAdminSafeMode());
+    
+    // Bounce HDFS back in-out
+    dfs.getNameNode().setSafeMode(
+        org.apache.hadoop.hdfs.protocol.FSConstants.SafeModeAction.SAFEMODE_ENTER);
+    Thread.sleep(5000);
+    dfs.getNameNode().setSafeMode(
+        org.apache.hadoop.hdfs.protocol.FSConstants.SafeModeAction.SAFEMODE_LEAVE);
+    
+    numTries = 20;
+    while (jt.isInSafeMode() && numTries > 0) {
+      Thread.sleep(1000);
+      --numTries;
+    }
+    
+    // By now JT should not be in safe-mode
+    assertEquals(false, jt.isInSafeMode());
+      
   }
   
   @Test
