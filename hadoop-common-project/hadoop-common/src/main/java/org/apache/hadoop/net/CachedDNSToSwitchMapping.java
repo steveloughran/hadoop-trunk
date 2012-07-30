@@ -35,7 +35,7 @@ import org.apache.hadoop.classification.InterfaceStability;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
+public class CachedDNSToSwitchMapping extends AbstractTopologyMapping {
   private Map<String, String> cache = new ConcurrentHashMap<String, String>();
 
   /**
@@ -129,7 +129,7 @@ public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
    * @return a copy of the cached map of hosts to rack
    */
   @Override
-  public Map<String, String> getSwitchMap() {
+  public Map<String, String> getTopologyMap() {
     Map<String, String > switchMap = new HashMap<String, String>(cache);
     return switchMap;
   }
@@ -142,11 +142,11 @@ public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
 
   /**
    * Delegate the switch topology query to the raw mapping, via
-   * {@link AbstractDNSToSwitchMapping#isMappingSingleSwitch(DNSToSwitchMapping)}
+   * {@link AbstractTopologyMapping#isTopologyFlat(DNSToSwitchMapping)}
    * @return true iff the raw mapper is considered single-switch.
    */
   @Override
-  public boolean isSingleSwitch() {
-    return isMappingSingleSwitch(rawMapping);
+  public boolean isFlatTopology() {
+    return isTopologyFlat(rawMapping);
   }
 }

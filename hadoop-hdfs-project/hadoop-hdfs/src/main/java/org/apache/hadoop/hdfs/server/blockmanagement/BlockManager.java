@@ -58,7 +58,6 @@ import static org.apache.hadoop.util.ExitUtil.terminate;
 
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
-import org.apache.hadoop.hdfs.server.common.Util;
 import org.apache.hadoop.hdfs.server.namenode.FSClusterStats;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.Namesystem;
@@ -69,7 +68,7 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.KeyUpdateCommand;
 import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo;
 import org.apache.hadoop.hdfs.util.LightWeightLinkedSet;
-import org.apache.hadoop.net.AbstractDNSToSwitchMapping;
+import org.apache.hadoop.net.AbstractTopologyMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.util.Daemon;
@@ -265,8 +264,8 @@ public class BlockManager {
     this.maxReplicationStreams = conf.getInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_MAX_STREAMS_KEY,
                                              DFSConfigKeys.DFS_NAMENODE_REPLICATION_MAX_STREAMS_DEFAULT);
     DNSToSwitchMapping dnsMap = datanodeManager.getDnsToSwitchMapping();
-    this.shouldCheckForEnoughRacks = !AbstractDNSToSwitchMapping
-        .isMappingSingleSwitch(dnsMap);
+    this.shouldCheckForEnoughRacks = !AbstractTopologyMapping
+        .isTopologyFlat(dnsMap);
 
     this.blocksInvalidateWorkPct = conf.getFloat(
         DFSConfigKeys.DFS_NAMENODE_INVALIDATE_WORK_PCT_PER_ITERATION,

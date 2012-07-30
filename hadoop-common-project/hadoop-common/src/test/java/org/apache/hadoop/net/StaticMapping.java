@@ -21,10 +21,8 @@ import org.apache.hadoop.conf.Configuration;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Implements the {@link DNSToSwitchMapping} via static mappings. Used
@@ -41,7 +39,7 @@ import java.util.Set;
  * {@link ScriptBasedMapping} -the presence of a non-empty topology script.
  * The script itself is not used.
  */
-public class StaticMapping extends AbstractDNSToSwitchMapping  {
+public class StaticMapping extends AbstractTopologyMapping {
 
   /**
    * Key to define the node mapping as a comma-delimited list of host=rack
@@ -121,8 +119,8 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
    * @return false, always
    */
   @Override
-  public boolean isSingleSwitch() {
-    return isSingleSwitchByScriptPolicy();
+  public boolean isFlatTopology() {
+    return isFlatTopologyByScriptPolicy();
   }
 
   /**
@@ -130,7 +128,7 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
    * @return a clone of the map or null for none known
    */
   @Override
-  public Map<String, String> getSwitchMap() {
+  public Map<String, String> getTopologyMap() {
     synchronized (nameToRackMap) {
       return new HashMap<String, String>(nameToRackMap);
     }
@@ -138,7 +136,7 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
 
   @Override
   public String toString() {
-    return "static mapping with single switch = " + isSingleSwitch();
+    return "static mapping with single switch = " + isFlatTopology();
   }
 
   /**

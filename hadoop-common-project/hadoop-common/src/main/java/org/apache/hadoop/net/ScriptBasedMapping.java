@@ -26,7 +26,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 
@@ -41,7 +40,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
  * class extends {@link CachedDNSToSwitchMapping} to cache the delegated
  * queries.
  * <p/>
- * This DNS mapper's {@link #isSingleSwitch()} predicate returns
+ * This DNS mapper's {@link #isFlatTopology()} predicate returns
  * true if and only if a script is defined.
  */
 @InterfaceAudience.Public
@@ -134,7 +133,7 @@ public final class ScriptBasedMapping extends CachedDNSToSwitchMapping {
    * by the superclass {@link CachedDNSToSwitchMapping}
    */
   private static final class RawScriptBasedMapping
-      extends AbstractDNSToSwitchMapping {
+      extends AbstractTopologyMapping {
     private String scriptName;
     private int maxArgs; //max hostnames per call of the script
     private static final Log LOG =
@@ -256,7 +255,7 @@ public final class ScriptBasedMapping extends CachedDNSToSwitchMapping {
      * @return true iff there is no script
      */
     @Override
-    public boolean isSingleSwitch() {
+    public boolean isFlatTopology() {
       return scriptName == null;
     }
 

@@ -76,24 +76,20 @@ public class TestStaticMapping extends Assert {
     return conf;
   }
 
-  private void assertSingleSwitch(DNSToSwitchMapping mapping) {
-    assertEquals("Expected a single switch mapping "
-                     + mapping,
-                 true,
-                 AbstractDNSToSwitchMapping.isMappingSingleSwitch(mapping));
+  private void assertFlatTopology(DNSToSwitchMapping mapping) {
+    assertTrue("Expected a single switch mapping "
+               + mapping, AbstractTopologyMapping.isTopologyFlat(mapping));
   }
 
-  private void assertMultiSwitch(DNSToSwitchMapping mapping) {
-    assertEquals("Expected a multi switch mapping "
-                     + mapping,
-                 false,
-                 AbstractDNSToSwitchMapping.isMappingSingleSwitch(mapping));
+  private void assertDeepTopology(DNSToSwitchMapping mapping) {
+    assertFalse("Expected a multi switch mapping "
+                + mapping, AbstractTopologyMapping.isTopologyFlat(mapping));
   }
 
-  protected void assertMapSize(AbstractDNSToSwitchMapping switchMapping, int expectedSize) {
+  protected void assertMapSize(AbstractTopologyMapping topologyMapping, int expectedSize) {
     assertEquals(
-        "Expected two entries in the map " + switchMapping.dumpTopology(),
-        expectedSize, switchMapping.getSwitchMap().size());
+      "Expected two entries in the map " + topologyMapping.dumpTopology(),
+      expectedSize, topologyMapping.getTopologyMap().size());
   }
 
   private List<String> createQueryList() {
@@ -107,13 +103,13 @@ public class TestStaticMapping extends Assert {
   public void testStaticIsSingleSwitchOnNullScript() throws Throwable {
     StaticMapping mapping = newInstance(null);
     mapping.setConf(createConf(null));
-    assertSingleSwitch(mapping);
+    assertFlatTopology(mapping);
   }
 
   @Test
   public void testStaticIsMultiSwitchOnScript() throws Throwable {
     StaticMapping mapping = newInstance("ls");
-    assertMultiSwitch(mapping);
+    assertDeepTopology(mapping);
   }
 
   @Test
@@ -126,7 +122,7 @@ public class TestStaticMapping extends Assert {
     assertEquals("/r1", resolved.get(0));
     assertEquals(NetworkTopology.DEFAULT_RACK, resolved.get(1));
     // get the switch map and examine it
-    Map<String, String> switchMap = mapping.getSwitchMap();
+    Map<String, String> switchMap = mapping.getTopologyMap();
     String topology = mapping.dumpTopology();
     LOG.info(topology);
     assertEquals(topology, 1, switchMap.size());
@@ -145,7 +141,7 @@ public class TestStaticMapping extends Assert {
     //even though we have inserted elements into the list, because 
     //it is driven by the script key in the configuration, it still
     //thinks that it is single rack
-    assertSingleSwitch(mapping);
+    assertFlatTopology(mapping);
     List<String> l1 = new ArrayList<String>(3);
     l1.add("n1");
     l1.add("unknown");
@@ -156,7 +152,7 @@ public class TestStaticMapping extends Assert {
     assertEquals(NetworkTopology.DEFAULT_RACK, resolved.get(1));
     assertEquals("/r2", resolved.get(2));
 
-    Map<String, String> switchMap = mapping.getSwitchMap();
+    Map<String, String> switchMap = mapping.getTopologyMap();
     String topology = mapping.dumpTopology();
     LOG.info(topology);
     assertEquals(topology, 2, switchMap.size());
@@ -173,11 +169,11 @@ public class TestStaticMapping extends Assert {
   public void testCachingRelaysSingleSwitchQueries() throws Throwable {
     //create a single switch map
     StaticMapping staticMapping = newInstance(null);
-    assertSingleSwitch(staticMapping);
+    assertFlatTopology(staticMapping);
     CachedDNSToSwitchMapping cachedMap =
         new CachedDNSToSwitchMapping(staticMapping);
     LOG.info("Mapping: " + cachedMap + "\n" + cachedMap.dumpTopology());
-    assertSingleSwitch(cachedMap);
+    assertFlatTopology(cachedMap);
   }
 
   /**
@@ -187,11 +183,11 @@ public class TestStaticMapping extends Assert {
   @Test
   public void testCachingRelaysMultiSwitchQueries() throws Throwable {
     StaticMapping staticMapping = newInstance("top");
-    assertMultiSwitch(staticMapping);
+    assertDeepTopology(staticMapping);
     CachedDNSToSwitchMapping cachedMap =
         new CachedDNSToSwitchMapping(staticMapping);
     LOG.info("Mapping: " + cachedMap + "\n" + cachedMap.dumpTopology());
-    assertMultiSwitch(cachedMap);
+    assertDeepTopology(cachedMap);
   }
 
 
