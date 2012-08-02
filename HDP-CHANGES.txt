@@ -35,6 +35,7 @@ HA Fixes
           MAPREDUCE-4328. Add JobTracker safe mode.
           MAPREDUCE-3837. JobTracker restart fixed. 
   HDFS-3551 WebHDFS CREATE does not use client location for redirection
+  BUG-1124. TestCLI failed with HA changes.
 
 HDP-PREVIEW-4  
   Branched From HADOOP-1.0.3
