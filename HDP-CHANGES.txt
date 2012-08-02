@@ -29,6 +29,9 @@ Performance improvements:
 
     MAPREDUCE-3289. Make use of fadvise in the NM's shuffle handler.
     (Todd Lipcon and Brandon Li via sseth)
+
+    MAPREDUCE-3278. Fix a busy loop in ReduceTask that would cause 100%
+    cpu utilization during the fetch phase. (todd)
     
 HA Fixes
   BUG-851 Do not check safemode in FSNamesystem.getBlockLocations(..) for fsck. - HDFS-3522
