@@ -26,6 +26,9 @@ Performance improvements:
     MAPREDUCE-1906. Lower minimum heartbeat interval between tasktracker and 
     JobTracker for smaller clusters. (Todd Lipcon, backport by 
     Brandon Li via sseth)
+
+    MAPREDUCE-3289. Make use of fadvise in the NM's shuffle handler.
+    (Todd Lipcon and Brandon Li via sseth)
     
 HA Fixes
   BUG-851 Do not check safemode in FSNamesystem.getBlockLocations(..) for fsck. - HDFS-3522
