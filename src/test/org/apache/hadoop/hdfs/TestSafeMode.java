@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdfs;
 
+import static org.junit.Assert.*;
+
 import java.io.IOException;
 
 import org.apache.commons.logging.Log;
