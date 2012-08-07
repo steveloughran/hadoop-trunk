@@ -95,6 +95,13 @@ public class RetryUtils {
           }
           return p.shouldRetry(e, retries);
         }
+
+        @Override
+        public String toString() {
+          return "RetryPolicy[" + multipleLinearRandomRetry + ", "
+              + RetryPolicies.TRY_ONCE_THEN_FAIL.getClass().getSimpleName()
+              + "]";
+        }
       };
     }
   }

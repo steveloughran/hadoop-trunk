@@ -43,6 +43,7 @@ HA Fixes
   HDFS-3551 WebHDFS CREATE does not use client location for redirection
   BUG-1124. TestCLI failed with HA changes.
   BUG-1188. Added retries for JobClient during JobTracker safe-mode.
+  BUG-1179. FSNamesystem.getAdditionalBlock(..) should check safemode earlier.
 
 HDP-PREVIEW-4  
   Branched From HADOOP-1.0.3

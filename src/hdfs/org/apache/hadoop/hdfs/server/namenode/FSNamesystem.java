@@ -1549,6 +1549,9 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
                                   +src+" for "+clientName);
 
     synchronized (this) {
+      if (isInSafeMode()) {//check safemode first for failing-fast
+        throw new SafeModeException("Cannot add block to " + src, safeMode);
+      }
       // have we exceeded the configured limit of fs objects.
       checkFsObjectLimit();
 
@@ -1566,7 +1569,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
       replication = (int)pendingFile.getReplication();
     }
 
-    // choose targets for the new block tobe allocated.
+    // choose targets for the new block to be allocated.
     DatanodeDescriptor targets[] = replicator.chooseTarget(replication,
                                                            clientNode,
                                                            excludedNodes,
@@ -1579,7 +1582,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
 
     // Allocate a new block and record it in the INode. 
     synchronized (this) {
-      if (isInSafeMode()) {
+      if (isInSafeMode()) { //make sure it is not in safemode again.
         throw new SafeModeException("Cannot add block to " + src, safeMode);
       }
       INode[] pathINodes = dir.getExistingPathINodes(src);
@@ -4761,6 +4764,10 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
       this.safeReplication = conf.getInt("dfs.replication.min", 1);
       this.blockTotal = 0; 
       this.blockSafe = 0;
+      
+      LOG.info("dfs.safemode.threshold.pct          = " + threshold);
+      LOG.info("dfs.namenode.safemode.min.datanodes = " + datanodeThreshold);
+      LOG.info("dfs.safemode.extension              = " + extension);
     }
 
     /**
