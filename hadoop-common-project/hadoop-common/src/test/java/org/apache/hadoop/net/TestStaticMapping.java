@@ -80,17 +80,17 @@ public class TestStaticMapping extends Assert {
     assertEquals("Expected a single switch mapping "
                      + mapping,
                  true,
-                 AbstractDNSToSwitchMapping.isMappingSingleSwitch(mapping));
+                 AbstractTopologyMapping.isMappingSingleSwitch(mapping));
   }
 
   private void assertMultiSwitch(DNSToSwitchMapping mapping) {
     assertEquals("Expected a multi switch mapping "
                      + mapping,
                  false,
-                 AbstractDNSToSwitchMapping.isMappingSingleSwitch(mapping));
+                 AbstractTopologyMapping.isMappingSingleSwitch(mapping));
   }
 
-  protected void assertMapSize(AbstractDNSToSwitchMapping switchMapping, int expectedSize) {
+  protected void assertMapSize(AbstractTopologyMapping switchMapping, int expectedSize) {
     assertEquals(
         "Expected two entries in the map " + switchMapping.dumpTopology(),
         expectedSize, switchMapping.getSwitchMap().size());

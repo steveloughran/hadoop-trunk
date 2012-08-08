@@ -41,7 +41,7 @@ import java.util.Set;
  * {@link ScriptBasedMapping} -the presence of a non-empty topology script.
  * The script itself is not used.
  */
-public class StaticMapping extends AbstractDNSToSwitchMapping  {
+public class StaticMapping extends AbstractTopologyMapping  {
 
   /**
    * Key to define the node mapping as a comma-delimited list of host=rack
@@ -121,7 +121,7 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
    * @return false, always
    */
   @Override
-  public boolean isSingleSwitch() {
+  public boolean isFlatTopology() {
     return isSingleSwitchByScriptPolicy();
   }
 
@@ -138,7 +138,7 @@ public class StaticMapping extends AbstractDNSToSwitchMapping  {
 
   @Override
   public String toString() {
-    return "static mapping with single switch = " + isSingleSwitch();
+    return "static mapping with single switch = " + isFlatTopology();
   }
 
   /**

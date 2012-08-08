@@ -41,7 +41,7 @@ public class TestSwitchMapping extends Assert {
   public void testStandaloneClassesAssumedMultiswitch() throws Throwable {
     DNSToSwitchMapping mapping = new StandaloneSwitchMapping();
     assertFalse("Expected to be multi switch " + mapping,
-                AbstractDNSToSwitchMapping.isMappingSingleSwitch(mapping));
+                AbstractTopologyMapping.isMappingSingleSwitch(mapping));
   }
 
 
@@ -56,7 +56,7 @@ public class TestSwitchMapping extends Assert {
     CachedDNSToSwitchMapping mapping =
         new CachedDNSToSwitchMapping(new StandaloneSwitchMapping());
     assertFalse("Expected to be multi switch " + mapping,
-                mapping.isSingleSwitch());
+                mapping.isFlatTopology());
   }
 
 
@@ -103,7 +103,7 @@ public class TestSwitchMapping extends Assert {
 
   @Test
   public void testNullMapping() {
-    assertFalse(AbstractDNSToSwitchMapping.isMappingSingleSwitch(null));
+    assertFalse(AbstractTopologyMapping.isMappingSingleSwitch(null));
   }
 
   /**

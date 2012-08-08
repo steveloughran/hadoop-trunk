@@ -52,9 +52,9 @@ public class TestScriptBasedMapping extends TestCase {
   public void testNoFilenameMeansSingleSwitch() throws Throwable {
     Configuration conf = new Configuration();
     ScriptBasedMapping mapping = createMapping(conf);
-    assertTrue("Expected to be single switch", mapping.isSingleSwitch());
+    assertTrue("Expected to be single switch", mapping.isFlatTopology());
     assertTrue("Expected to be single switch",
-               AbstractDNSToSwitchMapping.isMappingSingleSwitch(mapping));
+               AbstractTopologyMapping.isMappingSingleSwitch(mapping));
   }
 
   @Test
@@ -62,15 +62,15 @@ public class TestScriptBasedMapping extends TestCase {
     Configuration conf = new Configuration();
     conf.set(ScriptBasedMapping.SCRIPT_FILENAME_KEY, "any-filename");
     ScriptBasedMapping mapping = createMapping(conf);
-    assertFalse("Expected to be multi switch", mapping.isSingleSwitch());
+    assertFalse("Expected to be multi switch", mapping.isFlatTopology());
     mapping.setConf(new Configuration());
-    assertTrue("Expected to be single switch", mapping.isSingleSwitch());
+    assertTrue("Expected to be single switch", mapping.isFlatTopology());
   }
 
   @Test
   public void testNullConfig() throws Throwable {
     ScriptBasedMapping mapping = createMapping(null);
-    assertTrue("Expected to be single switch", mapping.isSingleSwitch());
+    assertTrue("Expected to be single switch", mapping.isFlatTopology());
 
   }
   private ScriptBasedMapping createMapping(Configuration conf) {

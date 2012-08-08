@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * This is a base class for DNS to Switch mappings. <p/> It is not mandatory to
+ * This is a base class for topology mappings. <p/> It is not mandatory to
  * derive {@link DNSToSwitchMapping} implementations from it, but it is strongly
  * recommended, as it makes it easy for the Hadoop developers to add new methods
  * to this base class that are automatically picked up by all implementations.
@@ -45,7 +45,7 @@ import java.util.Set;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public abstract class AbstractDNSToSwitchMapping
+public abstract class AbstractTopologyMapping
     implements DNSToSwitchMapping, Configurable {
 
   private Configuration conf;
@@ -53,7 +53,7 @@ public abstract class AbstractDNSToSwitchMapping
   /**
    * Create an unconfigured instance
    */
-  protected AbstractDNSToSwitchMapping() {
+  protected AbstractTopologyMapping() {
   }
 
   /**
@@ -62,7 +62,7 @@ public abstract class AbstractDNSToSwitchMapping
    * a subclass extracts information in that method, it must call it explicitly.
    * @param conf the configuration
    */
-  protected AbstractDNSToSwitchMapping(Configuration conf) {
+  protected AbstractTopologyMapping(Configuration conf) {
     this.conf = conf;
   }
 
@@ -91,7 +91,7 @@ public abstract class AbstractDNSToSwitchMapping
    *
    * @return true if the mapping thinks that it is on a single switch
    */
-  public boolean isSingleSwitch() {
+  public boolean isFlatTopology() {
     return false;
   }
 
@@ -149,8 +149,8 @@ public abstract class AbstractDNSToSwitchMapping
    * is not derived from this class.
    */
   public static boolean isMappingSingleSwitch(DNSToSwitchMapping mapping) {
-    return mapping != null && mapping instanceof AbstractDNSToSwitchMapping
-        && ((AbstractDNSToSwitchMapping) mapping).isSingleSwitch();
+    return mapping != null && mapping instanceof AbstractTopologyMapping
+        && ((AbstractTopologyMapping) mapping).isFlatTopology();
   }
 
 }
