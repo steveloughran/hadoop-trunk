@@ -33,17 +33,28 @@ Performance improvements:
     MAPREDUCE-3278. Fix a busy loop in ReduceTask that would cause 100%
     cpu utilization during the fetch phase. (todd)
     
-HA Fixes
-  BUG-851 Do not check safemode in FSNamesystem.getBlockLocations(..) for fsck. - HDFS-3522
-  BUG-845 Disable edit log toleration in SecondaryNameNode. -  HDFS-3521
-  BUG-1021 Log newly allocated blocks (backport HDFS-1108) 
-  BUG-444 MAPREDUCE-4328. Only check DFS health for hdfs uris.
-          MAPREDUCE-4328. Add JobTracker safe mode.
-          MAPREDUCE-3837. JobTracker restart fixed. 
-  HDFS-3551 WebHDFS CREATE does not use client location for redirection
-  BUG-1124. TestCLI failed with HA changes.
-  BUG-1188. Added retries for JobClient during JobTracker safe-mode.
-  BUG-1179. FSNamesystem.getAdditionalBlock(..) should check safemode earlier.
+  HA Fixes
+    BUG-851 Do not check safemode in FSNamesystem.getBlockLocations(..) 
+    for fsck. - HDFS-3522
+
+    BUG-845 Disable edit log toleration in SecondaryNameNode. -  HDFS-3521
+
+    BUG-1021 Log newly allocated blocks (backport HDFS-1108) 
+
+    BUG-444 MAPREDUCE-4328. Only check DFS health for hdfs uris.
+            MAPREDUCE-4328. Add JobTracker safe mode.
+            MAPREDUCE-3837. JobTracker restart fixed. 
+          
+    HDFS-3551 WebHDFS CREATE does not use client location for redirection
+
+    BUG-1124. TestCLI failed with HA changes.
+
+    BUG-1188. Added retries for JobClient during JobTracker safe-mode.
+
+    BUG-1179. FSNamesystem.getAdditionalBlock(..) should check safemode earlier.
+
+  Bug Fixes
+    BUG-1206. TestJobTrackerSafeMode fails in hdp-hadoop-1.0. (Sid via suresh)
 
 HDP-PREVIEW-4  
   Branched From HADOOP-1.0.3
