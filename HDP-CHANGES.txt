@@ -52,7 +52,9 @@ Performance improvements:
     BUG-1188. Added retries for JobClient during JobTracker safe-mode.
 
     BUG-1179. FSNamesystem.getAdditionalBlock(..) should check safemode earlier.
-
+    
+    HADOOP-8656 Backport forced daemon shutdown of HADOOP-8353 into branch-1
+    
   Bug Fixes
     BUG-1206. TestJobTrackerSafeMode fails in hdp-hadoop-1.0. (Sid via suresh)
 
