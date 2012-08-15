@@ -1,63 +1,3 @@
-Performance improvements:
-  RMP-270 - HDFS low-risk performance improvements
-    HADOOP-7753. Support fadvise and sync_file_range in NativeIO. Add
-    ReadaheadPool infrastructure for use in HDFS and MR.
-    (Brandon Li and todd via suresh)
-
-    HDFS-2465. Add HDFS support for fadvise readahead and drop-behind.
-    (todd via suresh)
-
-    HDFS-2751. Backport: Datanode may incorrectly drop OS cache behind reads
-    even for short reads.  (Brandon Li via szetszwo)
-
-    HADOOP-8617. Backport HADOOP-6148, HADOOP-6166 and HADOOP-7333 for 
-    a pure Java CRC32 calculator implementation. (Brandon Li via szetszwo)
-
-    HDFS-496. Backport: Use PureJavaCrc32 in HDFS. (Brandon Li via szetszwo)
-
-    MAPREDUCE-4399. Change the Jetty response buffer size to improve 
-    shuffle performance.
-
-    MAPREDUCE-4400 Fix performance regression for small jobs/workflows
-
-    MAPREDUCE-782. Use PureJavaCrc32 in mapreduce spills.
-    (Todd Lipcon, backport by Brandon Li via sseth)
-
-    MAPREDUCE-1906. Lower minimum heartbeat interval between tasktracker and 
-    JobTracker for smaller clusters. (Todd Lipcon, backport by 
-    Brandon Li via sseth)
-
-    MAPREDUCE-3289. Make use of fadvise in the NM's shuffle handler.
-    (Todd Lipcon and Brandon Li via sseth)
-
-    MAPREDUCE-3278. Fix a busy loop in ReduceTask that would cause 100%
-    cpu utilization during the fetch phase. (todd)
-    
-  HA Fixes
-    BUG-851 Do not check safemode in FSNamesystem.getBlockLocations(..) 
-    for fsck. - HDFS-3522
-
-    BUG-845 Disable edit log toleration in SecondaryNameNode. -  HDFS-3521
-
-    BUG-1021 Log newly allocated blocks (backport HDFS-1108) 
-
-    BUG-444 MAPREDUCE-4328. Only check DFS health for hdfs uris.
-            MAPREDUCE-4328. Add JobTracker safe mode.
-            MAPREDUCE-3837. JobTracker restart fixed. 
-          
-    HDFS-3551 WebHDFS CREATE does not use client location for redirection
-
-    BUG-1124. TestCLI failed with HA changes.
-
-    BUG-1188. Added retries for JobClient during JobTracker safe-mode.
-
-    BUG-1179. FSNamesystem.getAdditionalBlock(..) should check safemode earlier.
-    
-    HADOOP-8656 Backport forced daemon shutdown of HADOOP-8353 into branch-1
-    
-  Bug Fixes
-    BUG-1206. TestJobTrackerSafeMode fails in hdp-hadoop-1.0. (Sid via suresh)
-
 HDP-PREVIEW-4  
   Branched From HADOOP-1.0.3
   HDFS-2617. Jakob's spnego patch
@@ -71,7 +11,57 @@ HDP-PREVIEW-4
   BUG-602 HADOOP-5464 to back port it to branch 1.1 - BUG-602.patch - HADOOP-5464
   BUG-765 spnego principal uses the wrong keytab file for the HTTP principal - bug-765.patch  - HDFS-3466
   BUG-766 HFTP should use the same port & protocol for getting the delegation token - bug-766.patch - HDFS-3461
-HDP-1.0.15
+
+HDP-1.0.14
   HDFS-3652. FSEditLog failure removes the wrong edit stream when storage dirs have same name. (todd)
   HADOOP-7154. Should set MALLOC_ARENA_MAX in hadoop-config.sh
   MAPREDUCE-4399. Fix performance regression in shuffle
+
+HDP-1.1.0.15
+  HA Fixes:-
+    BUG-851 Do not check safemode in FSNamesystem.getBlockLocations(..)
+       	    for fsck. - HDFS-3522
+    BUG-845 Disable edit log toleration in SecondaryNameNode. -  HDFS-3521
+    BUG-1021 Log newly allocated blocks (backport HDFS-1108)
+    BUG-444 MAPREDUCE-4328. Only check DFS health for hdfs uris.
+            MAPREDUCE-4328. Add JobTracker safe mode.
+            MAPREDUCE-3837. JobTracker restart fixed.
+
+    HDFS-3551 WebHDFS CREATE does not use client location for redirection
+    BUG-1124. TestCLI failed with HA changes.
+    BUG-1188. Added retries for JobClient during JobTracker safe-mode.
+    BUG-1179. FSNamesystem.getAdditionalBlock(..) should check safemode earlier.
+    HADOOP-8656 Backport forced daemon shutdown of HADOOP-8353 into branch-1
+    HDFS-528. Backport: Add ability for safemode to wait for a minimum number of live datanodes.
+    HDFS-3667.  Add retry support to WebHdfsFileSystem.
+    HDFS-3516. Check content-type in WebHdfsFileSystem.
+    HDFS-3696. Set chunked streaming mode in WebHdfsFileSystem write operations to get around a Java library bug causing OutOfMemoryError.
+
+  Bug Fixes
+    BUG-1206. TestJobTrackerSafeMode fails in hdp-hadoop-1.0. (Sid via suresh)
+
+  Performance improvements:
+    RMP-270 - HDFS low-risk performance improvements
+    	HADOOP-7753. Support fadvise and sync_file_range in NativeIO. Add
+                     ReadaheadPool infrastructure for use in HDFS and MR.
+                     (Brandon Li and todd via suresh)
+    	HDFS-2465. Add HDFS support for fadvise readahead and drop-behind.
+                   (todd via suresh)
+    	HDFS-2751. Backport: Datanode may incorrectly drop OS cache behind reads
+                   even for short reads.  (Brandon Li via szetszwo)
+	MAPREDUCE-782. Use PureJavaCrc32 in mapreduce spills.
+                       (Todd Lipcon, backport by Brandon Li via sseth)
+	MAPREDUCE-1906. Lower minimum heartbeat interval between tasktracker and
+                        JobTracker for smaller clusters. (Todd Lipcon, backport by
+                        Brandon Li via sseth)
+
+    HADOOP-8617. Backport HADOOP-6148, HADOOP-6166 and HADOOP-7333 for
+                 a pure Java CRC32 calculator implementation. (Brandon Li via szetszwo)
+    HDFS-496. Backport: Use PureJavaCrc32 in HDFS. (Brandon Li via szetszwo)
+    MAPREDUCE-4399. Change the Jetty response buffer size to improve
+                    shuffle performance.
+    MAPREDUCE-4400 Fix performance regression for small jobs/workflows
+    MAPREDUCE-3289. Make use of fadvise in the NM's shuffle handler.
+                    (Todd Lipcon and Brandon Li via sseth)
+    MAPREDUCE-3278. Fix a busy loop in ReduceTask that would cause 100%
+                    cpu utilization during the fetch phase. (todd)
