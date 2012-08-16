@@ -35,6 +35,7 @@ import org.junit.*;
  * join back.
  */
 
+@Ignore
 public class TestJobTrackerSafeMode extends TestCase {
   final Path testDir = 
     new Path(System.getProperty("test.build.data", "/tmp"), "jt-safemode");
