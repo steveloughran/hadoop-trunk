@@ -40,6 +40,7 @@ HDP-1.1.0.15
   Bug Fixes
     BUG-1206. TestJobTrackerSafeMode fails in hdp-hadoop-1.0. (Sid via suresh)
     BUG-1206 ammendment. MAPREDUCE-4558. Disabled TestJobTrackerSafeMode (Sid)
+    BUG-1256 HDFS-3846. Namenode deadlock in branch-1. (Brandon Li via jitendra)
 
   Performance improvements:
     RMP-270 - HDFS low-risk performance improvements

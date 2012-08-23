@@ -4194,10 +4194,6 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
     }
   }
 
-  int getNumLiveDataNodes() {
-    return getNumberOfDatanodes(DatanodeReportType.LIVE);
-  }
-
   int getNumberOfDatanodes(DatanodeReportType type) {
     return getDatanodeListForReport(type).size(); 
   }
@@ -4884,7 +4880,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
      */
     boolean needEnter() {
       return getSafeBlockRatio() < threshold ||
-          getNumLiveDataNodes() < datanodeThreshold;
+          numLiveDataNodes() < datanodeThreshold;
     }
       
     /**
@@ -4982,7 +4978,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
       if(blockTotal < 0)
         return leaveMsg + ".";
 
-      int numLive = getNumLiveDataNodes();
+      int numLive = numLiveDataNodes();
       String msg = "";
       if (reached == 0) {
         if (getSafeBlockRatio() < threshold) {
