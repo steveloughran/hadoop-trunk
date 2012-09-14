@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.fs.http.client;
 
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.DelegationTokenRenewer;
@@ -59,7 +60,6 @@ import java.net.URL;
 import java.security.PrivilegedExceptionAction;
 import java.text.MessageFormat;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
@@ -68,6 +68,7 @@ import java.util.concurrent.Callable;
  * <p/>
  * This implementation allows a user to access HDFS over HTTP via a HttpFSServer server.
  */
+@InterfaceAudience.Private
 public class HttpFSFileSystem extends FileSystem
   implements DelegationTokenRenewer.Renewable {
 
@@ -160,7 +161,8 @@ public class HttpFSFileSystem extends FileSystem
   private static final String HTTP_POST = "POST";
   private static final String HTTP_DELETE = "DELETE";
 
-  public enum Operation {
+  @InterfaceAudience.Private
+  public static enum Operation {
     OPEN(HTTP_GET), GETFILESTATUS(HTTP_GET), LISTSTATUS(HTTP_GET),
     GETHOMEDIRECTORY(HTTP_GET), GETCONTENTSUMMARY(HTTP_GET),
     GETFILECHECKSUM(HTTP_GET),  GETFILEBLOCKLOCATIONS(HTTP_GET),
@@ -860,7 +862,6 @@ public class HttpFSFileSystem extends FileSystem
 
 
   @Override
-  @SuppressWarnings("deprecation")
   public Token<?> getDelegationToken(final String renewer)
     throws IOException {
     return doAsRealUserIfNecessary(new Callable<Token<?>>() {
@@ -868,19 +869,6 @@ public class HttpFSFileSystem extends FileSystem
       public Token<?> call() throws Exception {
         return HttpFSKerberosAuthenticator.
           getDelegationToken(uri, httpFSAddr, authToken, renewer);
-      }
-    });
-  }
-
-
-  @Override
-  public List<Token<?>> getDelegationTokens(final String renewer)
-    throws IOException {
-    return doAsRealUserIfNecessary(new Callable<List<Token<?>>>() {
-      @Override
-      public List<Token<?>> call() throws Exception {
-        return HttpFSKerberosAuthenticator.
-          getDelegationTokens(uri, httpFSAddr, authToken, renewer);
       }
     });
   }

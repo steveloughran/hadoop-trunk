@@ -34,7 +34,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -66,6 +65,7 @@ public class TrashPolicyDefault extends TrashPolicy {
 
   private Path current;
   private Path homesParent;
+  private long emptierInterval;
 
   public TrashPolicyDefault() { }
 
@@ -79,8 +79,12 @@ public class TrashPolicyDefault extends TrashPolicy {
     this.trash = new Path(home, TRASH);
     this.homesParent = home.getParent();
     this.current = new Path(trash, CURRENT);
-    this.deletionInterval = (long) (conf.getFloat(FS_TRASH_INTERVAL_KEY,
-                                    FS_TRASH_INTERVAL_DEFAULT) *  MSECS_PER_MINUTE);
+    this.deletionInterval = (long)(conf.getFloat(
+        FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT)
+        * MSECS_PER_MINUTE);
+    this.emptierInterval = (long)(conf.getFloat(
+        FS_TRASH_CHECKPOINT_INTERVAL_KEY, FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT)
+        * MSECS_PER_MINUTE);
   }
   
   private Path makeTrashRelativePath(Path basePath, Path rmFilePath) {
@@ -89,7 +93,7 @@ public class TrashPolicyDefault extends TrashPolicy {
 
   @Override
   public boolean isEnabled() {
-    return (deletionInterval != 0);
+    return deletionInterval != 0;
   }
 
   @Override
@@ -223,7 +227,7 @@ public class TrashPolicyDefault extends TrashPolicy {
 
   @Override
   public Runnable getEmptier() throws IOException {
-    return new Emptier(getConf());
+    return new Emptier(getConf(), emptierInterval);
   }
 
   private class Emptier implements Runnable {
@@ -231,21 +235,20 @@ public class TrashPolicyDefault extends TrashPolicy {
     private Configuration conf;
     private long emptierInterval;
 
-    Emptier(Configuration conf) throws IOException {
+    Emptier(Configuration conf, long emptierInterval) throws IOException {
       this.conf = conf;
-      this.emptierInterval = (long) (conf.getFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY,
-                                     FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT) *
-                                     MSECS_PER_MINUTE);
-      if (this.emptierInterval > deletionInterval ||
-          this.emptierInterval == 0) {
-        LOG.warn("The configured interval for checkpoint is " +
-                 this.emptierInterval + " minutes." +
-                 " Using interval of " + deletionInterval +
+      this.emptierInterval = emptierInterval;
+      if (emptierInterval > deletionInterval || emptierInterval == 0) {
+        LOG.info("The configured checkpoint interval is " +
+                 (emptierInterval / MSECS_PER_MINUTE) + " minutes." +
+                 " Using an interval of " +
+                 (deletionInterval / MSECS_PER_MINUTE) +
                  " minutes that is used for deletion instead");
         this.emptierInterval = deletionInterval;
       }
     }
 
+    @Override
     public void run() {
       if (emptierInterval == 0)
         return;                                   // trash disabled

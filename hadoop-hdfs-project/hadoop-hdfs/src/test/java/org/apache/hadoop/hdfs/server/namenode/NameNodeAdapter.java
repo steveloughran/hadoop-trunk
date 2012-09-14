@@ -61,7 +61,7 @@ public class NameNodeAdapter {
   
   public static HdfsFileStatus getFileInfo(NameNode namenode, String src,
       boolean resolveLink) throws AccessControlException, UnresolvedLinkException,
-        StandbyException {
+        StandbyException, IOException {
     return namenode.getNamesystem().getFileInfo(src, resolveLink);
   }
   
@@ -81,9 +81,8 @@ public class NameNodeAdapter {
     namenode.getNamesystem().enterSafeMode(resourcesLow);
   }
   
-  public static void leaveSafeMode(NameNode namenode, boolean checkForUpgrades)
-      throws SafeModeException {
-    namenode.getNamesystem().leaveSafeMode(checkForUpgrades);
+  public static void leaveSafeMode(NameNode namenode) {
+    namenode.getNamesystem().leaveSafeMode();
   }
   
   public static void abortEditLogs(NameNode nn) {

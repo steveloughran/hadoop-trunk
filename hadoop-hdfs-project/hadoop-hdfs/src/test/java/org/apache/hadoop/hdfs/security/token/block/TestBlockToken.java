@@ -162,7 +162,7 @@ public class TestBlockToken {
   public void testWritable() throws Exception {
     TestWritable.testWritable(new BlockTokenIdentifier());
     BlockTokenSecretManager sm = new BlockTokenSecretManager(
-        blockKeyUpdateInterval, blockTokenLifetime, 0);
+        blockKeyUpdateInterval, blockTokenLifetime, 0, "fake-pool", null);
     TestWritable.testWritable(generateTokenId(sm, block1,
         EnumSet.allOf(BlockTokenSecretManager.AccessMode.class)));
     TestWritable.testWritable(generateTokenId(sm, block2,
@@ -201,9 +201,9 @@ public class TestBlockToken {
   @Test
   public void testBlockTokenSecretManager() throws Exception {
     BlockTokenSecretManager masterHandler = new BlockTokenSecretManager(
-        blockKeyUpdateInterval, blockTokenLifetime, 0);
+        blockKeyUpdateInterval, blockTokenLifetime, 0, "fake-pool", null);
     BlockTokenSecretManager slaveHandler = new BlockTokenSecretManager(
-        blockKeyUpdateInterval, blockTokenLifetime);
+        blockKeyUpdateInterval, blockTokenLifetime, "fake-pool", null);
     ExportedBlockKeys keys = masterHandler.exportKeys();
     slaveHandler.addKeys(keys);
     tokenGenerationAndVerification(masterHandler, slaveHandler);
@@ -231,14 +231,15 @@ public class TestBlockToken {
         ProtobufRpcEngine.class);
     BlockingService service = ClientDatanodeProtocolService
         .newReflectiveBlockingService(mockDN);
-    return RPC.getServer(ClientDatanodeProtocolPB.class, service, ADDRESS, 0, 5,
-        true, conf, sm);
+    return new RPC.Builder(conf).setProtocol(ClientDatanodeProtocolPB.class)
+        .setInstance(service).setBindAddress(ADDRESS).setPort(0)
+        .setNumHandlers(5).setVerbose(true).setSecretManager(sm).build();
   }
 
   @Test
   public void testBlockTokenRpc() throws Exception {
     BlockTokenSecretManager sm = new BlockTokenSecretManager(
-        blockKeyUpdateInterval, blockTokenLifetime, 0);
+        blockKeyUpdateInterval, blockTokenLifetime, 0, "fake-pool", null);
     Token<BlockTokenIdentifier> token = sm.generateToken(block3,
         EnumSet.allOf(BlockTokenSecretManager.AccessMode.class));
 
@@ -273,7 +274,7 @@ public class TestBlockToken {
   public void testBlockTokenRpcLeak() throws Exception {
     Assume.assumeTrue(FD_DIR.exists());
     BlockTokenSecretManager sm = new BlockTokenSecretManager(
-        blockKeyUpdateInterval, blockTokenLifetime, 0);
+        blockKeyUpdateInterval, blockTokenLifetime, 0, "fake-pool", null);
     Token<BlockTokenIdentifier> token = sm.generateToken(block3,
         EnumSet.allOf(BlockTokenSecretManager.AccessMode.class));
 
@@ -304,7 +305,7 @@ public class TestBlockToken {
       long endTime = Time.now() + 3000;
       while (Time.now() < endTime) {
         proxy = DFSUtil.createClientDatanodeProtocolProxy(fakeDnId, conf, 1000,
-            fakeBlock);
+            false, fakeBlock);
         assertEquals(block3.getBlockId(), proxy.getReplicaVisibleLength(block3));
         if (proxy != null) {
           RPC.stopProxy(proxy);
@@ -342,9 +343,9 @@ public class TestBlockToken {
     for (int i = 0; i < 10; i++) {
       String bpid = Integer.toString(i);
       BlockTokenSecretManager masterHandler = new BlockTokenSecretManager(
-          blockKeyUpdateInterval, blockTokenLifetime, 0);
+          blockKeyUpdateInterval, blockTokenLifetime, 0, "fake-pool", null);
       BlockTokenSecretManager slaveHandler = new BlockTokenSecretManager(
-          blockKeyUpdateInterval, blockTokenLifetime);
+          blockKeyUpdateInterval, blockTokenLifetime, "fake-pool", null);
       bpMgr.addBlockPool(bpid, slaveHandler);
 
       ExportedBlockKeys keys = masterHandler.exportKeys();

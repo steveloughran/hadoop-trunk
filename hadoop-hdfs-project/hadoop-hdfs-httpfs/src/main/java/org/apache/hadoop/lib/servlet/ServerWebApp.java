@@ -19,6 +19,7 @@
 package org.apache.hadoop.lib.servlet;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.lib.server.Server;
 import org.apache.hadoop.lib.server.ServerException;
@@ -34,6 +35,7 @@ import java.text.MessageFormat;
  * {@link Server} subclass that implements <code>ServletContextListener</code>
  * and uses its lifecycle to start and stop the server.
  */
+@InterfaceAudience.Private
 public abstract class ServerWebApp extends Server implements ServletContextListener {
 
   private static final String HOME_DIR = ".home.dir";
@@ -145,6 +147,7 @@ public abstract class ServerWebApp extends Server implements ServletContextListe
    *
    * @param event servelt context event.
    */
+  @Override
   public void contextInitialized(ServletContextEvent event) {
     try {
       init();
@@ -192,6 +195,7 @@ public abstract class ServerWebApp extends Server implements ServletContextListe
    *
    * @param event servelt context event.
    */
+  @Override
   public void contextDestroyed(ServletContextEvent event) {
     destroy();
   }

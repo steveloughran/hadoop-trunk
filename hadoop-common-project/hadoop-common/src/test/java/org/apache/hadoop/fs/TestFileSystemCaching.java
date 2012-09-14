@@ -35,7 +35,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.concurrent.Semaphore;
 
 import static org.junit.Assert.*;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.*;
 
 
 public class TestFileSystemCaching {
@@ -110,6 +110,7 @@ public class TestFileSystemCaching {
   
   public static class InitializeForeverFileSystem extends LocalFileSystem {
     final static Semaphore sem = new Semaphore(0);
+    @Override
     public void initialize(URI uri, Configuration conf) throws IOException {
       // notify that InitializeForeverFileSystem started initialization
       sem.release();
@@ -127,6 +128,7 @@ public class TestFileSystemCaching {
   public void testCacheEnabledWithInitializeForeverFS() throws Exception {
     final Configuration conf = new Configuration();
     Thread t = new Thread() {
+      @Override
       public void run() {
         conf.set("fs.localfs1.impl", "org.apache.hadoop.fs." +
          "TestFileSystemCaching$InitializeForeverFileSystem");
@@ -167,11 +169,13 @@ public class TestFileSystemCaching {
     UserGroupInformation ugiA = UserGroupInformation.createRemoteUser("foo");
     UserGroupInformation ugiB = UserGroupInformation.createRemoteUser("bar");
     FileSystem fsA = ugiA.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
       public FileSystem run() throws Exception {
         return FileSystem.get(new URI("cachedfile://a"), conf);
       }
     });
     FileSystem fsA1 = ugiA.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
       public FileSystem run() throws Exception {
         return FileSystem.get(new URI("cachedfile://a"), conf);
       }
@@ -180,6 +184,7 @@ public class TestFileSystemCaching {
     assertSame(fsA, fsA1);
     
     FileSystem fsB = ugiB.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
       public FileSystem run() throws Exception {
         return FileSystem.get(new URI("cachedfile://a"), conf);
       }
@@ -192,6 +197,7 @@ public class TestFileSystemCaching {
     UserGroupInformation ugiA2 = UserGroupInformation.createRemoteUser("foo");
     
     fsA = ugiA2.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
       public FileSystem run() throws Exception {
         return FileSystem.get(new URI("cachedfile://a"), conf);
       }
@@ -203,6 +209,7 @@ public class TestFileSystemCaching {
     ugiA.addToken(t1);
     
     fsA = ugiA.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
       public FileSystem run() throws Exception {
         return FileSystem.get(new URI("cachedfile://a"), conf);
       }
@@ -245,12 +252,14 @@ public class TestFileSystemCaching {
     conf.set("fs.cachedfile.impl", FileSystem.getFileSystemClass("file", null).getName());
     UserGroupInformation ugiA = UserGroupInformation.createRemoteUser("foo");
     FileSystem fsA = ugiA.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
       public FileSystem run() throws Exception {
         return FileSystem.get(new URI("cachedfile://a"), conf);
       }
     });
     //Now we should get the cached filesystem
     FileSystem fsA1 = ugiA.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
       public FileSystem run() throws Exception {
         return FileSystem.get(new URI("cachedfile://a"), conf);
       }
@@ -261,10 +270,91 @@ public class TestFileSystemCaching {
     
     //Now we should get a different (newly created) filesystem
     fsA1 = ugiA.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
       public FileSystem run() throws Exception {
         return FileSystem.get(new URI("cachedfile://a"), conf);
       }
     });
     assertNotSame(fsA, fsA1);
+  }
+  
+  @Test
+  public void testDelete() throws IOException {
+    FileSystem mockFs = mock(FileSystem.class);
+    FileSystem fs = new FilterFileSystem(mockFs);    
+    Path path = new Path("/a");
+
+    fs.delete(path, false);
+    verify(mockFs).delete(eq(path), eq(false));
+    reset(mockFs);
+    fs.delete(path, true);
+    verify(mockFs).delete(eq(path), eq(true));
+  }
+
+  @Test
+  public void testDeleteOnExit() throws IOException {
+    FileSystem mockFs = mock(FileSystem.class);
+    FileSystem fs = new FilterFileSystem(mockFs);
+    Path path = new Path("/a");
+
+    // delete on close if path does exist
+    when(mockFs.getFileStatus(eq(path))).thenReturn(new FileStatus());
+    assertTrue(fs.deleteOnExit(path));
+    verify(mockFs).getFileStatus(eq(path));
+    reset(mockFs);
+    when(mockFs.getFileStatus(eq(path))).thenReturn(new FileStatus());
+    fs.close();
+    verify(mockFs).getFileStatus(eq(path));
+    verify(mockFs).delete(eq(path), eq(true));
+  }
+
+  @Test
+  public void testDeleteOnExitFNF() throws IOException {
+    FileSystem mockFs = mock(FileSystem.class);
+    FileSystem fs = new FilterFileSystem(mockFs);
+    Path path = new Path("/a");
+
+    // don't delete on close if path doesn't exist
+    assertFalse(fs.deleteOnExit(path));
+    verify(mockFs).getFileStatus(eq(path));
+    reset(mockFs);
+    fs.close();
+    verify(mockFs, never()).getFileStatus(eq(path));
+    verify(mockFs, never()).delete(any(Path.class), anyBoolean());
+  }
+
+
+  @Test
+  public void testDeleteOnExitRemoved() throws IOException {
+    FileSystem mockFs = mock(FileSystem.class);
+    FileSystem fs = new FilterFileSystem(mockFs);
+    Path path = new Path("/a");
+
+    // don't delete on close if path existed, but later removed
+    when(mockFs.getFileStatus(eq(path))).thenReturn(new FileStatus());
+    assertTrue(fs.deleteOnExit(path));
+    verify(mockFs).getFileStatus(eq(path));
+    reset(mockFs);
+    fs.close();
+    verify(mockFs).getFileStatus(eq(path));
+    verify(mockFs, never()).delete(any(Path.class), anyBoolean());
+  }
+
+  @Test
+  public void testCancelDeleteOnExit() throws IOException {
+    FileSystem mockFs = mock(FileSystem.class);
+    FileSystem fs = new FilterFileSystem(mockFs);
+    Path path = new Path("/a");
+
+    // don't delete on close if path existed, but later cancelled
+    when(mockFs.getFileStatus(eq(path))).thenReturn(new FileStatus());
+    assertTrue(fs.deleteOnExit(path));
+    verify(mockFs).getFileStatus(eq(path));
+    assertTrue(fs.cancelDeleteOnExit(path));
+    assertFalse(fs.cancelDeleteOnExit(path)); // false because not registered
+    reset(mockFs);
+    fs.close();
+    verify(mockFs, never()).getFileStatus(any(Path.class));
+    verify(mockFs, never()).delete(any(Path.class), anyBoolean());
   }
 }

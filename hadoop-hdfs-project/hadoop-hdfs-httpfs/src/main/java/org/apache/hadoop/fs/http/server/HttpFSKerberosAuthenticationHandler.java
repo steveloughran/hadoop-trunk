@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.fs.http.server;
 
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.http.client.HttpFSFileSystem;
 import org.apache.hadoop.fs.http.client.HttpFSKerberosAuthenticator;
 import org.apache.hadoop.fs.http.client.HttpFSKerberosAuthenticator.DelegationTokenOperation;
@@ -36,12 +37,9 @@ import javax.ws.rs.core.MediaType;
 import java.io.IOException;
 import java.io.Writer;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -52,6 +50,7 @@ import java.util.Set;
  * If not delegation token is present in the request it delegates to the
  * {@link KerberosAuthenticationHandler}
  */
+@InterfaceAudience.Private
 public class HttpFSKerberosAuthenticationHandler
   extends KerberosAuthenticationHandler {
 
@@ -61,8 +60,6 @@ public class HttpFSKerberosAuthenticationHandler
   static {
     DELEGATION_TOKEN_OPS.add(
       DelegationTokenOperation.GETDELEGATIONTOKEN.toString());
-    DELEGATION_TOKEN_OPS.add(
-      DelegationTokenOperation.GETDELEGATIONTOKENS.toString());
     DELEGATION_TOKEN_OPS.add(
       DelegationTokenOperation.RENEWDELEGATIONTOKEN.toString());
     DELEGATION_TOKEN_OPS.add(
@@ -109,7 +106,6 @@ public class HttpFSKerberosAuthenticationHandler
             Map map = null;
             switch (dtOp) {
               case GETDELEGATIONTOKEN:
-              case GETDELEGATIONTOKENS:
                 String renewerParam =
                   request.getParameter(HttpFSKerberosAuthenticator.RENEWER_PARAM);
                 if (renewerParam == null) {
@@ -117,11 +113,7 @@ public class HttpFSKerberosAuthenticationHandler
                 }
                 Token<?> dToken = tokenManager.createToken(
                   UserGroupInformation.getCurrentUser(), renewerParam);
-                if (dtOp == DelegationTokenOperation.GETDELEGATIONTOKEN) {
-                  map = delegationTokenToJSON(dToken);
-                } else {
-                  map = delegationTokensToJSON(Arrays.asList((Token)dToken));
-                }
+                map = delegationTokenToJSON(dToken);
                 break;
               case RENEWDELEGATIONTOKEN:
               case CANCELDELEGATIONTOKEN:
@@ -189,23 +181,6 @@ public class HttpFSKerberosAuthenticationHandler
     return response;
   }
   
-  @SuppressWarnings("unchecked")
-  private static Map delegationTokensToJSON(List<Token> tokens)
-    throws IOException {
-    List list = new ArrayList();
-    for (Token token : tokens) {
-      Map map = new HashMap();
-      map.put(HttpFSKerberosAuthenticator.DELEGATION_TOKEN_URL_STRING_JSON,
-              token.encodeToUrlString());
-      list.add(map);
-    }
-    Map map = new HashMap();
-    map.put(HttpFSKerberosAuthenticator.DELEGATION_TOKEN_JSON, list);
-    Map response = new LinkedHashMap();
-    response.put(HttpFSKerberosAuthenticator.DELEGATION_TOKENS_JSON, map);
-    return response;
-  }
-
   /**
    * Authenticates a request looking for the <code>delegation</code>
    * query-string parameter and verifying it is a valid token. If there is not

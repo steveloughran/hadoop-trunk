@@ -26,7 +26,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
-import org.apache.hadoop.hdfs.server.common.Util;
 import org.apache.hadoop.hdfs.server.namenode.Namesystem;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
@@ -75,6 +74,11 @@ class HeartbeatManager implements DatanodeStatistics {
 
   void close() {
     heartbeatThread.interrupt();
+    try {
+      // This will no effect if the thread hasn't yet been started.
+      heartbeatThread.join(3000);
+    } catch (InterruptedException e) {
+    }
   }
   
   synchronized int getLiveDatanodeCount() {
@@ -224,10 +228,10 @@ class HeartbeatManager implements DatanodeStatistics {
       if (!allAlive) {
         // acquire the fsnamesystem lock, and then remove the dead node.
         namesystem.writeLock();
-        if (namesystem.isInSafeMode()) {
-          return;
-        }
         try {
+          if (namesystem.isInSafeMode()) {
+            return;
+          }
           synchronized(this) {
             dm.removeDeadDatanode(dead);
           }

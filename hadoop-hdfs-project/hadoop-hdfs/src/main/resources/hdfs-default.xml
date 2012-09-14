@@ -53,7 +53,7 @@
   <name>dfs.datanode.address</name>
   <value>0.0.0.0:50010</value>
   <description>
-    The address where the datanode server will listen to.
+    The datanode server address and port for data transfer.
     If the port is 0 then the server will start on a free port.
   </description>
 </property>
@@ -78,7 +78,7 @@
 
 <property>
   <name>dfs.datanode.handler.count</name>
-  <value>3</value>
+  <value>10</value>
   <description>The number of server threads for the datanode.</description>
 </property>
 
@@ -921,6 +921,22 @@
 </property>
 
 <property>
+  <name>dfs.client.use.datanode.hostname</name>
+  <value>false</value>
+  <description>Whether clients should use datanode hostnames when
+    connecting to datanodes.
+  </description>
+</property>
+
+<property>
+  <name>dfs.datanode.use.datanode.hostname</name>
+  <value>false</value>
+  <description>Whether datanodes should use datanode hostnames when
+    connecting to other datanodes for data transfer.
+  </description>
+</property>
+
+<property>
   <name>dfs.client.local.interfaces</name>
   <value></value>
   <description>A comma separated list of network interface names to use
@@ -942,6 +958,30 @@
 <property>
   <name>dfs.secondary.namenode.kerberos.internal.spnego.principal</name>
   <value>${dfs.web.authentication.kerberos.principal}</value>
+</property>
+
+<property>
+  <name>dfs.namenode.check.stale.datanode</name>
+  <value>false</value>
+  <description>
+  	Indicate whether or not to check "stale" datanodes whose 
+  	heartbeat messages have not been received by the namenode 
+  	for more than a specified time interval. If this configuration 
+  	parameter is set as true, the stale datanodes will be moved to 
+  	the end of the target node list for reading. The writing will 
+  	also try to avoid stale nodes.
+  </description>
+</property>
+
+<property>
+  <name>dfs.namenode.stale.datanode.interval</name>
+  <value>30000</value>
+  <description>
+  	Default time interval for marking a datanode as "stale", i.e., if 
+  	the namenode has not received heartbeat msg from a datanode for 
+  	more than this time interval, the datanode will be marked and treated 
+  	as "stale" by default.
+  </description>
 </property>
 
 <property>
@@ -1011,6 +1051,51 @@
     Comma-delimited set of integers denoting the desired rollover intervals 
     (in seconds) for percentile latency metrics on the Namenode and Datanode.
     By default, percentile latency metrics are disabled.
+  </description>
+</property>
+
+<property>
+  <name>dfs.encrypt.data.transfer</name>
+  <value>false</value>
+  <description>
+    Whether or not actual block data that is read/written from/to HDFS should
+    be encrypted on the wire. This only needs to be set on the NN and DNs,
+    clients will deduce this automatically.
+  </description>
+</property>
+
+<property>
+  <name>dfs.encrypt.data.transfer.algorithm</name>
+  <value></value>
+  <description>
+    This value may be set to either "3des" or "rc4". If nothing is set, then
+    the configured JCE default on the system is used (usually 3DES.) It is
+    widely believed that 3DES is more cryptographically secure, but RC4 is
+    substantially faster.
+  </description>
+</property>
+
+<property>
+  <name>dfs.datanode.hdfs-blocks-metadata.enabled</name>
+  <value>false</value>
+  <description>
+    Boolean which enables backend datanode-side support for the experimental DistributedFileSystem#getFileVBlockStorageLocations API.
+  </description>
+</property>
+
+<property>
+  <name>dfs.client.file-block-storage-locations.num-threads</name>
+  <value>10</value>
+  <description>
+    Number of threads used for making parallel RPCs in DistributedFileSystem#getFileBlockStorageLocations().
+  </description>
+</property>
+
+<property>
+  <name>dfs.client.file-block-storage-locations.timeout</name>
+  <value>60</value>
+  <description>
+    Timeout (in seconds) for the parallel RPCs made in DistributedFileSystem#getFileBlockStorageLocations().
   </description>
 </property>
 

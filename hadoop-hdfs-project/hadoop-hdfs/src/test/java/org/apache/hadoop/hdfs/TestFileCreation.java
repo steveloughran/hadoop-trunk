@@ -42,8 +42,8 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import java.security.PrivilegedExceptionAction;
 import java.util.EnumSet;
 
 import org.apache.commons.logging.LogFactory;
@@ -75,10 +75,10 @@ import org.apache.hadoop.hdfs.server.namenode.LeaseManager;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -170,7 +170,14 @@ public class TestFileCreation {
 
   @Test
   public void testFileCreation() throws IOException {
-    checkFileCreation(null);
+    checkFileCreation(null, false);
+  }
+
+  /** Same test but the client should use DN hostnames */
+  @Test
+  public void testFileCreationUsingHostname() throws IOException {
+    assumeTrue(System.getProperty("os.name").startsWith("Linux"));
+    checkFileCreation(null, true);
   }
 
   /** Same test but the client should bind to a local interface */
@@ -179,10 +186,10 @@ public class TestFileCreation {
     assumeTrue(System.getProperty("os.name").startsWith("Linux"));
 
     // The mini cluster listens on the loopback so we can use it here
-    checkFileCreation("lo");
+    checkFileCreation("lo", false);
 
     try {
-      checkFileCreation("bogus-interface");
+      checkFileCreation("bogus-interface", false);
       fail("Able to specify a bogus interface");
     } catch (UnknownHostException e) {
       assertEquals("No such interface bogus-interface", e.getMessage());
@@ -192,16 +199,28 @@ public class TestFileCreation {
   /**
    * Test if file creation and disk space consumption works right
    * @param netIf the local interface, if any, clients should use to access DNs
+   * @param useDnHostname whether the client should contact DNs by hostname
    */
-  public void checkFileCreation(String netIf) throws IOException {
+  public void checkFileCreation(String netIf, boolean useDnHostname)
+      throws IOException {
     Configuration conf = new HdfsConfiguration();
     if (netIf != null) {
       conf.set(DFSConfigKeys.DFS_CLIENT_LOCAL_INTERFACES, netIf);
     }
+    conf.setBoolean(DFSConfigKeys.DFS_CLIENT_USE_DN_HOSTNAME, useDnHostname);
+    if (useDnHostname) {
+      // Since the mini cluster only listens on the loopback we have to
+      // ensure the hostname used to access DNs maps to the loopback. We
+      // do this by telling the DN to advertise localhost as its hostname
+      // instead of the default hostname.
+      conf.set(DFSConfigKeys.DFS_DATANODE_HOST_NAME_KEY, "localhost");
+    }
     if (simulatedStorage) {
       SimulatedFSDataset.setFactory(conf);
     }
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+      .checkDataNodeHostConfig(true)
+      .build();
     FileSystem fs = cluster.getFileSystem();
     try {
 
@@ -337,6 +356,60 @@ public class TestFileCreation {
     }
   }
 
+  /**
+   * Test that a file which is open for write is overwritten by another
+   * client. Regression test for HDFS-3755.
+   */
+  @Test
+  public void testOverwriteOpenForWrite() throws Exception {
+    Configuration conf = new HdfsConfiguration();
+    SimulatedFSDataset.setFactory(conf);
+    conf.setBoolean(DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY, false);
+    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
+    FileSystem fs = cluster.getFileSystem();
+    
+    UserGroupInformation otherUgi = UserGroupInformation.createUserForTesting(
+        "testuser", new String[]{"testgroup"});
+    FileSystem fs2 = otherUgi.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      @Override
+      public FileSystem run() throws Exception {
+        return FileSystem.get(cluster.getConfiguration(0));
+      }
+    });
+    
+    try {
+      Path p = new Path("/testfile");
+      FSDataOutputStream stm1 = fs.create(p);
+      stm1.write(1);
+      stm1.hflush();
+
+      // Create file again without overwrite
+      try {
+        fs2.create(p, false);
+        fail("Did not throw!");
+      } catch (IOException abce) {
+        GenericTestUtils.assertExceptionContains("already being created by",
+            abce);
+      }
+      
+      FSDataOutputStream stm2 = fs2.create(p, true);
+      stm2.write(2);
+      stm2.close();
+      
+      try {
+        stm1.close();
+        fail("Should have exception closing stm1 since it was deleted");
+      } catch (IOException ioe) {
+        GenericTestUtils.assertExceptionContains("File is not open for writing", ioe);
+      }
+      
+    } finally {
+      IOUtils.closeStream(fs);
+      IOUtils.closeStream(fs2);
+      cluster.shutdown();
+    }
+  }
+  
   /**
    * Test that file data does not become corrupted even in the face of errors.
    */
@@ -511,12 +584,9 @@ public class TestFileCreation {
 
   /**
    * Test that file leases are persisted across namenode restarts.
-   * This test is currently not triggered because more HDFS work is 
-   * is needed to handle persistent leases.
    */
-  @Ignore
   @Test
-  public void xxxtestFileCreationNamenodeRestart() throws IOException {
+  public void testFileCreationNamenodeRestart() throws IOException {
     Configuration conf = new HdfsConfiguration();
     final int MAX_IDLE_TIME = 2000; // 2s
     conf.setInt("ipc.client.connection.maxidletime", MAX_IDLE_TIME);

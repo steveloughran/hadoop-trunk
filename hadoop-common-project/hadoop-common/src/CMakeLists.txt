@@ -21,18 +21,7 @@ cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
 # Default to release builds
 set(CMAKE_BUILD_TYPE, Release)
 
-# If JVM_ARCH_DATA_MODEL is 32, compile all binaries as 32-bit.
-# This variable is set by maven.
-if (JVM_ARCH_DATA_MODEL EQUAL 32)
-    # force 32-bit code generation on amd64/x86_64, ppc64, sparc64
-    if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_SYSTEM_PROCESSOR MATCHES ".*64")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m32")
-        set(CMAKE_LD_FLAGS "${CMAKE_LD_FLAGS} -m32")
-    endif ()
-    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "amd64")
-        set(CMAKE_SYSTEM_PROCESSOR "i686")
-    endif ()
-endif (JVM_ARCH_DATA_MODEL EQUAL 32)
+include(JNIFlags.cmake NO_POLICY_SCOPE)
 
 # Compile a library with both shared and static variants
 function(add_dual_library LIBNAME)
@@ -71,6 +60,7 @@ find_package(ZLIB REQUIRED)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -O2")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_REENTRANT -D_FILE_OFFSET_BITS=64")
 set(D main/native/src/org/apache/hadoop)
+set(T main/native/src/test/org/apache/hadoop)
 
 GET_FILENAME_COMPONENT(HADOOP_ZLIB_LIBRARY ${ZLIB_LIBRARIES} NAME)
 
@@ -79,17 +69,26 @@ INCLUDE(CheckCSourceCompiles)
 CHECK_FUNCTION_EXISTS(sync_file_range HAVE_SYNC_FILE_RANGE)
 CHECK_FUNCTION_EXISTS(posix_fadvise HAVE_POSIX_FADVISE)
 
-find_library(SNAPPY_LIBRARY NAMES snappy PATHS)
-find_path(SNAPPY_INCLUDE_DIR NAMES snappy.h PATHS)
-if (SNAPPY_LIBRARY)
+find_library(SNAPPY_LIBRARY 
+    NAMES snappy
+    PATHS ${CUSTOM_SNAPPY_PREFIX} ${CUSTOM_SNAPPY_PREFIX}/lib
+          ${CUSTOM_SNAPPY_PREFIX}/lib64 ${CUSTOM_SNAPPY_LIB})
+find_path(SNAPPY_INCLUDE_DIR 
+    NAMES snappy.h
+    PATHS ${CUSTOM_SNAPPY_PREFIX} ${CUSTOM_SNAPPY_PREFIX}/include
+          ${CUSTOM_SNAPPY_INCLUDE})
+if (SNAPPY_LIBRARY AND SNAPPY_INCLUDE_DIR)
     GET_FILENAME_COMPONENT(HADOOP_SNAPPY_LIBRARY ${SNAPPY_LIBRARY} NAME)
     set(SNAPPY_SOURCE_FILES
         "${D}/io/compress/snappy/SnappyCompressor.c"
         "${D}/io/compress/snappy/SnappyDecompressor.c")
-else (${SNAPPY_LIBRARY})
+else (SNAPPY_LIBRARY AND SNAPPY_INCLUDE_DIR)
     set(SNAPPY_INCLUDE_DIR "")
     set(SNAPPY_SOURCE_FILES "")
-endif (SNAPPY_LIBRARY)
+    IF(REQUIRE_SNAPPY)
+        MESSAGE(FATAL_ERROR "Required snappy library could not be found.  SNAPPY_LIBRARY=${SNAPPY_LIBRARY}, SNAPPY_INCLUDE_DIR=${SNAPPY_INCLUDE_DIR}, CUSTOM_SNAPPY_INCLUDE_DIR=${CUSTOM_SNAPPY_INCLUDE_DIR}, CUSTOM_SNAPPY_PREFIX=${CUSTOM_SNAPPY_PREFIX}, CUSTOM_SNAPPY_INCLUDE=${CUSTOM_SNAPPY_INCLUDE}")
+    ENDIF(REQUIRE_SNAPPY)
+endif (SNAPPY_LIBRARY AND SNAPPY_INCLUDE_DIR)
 
 include_directories(
     ${GENERATED_JAVAH}
@@ -100,8 +99,15 @@ include_directories(
     ${JNI_INCLUDE_DIRS}
     ${ZLIB_INCLUDE_DIRS}
     ${SNAPPY_INCLUDE_DIR}
+    ${D}/util
 )
 CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/config.h.cmake ${CMAKE_BINARY_DIR}/config.h)
+
+add_executable(test_bulk_crc32
+    ${D}/util/bulk_crc32.c
+    ${T}/util/test_bulk_crc32.c
+)
+set_property(SOURCE main.cpp PROPERTY INCLUDE_DIRECTORIES "\"-Werror\" \"-Wall\"")
 
 add_dual_library(hadoop
     ${D}/io/compress/lz4/Lz4Compressor.c

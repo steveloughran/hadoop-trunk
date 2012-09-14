@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.balancer;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static org.apache.hadoop.hdfs.protocol.HdfsProtoUtil.vintPrefixed;
 
 import java.io.BufferedInputStream;
@@ -24,6 +25,9 @@ import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.net.Socket;
 import java.net.URI;
 import java.text.DateFormat;
@@ -57,6 +61,8 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
+import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferEncryptor;
+import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
 import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
@@ -64,7 +70,6 @@ import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicy;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicyDefault;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
-import org.apache.hadoop.hdfs.server.common.Util;
 import org.apache.hadoop.hdfs.server.namenode.UnsupportedActionException;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
 import org.apache.hadoop.io.IOUtils;
@@ -75,7 +80,6 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import static com.google.common.base.Preconditions.checkArgument;
 
 /** <p>The balancer is a tool that balances disk space usage on an HDFS cluster
  * when some datanodes become full or when new empty nodes join the cluster.
@@ -184,6 +188,13 @@ public class Balancer {
    * balancing purpose at a datanode
    */
   public static final int MAX_NUM_CONCURRENT_MOVES = 5;
+  
+  private static final String USAGE = "Usage: java "
+      + Balancer.class.getSimpleName()
+      + "\n\t[-policy <policy>]\tthe balancing policy: "
+      + BalancingPolicy.Node.INSTANCE.getName() + " or "
+      + BalancingPolicy.Pool.INSTANCE.getName()
+      + "\n\t[-threshold <threshold>]\tPercentage of disk capacity";
   
   private final NameNodeConnector nnc;
   private final BalancingPolicy policy;
@@ -312,11 +323,22 @@ public class Balancer {
             NetUtils.createSocketAddr(target.datanode.getXferAddr()),
             HdfsServerConstants.READ_TIMEOUT);
         sock.setKeepAlive(true);
-        out = new DataOutputStream( new BufferedOutputStream(
-            sock.getOutputStream(), HdfsConstants.IO_FILE_BUFFER_SIZE));
+        
+        OutputStream unbufOut = sock.getOutputStream();
+        InputStream unbufIn = sock.getInputStream();
+        if (nnc.getDataEncryptionKey() != null) {
+          IOStreamPair encryptedStreams =
+              DataTransferEncryptor.getEncryptedStreams(
+                  unbufOut, unbufIn, nnc.getDataEncryptionKey());
+          unbufOut = encryptedStreams.out;
+          unbufIn = encryptedStreams.in;
+        }
+        out = new DataOutputStream(new BufferedOutputStream(unbufOut,
+            HdfsConstants.IO_FILE_BUFFER_SIZE));
+        in = new DataInputStream(new BufferedInputStream(unbufIn,
+            HdfsConstants.IO_FILE_BUFFER_SIZE));
+        
         sendRequest(out);
-        in = new DataInputStream( new BufferedInputStream(
-            sock.getInputStream(), HdfsConstants.IO_FILE_BUFFER_SIZE));
         receiveResponse(in);
         bytesMoved.inc(block.getNumBytes());
         LOG.info( "Moving block " + block.getBlock().getBlockId() +
@@ -1535,7 +1557,7 @@ public class Balancer {
             }
           }
         } catch(RuntimeException e) {
-          printUsage();
+          printUsage(System.err);
           throw e;
         }
       }
@@ -1543,13 +1565,8 @@ public class Balancer {
       return new Parameters(policy, threshold);
     }
 
-    private static void printUsage() {
-      System.out.println("Usage: java " + Balancer.class.getSimpleName());
-      System.out.println("    [-policy <policy>]\tthe balancing policy: "
-          + BalancingPolicy.Node.INSTANCE.getName() + " or " 
-          + BalancingPolicy.Pool.INSTANCE.getName());
-      System.out.println(
-          "    [-threshold <threshold>]\tPercentage of disk capacity");
+    private static void printUsage(PrintStream out) {
+      out.println(USAGE + "\n");
     }
   }
 
@@ -1558,6 +1575,10 @@ public class Balancer {
    * @param args Command line arguments
    */
   public static void main(String[] args) {
+    if (DFSUtil.parseHelpArgument(args, USAGE, System.out, true)) {
+      System.exit(0);
+    }
+
     try {
       System.exit(ToolRunner.run(new HdfsConfiguration(), new Cli(), args));
     } catch (Throwable e) {
