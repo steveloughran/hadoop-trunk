@@ -67,3 +67,9 @@ HDP-1.1.0.15
                     (Todd Lipcon and Brandon Li via sseth)
     MAPREDUCE-3278. Fix a busy loop in ReduceTask that would cause 100%
                     cpu utilization during the fetch phase. (todd)
+
+
+HDP-1.1.1.16
+	BUG-1369 - Hadoop tokens use a 20-bit secret (Refer Jira, for Apache
+		   Bug details)
+
