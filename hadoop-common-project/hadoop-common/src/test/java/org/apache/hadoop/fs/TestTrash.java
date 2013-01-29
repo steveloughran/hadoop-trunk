@@ -33,6 +33,8 @@ import java.util.Set;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.Time;
 
@@ -40,7 +42,7 @@ import org.apache.hadoop.util.Time;
  * This class tests commands from Trash.
  */
 public class TestTrash extends TestCase {
-
+  public static final Log LOG = LogFactory.getLog(TestTrash.class);
   private final static Path TEST_DIR =
     new Path(new File(System.getProperty("test.build.data","/tmp")
           ).toURI().toString().replace(' ', '+'), "testTrash");
@@ -552,10 +554,9 @@ public class TestTrash extends TestCase {
       try {
         val = shell.run(args);
       } catch (Exception e) {
-        System.err.println("Exception raised from Trash.run " +
-                           e.getLocalizedMessage());
+        LOG.warn("Exception raised from Trash.run " + e, e);
       }
-      assertTrue(val == 0);
+      assertEquals("wrong result from shell script", 0, val);
 
       Path trashDir = shell.getCurrentTrashDir();
       FileStatus files[] = fs.listStatus(trashDir.getParent());
