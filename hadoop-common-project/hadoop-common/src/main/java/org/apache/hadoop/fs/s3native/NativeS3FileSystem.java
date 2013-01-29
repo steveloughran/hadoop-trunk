@@ -582,13 +582,17 @@ public class NativeS3FileSystem extends FileSystem {
   public boolean rename(Path src, Path dst) throws IOException {
 
     String srcKey = pathToKey(makeAbsolute(src));
+    final String debugPreamble = "Renaming '" + src + "' to '" + dst + "' - ";
+
 
     if (srcKey.length() == 0) {
       // Cannot rename root of file system
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(debugPreamble +
+                  "returning false as cannot rename the root of a filesystem");
+      }
       return false;
     }
-
-    final String debugPreamble = "Renaming '" + src + "' to '" + dst + "' - ";
 
     // Figure out the final destination
     String dstKey;
