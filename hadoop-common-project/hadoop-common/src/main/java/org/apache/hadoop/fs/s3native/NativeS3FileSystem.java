@@ -595,7 +595,12 @@ public class NativeS3FileSystem extends FileSystem {
     }
 
     // Figure out the final destination
-    String dstKey;
+    String dstKey = pathToKey(makeAbsolute(dst));
+    if (dstKey.startsWith(srcKey + "/")) {
+      LOG.debug(debugPreamble +
+                "returning false as cannot rename into a child dir of source");
+      return false;
+    }
     try {
       boolean dstIsFile = getFileStatus(dst).isFile();
       if (dstIsFile) {
@@ -608,13 +613,14 @@ public class NativeS3FileSystem extends FileSystem {
         if(LOG.isDebugEnabled()) {
           LOG.debug(debugPreamble + "using dst as output directory");
         }
+        //destination goes under the dst path, with the filename of the
+        //source entry
         dstKey = pathToKey(makeAbsolute(new Path(dst, src.getName())));
       }
     } catch (FileNotFoundException e) {
       if(LOG.isDebugEnabled()) {
         LOG.debug(debugPreamble + "using dst as output destination");
       }
-      dstKey = pathToKey(makeAbsolute(dst));
       try {
         if (getFileStatus(dst.getParent()).isFile()) {
           if(LOG.isDebugEnabled()) {
