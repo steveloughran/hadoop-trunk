@@ -69,7 +69,20 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     return "/user/" + System.getProperty("user.name");
   }
 
+  /**
+   * Override this if the filesystem does not support rename
+   * @return true if the FS supports rename -and rename related tests
+   * should be run
+   */
   protected boolean renameSupported() {
+    return true;
+  }
+
+  /**
+   * Override this if the filesystem is not case sensitive
+   * @return true if the case detection/preservation tests should run
+   */
+  protected boolean filesystemIsCaseSensitive() {
     return true;
   }
 
@@ -126,17 +139,17 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     Path grandparentDir = parentDir.getParent();
     assertTrue(fs.exists(grandparentDir));
     assertFalse(fs.isFile(grandparentDir));
-    
+
   }
-  
+
   public void testMkdirsFailsForSubdirectoryOfExistingFile() throws Exception {
     Path testDir = path("/test/hadoop");
     assertFalse(fs.exists(testDir));
     assertTrue(fs.mkdirs(testDir));
     assertTrue(fs.exists(testDir));
-    
+
     createFile(path("/test/hadoop/file"));
-    
+
     Path testSubDir = path("/test/hadoop/file/subdir");
     try {
       fs.mkdirs(testSubDir);
@@ -145,7 +158,7 @@ public abstract class FileSystemContractBaseTest extends TestCase {
       // expected
     }
     assertFalse(fs.exists(testSubDir));
-    
+
     Path testDeepSubDir = path("/test/hadoop/file/deep/sub/dir");
     try {
       fs.mkdirs(testDeepSubDir);
@@ -154,7 +167,7 @@ public abstract class FileSystemContractBaseTest extends TestCase {
       // expected
     }
     assertFalse(fs.exists(testDeepSubDir));
-    
+
   }
 
   public void testMkdirsWithUmask() throws Exception {
@@ -185,7 +198,7 @@ public abstract class FileSystemContractBaseTest extends TestCase {
       // expected
     }
   }
-  
+
   public void testListStatusThrowsExceptionForNonExistentFile() throws Exception {
     try {
       fs.listStatus(path("/test/hadoop/file"));
@@ -194,7 +207,7 @@ public abstract class FileSystemContractBaseTest extends TestCase {
       // expected
     }
   }
-  
+
   public void testListStatus() throws Exception {
     Path[] testDirs = { path("/test/hadoop/a"),
                         path("/test/hadoop/b"),
@@ -218,7 +231,7 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     paths = fs.listStatus(path("/test/hadoop/a"));
     assertEquals(0, paths.length);
   }
-  
+
   public void testWriteReadAndDeleteEmptyFile() throws Exception {
     writeReadAndDelete(0);
   }
@@ -230,7 +243,7 @@ public abstract class FileSystemContractBaseTest extends TestCase {
   public void testWriteReadAndDeleteOneBlock() throws Exception {
     writeReadAndDelete(getBlockSize());
   }
-  
+
   public void testWriteReadAndDeleteOneAndAHalfBlocks() throws Exception {
     writeReadAndDelete(getBlockSize() + (getBlockSize() / 2));
   }
@@ -509,6 +522,10 @@ public abstract class FileSystemContractBaseTest extends TestCase {
    * @throws Exception
    */
   public void testFilesystemIsCaseSensitive() throws Exception {
+    if (!filesystemIsCaseSensitive()) {
+      LOG.info("Skipping test");
+      return;
+    }
     String mixedCaseFilename = "/test/UPPER.TXT";
     Path upper = path(mixedCaseFilename);
     Path lower = path(mixedCaseFilename.toLowerCase(Locale.ENGLISH));
@@ -603,6 +620,17 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     fs.mkdirs(childdir);
     Path childchilddir = new Path(childdir, "childdir");
     rename(parentdir, childchilddir, false, true, false);
+  }
+
+  /**
+   * This a sanity check to make sure that any filesystem's handling of
+   * renames doesn't cause any regressions
+   */
+  public void testRenameToDirWithSamePrefixAllowed() throws Throwable {
+    Path parentdir = path("test/parentdir");
+    fs.mkdirs(parentdir);
+    Path dest = path("test/parentdirdest");
+    rename(parentdir, dest, true, false, true);
   }
 
   /**
