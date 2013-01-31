@@ -633,6 +633,54 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     rename(parentdir, dest, true, false, true);
   }
 
+  public void testLSRootDir() throws Throwable {
+    Path dir = path("/");
+    Path subdir = path("/test");
+    fs.mkdirs(subdir);
+    assertListFilesFinds(dir, subdir);
+  }
+
+  public void testListStatusRootDir() throws Throwable {
+    Path dir = path("/");
+    Path subdir  = path("/test");
+    fs.mkdirs(subdir);
+    assertListStatusFinds(dir, subdir);
+  }
+
+
+  private void assertListFilesFinds(Path dir, Path subdir) throws IOException {
+    RemoteIterator<LocatedFileStatus> iterator =
+      fs.listFiles(dir, true);
+    boolean found = false;
+    StringBuilder builder = new StringBuilder();
+    while (iterator.hasNext()) {
+      LocatedFileStatus next =  iterator.next();
+      builder.append(next.toString()).append('\n');
+      if (next.getPath().equals(subdir)) {
+        found = true;
+      }
+    }
+    assertTrue("Path " + subdir
+               + " not found in directory " + dir + ":" + builder,
+               found);
+  }
+
+  private void assertListStatusFinds(Path dir, Path subdir) throws IOException {
+    FileStatus[] stats = fs.listStatus(dir);
+    boolean found = false;
+    StringBuilder builder = new StringBuilder();
+    for (FileStatus stat : stats) {
+      builder.append(stat.toString()).append('\n');
+      if (stat.getPath().equals(subdir)) {
+        found = true;
+      }
+    }
+    assertTrue("Path " + subdir
+               + " not found in directory " + dir + ":" + builder,
+               found);
+  }
+
+
   /**
    * Assert that a file exists and whose {@link FileStatus} entry
    * declares that this is a file and not a symlink or directory.
