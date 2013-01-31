@@ -642,9 +642,9 @@ public abstract class FileSystemContractBaseTest extends TestCase {
 
   public void testListStatusRootDir() throws Throwable {
     Path dir = path("/");
-    Path subdir  = path("/test");
-    fs.mkdirs(subdir);
-    assertListStatusFinds(dir, subdir);
+    Path child  = path("/test");
+    createFile(child);
+    assertListStatusFinds(dir, child);
   }
 
 
