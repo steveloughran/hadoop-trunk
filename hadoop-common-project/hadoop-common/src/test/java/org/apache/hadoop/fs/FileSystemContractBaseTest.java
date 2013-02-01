@@ -608,7 +608,7 @@ public abstract class FileSystemContractBaseTest extends TestCase {
    */
   public void testRenameChildDirForbidden() throws Exception {
     if (!renameSupported()) return;
-
+    LOG.info("testRenameChildDirForbidden");
     Path parentdir = path("/test/parentdir");
     fs.mkdirs(parentdir);
     Path childFile = new Path(parentdir, "childfile");
@@ -627,17 +627,77 @@ public abstract class FileSystemContractBaseTest extends TestCase {
    * renames doesn't cause any regressions
    */
   public void testRenameToDirWithSamePrefixAllowed() throws Throwable {
+    if (!renameSupported()) return;
     Path parentdir = path("test/parentdir");
     fs.mkdirs(parentdir);
     Path dest = path("test/parentdirdest");
     rename(parentdir, dest, true, false, true);
   }
 
+  /**
+   * trying to rename a directory onto itself should fail,
+   * preserving everything underneath.
+   */
+  public void testRenameDirToSelf() throws Throwable {
+    if (!renameSupported()) {
+      return;
+    }
+    Path parentdir = path("test/parentdir");
+    fs.mkdirs(parentdir);
+    Path child = new Path(parentdir, "child");
+    createFile(child);
+
+    rename(parentdir, parentdir, false, true, true);
+    //verify the child is still there
+    assertIsFile(child);
+  }
+
+  /**
+   * trying to rename a directory onto its parent dir will build
+   * a destination path of its original name, which should then fail
+   */
+  public void testMoveDirUnderParent() throws Throwable {
+    if (!renameSupported()) {
+      return;
+    }
+    Path testdir = path("test/dir");
+    fs.mkdirs(testdir);
+    Path parent = testdir.getParent();
+
+    rename(testdir, parent, false, true, true);
+  }
+  /**
+   * trying to rename a file onto itself should succeed (it's a no-op)
+   *
+   */
+  public void testRenameFileToSelf() throws Throwable {
+    if (!renameSupported()) return;
+    Path filepath = path("test/file");
+    createFile(filepath);
+    //HDFS expects rename src, src -> true
+    rename(filepath, filepath, true, true, true);
+    //verify the file is still there
+    assertIsFile(filepath);
+  }
+  /**
+   * trying to move a file into it's parent dir should succeed
+   * again: no-op
+   */
+  public void testMoveFileUnderParent() throws Throwable {
+    if (!renameSupported()) return;
+    Path filepath = path("test/file");
+    createFile(filepath);
+    //HDFS expects rename src, src -> true
+    rename(filepath, filepath, true, true, true);
+    //verify the file is still there
+    assertIsFile(filepath);
+  }
+
   public void testLSRootDir() throws Throwable {
     Path dir = path("/");
-    Path subdir = path("/test");
-    fs.mkdirs(subdir);
-    assertListFilesFinds(dir, subdir);
+    Path child = path("/test");
+    createFile(child);
+    assertListFilesFinds(dir, child);
   }
 
   public void testListStatusRootDir() throws Throwable {
@@ -646,7 +706,6 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     createFile(child);
     assertListStatusFinds(dir, child);
   }
-
 
   private void assertListFilesFinds(Path dir, Path subdir) throws IOException {
     RemoteIterator<LocatedFileStatus> iterator =
