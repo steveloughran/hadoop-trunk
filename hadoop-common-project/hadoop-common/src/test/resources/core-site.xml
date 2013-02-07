@@ -69,4 +69,6 @@
   <value>simple</value>
 </property>
 
+<include xmlns="http://www.w3.org/2001/XInclude"
+    href="auth-keys.xml" />
 </configuration>
