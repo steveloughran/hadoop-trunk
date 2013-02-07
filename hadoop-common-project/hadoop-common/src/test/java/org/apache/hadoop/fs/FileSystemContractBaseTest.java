@@ -647,7 +647,7 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     Path child = new Path(parentdir, "child");
     createFile(child);
 
-    rename(parentdir, parentdir, true, true, true);
+    rename(parentdir, parentdir, false, true, true);
     //verify the child is still there
     assertIsFile(child);
   }
@@ -664,7 +664,7 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     fs.mkdirs(testdir);
     Path parent = testdir.getParent();
 
-    rename(testdir, parent, true, true, true);
+    rename(testdir, parent, true, false, true);
   }
   /**
    * trying to rename a file onto itself should succeed (it's a no-op)
