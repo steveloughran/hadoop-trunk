@@ -487,9 +487,9 @@ public abstract class FileSystemContractBaseTest extends TestCase {
   
   private void rename(Path src, Path dst, boolean renameSucceeded,
       boolean srcExists, boolean dstExists) throws IOException {
-    assertEquals("Rename result", renameSucceeded, fs.rename(src, dst));
-    assertEquals("Source exists", srcExists, fs.exists(src));
-    assertEquals("Destination exists", dstExists, fs.exists(dst));
+    assertEquals("mv " + src + " " + dst,renameSucceeded, fs.rename(src, dst));
+    assertEquals("Source exists: " + src, srcExists, fs.exists(src));
+    assertEquals("Destination exists" + dst, dstExists, fs.exists(dst));
   }
 
   /**
@@ -654,7 +654,8 @@ public abstract class FileSystemContractBaseTest extends TestCase {
 
   /**
    * trying to rename a directory onto its parent dir will build
-   * a destination path of its original name, which should then fail
+   * a destination path of its original name, which should then fail.
+   * The source path and the destination path should still exist afterwards
    */
   public void testMoveDirUnderParent() throws Throwable {
     if (!renameSupported()) {
@@ -664,7 +665,7 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     fs.mkdirs(testdir);
     Path parent = testdir.getParent();
 
-    rename(testdir, parent, true, false, true);
+    rename(testdir, parent, true, true, true);
   }
   /**
    * trying to rename a file onto itself should succeed (it's a no-op)
