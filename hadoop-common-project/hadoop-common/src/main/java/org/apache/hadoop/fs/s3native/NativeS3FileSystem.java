@@ -584,7 +584,6 @@ public class NativeS3FileSystem extends FileSystem {
     String srcKey = pathToKey(makeAbsolute(src));
     final String debugPreamble = "Renaming '" + src + "' to '" + dst + "' - ";
 
-
     if (srcKey.length() == 0) {
       // Cannot rename root of file system
       if (LOG.isDebugEnabled()) {
@@ -607,28 +606,18 @@ public class NativeS3FileSystem extends FileSystem {
     }
     // Figure out the final destination
     String dstKey = pathToKey(makeAbsolute(dst));
-    //check for rename here, before probes for file type take place
-    // -this is needed to stop rename(dir,dir) creating the path dir/dir
-    // and then rejectig that operation
-
-    if (srcKey.equals(dstKey)) {
-      //fully resolved destination key matches source: fail
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(debugPreamble + "renamingToSelf; returning true");
-      }
-      return true;
-    }
 
     try {
       boolean dstIsFile = getFileStatus(dst).isFile();
       if (dstIsFile) {
         //destination is a file.
         //you can't copy a file or a directory onto an existing file
-        //except for the special case of dest==src
+        //except for the special case of dest==src, which is a no-op
         if(LOG.isDebugEnabled()) {
           LOG.debug(debugPreamble +
               "returning dst is an already existing file");
         }
+        //bail out early
         return srcKey.equals(dstKey);
       } else {
         //destination exists and is a directory
@@ -662,7 +651,6 @@ public class NativeS3FileSystem extends FileSystem {
       }
     }
 
-
     //rename to self behavior follows Posix rules and is different
     //for directories and files -the return code is driven by src type
     if (srcKey.equals(dstKey)) {
@@ -672,17 +660,16 @@ public class NativeS3FileSystem extends FileSystem {
       }
       return true;
     }
-
     if (srcIsFile) {
       //source is a file; COPY then DELETE
-      if (LOG.isDebugEnabled()) {
+      if(LOG.isDebugEnabled()) {
         LOG.debug(debugPreamble +
-                  "src is file, so doing copy then delete in S3");
+            "src is file, so doing copy then delete in S3");
       }
       store.copy(srcKey, dstKey);
       store.delete(srcKey);
     } else {
-      if (LOG.isDebugEnabled()) {
+      if(LOG.isDebugEnabled()) {
         LOG.debug(debugPreamble + "src is directory, so copying contents");
       }
       //Verify dest is not a child of the parent
