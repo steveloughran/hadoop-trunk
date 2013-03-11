@@ -252,13 +252,112 @@ public class S3FileSystem extends FileSystem {
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
     Path absoluteSrc = makeAbsolute(src);
+    final String debugPreamble = "Renaming '" + src + "' to '" + dst + "' - ";
     INode srcINode = store.retrieveINode(absoluteSrc);
     if (srcINode == null) {
       // src path doesn't exist
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(debugPreamble + "returning false as src does not exist");
+      }
       return false; 
     }
+    
     Path absoluteDst = makeAbsolute(dst);
+    boolean renamingOnToSelf = src.equals(dst);
+
+    //validate the parent dir of the destination
+    Path dstParent = absoluteDst.getParent();
+    if (dstParent != null) {
+      //if the dst parent is not root, make sure it exists
+      INode dstParentINode = store.retrieveINode(dstParent);
+      if (dstParentINode == null) {
+        // dst parent doesn't exist
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(debugPreamble +
+                    "returning false as dst parent does not exist");
+        }
+        return false;
+      }
+      if (dstParentINode.isFile()) {
+        // dst parent exists but is a file
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(debugPreamble +
+                    "returning false as dst parent exists and is a file");
+        }
+        return false;
+      }
+    }
+    
+    //get status of source
+    boolean srcIsFile = srcINode.isFile();
+
     INode dstINode = store.retrieveINode(absoluteDst);
+    boolean destExists = dstINode != null;
+    boolean destIsDir = destExists && !dstINode.isFile();
+    if (srcIsFile) {
+
+      //source is a simple file
+      // outcomes:
+      // #1 dest exists and is file: fail
+      // #2 dest exists and is dir: destination path becomes under dest dir
+      // #3 dest does not exist: use dest as name
+      if (destExists) {
+
+        if (destIsDir) {
+          //outcome #2 -move to subdir of dest
+          absoluteDst = new Path(absoluteDst, absoluteDst.getName());
+        } else {
+          //outcome #1 dest it's a file: fail if differeent
+          if (!renamingOnToSelf) {
+            throw new SwiftOperationFailedException(
+              "cannot rename a file over one that already exists");
+          } else {
+            //is mv self self where self is a file. this becomes a no-op
+            return;
+          }
+        }
+      }
+    }
+    
+    
+    if (destExists) {
+      if (destIsDir) {
+        //destination is a directory
+        boolean isChildOf = absoluteSrc.toString()
+                                   .startsWith(absoluteDst.toString()+ "/");
+        
+        
+      } else {
+        //destination exists and is a file.
+        //you can't copy a file or a directory onto an existing file
+        //except for the special case of dest==src, which is a no-op
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(debugPreamble +
+                    "returning without rename as dst is an already existing file");
+        }
+        //exit, returning true iff the rename is onto self
+        return absoluteSrc.equals(absoluteDst);
+
+      }
+    } else {
+      //no destination
+    }
+    //dest does not exist, or dest is a directory
+    
+      
+      //at this point the parent dir is root or an extant directory.
+      //1. src is file and dest doesn't exist -destination is absoluteDst
+      //2. src is dir and dest does not exist -destination is absoluteDst
+      //3. src is dir and dest does exist -destination is under absoluteDst
+      //for case #3, then, the dest path may need recalculation
+      if (!srcIsFile && destExists){
+        absoluteDst = new Path(absoluteDst,absoluteDst.getName());
+      }
+    }
+
+
+    //OLD CODE
+/*
     if (dstINode != null && dstINode.isDirectory()) {
       absoluteDst = new Path(absoluteDst, absoluteSrc.getName());
       dstINode = store.retrieveINode(absoluteDst);
@@ -275,6 +374,7 @@ public class S3FileSystem extends FileSystem {
         return false;
       }
     }
+*/
     return renameRecursive(absoluteSrc, absoluteDst);
   }
   
