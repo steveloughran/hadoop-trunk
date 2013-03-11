@@ -262,9 +262,8 @@ public class S3FileSystem extends FileSystem {
       }
       return false; 
     }
-    
-    Path absoluteDst = makeAbsolute(dst);
 
+    Path absoluteDst = makeAbsolute(dst);
 
     //validate the parent dir of the destination
     Path dstParent = absoluteDst.getParent();
@@ -288,7 +287,7 @@ public class S3FileSystem extends FileSystem {
         return false;
       }
     }
-    
+
     //get status of source
     boolean srcIsFile = srcINode.isFile();
 
@@ -370,29 +369,8 @@ public class S3FileSystem extends FileSystem {
     }
     //here the dest path is set up -so rename
     return renameRecursive(absoluteSrc, absoluteDst);
-
-    //OLD CODE
-/*
-    if (dstINode != null && dstINode.isDirectory()) {
-      absoluteDst = new Path(absoluteDst, absoluteSrc.getName());
-      dstINode = store.retrieveINode(absoluteDst);
-    }
-    if (dstINode != null) {
-      // dst path already exists - can't overwrite
-      return false;
-    }
-    Path dstParent = absoluteDst.getParent();
-    if (dstParent != null) {
-      INode dstParentINode = store.retrieveINode(dstParent);
-      if (dstParentINode == null || dstParentINode.isFile()) {
-        // dst parent doesn't exist or is a file
-        return false;
-      }
-    }
-*/
-
   }
-  
+
   private boolean renameRecursive(Path src, Path dst) throws IOException {
     INode srcINode = store.retrieveINode(src);
     store.storeINode(dst, srcINode);
