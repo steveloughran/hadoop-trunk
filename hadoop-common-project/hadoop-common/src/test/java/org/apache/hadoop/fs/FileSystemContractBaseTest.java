@@ -386,8 +386,7 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     Path dst = path("/test/new/newdir");
     fs.mkdirs(dst);
     rename(src, dst, true, false, true);
-    assertTrue("Destination changed",
-        fs.exists(path("/test/new/newdir/file")));
+    assertIsFile(path("/test/new/newdir/file"));
   }
   
   public void testRenameDirectoryMoveToNonExistentDirectory() 
@@ -664,9 +663,12 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     Path testdir = path("test/dir");
     fs.mkdirs(testdir);
     Path parent = testdir.getParent();
-
-    rename(testdir, parent, true, true, true);
+    //the outcome here is ambiguous, so is not checked
+    fs.rename(testdir, parent);
+    assertEquals("Source exists: " + testdir, true, fs.exists(testdir));
+    assertEquals("Destination exists" + parent, true, fs.exists(parent));
   }
+
   /**
    * trying to rename a file onto itself should succeed (it's a no-op)
    *
@@ -749,7 +751,7 @@ public abstract class FileSystemContractBaseTest extends TestCase {
    * @throws IOException IO problems during file operations
    */
   private void assertIsFile(Path filename) throws IOException {
-    assertTrue("Does not exit: " + filename, fs.exists(filename));
+    assertTrue("Does not exist: " + filename, fs.exists(filename));
     FileStatus status = fs.getFileStatus(filename);
     String fileInfo = filename + "  " + status;
     assertTrue("Not a file " + fileInfo, status.isFile());

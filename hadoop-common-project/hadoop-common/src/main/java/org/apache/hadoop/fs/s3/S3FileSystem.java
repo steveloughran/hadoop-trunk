@@ -254,16 +254,17 @@ public class S3FileSystem extends FileSystem {
     Path absoluteSrc = makeAbsolute(src);
     final String debugPreamble = "Renaming '" + src + "' to '" + dst + "' - ";
     INode srcINode = store.retrieveINode(absoluteSrc);
+    boolean debugEnabled = LOG.isDebugEnabled();
     if (srcINode == null) {
       // src path doesn't exist
-      if (LOG.isDebugEnabled()) {
+      if (debugEnabled) {
         LOG.debug(debugPreamble + "returning false as src does not exist");
       }
       return false; 
     }
     
     Path absoluteDst = makeAbsolute(dst);
-    boolean renamingOnToSelf = src.equals(dst);
+
 
     //validate the parent dir of the destination
     Path dstParent = absoluteDst.getParent();
@@ -272,7 +273,7 @@ public class S3FileSystem extends FileSystem {
       INode dstParentINode = store.retrieveINode(dstParent);
       if (dstParentINode == null) {
         // dst parent doesn't exist
-        if (LOG.isDebugEnabled()) {
+        if (debugEnabled) {
           LOG.debug(debugPreamble +
                     "returning false as dst parent does not exist");
         }
@@ -280,7 +281,7 @@ public class S3FileSystem extends FileSystem {
       }
       if (dstParentINode.isFile()) {
         // dst parent exists but is a file
-        if (LOG.isDebugEnabled()) {
+        if (debugEnabled) {
           LOG.debug(debugPreamble +
                     "returning false as dst parent exists and is a file");
         }
@@ -297,64 +298,78 @@ public class S3FileSystem extends FileSystem {
     if (srcIsFile) {
 
       //source is a simple file
-      // outcomes:
-      // #1 dest exists and is file: fail
-      // #2 dest exists and is dir: destination path becomes under dest dir
-      // #3 dest does not exist: use dest as name
       if (destExists) {
-
         if (destIsDir) {
-          //outcome #2 -move to subdir of dest
-          absoluteDst = new Path(absoluteDst, absoluteDst.getName());
+          //outcome #1 dest exists and is dir -filename to subdir of dest
+          if (debugEnabled) {
+            LOG.debug(debugPreamble +
+                      "copying src file under dest dir to " + absoluteDst);
+          }
+          absoluteDst = new Path(absoluteDst, absoluteSrc.getName());
         } else {
-          //outcome #1 dest it's a file: fail if differeent
-          if (!renamingOnToSelf) {
-            throw new SwiftOperationFailedException(
-              "cannot rename a file over one that already exists");
-          } else {
-            //is mv self self where self is a file. this becomes a no-op
-            return;
+          //outcome #2 dest it's a file: fail iff different from src
+          boolean renamingOnToSelf = absoluteSrc.equals(absoluteDst);
+          if (debugEnabled) {
+            LOG.debug(debugPreamble +
+                      "copying file onto file, outcome is " + renamingOnToSelf);
+          }
+          return renamingOnToSelf;
+        }
+      } else {
+        // #3 dest does not exist: use dest as path for rename
+        if (debugEnabled) {
+          LOG.debug(debugPreamble +
+                    "copying file onto file");
+        }
+      }
+    } else {
+      //here the source exists and is a directory
+      // outcomes (given we know the parent dir exists if we get this far)
+      // #1 destination is a file: fail
+      // #2 destination is a directory: create a new dir under that one
+      // #3 destination doesn't exist: create a new dir with that name
+      // #3 and #4 are only allowed if the dest path is not == or under src
+
+      if (destExists) {
+        if (!destIsDir) {
+          // #1 destination is a file: fail
+          if (debugEnabled) {
+            LOG.debug(debugPreamble +
+                      "returning false as src is a directory, but not dest");
+          }
+          return false;
+        } else {
+          // the destination dir exists
+          // destination for rename becomes a subdir of the target name
+          absoluteDst = new Path(absoluteDst, absoluteSrc.getName());
+          if (debugEnabled) {
+            LOG.debug(debugPreamble +
+                      "copying src dir under dest dir to " + absoluteDst);
           }
         }
       }
-    }
-    
-    
-    if (destExists) {
-      if (destIsDir) {
-        //destination is a directory
-        boolean isChildOf = absoluteSrc.toString()
-                                   .startsWith(absoluteDst.toString()+ "/");
-        
-        
-      } else {
-        //destination exists and is a file.
-        //you can't copy a file or a directory onto an existing file
-        //except for the special case of dest==src, which is a no-op
-        if (LOG.isDebugEnabled()) {
+      //the final destination directory is now know, so validate it for
+      //illegal moves
+
+      if (absoluteSrc.equals(absoluteDst)) {
+        //you can't rename a directory onto itself
+        if (debugEnabled) {
           LOG.debug(debugPreamble +
-                    "returning without rename as dst is an already existing file");
+                    "Dest==source && isDir -failing");
         }
-        //exit, returning true iff the rename is onto self
-        return absoluteSrc.equals(absoluteDst);
-
+        return false;
       }
-    } else {
-      //no destination
-    }
-    //dest does not exist, or dest is a directory
-    
-      
-      //at this point the parent dir is root or an extant directory.
-      //1. src is file and dest doesn't exist -destination is absoluteDst
-      //2. src is dir and dest does not exist -destination is absoluteDst
-      //3. src is dir and dest does exist -destination is under absoluteDst
-      //for case #3, then, the dest path may need recalculation
-      if (!srcIsFile && destExists){
-        absoluteDst = new Path(absoluteDst,absoluteDst.getName());
+      if (absoluteDst.toString().startsWith(absoluteSrc.toString() + "/")) {
+        //you can't move a directory under itself
+        if (debugEnabled) {
+          LOG.debug(debugPreamble +
+                    "dst is equal to or under src dir -failing");
+        }
+        return false;
       }
     }
-
+    //here the dest path is set up -so rename
+    return renameRecursive(absoluteSrc, absoluteDst);
 
     //OLD CODE
 /*
@@ -375,7 +390,7 @@ public class S3FileSystem extends FileSystem {
       }
     }
 */
-    return renameRecursive(absoluteSrc, absoluteDst);
+
   }
   
   private boolean renameRecursive(Path src, Path dst) throws IOException {

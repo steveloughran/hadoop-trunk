@@ -615,9 +615,9 @@ public class NativeS3FileSystem extends FileSystem {
         //except for the special case of dest==src, which is a no-op
         if(LOG.isDebugEnabled()) {
           LOG.debug(debugPreamble +
-              "returning dst is an already existing file");
+              "returning without rename as dst is an already existing file");
         }
-        //bail out early
+        //exit, returning true iff the rename is onto self
         return srcKey.equals(dstKey);
       } else {
         //destination exists and is a directory
@@ -669,6 +669,7 @@ public class NativeS3FileSystem extends FileSystem {
       store.copy(srcKey, dstKey);
       store.delete(srcKey);
     } else {
+      //src is a directory
       if(LOG.isDebugEnabled()) {
         LOG.debug(debugPreamble + "src is directory, so copying contents");
       }
@@ -676,10 +677,11 @@ public class NativeS3FileSystem extends FileSystem {
       if (dstKey.startsWith(srcKey + "/")) {
         if (LOG.isDebugEnabled()) {
           LOG.debug(
-            debugPreamble + "cannot rename a directory to a subdirectory");
+            debugPreamble + "cannot rename a directory to a subdirectory of self");
         }
         return false;
       }
+      //create the subdir under the destination
       store.storeEmptyFile(dstKey + FOLDER_SUFFIX);
 
       List<String> keysToDelete = new ArrayList<String>();
