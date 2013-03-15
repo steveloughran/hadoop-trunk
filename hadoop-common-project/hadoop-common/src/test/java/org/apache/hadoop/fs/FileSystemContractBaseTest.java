@@ -548,7 +548,8 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     assertEquals("Expected status:" + upperStatus
                  + " actual status " + newStatus,
                  upperStatus.getLen(),
-                 newStatus.getLen()); }
+                 newStatus.getLen());
+  }
 
   /**
    * Asserts that a zero byte file has a status of file and not
@@ -704,30 +705,6 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     assertListStatusFinds(dir, child);
   }
 
-  public void testListFilesRootDir() throws Throwable {
-    Path dir = path("/");
-    Path child = path("/test");
-    createFile(child);
-    assertListFilesFinds(dir, child);
-  }
-
-  protected void assertListFilesFinds(Path dir, Path subdir) throws IOException {
-    RemoteIterator<LocatedFileStatus> iterator =
-      fs.listFiles(dir, true);
-    boolean found = false;
-    StringBuilder builder = new StringBuilder();
-    while (iterator.hasNext()) {
-      LocatedFileStatus next =  iterator.next();
-      builder.append(next.toString()).append('\n');
-      if (next.getPath().equals(subdir)) {
-        found = true;
-      }
-    }
-    assertTrue("Path " + subdir
-               + " not found in directory " + dir + ":" + builder,
-               found);
-  }
-
   private void assertListStatusFinds(Path dir, Path subdir) throws IOException {
     FileStatus[] stats = fs.listStatus(dir);
     boolean found = false;
@@ -742,7 +719,6 @@ public abstract class FileSystemContractBaseTest extends TestCase {
                + " not found in directory " + dir + ":" + builder,
                found);
   }
-
 
   /**
    * Assert that a file exists and whose {@link FileStatus} entry
@@ -879,5 +855,25 @@ public abstract class FileSystemContractBaseTest extends TestCase {
       dataset[i] = (byte) (base + (i % modulo));
     }
     return dataset;
+  }
+
+  /**
+   * Take a list of filestatus entries and convert that to a list
+   * of the form [ file file2 dir/ ]
+   * @param statuses status array
+   * @return a string for use in failures
+   */
+  public String stringifyFileStatuses(FileStatus[] statuses) {
+    StringBuilder text = new StringBuilder(4 + statuses.length * 20);
+    text.append("[ ");
+    for (FileStatus s : statuses) {
+      text.append(s.getPath());
+      if (s.isDir()) {
+        text.append("/");
+      }
+      text.append(" ");
+    }
+    text.append("]");
+    return text.toString();
   }
 }

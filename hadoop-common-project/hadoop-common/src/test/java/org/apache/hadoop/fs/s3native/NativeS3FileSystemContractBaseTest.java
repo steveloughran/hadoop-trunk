@@ -48,21 +48,29 @@ public abstract class NativeS3FileSystemContractBaseTest
     store.purge("test");
     super.tearDown();
   }
-  
+
+
   public void testListStatusForRoot() throws Exception {
     Path testDir = path("/test");
     //make sure that test dir really isn't there, though consistency
     //guarantees in S3 mean that it may still be there the next
     //time the client looks
     fs.delete(testDir, true);
+    Thread.sleep(1000);
     FileStatus[] paths = fs.listStatus(path("/"));
-    assertEquals("Root directory is not empty; ", 0, paths.length);
+    assertEquals("Root directory is not empty: "
+                 + stringifyFileStatuses(paths),
+                 0,
+                 paths.length);
     
     assertTrue(fs.mkdirs(testDir));
     
     paths = fs.listStatus(path("/"));
-    assertEquals(1, paths.length);
-    assertEquals(path("/test"), paths[0].getPath());
+    String root = stringifyFileStatuses(paths);
+    assertEquals("Root directory wrong " + root, 1, paths.length);
+    assertEquals("Root directory wrong "+ root,
+                 path("/test"),
+                 paths[0].getPath());
   }
   
   public void testNoTrailingBackslashOnBucket() throws Exception {
