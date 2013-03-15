@@ -697,13 +697,6 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     assertIsFile(filepath);
   }
 
-  public void testLSRootDir() throws Throwable {
-    Path dir = path("/");
-    Path child = path("/test");
-    createFile(child);
-    assertListFilesFinds(dir, child);
-  }
-
   public void testListStatusRootDir() throws Throwable {
     Path dir = path("/");
     Path child  = path("/test");
@@ -711,7 +704,14 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     assertListStatusFinds(dir, child);
   }
 
-  private void assertListFilesFinds(Path dir, Path subdir) throws IOException {
+  public void testLSRootDir() throws Throwable {
+    Path dir = path("/");
+    Path child = path("/test");
+    createFile(child);
+    assertListFilesFinds(dir, child);
+  }
+
+  protected void assertListFilesFinds(Path dir, Path subdir) throws IOException {
     RemoteIterator<LocatedFileStatus> iterator =
       fs.listFiles(dir, true);
     boolean found = false;
