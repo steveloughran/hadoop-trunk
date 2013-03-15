@@ -704,7 +704,7 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     assertListStatusFinds(dir, child);
   }
 
-  public void testLSRootDir() throws Throwable {
+  public void testListFilesRootDir() throws Throwable {
     Path dir = path("/");
     Path child = path("/test");
     createFile(child);
