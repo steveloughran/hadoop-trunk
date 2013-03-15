@@ -49,14 +49,12 @@ public abstract class NativeS3FileSystemContractBaseTest
     super.tearDown();
   }
 
-
   public void testListStatusForRoot() throws Exception {
     Path testDir = path("/test");
     //make sure that test dir really isn't there, though consistency
     //guarantees in S3 mean that it may still be there the next
     //time the client looks
     fs.delete(testDir, true);
-    Thread.sleep(1000);
     FileStatus[] paths = fs.listStatus(path("/"));
     assertEquals("Root directory is not empty: "
                  + stringifyFileStatuses(paths),

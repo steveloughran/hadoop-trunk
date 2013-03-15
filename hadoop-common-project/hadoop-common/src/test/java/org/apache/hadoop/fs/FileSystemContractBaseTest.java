@@ -705,6 +705,30 @@ public abstract class FileSystemContractBaseTest extends TestCase {
     assertListStatusFinds(dir, child);
   }
 
+  public void testListFilesRootDir() throws Throwable {
+    Path dir = path("/");
+    Path child = path("/test");
+    createFile(child);
+    assertListFilesFinds(dir, child);
+  }
+
+  protected void assertListFilesFinds(Path dir, Path subdir) throws IOException {
+    RemoteIterator<LocatedFileStatus> iterator =
+      fs.listFiles(dir, true);
+    boolean found = false;
+    StringBuilder builder = new StringBuilder();
+    while (iterator.hasNext()) {
+      LocatedFileStatus next =  iterator.next();
+      builder.append(next.toString()).append('\n');
+      if (next.getPath().equals(subdir)) {
+        found = true;
+      }
+    }
+    assertTrue("Path " + subdir
+               + " not found in directory " + dir + ":" + builder,
+               found);
+  }
+
   private void assertListStatusFinds(Path dir, Path subdir) throws IOException {
     FileStatus[] stats = fs.listStatus(dir);
     boolean found = false;
