@@ -102,9 +102,10 @@ public class MiniYARNCluster extends CompositeService {
   }
   
   @Override
-  public void init(Configuration conf) {
-    super.init(conf instanceof YarnConfiguration ? conf
-        : new YarnConfiguration(conf));
+  public void innerInit(Configuration conf) {
+    super.innerInit(conf instanceof YarnConfiguration ? conf
+                                                      : new YarnConfiguration(
+                                                        conf));
   }
 
   public File getTestWorkDir() {
@@ -134,7 +135,7 @@ public class MiniYARNCluster extends CompositeService {
     }
 
     @Override
-    public synchronized void start() {
+    public synchronized void innerStart() {
       try {
         getConfig().setBoolean(YarnConfiguration.IS_MINI_YARN_CLUSTER, true);
         if (!getConfig().getBoolean(
@@ -187,11 +188,11 @@ public class MiniYARNCluster extends CompositeService {
     }
 
     @Override
-    public synchronized void stop() {
+    public synchronized void innerStop() throws Exception {
       if (resourceManager != null) {
         resourceManager.stop();
       }
-      super.stop();
+      super.innerStop();
     }
   }
 
@@ -203,9 +204,9 @@ public class MiniYARNCluster extends CompositeService {
       index = i;
     }
 
-    public synchronized void init(Configuration conf) {                          
+    public synchronized void innerInit(Configuration conf) throws Exception {                          
       Configuration config = new YarnConfiguration(conf);                            
-      super.init(config);                                                        
+      super.innerInit(config);                                                        
     }                                                                            
 
     /**
@@ -228,7 +229,7 @@ public class MiniYARNCluster extends CompositeService {
       return dirsString;
     }
 
-    public synchronized void start() {
+    public synchronized void innerStart() throws Exception {
       try {
         // create nm-local-dirs and configure them for the nodemanager
         String localDirsString = prepareDirs("local", numLocalDirs);
@@ -268,18 +269,18 @@ public class MiniYARNCluster extends CompositeService {
           // RM could have failed.
           throw new IOException("NodeManager " + index + " failed to start");
         }
-        super.start();
+        super.innerStart();
       } catch (Throwable t) {
         throw new YarnException(t);
       }
     }
 
     @Override
-    public synchronized void stop() {
+    public synchronized void innerStop() throws Exception {
       if (nodeManagers[index] != null) {
         nodeManagers[index].stop();
       }
-      super.stop();
+      super.innerStop();
     }
   }
   
