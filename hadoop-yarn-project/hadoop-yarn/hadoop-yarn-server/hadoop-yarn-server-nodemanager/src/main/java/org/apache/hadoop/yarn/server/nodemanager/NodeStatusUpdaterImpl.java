@@ -109,7 +109,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   }
 
   @Override
-  public synchronized void init(Configuration conf) {
+  protected void innerInit(Configuration conf) {
     this.rmAddress = conf.getSocketAddr(
         YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
         YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_ADDRESS,
@@ -150,7 +150,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   }
 
   @Override
-  public void start() {
+  protected void innerStart() {
 
     // NodeManager is the last service to start, so NodeId is available.
     this.nodeId = this.context.getNodeId();
@@ -159,7 +159,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
       // Registration has to be in start so that ContainerManager can get the
       // perNM tokens needed to authenticate ContainerTokens.
       registerWithRM();
-      super.start();
+      super.innerStart();
       startStatusUpdater();
     } catch (Exception e) {
       String errorMessage = "Unexpected error starting NodeStatusUpdater";
@@ -169,10 +169,10 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   }
 
   @Override
-  public synchronized void stop() {
+  protected void innerStop() throws Exception {
     // Interrupt the updater.
     this.isStopped = true;
-    super.stop();
+    super.innerStop();
   }
 
   protected void rebootNodeStatusUpdater() {
