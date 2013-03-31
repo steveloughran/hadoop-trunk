@@ -107,7 +107,7 @@ public class ApplicationMasterService extends AbstractService implements
   }
 
   @Override
-  public void innerStart() {
+  protected void innerStart() throws Exception {
     Configuration conf = getConfig();
     YarnRPC rpc = YarnRPC.create(conf);
 
@@ -446,7 +446,7 @@ public class ApplicationMasterService extends AbstractService implements
   }
   
   @Override
-  public void innerStop() {
+  protected void innerStop() throws Exception {
     if (this.server != null) {
       this.server.stop();
     }
