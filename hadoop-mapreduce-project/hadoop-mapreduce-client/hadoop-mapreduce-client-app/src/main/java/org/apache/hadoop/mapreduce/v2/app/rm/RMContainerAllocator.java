@@ -153,8 +153,8 @@ public class RMContainerAllocator extends RMContainerRequestor
   }
 
   @Override
-  public void init(Configuration conf) {
-    super.init(conf);
+  protected void innerInit(Configuration conf) throws Exception {
+    super.innerInit(conf);
     reduceSlowStart = conf.getFloat(
         MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 
         DEFAULT_COMPLETED_MAPS_PERCENT_FOR_REDUCE_SLOWSTART);
@@ -173,7 +173,7 @@ public class RMContainerAllocator extends RMContainerRequestor
   }
 
   @Override
-  public void start() {
+  protected void innerStart() throws Exception {
     this.eventHandlingThread = new Thread() {
       @SuppressWarnings("unchecked")
       @Override
@@ -205,7 +205,7 @@ public class RMContainerAllocator extends RMContainerRequestor
       }
     };
     this.eventHandlingThread.start();
-    super.start();
+    super.innerStart();
   }
 
   @Override
@@ -239,13 +239,13 @@ public class RMContainerAllocator extends RMContainerRequestor
   }
 
   @Override
-  public void stop() {
+  protected void innerStop() throws Exception {
     if (stopped.getAndSet(true)) {
       // return if already stopped
       return;
     }
     eventHandlingThread.interrupt();
-    super.stop();
+    super.innerStop();
     scheduleStats.log("Final Stats: ");
   }
 

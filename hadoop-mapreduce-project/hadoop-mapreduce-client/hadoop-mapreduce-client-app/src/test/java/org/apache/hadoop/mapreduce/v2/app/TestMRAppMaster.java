@@ -252,11 +252,11 @@ class MRAppMasterTest extends MRAppMaster {
   }
 
   @Override
-  public void init(Configuration conf) {
+  protected void innerInit(Configuration conf) throws Exception {
     if (overrideInitAndStart) {
       this.conf = conf; 
     } else {
-      super.init(conf);
+      super.innerInit(conf);
     }
   }
   
@@ -276,7 +276,7 @@ class MRAppMasterTest extends MRAppMaster {
   }
 
   @Override
-  public void start() {
+  protected void innerStart() throws Exception {
     if (overrideInitAndStart) {
       try {
         String user = UserGroupInformation.getCurrentUser().getShortUserName();
@@ -285,7 +285,7 @@ class MRAppMasterTest extends MRAppMaster {
         fail(e.getMessage());
       }
     } else {
-      super.start();
+      super.innerStart();
     }
   }
 
