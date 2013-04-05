@@ -298,8 +298,7 @@ public class SwiftTestUtils extends org.junit.Assert {
   /**
    * downgrade a failure to a message and a warning, then an
    * exception for the Junit test runner to mark as failed
-   * @param log log to print to
-   * @param message text medsage
+   * @param message text message
    * @param failure what failed
    * @throws AssumptionViolatedException always
    */

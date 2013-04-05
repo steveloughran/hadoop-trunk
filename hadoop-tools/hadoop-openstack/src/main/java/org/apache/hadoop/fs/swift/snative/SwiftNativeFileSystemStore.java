@@ -83,16 +83,20 @@ public class SwiftNativeFileSystemStore {
   }
 
   /**
-   * Upload a file
+   * Upload a file/input stream of a specific length.
    *
    * @param path        destination path in the swift filesystem
-   * @param inputStream input data
+   * @param inputStream input data. This is closed afterwards, always
    * @param length      length of the data
    * @throws IOException on a problem
    */
   public void uploadFile(Path path, InputStream inputStream, long length)
           throws IOException {
-    swiftRestClient.upload(toObjectPath(path), inputStream, length);
+    try {
+      swiftRestClient.upload(toObjectPath(path), inputStream, length);
+    } finally {
+      inputStream.close();
+    }
   }
 
   /**

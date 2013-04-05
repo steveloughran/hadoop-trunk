@@ -239,7 +239,7 @@ public final class SwiftRestClient {
                               AccessToken authToken) {
     if (LOG.isDebugEnabled()) {
       LOG.debug(String.format("setAuth: endpoint=%s; objectURI=%s; token=%s",
-              endpoint, objectLocation, token));
+              endpoint, objectLocation, authToken));
     }
     synchronized (this) {
       endpointURI = endpoint;
