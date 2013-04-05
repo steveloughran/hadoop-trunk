@@ -118,6 +118,11 @@ public class TestSwiftFileSystemContract
     }
   }
 
+  @Override
+  public void testMkdirsWithUmask() throws Exception {
+    //unsupported
+  }
+
   public void testZeroByteFilesAreFiles() throws Exception {
 //    SwiftTestUtils.unsupported("testZeroByteFilesAreFiles");
   }
