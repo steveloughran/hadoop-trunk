@@ -117,8 +117,7 @@ public class TestSwiftObjectPath {
     assertFalse(p1.toString() + " is a parent of " + p2, p1.isEqualToOrParentOf(
       p2));
   }
-  
-  
+
   @Test
   public void testChildOfProbe() throws Throwable {
     SwiftObjectPath parent = new SwiftObjectPath("container",
@@ -134,7 +133,6 @@ public class TestSwiftObjectPath {
     assertParentOf(parent, child);
     assertParentOf(parent, grandchild);
     assertParentOf(child, grandchild);
-    
     assertParentOf(parent, parent);
     assertNotParentOf(child, parent);
     assertParentOf(child, child);
@@ -151,7 +149,6 @@ public class TestSwiftObjectPath {
     assertParentOf(root, child);
     assertParentOf(root, grandchild);
     assertParentOf(child, grandchild);
-    
     assertParentOf(root, root);
     assertNotParentOf(child, root);
     assertParentOf(child, child);

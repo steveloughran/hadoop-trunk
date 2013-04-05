@@ -35,7 +35,7 @@ import java.io.IOException;
 
 
 /**
- * Test basic filesystem operations. 
+ * Test basic filesystem operations.
  * Many of these are similar to those in {@link TestSwiftFileSystemContract}
  * -this is a JUnit4 test suite used to initially test the Swift
  * component. Once written, there's no reason not to retain these tests.

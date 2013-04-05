@@ -6,9 +6,9 @@
  *  to you under the Apache License, Version 2.0 (the
  *  "License"); you may not use this file except in compliance
  *  with the License.  You may obtain a copy of the License at
- *  
+ *
  *       http://www.apache.org/licenses/LICENSE-2.0
- *  
+ *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -35,7 +35,7 @@ import java.net.URISyntaxException;
 /**
  * This is the full filesystem contract test -which requires the
  * Default config set up to point to a filesystem.
- * 
+ *
  * Some of the tests override the base class tests -these
  * are where SwiftFS does not implement those features, or
  * when the behavior of SwiftFS does not match the normal
@@ -55,7 +55,7 @@ public class TestSwiftFileSystemContract
     try {
       fs.initialize(uri, conf);
     } catch (IOException e) {
-      //FS init failed, set it to null so that teardown doesn't 
+      //FS init failed, set it to null so that teardown doesn't
       //attempt to use it
       fs = null;
       throw e;
@@ -90,7 +90,6 @@ public class TestSwiftFileSystemContract
       fs.mkdirs(testSubDir);
       fail("Should throw IOException.");
     } catch (SwiftNotDirectoryException e) {
-      
       // expected
       assertEquals(filepath,e.getPath());
     }

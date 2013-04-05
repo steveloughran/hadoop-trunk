@@ -35,7 +35,7 @@ import java.io.InputStream;
 class SwiftNativeInputStream extends FSInputStream {
 
   private static final Log LOG = LogFactory.getLog(SwiftNativeInputStream.class);
-  
+
   /**
    * Default buffer size 64mb
    */
@@ -100,7 +100,7 @@ class SwiftNativeInputStream extends FSInputStream {
     bufferOffset = 0;
     SwiftUtils.trace(LOG, "Move: pos=%d bufferOffset=%d", pos, bufferOffset);
   }
-  
+
   @Override
   public synchronized int read() throws IOException {
     int result;
@@ -202,7 +202,6 @@ class SwiftNativeInputStream extends FSInputStream {
       try {
         LOG.debug("chomping ");
         chompBytes(offset);
-  
       } catch (IOException e) {
         //this is assumed to be recoverable with a seek -or more likely to fail
         LOG.debug("while chomping ",e);

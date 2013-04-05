@@ -263,12 +263,12 @@ public class SwiftNativeFileSystem extends FileSystem {
    * directories is <i>Not</i> polled. Instead
    * the tree is walked up from the last to the first,
    * creating directories until one that exists is found.
-   * 
+   *
    * This strategy means if a file is created in an existing directory,
    * one quick poll sufficies.
-   * 
+   *
    * There is a big assumption here: that all parent directories of an existing
-   * directory also exists. 
+   * directory also exists.
    * @param path path to create.
    * @param permission to apply to files
    * @return true if the operation was successful
@@ -298,7 +298,7 @@ public class SwiftNativeFileSystem extends FileSystem {
         forceMkdir(p);
       }
     }
-    
+
     //if an exception was not thrown, this operation is considered
     //a success
     return true;
@@ -307,11 +307,10 @@ public class SwiftNativeFileSystem extends FileSystem {
   private boolean isNotRoot(Path absolutePath) {
     return !isRoot(absolutePath);
   }
-  
+
   private boolean isRoot(Path absolutePath) {
     return absolutePath.getParent() == null;
   }
-
 
   /**
    * internal implementation of directory creation.
@@ -330,7 +329,7 @@ public class SwiftNativeFileSystem extends FileSystem {
   }
 
   /**
-   * Should mkdir create this directory. 
+   * Should mkdir create this directory?
    * If the directory is root : false
    * If the entry exists and is a directory: false
    * If the entry exists and is a file: exception
@@ -350,7 +349,7 @@ public class SwiftNativeFileSystem extends FileSystem {
     try {
       //find out about the path
       fileStatus = getFileStatus(directory);
-      
+
       if (!SwiftUtils.isDirectory(fileStatus)) {
         //if it's a file, raise an error
         throw new SwiftNotDirectoryException(directory,

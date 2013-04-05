@@ -83,12 +83,11 @@ public final class SwiftUtils {
       log.debug(String.format(text, args));
     }
   }
-  
+
   public static void trace(Log log, String text, Object... args) {
     if (log.isTraceEnabled()) {
       log.trace(String.format(text, args));
     }
   }
-  
-  
+
 }
