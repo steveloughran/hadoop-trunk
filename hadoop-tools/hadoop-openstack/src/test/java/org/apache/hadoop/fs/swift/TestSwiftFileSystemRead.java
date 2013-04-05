@@ -73,7 +73,6 @@ public class TestSwiftFileSystemRead extends SwiftFileSystemBaseTest {
     //now find out where it is
     FileStatus status = fs.getFileStatus(filePath);
     BlockLocation[] locations = fs.getFileBlockLocations(status, 0, 10);
-    
   }
 
   /**
@@ -93,5 +92,4 @@ public class TestSwiftFileSystemRead extends SwiftFileSystemBaseTest {
     assertEquals(message,read);
   }
 
-  
 }

@@ -47,7 +47,7 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
   }
 
   /**
-   * Create subdirectories and files under test/ for those tests 
+   * Create subdirectories and files under test/ for those tests
    * that want them. Doing so adds overhead to setup and teardown,
    * so should only be done for those tests that need them.
    * @throws IOException on an IO problem
@@ -117,7 +117,6 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
 
   @Test
   public void testListNonEmptyRoot() throws Throwable {
-    
     Path file = path("/test");
     touch(fs, file);
     FileStatus[] fileStatuses = fs.listStatus(path("/"));

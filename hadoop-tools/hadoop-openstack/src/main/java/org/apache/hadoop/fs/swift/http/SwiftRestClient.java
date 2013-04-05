@@ -156,20 +156,21 @@ public final class SwiftRestClient {
    * Access token (Secret)
    */
   private AccessToken token;
-  
+
   /**
    * Endpoint for swift operations, obtained after authentication
    */
   private URI endpointURI;
-  
+
   /**
    * URI under which objects can be found.
    * This is set when the user is authenticated -the URI
    * is returned in the body of the success response.
    */
   private URI objectLocationURI;
-  
+
   private final URI filesystemURI;
+
   /**
    * The name of the service provider
    */
@@ -194,6 +195,7 @@ public final class SwiftRestClient {
   * the name of a proxy host (can be null, in which case there is no proxy)
    */
   private String proxyHost;
+
   /**
    * The port of a proxy. This is ignored if {@link #proxyHost} is null
    */
