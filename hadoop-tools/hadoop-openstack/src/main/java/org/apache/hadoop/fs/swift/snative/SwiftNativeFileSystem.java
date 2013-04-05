@@ -401,7 +401,7 @@ public class SwiftNativeFileSystem extends FileSystem {
   }
 
   /**
-   * This optional operation is not supported yet
+   * This optional operation is not supported
    */
   public FSDataOutputStream append(Path f, int bufferSize, Progressable progress) throws
           IOException {
