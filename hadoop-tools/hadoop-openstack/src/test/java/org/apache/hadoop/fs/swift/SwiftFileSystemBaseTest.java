@@ -57,7 +57,7 @@ public class SwiftFileSystemBaseTest extends Assert {
     try {
       fs.initialize(uri, conf);
     } catch (IOException e) {
-      //FS init failed, set it to null so that teardown doesn't 
+      //FS init failed, set it to null so that teardown doesn't
       //attempt to use it
       fs = null;
       throw e;

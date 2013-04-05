@@ -318,7 +318,7 @@ public class SwiftTestUtils extends org.junit.Assert {
   public static void unsupported(String message) {
     throw new AssumptionViolatedException(message);
   }
-  
+
   /**
    * report a test has been skipped for some reason
    * @param message message to use in the text
@@ -400,7 +400,7 @@ public class SwiftTestUtils extends org.junit.Assert {
                            Path path) throws IOException {
     writeTextFile(fs, path, null, false);
   }
-  
+
   public static void assertDeleted(FileSystem fs,
                                    Path file,
                                    boolean recursive) throws IOException {
