@@ -48,7 +48,7 @@
         <maven.test.skip>false</maven.test.skip>
       </properties>
     </profile>
-    
+
   </profiles>
 
   <build>
