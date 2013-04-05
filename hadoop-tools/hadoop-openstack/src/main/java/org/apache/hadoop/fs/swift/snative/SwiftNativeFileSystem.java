@@ -91,6 +91,11 @@ public class SwiftNativeFileSystem extends FileSystem {
     return store;
   }
 
+  @Override
+  public String getScheme() {
+    return SWIFT;
+  }
+
   /**
    * default class initialization
    *
