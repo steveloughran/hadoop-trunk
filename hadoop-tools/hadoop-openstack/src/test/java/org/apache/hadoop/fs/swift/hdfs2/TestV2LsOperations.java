@@ -18,18 +18,15 @@
 
 package org.apache.hadoop.fs.swift.hdfs2;
 
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.swift.SwiftFileSystemBaseTest;
-import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.junit.Test;
 
 import java.io.IOException;
-
-import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.skip;
-import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.touch;
 
 public class TestV2LsOperations extends SwiftFileSystemBaseTest {
 
@@ -49,7 +46,7 @@ public class TestV2LsOperations extends SwiftFileSystemBaseTest {
   }
 
   /**
-   * Create subdirectories and files under test/ for those tests 
+   * Create subdirectories and files under test/ for those tests
    * that want them. Doing so adds overhead to setup and teardown,
    * so should only be done for those tests that need them.
    * @throws IOException on an IO problem
@@ -67,33 +64,66 @@ public class TestV2LsOperations extends SwiftFileSystemBaseTest {
   }
 
 
-  public static void assertListFilesFinds(FileSystem fs, Path dir,
-                                          Path subdir) throws IOException {
-    skip("Hadoop 2 only");
-/*    RemoteIterator<LocatedFileStatus> iterator =
-      fs.listFiles(dir, true);
+  /**
+   * To get this project to compile under Hadoop 1, this code needs to be
+   * commented out
+   * 
+   *
+   * @param fs filesystem
+   * @param dir dir
+   * @param subdir subdir
+   * @param recursive recurse?
+   * @throws IOException IO problems
+   */
+  public static void assertListFilesFinds(FileSystem fs,
+                                          Path dir,
+                                          Path subdir,
+                                          boolean recursive) throws IOException {
+    RemoteIterator<LocatedFileStatus> iterator =
+      fs.listFiles(dir, recursive);
     boolean found = false;
+    int entries = 0;
     StringBuilder builder = new StringBuilder();
     while (iterator.hasNext()) {
       LocatedFileStatus next = iterator.next();
+      entries++;
       builder.append(next.toString()).append('\n');
       if (next.getPath().equals(subdir)) {
         found = true;
       }
     }
     assertTrue("Path " + subdir
-               + " not found in directory " + dir + ":" + builder,
-               found);*/
-    
+               + " not found in directory " + dir + " : "
+               + " entries=" + entries
+               + " content"
+               + builder.toString(),
+               found);
   }
 
   @Test
   public void testListFilesRootDir() throws Throwable {
-    createTestSubdirs();
     Path dir = path("/");
     Path child = new Path(dir, "test");
-    assertListFilesFinds(fs, dir, child);
+    SwiftTestUtils.writeTextFile(fs, child, "text", false);
+    assertListFilesFinds(fs, dir, child, false);
   }
 
-  
+  @Test
+  public void testListFilesSubDir() throws Throwable {
+    createTestSubdirs();
+    Path dir = path("/test");
+    Path child = new Path(dir, "text.txt");
+    SwiftTestUtils.writeTextFile(fs, child, "text", false);
+    assertListFilesFinds(fs, dir, child, false);
+  }
+
+  @Test
+  public void testListFilesRecursive() throws Throwable {
+    createTestSubdirs();
+    Path dir = path("/test");
+    Path child = new Path(dir, "hadoop/a/a.txt");
+    SwiftTestUtils.writeTextFile(fs, child, "text", false);
+    assertListFilesFinds(fs, dir, child, true);
+  }
+
 }
