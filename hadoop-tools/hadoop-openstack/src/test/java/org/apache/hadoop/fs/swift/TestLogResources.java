@@ -24,14 +24,17 @@ import org.junit.Test;
 
 import java.net.URL;
 
+/**
+ * This test just debugs which log resources are being picked up
+ */
 public class TestLogResources {
   protected static final Log LOG =
     LogFactory.getLog(TestLogResources.class);
-  
+
   private void printf(String format, Object... args) {
     String msg = String.format(format, args);
-    System.out.printf(msg+"\n");
-    LOG.info(msg);  
+    System.out.printf(msg + "\n");
+    LOG.info(msg);
   }
 
   @Test

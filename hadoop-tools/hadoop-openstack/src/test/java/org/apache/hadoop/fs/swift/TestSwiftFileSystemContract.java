@@ -22,6 +22,7 @@ import junit.framework.AssertionFailedError;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystemContractBaseTest;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.exceptions.SwiftNotDirectoryException;
 import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
@@ -42,16 +43,30 @@ import java.net.URISyntaxException;
  * are being treated as equal.
  */
 public class TestSwiftFileSystemContract
-        extends NativeSwiftFileSystemContractBaseTest {
+        extends FileSystemContractBaseTest {
   private static final Log LOG =
           LogFactory.getLog(TestSwiftFileSystemContract.class);
 
   @Override
+  protected void setUp() throws Exception {
+    final URI uri = getFilesystemURI();
+    final Configuration conf = new Configuration();
+    fs = createSwiftFS();
+    try {
+      fs.initialize(uri, conf);
+    } catch (IOException e) {
+      //FS init failed, set it to null so that teardown doesn't 
+      //attempt to use it
+      fs = null;
+      throw e;
+    }
+    super.setUp();
+  }
+
   protected URI getFilesystemURI() throws URISyntaxException, IOException {
     return SwiftTestUtils.getServiceURI(new Configuration());
   }
 
-  @Override
   protected SwiftNativeFileSystem createSwiftFS() throws IOException {
     SwiftNativeFileSystem swiftNativeFileSystem =
             new SwiftNativeFileSystem();

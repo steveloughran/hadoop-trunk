@@ -18,13 +18,15 @@
 package org.apache.hadoop.fs.swift;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.snative.SwiftFileSystemForFunctionalTests;
 import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
-import org.junit.After;
+
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.*;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -32,12 +34,9 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 /**
- * these tests currently are unit tests, but will be
- * moved to functional/integration tests
+ * Test partitioned uploads
  */
 public class TestSwiftFileSystemPartitionedUploads extends SwiftFileSystemBaseTest {
 
@@ -103,18 +102,20 @@ public class TestSwiftFileSystemPartitionedUploads extends SwiftFileSystemBaseTe
                  3, swiftFS.getPartitionsWritten(out));
 
     assertTrue("Exists", fs.exists(path));
-    assertEquals("Length", len, fs.getFileStatus(path).getLen());
+    FileStatus status = fs.getFileStatus(path);
+    assertEquals("Length", len, status.getLen());
 
-    FSDataInputStream in = fs.open(path);
-    byte[] dest = new byte[len];
-    try {
-      in.readFully(0, dest);
-    } finally {
-      in.close();
-    }
 
+    byte[] dest = readDataset(fs, path, len);
     SwiftTestUtils.compareByteArrays(src, dest, len);
 
+    //now see what block location info comes back. 
+    //This will vary depending on the Swift version, so the results
+    //aren't checked -merely that the test actually worked
+    BlockLocation[] locations = fs.getFileBlockLocations(status, 0, len);
+    assertNotNull("Null getFileBlockLocations()", locations);
+    assertTrue("empty array returned for getFileBlockLocations()",
+               locations.length > 0);
   }
 
 
