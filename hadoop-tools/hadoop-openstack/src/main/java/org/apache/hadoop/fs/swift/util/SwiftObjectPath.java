@@ -146,8 +146,8 @@ public final class SwiftObjectPath {
    * chosen from the host of the URI.
    * A trailing slash can be added to the path. This is the point where
    * these /-es need to be appended, because when you construct a {@link Path}
-   * instance, {@link Path#normalizePath(String)} is called -which strips
-   * off any trailing slash.
+   * instance, {@link Path#normalizePath(String, String)} is called
+   * -which strips off any trailing slash.
    *
    * @param uri              uri to start from
    * @param path             path underneath

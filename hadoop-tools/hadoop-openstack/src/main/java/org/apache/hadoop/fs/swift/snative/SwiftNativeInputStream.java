@@ -83,7 +83,7 @@ class SwiftNativeInputStream extends FSInputStream {
    * Always call from a synchronized clause
    * @param offset offset
    */
-  private void incPos(int offset) {
+  private synchronized void incPos(int offset) {
     pos += offset;
     bufferOffset += offset;
     SwiftUtils.trace(LOG, "Inc: pos=%d bufferOffset=%d", pos, bufferOffset);
@@ -93,7 +93,7 @@ class SwiftNativeInputStream extends FSInputStream {
    * Update the start of the buffer; always call from a sync'd clause
    * @param seekPos position sought.
    */
-  private void updateStartOfBufferPosition(long seekPos) {
+  private synchronized void updateStartOfBufferPosition(long seekPos) {
     //reset the seek pointer
     pos = seekPos;
     //and put the buffer offset to 0
