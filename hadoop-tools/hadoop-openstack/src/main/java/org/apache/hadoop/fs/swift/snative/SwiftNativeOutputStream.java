@@ -109,10 +109,14 @@ class SwiftNativeOutputStream extends OutputStream {
         }
       }
     } finally {
-      if (!backupFile.delete()) {
-        LOG.warn("Could not delete " + backupFile);
-      }
+      delete(backupFile);
       backupStream = null;
+    }
+  }
+
+  private void delete(File file) {
+    if (!file.delete()) {
+      LOG.warn("Could not delete " + file);
     }
   }
 
@@ -146,7 +150,7 @@ class SwiftNativeOutputStream extends OutputStream {
             partNumber,
             new FileInputStream(backupFile),
             backupFile.length());
-    backupFile.delete();
+    delete(backupFile);
     backupFile = newBackupFile();
     backupStream = new BufferedOutputStream(new FileOutputStream(backupFile));
     blockSize = 0;
