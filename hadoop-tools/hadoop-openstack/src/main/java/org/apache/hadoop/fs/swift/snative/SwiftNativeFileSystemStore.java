@@ -46,6 +46,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -332,10 +333,20 @@ public class SwiftNativeFileSystemStore {
     return SwiftObjectPath.fromPath(uri, path);
   }
 
+  /**
+   * Try to find the specific server(s) on which the data lives
+   * @param path path to probe
+   * @return a possibly empty list of locations
+   * @throws IOException on problems determining the locations
+   */
   public List<URI> getObjectLocation(Path path) throws IOException {
     final byte[] objectLocation;
     objectLocation = swiftRestClient.getObjectLocation(toObjectPath(path));
-    return extractUris(new String(objectLocation));
+    if (objectLocation == null || objectLocation.length == 0) {
+      //no object location, return an empty list
+      return new LinkedList<URI>();
+    }
+    return extractUris(new String(objectLocation), path);
   }
 
   /**
@@ -658,16 +669,28 @@ public class SwiftNativeFileSystemStore {
 
   /**
    * extracts URIs from json
-   *
+   * @param json json to parse
+   * @param path path (used in exceptions)
    * @return URIs
+   * @throws SwiftOperationFailedException on any problem parsing the JSON
    */
-  public static List<URI> extractUris(String json) {
+  public static List<URI> extractUris(String json, Path path) throws
+                                                   SwiftOperationFailedException {
     final Matcher matcher = URI_PATTERN.matcher(json);
     final List<URI> result = new ArrayList<URI>();
     while (matcher.find()) {
       final String s = matcher.group();
       final String uri = s.substring(1, s.length() - 1);
-      result.add(URI.create(uri));
+      try {
+        URI createdUri = URI.create(uri);
+        result.add(createdUri);
+      } catch (IllegalArgumentException e) {
+        //failure to create the URI, which means this is bad JSON. Convert
+        //to an exception with useful text
+        throw new SwiftOperationFailedException("Could not convert "+uri 
+        + " into URI -source " + path);
+
+      }
     }
     return result;
   }

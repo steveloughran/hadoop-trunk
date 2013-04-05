@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.fs.swift;
 
+import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.junit.Test;
 
@@ -53,4 +55,43 @@ public class TestSwiftFileSystemRead extends SwiftFileSystemBaseTest {
     }
   }
 
+  /**
+   * Read and write some JSON
+   * @throws IOException
+   */
+  @Test
+  public void testRWJson() throws IOException {
+    final String message = "{" +
+                           " 'json': { 'i':43, 'b':true}," +
+                           " 's':'string'" +
+                           "}";
+    final Path filePath = new Path("/test/file.json");
+
+    writeTextFile(fs, filePath, message, false);
+    String readJson = readBytesToString(fs, filePath, message.length());
+    assertEquals(message,readJson);
+    //now find out where it is
+    FileStatus status = fs.getFileStatus(filePath);
+    BlockLocation[] locations = fs.getFileBlockLocations(status, 0, 10);
+    
+  }
+
+  /**
+   * Read and write some XML
+   * @throws IOException
+   */
+  @Test
+  public void testRWXML() throws IOException {
+    final String message = "<x>" +
+                           " <json i='43' 'b'=true/>" +
+                           " string" +
+                           "</x>";
+    final Path filePath = new Path("/test/file.xml");
+
+    writeTextFile(fs, filePath, message, false);
+    String read = readBytesToString(fs, filePath, message.length());
+    assertEquals(message,read);
+  }
+
+  
 }
