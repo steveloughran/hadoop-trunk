@@ -22,6 +22,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
@@ -44,8 +45,10 @@ public class TestSwiftFileSystemConcurrency extends SwiftFileSystemBaseTest {
    * test on concurrent file system changes
    */
   @Test
+  
   public void testRaceConditionOnDirDeleteTest() throws Exception {
-
+    SwiftTestUtils.skip("Skipping unreliable test");
+    
     final String message = "message";
     final Path fileToRead = new Path("/test/huge/files/many-files/file");
     final ExecutorService executorService = Executors.newFixedThreadPool(2);

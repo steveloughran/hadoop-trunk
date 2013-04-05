@@ -178,8 +178,11 @@ public class SwiftTestUtils extends org.junit.Assert {
       throws IOException {
     FSDataInputStream in = fs.open(path);
     byte[] dest = new byte[len];
-    in.readFully(0, dest);
-    in.close();
+    try {
+      in.readFully(0, dest);
+    } finally {
+      in.close();
+    }
     return dest;
   }
 

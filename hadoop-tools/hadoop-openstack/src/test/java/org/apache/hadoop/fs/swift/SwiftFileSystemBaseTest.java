@@ -229,7 +229,6 @@ public class SwiftFileSystemBaseTest extends Assert {
     SwiftTestUtils.assertIsFile(fs, filename);
   }
 
-
   /**
    * Assert that a file exists and whose {@link FileStatus} entry
    * declares that this is a file and not a symlink or directory.
@@ -239,7 +238,6 @@ public class SwiftFileSystemBaseTest extends Assert {
   protected void mkdirs(Path path) throws IOException {
     assertTrue("Failed to mkdir" + path, fs.mkdirs(path));
   }
-
 
   protected void assertDeleted(Path file, boolean recursive) throws IOException {
     SwiftTestUtils.assertDeleted(fs, file, recursive);

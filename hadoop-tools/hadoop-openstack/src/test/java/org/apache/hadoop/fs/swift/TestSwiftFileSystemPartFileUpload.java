@@ -59,7 +59,7 @@ public class TestSwiftFileSystemPartFileUpload {
             new SwiftFileSystemForFunctionalTests();
     fs.initialize(uri, conf);
 
-    final Path f = new Path("/home/huge/file/test/file");
+    final Path f = new Path("/test/huge/file/test/file");
     final FSDataOutputStream fsDataOutputStream =
             fs.create(f);
 
