@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.http.RestClientBindings;
+import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.junit.Test;
 
@@ -96,6 +97,11 @@ public class TestSwiftFileSystemExtendedContract extends SwiftFileSystemBaseTest
     RestClientBindings.bind(fsURI, conf);
   }
 
+  @Test
+  public void testGetSchemeImplemented() throws Throwable {
+    String scheme = fs.getScheme();
+    assertEquals(SwiftNativeFileSystem.SWIFT,scheme);
+  }
 
   /**
    * Assert that a filesystem is case sensitive.
