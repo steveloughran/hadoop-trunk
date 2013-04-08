@@ -18,33 +18,84 @@
 
 package org.apache.hadoop.fs.swift.http;
 
-import org.apache.http.HttpHeaders;
-
 /**
  * Constants used in the Swift REST protocol,
  * and in the properties used to configure the {@link SwiftRestClient}.
  */
 public class SwiftProtocolConstants {
+  /**
+   * Swift-specific header for authentication: {@value}
+   */
   public static final String HEADER_AUTH_KEY = "X-Auth-Token";
+
+  /**
+   * Default port used by Swift for HTTP
+   */
   public static final int SWIFT_HTTP_PORT = 8080;
+
+  /**
+   * Default port used by Swift Auth for HTTPS
+   */
   public static final int SWIFT_HTTPS_PORT = 443;
+
+  /** HTTP standard {@value} header */
   public static final String HEADER_RANGE = "Range";
+
+  /** HTTP standard {@value} header */
   public static final String HEADER_DESTINATION = "Destination";
+
+  /** HTTP standard {@value} header */
   public static final String HEADER_LAST_MODIFIED = "Last-Modified";
+
+  /** HTTP standard {@value} header */
   public static final String HEADER_CONTENT_LENGTH = "Content-Length";
+
+  /**
+   * Patten for range headers
+   */
   public static final String SWIFT_RANGE_HEADER_FORMAT_PATTERN = "bytes=%d-%d";
+
+  /**
+   *  section in the JSON catalog provided after auth listing the swift FS:
+   *  {@value}
+   */
   public static final String SERVICE_CATALOG_SWIFT = "swift";
+  /**
+   *  section in the JSON catalog provided after auth listing the cloudfiles;
+   * this is an alternate catalog entry name
+   *  {@value}
+   */
   public static final String SERVICE_CATALOG_CLOUD_FILES = "cloudFiles";
+  /**
+   *  section in the JSON catalog provided after auth listing the object store;
+   * this is an alternate catalog entry name
+   *  {@value}
+   */
   public static final String SERVICE_CATALOG_OBJECT_STORE = "object-store";
+
+  /**
+   * entry in the swift catalog defining the prefix used to talk to objects
+   *  {@value}
+   */
   public static final String SWIFT_OBJECT_AUTH_ENDPOINT =
           "/object_endpoint/";
+  /**
+   * Swift-specific header: object manifest used in the final upload
+   * of a multipart operation: {@value}
+   */
   public static final String X_OBJECT_MANIFEST = "X-Object-Manifest";
+  /**
+   * Swift-specific header -#of objects in a container: {@value}
+   */
   public static final String X_CONTAINER_OBJECT_COUNT =
           "X-Container-Object-Count";
+  /**
+   * Swift-specific header: no. of bytes used in a container {@value}
+   */
   public static final String X_CONTAINER_BYTES_USED = "X-Container-Bytes-Used";
 
   /**
-   * Header to set when requesting the latest version of a file
+   * Header to set when requesting the latest version of a file: : {@value}
    */
   public static final String X_NEWEST = "X-Newest";
 
@@ -85,6 +136,7 @@ public class SwiftProtocolConstants {
   public static final String DOT_APIKEY = ".apikey";
   public static final String DOT_HTTP_PORT = ".http.port";
   public static final String DOT_HTTPS_PORT = ".https.port";
+  public static final String DOT_LOCATION_AWARE = ".location-aware";
   public static final String DOT_REGION = ".region";
   public static final String DOT_PROXY_HOST = ".proxy.host";
   public static final String DOT_PROXY_PORT = ".proxy.port";
@@ -104,6 +156,8 @@ public class SwiftProtocolConstants {
   public static final String SWIFT_HTTP_PORT_PROPERTY = FS_SWIFT + DOT_HTTP_PORT;
   public static final String SWIFT_HTTPS_PORT_PROPERTY = FS_SWIFT
           + DOT_HTTPS_PORT;
+  public static final String SWIFT_LOCATION_AWARE_PROPERTY = FS_SWIFT +
+                                                        DOT_LOCATION_AWARE;
   public static final String SWIFT_REGION_PROPERTY = FS_SWIFT + DOT_REGION;
   public static final String SWIFT_PUBLIC_PROPERTY = FS_SWIFT + DOT_PUBLIC;
 
