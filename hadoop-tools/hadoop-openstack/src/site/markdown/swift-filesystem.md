@@ -158,6 +158,9 @@ Alternatively, the JAR can be included as one of the JAR files that an
 application uses. This lets the Hadoop jobs work with a Swift object store even
 if the Hadoop cluster is not pre-configured for this.
 
+The library also depends upon the Apache HttpComponents library, which
+must also be on the classpath.
+
 Other applications may use the Swift Filesystem library, by way of the Hadoop
 filesystem APIs. This allows programs which interact with a Hadoop cluster to
 also read and write data in a Swift object store.
