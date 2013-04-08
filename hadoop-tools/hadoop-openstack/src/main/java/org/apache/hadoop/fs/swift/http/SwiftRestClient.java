@@ -50,7 +50,6 @@ import org.apache.hadoop.fs.swift.auth.entities.Endpoint;
 import org.apache.hadoop.fs.swift.exceptions.SwiftAuthenticationFailedException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftBadRequestException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException;
-import org.apache.hadoop.fs.swift.exceptions.SwiftConnectionException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftInternalStateException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftInvalidResponseException;
@@ -200,6 +199,7 @@ public final class SwiftRestClient {
    * The port of a proxy. This is ignored if {@link #proxyHost} is null
    */
   private int proxyPort;
+  private final boolean locationAware;
 
   /**
    * objects query endpoint. This is synchronized
@@ -436,6 +436,8 @@ public final class SwiftRestClient {
     //proxy options
     proxyHost = props.getProperty(SWIFT_PROXY_HOST_PROPERTY, null);
     proxyPort = getIntOption(props, SWIFT_PROXY_PORT_PROPERTY, 8080);
+    locationAware = "true".equals(
+      props.getProperty(SWIFT_LOCATION_AWARE_PROPERTY, "false"));
 
     if (LOG.isDebugEnabled()) {
       //everything you need for diagnostics. The password is omitted.
@@ -595,6 +597,10 @@ public final class SwiftRestClient {
    */
   public byte[] getObjectLocation(SwiftObjectPath path,
                                   final Header... requestHeaders) throws IOException {
+    if(!isLocationAware()) {
+      //if the filesystem is not location aware, do not ask for this information
+      return null;
+    }
     preRemoteCommand("getObjectLocation");
     try {
       return perform(pathToObjectLocation(path),
@@ -1555,5 +1561,47 @@ public final class SwiftRestClient {
   @Override
   public String toString() {
     return "SwiftRestClient: " + filesystemURI;
+  }
+
+  /**
+   * Get the region which this client is bound to
+   * @return the region
+   */
+  public String getRegion() {
+    return region;
+  }
+
+  /**
+   * Get the tenant to which this client is bound
+   * @return the tenant
+   */
+  public String getTenant() {
+    return tenant;
+  }
+
+  /**
+   * Get the username this client identifies itself as
+   * @return the username
+   */
+  public String getUsername() {
+    return username;
+  }
+
+  /**
+   * Get the container to which this client is bound
+   * @return the container
+   */
+  public String getContainer() {
+    return container;
+  }
+
+  /**
+   * Is this client bound to a location aware Swift blobstore
+   * -that is, can you query for the location of partitions
+   * @return true iff the location of multipart file uploads
+   * can be determined.
+   */
+  public boolean isLocationAware() {
+    return locationAware;
   }
 }
