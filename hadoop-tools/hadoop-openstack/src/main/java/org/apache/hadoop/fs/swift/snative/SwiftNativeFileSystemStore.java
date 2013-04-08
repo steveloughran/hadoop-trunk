@@ -691,9 +691,12 @@ public class SwiftNativeFileSystemStore {
       } catch (IllegalArgumentException e) {
         //failure to create the URI, which means this is bad JSON. Convert
         //to an exception with useful text
-        throw new SwiftOperationFailedException("Could not convert "+uri
-        + " into URI -source " + path);
-
+        throw new SwiftOperationFailedException(
+          String.format(
+            "could not convert \"%s\" into a URI." +
+            " source: %s " +
+            " first JSON: %s",
+            uri, path, json.substring(0, 256)));
       }
     }
     return result;

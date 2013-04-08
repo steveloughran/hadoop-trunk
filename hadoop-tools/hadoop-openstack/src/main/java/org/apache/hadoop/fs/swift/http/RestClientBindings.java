@@ -154,9 +154,9 @@ public final class RestClientBindings {
     copy(conf, prefix +
             DOT_HTTPS_PORT, props, SWIFT_HTTPS_PORT_PROPERTY, false);
 
-    //boolean value
-    boolean isPublicURL = conf.getBoolean(prefix + DOT_PUBLIC, false);
-    props.setProperty(SWIFT_PUBLIC_PROPERTY, Boolean.toString(isPublicURL));
+    copyBool(conf, prefix + DOT_PUBLIC, props, SWIFT_PUBLIC_PROPERTY, false);
+    copyBool(conf, prefix + DOT_LOCATION_AWARE, props,
+             SWIFT_LOCATION_AWARE_PROPERTY, false);
 
     // copy in parameters that apply to all services
     copy(conf, SWIFT_CONNECTION_TIMEOUT, props, SWIFT_CONNECTION_TIMEOUT, false);
@@ -164,6 +164,23 @@ public final class RestClientBindings {
 
     return props;
 
+  }
+
+  /**
+   * Extract a boolean value from the configuration and copy it to the 
+   * @param conf     source configuration
+   * @param confKey  key in the configuration file
+   * @param props    destination property set
+   * @param propsKey key in the property set
+   * @param defVal default value
+   */
+  private static void copyBool(Configuration conf,
+                               String confKey,
+                               Properties props,
+                               String propsKey,
+                               boolean defVal) {
+    boolean b = conf.getBoolean(confKey, defVal);
+    props.setProperty(propsKey, Boolean.toString(b));
   }
 
   private static void set(Properties props, String key, String optVal) {
@@ -182,18 +199,18 @@ public final class RestClientBindings {
    * it will remain untouched.
    *
    * @param conf     source configuration
-   * @param confkey  key in the configuration file
+   * @param confKey  key in the configuration file
    * @param props    destination property set
    * @param propsKey key in the property set
    * @param required is the property required
    * @throws SwiftConfigurationException if the property is required but was
    *                                     not found in the configuration instance.
    */
-  public static void copy(Configuration conf, String confkey, Properties props,
+  public static void copy(Configuration conf, String confKey, Properties props,
                           String propsKey,
                           boolean required) throws SwiftConfigurationException {
     //TODO: replace. version compatibility issue conf.getTrimmed fails with NoSuchMethodError
-    String val = conf.get(confkey);
+    String val = conf.get(confKey);
     if (val != null) {
       val = val.trim();
     }
@@ -201,7 +218,7 @@ public final class RestClientBindings {
       throw new SwiftConfigurationException(
               "Missing mandatory configuration option: "
                       +
-                      confkey);
+                      confKey);
     }
     set(props, propsKey, val);
   }
