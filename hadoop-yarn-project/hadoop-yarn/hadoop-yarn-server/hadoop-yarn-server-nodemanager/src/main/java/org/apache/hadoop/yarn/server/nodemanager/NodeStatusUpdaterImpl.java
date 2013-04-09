@@ -150,7 +150,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   }
 
   @Override
-  protected void innerStart() {
+  protected void innerStart() throws Exception {
 
     // NodeManager is the last service to start, so NodeId is available.
     this.nodeId = this.context.getNodeId();
@@ -166,6 +166,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
       LOG.error(errorMessage, e);
       throw new YarnRuntimeException(e);
     }
+    super.innerStart();
   }
 
   @Override
