@@ -173,7 +173,7 @@ versions of HDFS]
 
 * If `append()` is implemented, each individual `append()` operation SHOULD be atomic.
 
-* Only one writer can write to a file (ISSUE: does anything in MR/HBase use this for locks?)
+* A file may have multiple writers and each writers only guarantee on consistency is during a sync(...) call.
 
 * `FileSystem.listStatus()` does not appear to contain any claims of atomicity,
   though some uses in the MapReduce codebase (such as `FileOutputCommitter`) do
