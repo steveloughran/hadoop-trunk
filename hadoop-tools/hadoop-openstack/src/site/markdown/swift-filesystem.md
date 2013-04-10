@@ -56,7 +56,7 @@ read and write data to and from instances of the OpenStack Swift object store.
 ## Concepts: services and containers
 
 OpenStack swift is an *Object Store*; also known as a *blobstore*. It stores
-arbitrary binary objects by name in a *container*. 
+arbitrary binary objects by name in a *container*.
 
 The Hadoop Swift filesystem library adds another concept, the *service*, which
 defines which Swift blobstore hosts a container -and how to connect to it.
@@ -312,7 +312,7 @@ The property has a unit of kilobytes; the default value is `32*1024*1024`: 32 MB
 
 Note that the mapreduce engine's split logic can be tuned independently by setting
 the `mapred.min.split.size` and `mapred.max.split.size` properties,
-which can be done in specific job configurations. 
+which can be done in specific job configurations.
 
     <property>
       <name>mapred.min.split.size</name>

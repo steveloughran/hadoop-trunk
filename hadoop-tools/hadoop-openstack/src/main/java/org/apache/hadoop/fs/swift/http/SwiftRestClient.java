@@ -145,7 +145,7 @@ public final class SwiftRestClient {
    * The authentication request used to authenticate with Swift
    */
   private final AuthenticationRequest authRequest;
-  
+
   /**
    * The container this client is working with
    */
@@ -210,7 +210,7 @@ public final class SwiftRestClient {
    * The blocksize of this FS
    */
   private long blocksize;
-  
+
   /**
    * objects query endpoint. This is synchronized
    * to handle a simultaneous update of all auth data in one
