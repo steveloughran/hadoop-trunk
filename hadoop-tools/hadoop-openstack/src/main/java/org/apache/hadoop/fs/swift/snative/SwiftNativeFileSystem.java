@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.swift.exceptions.SwiftNotDirectoryException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftOperationFailedException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftPathExistsException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftUnsupportedFeatureException;
+import org.apache.hadoop.fs.swift.http.SwiftProtocolConstants;
 import org.apache.hadoop.fs.swift.util.SwiftObjectPath;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
 import org.apache.hadoop.util.Progressable;
@@ -112,8 +113,9 @@ public class SwiftNativeFileSystem extends FileSystem {
       store = new SwiftNativeFileSystemStore();
     }
     this.uri = fsuri;
-    this.workingDir = new Path("/user",
-            System.getProperty("user.name")).makeQualified(uri, new Path(System.getProperty("user.name")));
+    String username = System.getProperty("user.name");
+    this.workingDir = new Path("/user", username)
+      .makeQualified(uri, new Path(username));
     if (LOG.isDebugEnabled()) {
       LOG.debug("Initializing SwiftNativeFileSystem against URI " + uri
               + " and working dir " + workingDir);
@@ -170,10 +172,31 @@ public class SwiftNativeFileSystem extends FileSystem {
     return store.getObjectMetadata(f);
   }
 
+  /**
+   * The blocksize of this filesystem is set by the property
+   * {@link SwiftProtocolConstants#SWIFT_BLOCKSIZE};
+   * the default is the value of 
+   * {@link SwiftProtocolConstants#DEFAULT_SWIFT_BLOCKSIZE};
+   * @return the blocksize for this FS.
+   */
+  @Override
+  public long getDefaultBlockSize() {
+    return store.getDefaultBlocksize();
+  }
+
+  /**
+   * The blocksize for this filesystem. 
+   * @see #getDefaultBlockSize() 
+   * @param f path of file
+   * @return
+   */
+  @Override
+  public long getDefaultBlockSize(Path f) {
+    return store.getDefaultBlocksize();
+  }
 
   @Override
   public boolean isFile(Path f) throws IOException {
-
     try {
       FileStatus fileStatus = getFileStatus(f);
       return !SwiftUtils.isDirectory(fileStatus);

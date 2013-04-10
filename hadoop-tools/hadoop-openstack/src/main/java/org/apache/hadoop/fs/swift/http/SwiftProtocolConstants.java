@@ -106,16 +106,27 @@ public class SwiftProtocolConstants {
   public static final String SWIFT_SERVICE_PREFIX = FS_SWIFT + ".service.";
 
   /**
-   * timeout for all connections
+   * timeout for all connections: {@value}
    */
   public static final String SWIFT_CONNECTION_TIMEOUT =
           FS_SWIFT + ".connect.timeout";
 
   /**
-   * connection retry count for all connections
+   * connection retry count for all connections: {@value}
    */
   public static final String SWIFT_RETRY_COUNT =
           FS_SWIFT + "connect.retry.count";
+
+  /**
+   * blocksize for all filesystems: {@value}
+   */
+  public static final String SWIFT_BLOCKSIZE =
+          FS_SWIFT + "blocksize";
+
+  /**
+   * the default blocksize for filesystems: {@value}
+   */
+  public static final long DEFAULT_SWIFT_BLOCKSIZE = 32 * 1024 * 1024;
 
   /**
    * Key for passing the service name as a property -not read from the

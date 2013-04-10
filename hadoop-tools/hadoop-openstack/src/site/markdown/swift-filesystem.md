@@ -287,6 +287,50 @@ A reference to this service would use the `hpcloud` service name:
 Some configuration options apply to the Swift client, independent of
 the specific Swift filesystem chosen.
 
+#### Blocksize `fs.swift.blocksize`
+
+Swift does not break up files into blocks, except in the special case of files
+over 5GB in length. Accordingly, there isn't a notion of a "block size"
+to define where the data is kept.
+
+Hadoop's MapReduce layer depends on files declaring their block size,
+so that it knows how to partition work. Too small a blocksize means that
+many mappers work on small pieces of data; too large a block size means
+that only a few mappers get started.
+
+The block size value reported by Swift, therefore, controls the basic workload
+partioning of the MapReduce engine -and can be an important parameter to
+tune for performance of the cluster.
+
+The property has a unit of kilobytes; the default value is `32*1024*1024`: 32 MB
+
+    <property>
+      <name>fs.swift.blocksize</name>
+      <value>33554432</value>
+    </property>
+
+
+Note that the mapreduce engine's split logic can be tuned independently by setting
+the `mapred.min.split.size` and `mapred.max.split.size` properties,
+which can be done in specific job configurations. 
+
+    <property>
+      <name>mapred.min.split.size</name>
+      <value>524288</value>
+    </property>
+
+    <property>
+      <name>mapred.max.split.size</name>
+      <value>1048576</value>
+    </property>
+
+in a pig script, these properties would be set as:
+
+    mapred.min.split.size 524288
+    mapred.max.split.size 1048576
+
+
+
 #### Connection timeout `fs.swift.connect.timeout`
 
 This sets the timeout in milliseconds to connect to a Swift service.
