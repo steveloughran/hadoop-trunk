@@ -161,6 +161,7 @@ public final class RestClientBindings {
     // copy in parameters that apply to all services
     copy(conf, SWIFT_CONNECTION_TIMEOUT, props, SWIFT_CONNECTION_TIMEOUT, false);
     copy(conf, SWIFT_RETRY_COUNT, props, SWIFT_RETRY_COUNT, false);
+    copy(conf, SWIFT_BLOCKSIZE, props, SWIFT_BLOCKSIZE, false);
 
     return props;
 

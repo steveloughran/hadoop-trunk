@@ -181,7 +181,7 @@ public class SwiftNativeFileSystem extends FileSystem {
    */
   @Override
   public long getDefaultBlockSize() {
-    return store.getDefaultBlocksize();
+    return store.getBlocksize();
   }
 
   /**
@@ -192,7 +192,7 @@ public class SwiftNativeFileSystem extends FileSystem {
    */
   @Override
   public long getDefaultBlockSize(Path f) {
-    return store.getDefaultBlocksize();
+    return store.getBlocksize();
   }
 
   @Override
