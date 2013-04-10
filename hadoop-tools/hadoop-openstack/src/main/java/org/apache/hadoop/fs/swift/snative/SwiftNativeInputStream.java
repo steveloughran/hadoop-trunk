@@ -30,16 +30,21 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * Wrapper for input stream
+ * The input stream from remote Swift blobs.
+ * The class attempts to be buffer aware, and react to a forward seek operation
+ * by trying to scan ahead through the current block of data to find it.
+ * This accelerates some operations that do a lot of seek()/read() actions,
+ * including work (such as in the MR engine) that do a seek() immediately after
+ * an open(). 
  */
 class SwiftNativeInputStream extends FSInputStream {
 
   private static final Log LOG = LogFactory.getLog(SwiftNativeInputStream.class);
 
   /**
-   * Default buffer size 64mb
+   *  range requested off the server: {@value}
    */
-  private static final long BUFFER_SIZE = 64 * 1024 * 1024;
+  private static final long RANGE_SIZE = 64 * 1024 * 1024;
 
   /**
    * File nativeStore instance
@@ -66,7 +71,10 @@ class SwiftNativeInputStream extends FSInputStream {
    */
   private long pos = 0;
 
-  private long bufferOffset = 0;
+  /**
+   * Offset in the range requested last 
+   */
+  private long rangeOffset = 0;
 
   public SwiftNativeInputStream(SwiftNativeFileSystemStore storeNative,
                                 FileSystem.Statistics statistics,
@@ -85,8 +93,8 @@ class SwiftNativeInputStream extends FSInputStream {
    */
   private synchronized void incPos(int offset) {
     pos += offset;
-    bufferOffset += offset;
-    SwiftUtils.trace(LOG, "Inc: pos=%d bufferOffset=%d", pos, bufferOffset);
+    rangeOffset += offset;
+    SwiftUtils.trace(LOG, "Inc: pos=%d bufferOffset=%d", pos, rangeOffset);
   }
 
   /**
@@ -97,8 +105,8 @@ class SwiftNativeInputStream extends FSInputStream {
     //reset the seek pointer
     pos = seekPos;
     //and put the buffer offset to 0
-    bufferOffset = 0;
-    SwiftUtils.trace(LOG, "Move: pos=%d bufferOffset=%d", pos, bufferOffset);
+    rangeOffset = 0;
+    SwiftUtils.trace(LOG, "Move: pos=%d bufferOffset=%d", pos, rangeOffset);
   }
 
   @Override
@@ -162,6 +170,16 @@ class SwiftNativeInputStream extends FSInputStream {
     }
   }
 
+  /**
+   * Read through the specified number of bytes.
+   * The implementation iterates a byte a time, which may seem inefficient
+   * compared to the read(bytes[]) method offered by input streams.
+   * However, if you look at the code that implements that method, it comes
+   * down to read() one char at a time -only here the return value is discarded.
+   * @param bytes number of bytes to read.
+   * @throws IOException IO problems
+   * @throws SwiftException if a read returned -1.
+   */
   private void chompBytes(long bytes) throws IOException {
     int result;
     for (long i = 0; i < bytes; i++) {
@@ -191,14 +209,14 @@ class SwiftNativeInputStream extends FSInputStream {
       return;
     }
 
-    if (bufferOffset + offset < BUFFER_SIZE) {
+    if (rangeOffset + offset < RANGE_SIZE) {
       //if the seek is in  range of that requested, scan forwards
       //instead of closing and re-opening a new HTTP connection
       SwiftUtils.debug(LOG,
                        "seek is within current stream"
                        + "; pos= %d ; targetPos=%d; "
                        + "offset= %d ; bufferOffset=%d",
-                       pos, targetPos, offset, bufferOffset);
+                       pos, targetPos, offset, rangeOffset);
       try {
         LOG.debug("chomping ");
         chompBytes(offset);
@@ -214,7 +232,7 @@ class SwiftNativeInputStream extends FSInputStream {
     }
 
     close();
-    in = nativeStore.getObject(path, targetPos, targetPos + BUFFER_SIZE);
+    in = nativeStore.getObject(path, targetPos, targetPos + RANGE_SIZE);
     this.pos = targetPos;
   }
 
