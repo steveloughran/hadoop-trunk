@@ -199,8 +199,18 @@ public final class SwiftRestClient {
    * The port of a proxy. This is ignored if {@link #proxyHost} is null
    */
   private int proxyPort;
+
+  /**
+   * Flag to indicate whether or not the client should
+   * query for file location data.
+   */
   private final boolean locationAware;
 
+  /**
+   * The blocksize of this FS
+   */
+  private long blocksize;
+  
   /**
    * objects query endpoint. This is synchronized
    * to handle a simultaneous update of all auth data in one
@@ -439,6 +449,16 @@ public final class SwiftRestClient {
     locationAware = "true".equals(
       props.getProperty(SWIFT_LOCATION_AWARE_PROPERTY, "false"));
 
+    blocksize = getLongOption(props,
+                              SwiftProtocolConstants.SWIFT_BLOCKSIZE,
+                              SwiftProtocolConstants.DEFAULT_SWIFT_BLOCKSIZE);
+    if (blocksize <= 0) {
+      throw new SwiftConfigurationException("Invalid blocksize set in"
+                                            +
+                                            SwiftProtocolConstants.SWIFT_BLOCKSIZE
+                                            + ": " + blocksize);
+    }
+
     if (LOG.isDebugEnabled()) {
       //everything you need for diagnostics. The password is omitted.
       LOG.debug(String.format(
@@ -497,6 +517,26 @@ public final class SwiftRestClient {
     String val = props.getProperty(key, Integer.toString(def));
     try {
       return Integer.decode(val);
+    } catch (NumberFormatException e) {
+      throw new SwiftConfigurationException("Failed to parse (numeric) value" +
+              " of property" + key
+              + " : " + val, e);
+    }
+  }
+  /**
+   * Get an integer option from the property object
+   * @param props property object
+   * @param key configuration
+   * @param def default value
+   * @return the value in the property file, or the default.
+   * @throws SwiftConfigurationException if the property file-supplied
+   * value cannot be parsed to an integer
+   */
+  private long getLongOption(Properties props, String key, long def) throws
+          SwiftConfigurationException {
+    String val = props.getProperty(key, Long.toString(def));
+    try {
+      return Long.decode(val);
     } catch (NumberFormatException e) {
       throw new SwiftConfigurationException("Failed to parse (numeric) value" +
               " of property" + key
@@ -1603,5 +1643,13 @@ public final class SwiftRestClient {
    */
   public boolean isLocationAware() {
     return locationAware;
+  }
+
+  /**
+   * Get the blocksize of this filesystem
+   * @return a blocksize >0
+   */
+  public long getBlocksize() {
+    return blocksize;
   }
 }

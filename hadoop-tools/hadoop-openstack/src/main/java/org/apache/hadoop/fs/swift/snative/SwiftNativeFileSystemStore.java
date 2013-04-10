@@ -62,7 +62,6 @@ public class SwiftNativeFileSystemStore {
           LogFactory.getLog(SwiftNativeFileSystemStore.class);
   private URI uri;
   private SwiftRestClient swiftRestClient;
-  private long defaultBlocksize;
 
   /**
    * Initalize the filesystem store -this creates the REST client binding.
@@ -75,9 +74,6 @@ public class SwiftNativeFileSystemStore {
   public void initialize(URI fsURI, Configuration configuration) throws IOException {
     this.uri = fsURI;
     this.swiftRestClient = SwiftRestClient.getInstance(fsURI, configuration);
-    defaultBlocksize = configuration.getLong(
-      SwiftProtocolConstants.SWIFT_BLOCKSIZE,
-      SwiftProtocolConstants.DEFAULT_SWIFT_BLOCKSIZE);
   }
 
   @Override
@@ -91,8 +87,8 @@ public class SwiftNativeFileSystemStore {
    * @return the blocksize returned for all FileStatus queries,
    * which is used by the MapReduce splitter.
    */
-  public long getDefaultBlocksize() {
-    return defaultBlocksize;
+  public long getBlocksize() {
+    return swiftRestClient.getBlocksize();
   }
 
   /**
@@ -203,7 +199,7 @@ public class SwiftNativeFileSystemStore {
     return new SwiftFileStatus(length,
                                isDir,
                                0,
-                               defaultBlocksize,
+                               getBlocksize(),
                                lastModified,
                                correctSwiftPath);
   }

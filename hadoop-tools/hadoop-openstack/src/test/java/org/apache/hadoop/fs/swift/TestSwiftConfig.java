@@ -93,6 +93,27 @@ public class TestSwiftConfig {
     mkInstance(configuration);
   }
 
+  @Test(expected = org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException.class)
+  public void testZeroBlocksize() throws Exception {
+    final Configuration configuration = createCoreConfig();
+    configuration.set(SWIFT_BLOCKSIZE, "0");
+    mkInstance(configuration);
+  }
+
+  @Test(expected = org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException.class)
+  public void testNegativeBlocksize() throws Exception {
+    final Configuration configuration = createCoreConfig();
+    configuration.set(SWIFT_BLOCKSIZE, "-1");
+    mkInstance(configuration);
+  }
+
+  @Test
+  public void testPositiveBlocksize() throws Exception {
+    final Configuration configuration = createCoreConfig();
+    configuration.set(SWIFT_BLOCKSIZE, "1");
+    mkInstance(configuration);
+  }
+
   private Configuration createCoreConfig() {
     final Configuration configuration = new Configuration();
     set(configuration, DOT_AUTH_URL, "http://localhost:8080");
