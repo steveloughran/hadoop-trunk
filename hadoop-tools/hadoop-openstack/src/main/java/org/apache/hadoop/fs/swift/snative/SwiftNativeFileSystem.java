@@ -175,7 +175,7 @@ public class SwiftNativeFileSystem extends FileSystem {
   /**
    * The blocksize of this filesystem is set by the property
    * {@link SwiftProtocolConstants#SWIFT_BLOCKSIZE};
-   * the default is the value of 
+   * the default is the value of
    * {@link SwiftProtocolConstants#DEFAULT_SWIFT_BLOCKSIZE};
    * @return the blocksize for this FS.
    */
@@ -185,10 +185,10 @@ public class SwiftNativeFileSystem extends FileSystem {
   }
 
   /**
-   * The blocksize for this filesystem. 
-   * @see #getDefaultBlockSize() 
+   * The blocksize for this filesystem.
+   * @see #getDefaultBlockSize()
    * @param f path of file
-   * @return
+   * @return the blocksize for the path
    */
   @Override
   public long getDefaultBlockSize(Path f) {

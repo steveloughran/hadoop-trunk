@@ -35,7 +35,7 @@ import java.io.InputStream;
  * by trying to scan ahead through the current block of data to find it.
  * This accelerates some operations that do a lot of seek()/read() actions,
  * including work (such as in the MR engine) that do a seek() immediately after
- * an open(). 
+ * an open().
  */
 class SwiftNativeInputStream extends FSInputStream {
 
