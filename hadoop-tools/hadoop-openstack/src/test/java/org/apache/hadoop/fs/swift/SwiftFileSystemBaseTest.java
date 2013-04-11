@@ -46,12 +46,13 @@ public class SwiftFileSystemBaseTest extends Assert {
           LogFactory.getLog(SwiftFileSystemBaseTest.class);
   protected SwiftNativeFileSystem fs;
   protected byte[] data = SwiftTestUtils.dataset(getBlockSize() * 2, 0, 255);
+  private Configuration conf;
 
   @Before
   public void setUp() throws Exception {
     noteAction("setup");
     final URI uri = getFilesystemURI();
-    final Configuration conf = new Configuration();
+    conf = new Configuration();
 
     fs = createSwiftFS();
     try {
@@ -68,6 +69,14 @@ public class SwiftFileSystemBaseTest extends Assert {
   @After
   public void tearDown() throws Exception {
     cleanupInTeardown(fs, "/test");
+  }
+
+  /**
+   * Get the configuration used to set up the FS
+   * @return the configuration
+   */
+  public Configuration getConf() {
+    return conf;
   }
 
   /**
