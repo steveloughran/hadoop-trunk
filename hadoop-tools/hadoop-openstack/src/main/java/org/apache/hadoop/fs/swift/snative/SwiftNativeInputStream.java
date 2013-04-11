@@ -171,6 +171,19 @@ class SwiftNativeInputStream extends FSInputStream {
   }
 
   /**
+   * Treats any finalize() call without the input stream being closed
+   * as a serious problem, logging at error level
+   * @throws Throwable n/a
+   */
+  @Override
+  protected void finalize() throws Throwable {
+    if (in != null) {
+      LOG.error(
+        "Input stream is leaking handles by not being closed() properly!");
+    }
+  }
+
+  /**
    * Read through the specified number of bytes.
    * The implementation iterates a byte a time, which may seem inefficient
    * compared to the read(bytes[]) method offered by input streams.
