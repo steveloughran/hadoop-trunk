@@ -48,7 +48,6 @@ class SwiftNativeOutputStream extends OutputStream {
   private int partNumber;
   private long blockSize;
   private boolean partUpload = false;
-  private boolean abortWrite = false;
 
   public SwiftNativeOutputStream(Configuration conf,
                                  SwiftNativeFileSystemStore nativeStore,
@@ -93,24 +92,34 @@ class SwiftNativeOutputStream extends OutputStream {
     if (closed) {
       return;
     }
-    //formally declare as closed.
-    closed = true;
-    backupStream.close();
 
     try {
-      if (!abortWrite) {
-        if (partUpload) {
-          partUpload();
-          nativeStore.createManifestForPartUpload(new Path(key));
-        } else {
-          nativeStore.uploadFile(new Path(key),
-                  new FileInputStream(backupFile),
-                  backupFile.length());
-        }
+      closed = true;
+      //formally declare as closed.
+      backupStream.close();
+      Path keypath = new Path(key);
+      if (partUpload) {
+        partUpload();
+        nativeStore.createManifestForPartUpload(keypath);
+      } else {
+        nativeStore.uploadFile(keypath,
+                               new FileInputStream(backupFile),
+                               backupFile.length());
       }
     } finally {
       delete(backupFile);
       backupStream = null;
+      backupFile = null;
+    }
+  }
+
+  @Override
+  protected void finalize() throws Throwable {
+    if(!closed) {
+      LOG.warn("stream not closed");
+    }
+    if(backupFile!=null) {
+      LOG.warn("Leaking backing file "+ backupFile);
     }
   }
 
@@ -155,14 +164,6 @@ class SwiftNativeOutputStream extends OutputStream {
     backupStream = new BufferedOutputStream(new FileOutputStream(backupFile));
     blockSize = 0;
     partNumber++;
-  }
-
-  /**
-   * Cancel the write-on-close operation. This permits a faster bailout
-   * during some failures.
-   */
-  public void abortWrite() {
-    abortWrite = true;
   }
 
   /**
