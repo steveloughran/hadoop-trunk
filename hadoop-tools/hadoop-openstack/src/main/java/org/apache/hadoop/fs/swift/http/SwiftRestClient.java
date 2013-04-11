@@ -883,7 +883,8 @@ public final class SwiftRestClient {
   }
 
   /**
-   * Uploads file as Input Stream to Swift
+   * Uploads file as Input Stream to Swift.
+   * The data stream will be closed after the request.
    *
    * @param path           path to Swift
    * @param data           object data
@@ -897,19 +898,25 @@ public final class SwiftRestClient {
                      final Header... requestHeaders)
           throws IOException {
     preRemoteCommand("upload");
-    perform(pathToURI(path), new PutMethodProcessor<byte[]>() {
-      @Override
-      public byte[] extractResult(PutMethod method) throws IOException {
-        return method.getResponseBody();
-      }
 
-      @Override
-      protected void setup(PutMethod method) throws
-                                             SwiftInternalStateException {
-        method.setRequestEntity(new InputStreamRequestEntity(data, length));
-        setHeaders(method, requestHeaders);
-      }
-    });
+    try {
+      perform(pathToURI(path), new PutMethodProcessor<byte[]>() {
+        @Override
+        public byte[] extractResult(PutMethod method) throws IOException {
+          return method.getResponseBody();
+        }
+  
+        @Override
+        protected void setup(PutMethod method) throws
+                                               SwiftInternalStateException {
+          method.setRequestEntity(new InputStreamRequestEntity(data, length));
+          setHeaders(method, requestHeaders);
+        }
+      });
+    } finally {
+      data.close();
+    }
+
   }
 
 

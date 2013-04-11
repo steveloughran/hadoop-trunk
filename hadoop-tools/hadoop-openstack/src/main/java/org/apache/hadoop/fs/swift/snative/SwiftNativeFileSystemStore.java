@@ -101,11 +101,7 @@ public class SwiftNativeFileSystemStore {
    */
   public void uploadFile(Path path, InputStream inputStream, long length)
           throws IOException {
-    try {
       swiftRestClient.upload(toObjectPath(path), inputStream, length);
-    } finally {
-      inputStream.close();
-    }
   }
 
   /**
@@ -128,8 +124,10 @@ public class SwiftNativeFileSystemStore {
       stringPath = stringPath.concat("/").concat(String.valueOf(partNumber));
     }
 
-    swiftRestClient.upload(new SwiftObjectPath(toDirPath(path).getContainer(), stringPath),
-            inputStream, length);
+    swiftRestClient.upload(
+      new SwiftObjectPath(toDirPath(path).getContainer(), stringPath),
+            inputStream,
+            length);
   }
 
   /**
