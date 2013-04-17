@@ -52,7 +52,7 @@ public class SwiftFileSystemBaseTest extends Assert {
   public void setUp() throws Exception {
     noteAction("setup");
     final URI uri = getFilesystemURI();
-    conf = new Configuration();
+    conf = createConfiguration();
 
     fs = createSwiftFS();
     try {
@@ -64,6 +64,15 @@ public class SwiftFileSystemBaseTest extends Assert {
       throw e;
     }
     noteAction("setup complete");
+  }
+
+  /**
+   * Configuration generator. May be overridden to inject
+   * some custom options
+   * @return a configuration with which to create FS instances
+   */
+  protected Configuration createConfiguration() {
+    return new Configuration();
   }
 
   @After
@@ -90,7 +99,7 @@ public class SwiftFileSystemBaseTest extends Assert {
   }
 
   protected URI getFilesystemURI() throws URISyntaxException, IOException {
-    return getServiceURI(new Configuration());
+    return getServiceURI(createConfiguration());
   }
 
   protected SwiftNativeFileSystem createSwiftFS() throws IOException {

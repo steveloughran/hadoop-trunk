@@ -210,6 +210,8 @@ public final class SwiftRestClient {
    * The blocksize of this FS
    */
   private long blocksize;
+  private final int partSizeKB;
+  private final int blocksizeKB;
 
   /**
    * objects query endpoint. This is synchronized
@@ -449,16 +451,22 @@ public final class SwiftRestClient {
     locationAware = "true".equals(
       props.getProperty(SWIFT_LOCATION_AWARE_PROPERTY, "false"));
 
-    blocksize = getLongOption(props,
-                              SwiftProtocolConstants.SWIFT_BLOCKSIZE,
-                              SwiftProtocolConstants.DEFAULT_SWIFT_BLOCKSIZE);
+    blocksizeKB = getIntOption(props,
+                                 SwiftProtocolConstants.SWIFT_BLOCKSIZE,
+                                 SwiftProtocolConstants.DEFAULT_SWIFT_BLOCKSIZE);
+    blocksize = 1024L * blocksizeKB;
     if (blocksize <= 0) {
-      throw new SwiftConfigurationException("Invalid blocksize set in"
-                                            +
-                                            SwiftProtocolConstants.SWIFT_BLOCKSIZE
-                                            + ": " + blocksize);
+      throw new SwiftConfigurationException("Invalid blocksize set in "
+                        + SwiftProtocolConstants.SWIFT_BLOCKSIZE
+                        + ": " + blocksize);
     }
-
+    partSizeKB = getIntOption(props, SWIFT_PARTITION_SIZE,
+                                  DEFAULT_SWIFT_PARTITION_SIZE);
+    if (partSizeKB <=0) {
+      throw new SwiftConfigurationException("Invalid partition size set in "
+                        + SwiftProtocolConstants.SWIFT_PARTITION_SIZE
+                        + ": " + partSizeKB);
+    }
     if (LOG.isDebugEnabled()) {
       //everything you need for diagnostics. The password is omitted.
       LOG.debug(String.format(
@@ -501,7 +509,6 @@ public final class SwiftRestClient {
     }
     return val;
   }
-
 
   /**
    * Get an integer option from the property object
@@ -1607,7 +1614,12 @@ public final class SwiftRestClient {
 
   @Override
   public String toString() {
-    return "SwiftRestClient: " + filesystemURI;
+    return "Swift client: " + filesystemURI
+           + " authURI=" + authUri
+           + " public endpoint=" + usePublicURL
+           + " location aware=" + locationAware
+           + " blocksize/KB = "+ blocksizeKB
+           + " partsize/KB = "+ partSizeKB;
   }
 
   /**
@@ -1658,5 +1670,33 @@ public final class SwiftRestClient {
    */
   public long getBlocksize() {
     return blocksize;
+  }
+
+  /**
+   * Get the partition size in KB
+   * @return the partition size
+   */
+  public int getPartSizeKB() {
+    return partSizeKB;
+  }
+
+  public int getProxyPort() {
+    return proxyPort;
+  }
+
+  public String getProxyHost() {
+    return proxyHost;
+  }
+
+  public int getRetryCount() {
+    return retryCount;
+  }
+
+  public int getConnectTimeout() {
+    return connectTimeout;
+  }
+
+  public boolean isUsePublicURL() {
+    return usePublicURL;
   }
 }

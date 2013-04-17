@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.swift.snative;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.BufferedFSInputStream;
@@ -33,13 +34,14 @@ import org.apache.hadoop.fs.swift.exceptions.SwiftNotDirectoryException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftOperationFailedException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftPathExistsException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftUnsupportedFeatureException;
-import org.apache.hadoop.fs.swift.http.SwiftProtocolConstants;
+import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.*;
 import org.apache.hadoop.fs.swift.util.SwiftObjectPath;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
 import org.apache.hadoop.util.Progressable;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -135,7 +137,7 @@ public class SwiftNativeFileSystem extends FileSystem {
 
   @Override
   public String toString() {
-    return "SwiftNativeFileSystem " + uri;
+    return "Swift FileSystem " + store;
   }
 
   /**
@@ -438,7 +440,8 @@ public class SwiftNativeFileSystem extends FileSystem {
   @Override
   public FSDataOutputStream create(Path file, FsPermission permission,
                                    boolean overwrite, int bufferSize,
-                                   short replication, long blockSize, Progressable progress)
+                                   short replication, long blockSize,
+                                   Progressable progress)
           throws IOException {
     LOG.debug("SwiftFileSystem.create");
 
@@ -464,11 +467,23 @@ public class SwiftNativeFileSystem extends FileSystem {
       }
     }
 
-    SwiftNativeOutputStream out = new SwiftNativeOutputStream(getConf(),
-            store,
-            file.toUri()
-                    .toString());
+    SwiftNativeOutputStream out = createSwiftOutputStream(file);
     return new FSDataOutputStream(out, statistics);
+  }
+
+  /**
+   * Create the swift output stream
+   * @param path path to write to 
+   * @return the new file
+   * @throws IOException
+   */
+  protected SwiftNativeOutputStream createSwiftOutputStream(Path path) throws
+                                                                       IOException {
+    long partSizeKB = getStore().getPartsizeKB();
+    return new SwiftNativeOutputStream(getConf(),
+            getStore(),
+            path.toUri().toString(),
+            partSizeKB);
   }
 
   /**
@@ -652,4 +667,33 @@ public class SwiftNativeFileSystem extends FileSystem {
     }
     return new Path(workingDir, path);
   }
+
+
+  /**
+   * Get the number of partitions written by an output stream
+   * This is for testing
+   * @param outputStream output stream
+   * @return the #of partitions written by that stream
+   */
+  @InterfaceAudience.Private
+  public static int getPartitionsWritten(FSDataOutputStream outputStream) {
+    OutputStream wrappedStream = outputStream.getWrappedStream();
+    SwiftNativeOutputStream snos = (SwiftNativeOutputStream) wrappedStream;
+    return snos.getPartitionsWritten();
+  }
+  
+  /**
+   * Get the size of partitions written by an output stream
+   * This is for testing
+   *
+   * @param outputStream output stream
+   * @return partition size in bytes
+   */
+  @InterfaceAudience.Private
+  public static long getPartitionSize(FSDataOutputStream outputStream) {
+    OutputStream wrappedStream = outputStream.getWrappedStream();
+    SwiftNativeOutputStream snos = (SwiftNativeOutputStream) wrappedStream;
+    return snos.getFilePartSize();
+  }
+  
 }

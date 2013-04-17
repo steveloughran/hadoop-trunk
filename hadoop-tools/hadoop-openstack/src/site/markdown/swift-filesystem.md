@@ -302,13 +302,12 @@ The block size value reported by Swift, therefore, controls the basic workload
 partioning of the MapReduce engine -and can be an important parameter to
 tune for performance of the cluster.
 
-The property has a unit of kilobytes; the default value is `32*1024*1024`: 32 MB
+The property has a unit of kilobytes; the default value is `32*1024`: 32 MB
 
     <property>
       <name>fs.swift.blocksize</name>
-      <value>33554432</value>
+      <value>32768</value>
     </property>
-
 
 Note that the mapreduce engine's split logic can be tuned independently by setting
 the `mapred.min.split.size` and `mapred.max.split.size` properties,
@@ -329,7 +328,38 @@ in a pig script, these properties would be set as:
     mapred.min.split.size 524288
     mapred.max.split.size 1048576
 
+#### Partition size `fs.swift.partsize`
 
+The Swift filesystem client breaks very large files into partitioned files,
+uploading each as it progresses, and writing any remaning data and an XML
+manifest when a partitioned file is closed.
+
+The partition size defaults to 4608 MB; 4.5GB, the maximum filesize that
+Swift can support.
+
+It is possible to set a smaller partition size, in the `fs.swift.partsize`
+option. This takes a value in KB.
+
+    <property>
+      <name>fs.swift.partsize</name>
+      <value>1024</value>
+      <description>upload every MB</description>
+    </property>
+
+When should this value be changed from its default?
+
+While there is no need to ever change it for basic operation of 
+the Swift filesystem client, it can be tuned
+
+* If a Swift filesystem is location aware, then breaking a file up into
+smaller partitions scatters the data round the cluster. For best performance,
+the property `fs.swift.blocksize` should be set to a smaller value than the
+partition size of files.
+
+* When writing to an unpartitioned file, the entire write is done in the 
+`close()` operation. When a file is partitioned, the outstanding data to
+be written whenever the outstanding amount of data is greater than the
+partition size. This means that data will be written more incrementally
 
 #### Connection timeout `fs.swift.connect.timeout`
 
