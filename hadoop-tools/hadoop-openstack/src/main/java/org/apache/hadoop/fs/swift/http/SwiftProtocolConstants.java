@@ -121,12 +121,23 @@ public class SwiftProtocolConstants {
    * blocksize for all filesystems: {@value}
    */
   public static final String SWIFT_BLOCKSIZE =
-          FS_SWIFT + "blocksize";
+          FS_SWIFT + ".blocksize";
 
   /**
-   * the default blocksize for filesystems: {@value}
+   * the default blocksize for filesystems in KB: {@value}
    */
-  public static final long DEFAULT_SWIFT_BLOCKSIZE = 32 * 1024 * 1024;
+  public static final int DEFAULT_SWIFT_BLOCKSIZE = 32 * 1024;
+
+  /**
+   * partition size for all filesystems in KB: {@value}
+   */
+  public static final String SWIFT_PARTITION_SIZE =
+    FS_SWIFT + ".partsize";
+
+  /**
+   * The default partition size for uploads: {@value}
+   */
+  public static final int DEFAULT_SWIFT_PARTITION_SIZE = 4608*1024;
 
   /**
    * Key for passing the service name as a property -not read from the

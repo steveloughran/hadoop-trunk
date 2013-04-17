@@ -91,6 +91,10 @@ public class SwiftNativeFileSystemStore {
     return swiftRestClient.getBlocksize();
   }
 
+  public long getPartsizeKB() {
+    return swiftRestClient.getPartSizeKB();
+  }
+
   /**
    * Upload a file/input stream of a specific length.
    *

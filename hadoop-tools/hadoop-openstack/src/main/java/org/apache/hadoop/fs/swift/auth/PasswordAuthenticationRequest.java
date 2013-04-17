@@ -53,7 +53,7 @@ public class PasswordAuthenticationRequest extends AuthenticationRequest {
 
   @Override
   public String toString() {
-    return "Auth as " +
+    return "Authenticate as " +
            "tenant '" + tenantName + "' "
            + passwordCredentials;
   }

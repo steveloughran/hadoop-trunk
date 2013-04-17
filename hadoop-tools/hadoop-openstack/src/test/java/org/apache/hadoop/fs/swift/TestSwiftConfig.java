@@ -19,6 +19,7 @@ package org.apache.hadoop.fs.swift;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.swift.http.SwiftRestClient;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -30,7 +31,7 @@ import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.*;
 /**
  * Test the swift service-specific configuration binding features
  */
-public class TestSwiftConfig {
+public class TestSwiftConfig extends Assert {
 
 
   public static final String SERVICE = "openstack";
@@ -110,8 +111,54 @@ public class TestSwiftConfig {
   @Test
   public void testPositiveBlocksize() throws Exception {
     final Configuration configuration = createCoreConfig();
-    configuration.set(SWIFT_BLOCKSIZE, "1");
-    mkInstance(configuration);
+    int size = 127;
+    configuration.set(SWIFT_BLOCKSIZE, Integer.toString(size));
+    SwiftRestClient restClient = mkInstance(configuration);
+    assertEquals(size * 1024, restClient.getBlocksize());
+  }
+
+  @Test
+  public void testLocationAwareTruePropagates() throws Exception {
+    final Configuration configuration = createCoreConfig();
+    set(configuration, DOT_LOCATION_AWARE, "true");
+    SwiftRestClient restClient = mkInstance(configuration);
+    assertTrue(restClient.isLocationAware());
+  }
+
+  @Test
+  public void testLocationAwareFalsePropagates() throws Exception {
+    final Configuration configuration = createCoreConfig();
+    set(configuration, DOT_LOCATION_AWARE, "false");
+    SwiftRestClient restClient = mkInstance(configuration);
+    assertFalse(restClient.isLocationAware());
+  }
+  
+  @Test(expected = org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException.class)
+  public void testNegativePartsize() throws Exception {
+    final Configuration configuration = createCoreConfig();
+    configuration.set(SWIFT_PARTITION_SIZE, "-1");
+    SwiftRestClient restClient = mkInstance(configuration);
+  }
+
+  @Test
+  public void testPositivePartsize() throws Exception {
+    final Configuration configuration = createCoreConfig();
+    int size = 127;
+    configuration.set(SWIFT_PARTITION_SIZE, Integer.toString(size));
+    SwiftRestClient restClient = mkInstance(configuration);
+    assertEquals(size, restClient.getPartSizeKB());
+  }
+
+  @Test
+  public void testProxyData() throws Exception {
+    final Configuration configuration = createCoreConfig();
+    String proxy="web-proxy";
+    int port = 8088;
+    configuration.set(SWIFT_PROXY_HOST_PROPERTY, proxy);
+    configuration.set(SWIFT_PROXY_PORT_PROPERTY, Integer.toString(port));
+    SwiftRestClient restClient = mkInstance(configuration);
+    assertEquals(proxy, restClient.getProxyHost());
+    assertEquals(port, restClient.getProxyPort());
   }
 
   private Configuration createCoreConfig() {
@@ -127,10 +174,10 @@ public class TestSwiftConfig {
     configuration.set(SWIFT_SERVICE_PREFIX + SERVICE + field, value);
   }
 
-  private void mkInstance(Configuration configuration) throws
+  private SwiftRestClient mkInstance(Configuration configuration) throws
           IOException,
           URISyntaxException {
     URI uri = new URI("swift://container.openstack/");
-    SwiftRestClient.getInstance(uri, configuration);
+    return SwiftRestClient.getInstance(uri, configuration);
   }
 }
