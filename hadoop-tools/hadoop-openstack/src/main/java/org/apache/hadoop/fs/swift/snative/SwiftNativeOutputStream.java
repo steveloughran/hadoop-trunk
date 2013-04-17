@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.swift.snative;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.exceptions.SwiftException;
@@ -33,10 +34,14 @@ import java.io.OutputStream;
 
 /**
  * Output stream, buffers data on local disk.
- * Writes to Swift on close() method
+ * Writes to Swift on the close() method, unless the 
+ * file is significantly large that it is being written as partitions.
+ * In this case, the first partition is written on the first write that puts
+ * data over the partition, as may later writes. The close() then causes
+ * the final partition to be written, along with a partition manifest.
  */
 class SwiftNativeOutputStream extends OutputStream {
-  private long filePartSize = 4768709000L; // files greater than 4.5Gb are divided into parts
+  private long filePartSize;
   private static final Log LOG =
           LogFactory.getLog(SwiftNativeOutputStream.class);
   private Configuration conf;
@@ -46,19 +51,29 @@ class SwiftNativeOutputStream extends OutputStream {
   private SwiftNativeFileSystemStore nativeStore;
   private boolean closed;
   private int partNumber;
-  private long blockSize;
+  private long blockOffset;
   private boolean partUpload = false;
 
+  /**
+   * Create an output stream
+   * @param conf configuration to use
+   * @param nativeStore native store to write through
+   * @param key the key to write
+   * @param partSizeKB the partition size
+   * @throws IOException
+   */
   public SwiftNativeOutputStream(Configuration conf,
                                  SwiftNativeFileSystemStore nativeStore,
-                                 String key) throws IOException {
+                                 String key,
+                                 long partSizeKB) throws IOException {
     this.conf = conf;
     this.key = key;
     this.backupFile = newBackupFile();
     this.nativeStore = nativeStore;
     this.backupStream = new BufferedOutputStream(new FileOutputStream(backupFile));
     this.partNumber = 1;
-    this.blockSize = 0;
+    this.blockOffset = 0;
+    this.filePartSize = 1024L * partSizeKB;
   }
 
   private File newBackupFile() throws IOException {
@@ -71,6 +86,11 @@ class SwiftNativeOutputStream extends OutputStream {
     return result;
   }
 
+  /**
+   * Flush the local backing stream.
+   * This does not trigger a flush of data to the remote blobstore.
+   * @throws IOException
+   */
   @Override
   public void flush() throws IOException {
     backupStream.flush();
@@ -87,6 +107,11 @@ class SwiftNativeOutputStream extends OutputStream {
     }
   }
 
+  /**
+   * Close the stream. This will trigger the upload of all locally cached
+   * data to the remote blobstore.
+   * @throws IOException IO problems uploading the data.
+   */
   @Override
   public synchronized void close() throws IOException {
     if (closed) {
@@ -102,15 +127,33 @@ class SwiftNativeOutputStream extends OutputStream {
         partUpload();
         nativeStore.createManifestForPartUpload(keypath);
       } else {
-        nativeStore.uploadFile(keypath,
-                               new FileInputStream(backupFile),
-                               backupFile.length());
+        uploadOnClose(keypath);
       }
     } finally {
       delete(backupFile);
       backupStream = null;
       backupFile = null;
     }
+  }
+
+  /**
+   * Upload a file when closed, either in one go, or, if the file is
+   * already partitioned, by uploading the remaining partition and a manifest.
+   * @param keypath key as a path
+   * @throws IOException IO Problems
+   */
+  private void uploadOnClose(Path keypath) throws IOException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("Closing write of file %s;" +
+                              " localfile=%s of length %d",
+                              key,
+                              backupFile,
+                              backupFile.length()));
+    }
+
+    nativeStore.uploadFile(keypath,
+                           new FileInputStream(backupFile),
+                           backupFile.length());
   }
 
   @Override
@@ -143,18 +186,34 @@ class SwiftNativeOutputStream extends OutputStream {
     }
     verifyOpen();
 
-    //if size of file is greater than 5Gb Swift limit - than divide file into parts and upload parts
-    if (blockSize + len >= filePartSize) {
+    // if the size of file is greater than the partition limit
+    if (blockOffset + len >= filePartSize) {
+      // - then partition the blob and upload the first part
+      // (this also sets blockOffset=0)
       partUpload();
     }
 
-    blockSize += len;
+    //now update
+    blockOffset += len;
     backupStream.write(b, off, len);
   }
 
+  /**
+   * Upload a single partition. This deletes the local backing-file, 
+   * and re-opens it to create a new one.
+   * @throws IOException on IO problems
+   */
   private void partUpload() throws IOException {
     partUpload = true;
     backupStream.close();
+    if(LOG.isDebugEnabled()) {
+      LOG.debug(String.format("Uploading part %d of file %s;" +
+                              " localfile=%s of length %d",
+                              partNumber,
+                              key,
+                              backupFile,
+                              backupFile.length()));
+    }
     nativeStore.uploadFilePart(new Path(key),
             partNumber,
             new FileInputStream(backupFile),
@@ -162,19 +221,16 @@ class SwiftNativeOutputStream extends OutputStream {
     delete(backupFile);
     backupFile = newBackupFile();
     backupStream = new BufferedOutputStream(new FileOutputStream(backupFile));
-    blockSize = 0;
+    blockOffset = 0;
     partNumber++;
   }
 
   /**
-   * Partition size can be set for testing purposes.
-   * This is intended for testing
-   * @param filePartSize new partition size
+   * Get the file partition size
+   * @return the partition size
    */
-//  @InterfaceAudience.Private
-//  @InterfaceStability.Unstable
-  synchronized void setFilePartSize(long filePartSize) {
-    this.filePartSize = filePartSize;
+  long getFilePartSize() {
+    return filePartSize;
   }
 
   /**
@@ -182,9 +238,21 @@ class SwiftNativeOutputStream extends OutputStream {
    * This is intended for testing
    * @return the of partitions already written to the remote FS
    */
-//  @InterfaceAudience.Private
-//  @InterfaceStability.Unstable
   synchronized int getPartitionsWritten() {
     return partNumber - 1;
+  }
+
+  @Override
+  public String toString() {
+    return "SwiftNativeOutputStream{" +
+           ", key='" + key + '\'' +
+           ", backupFile=" + backupFile +
+           ", closed=" + closed +
+           ", filePartSize=" + filePartSize +
+           ", partNumber=" + partNumber +
+           ", blockOffset=" + blockOffset +
+           ", partUpload=" + partUpload +
+           ", nativeStore=" + nativeStore +
+           '}';
   }
 }
