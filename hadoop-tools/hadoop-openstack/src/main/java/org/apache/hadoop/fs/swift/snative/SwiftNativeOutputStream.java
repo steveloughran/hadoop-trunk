@@ -20,7 +20,6 @@ package org.apache.hadoop.fs.swift.snative;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.exceptions.SwiftException;
@@ -34,7 +33,7 @@ import java.io.OutputStream;
 
 /**
  * Output stream, buffers data on local disk.
- * Writes to Swift on the close() method, unless the 
+ * Writes to Swift on the close() method, unless the
  * file is significantly large that it is being written as partitions.
  * In this case, the first partition is written on the first write that puts
  * data over the partition, as may later writes. The close() then causes
@@ -199,7 +198,7 @@ class SwiftNativeOutputStream extends OutputStream {
   }
 
   /**
-   * Upload a single partition. This deletes the local backing-file, 
+   * Upload a single partition. This deletes the local backing-file,
    * and re-opens it to create a new one.
    * @throws IOException on IO problems
    */

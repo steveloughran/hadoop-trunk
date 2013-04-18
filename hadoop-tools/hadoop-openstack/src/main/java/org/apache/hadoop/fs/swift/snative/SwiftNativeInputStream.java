@@ -72,7 +72,7 @@ class SwiftNativeInputStream extends FSInputStream {
   private long pos = 0;
 
   /**
-   * Offset in the range requested last 
+   * Offset in the range requested last
    */
   private long rangeOffset = 0;
 
@@ -275,7 +275,7 @@ class SwiftNativeInputStream extends FSInputStream {
   }
 
   /**
-   * This FS doesn't explicitly support multiple data sources, so 
+   * This FS doesn't explicitly support multiple data sources, so
    * return false here.
    * @param targetPos the desired target position
    * @return true if a new source of the data has been set up
