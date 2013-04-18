@@ -361,6 +361,28 @@ partition size of files.
 be written whenever the outstanding amount of data is greater than the
 partition size. This means that data will be written more incrementally
 
+#### Request size `fs.swift.requestsize`
+
+The Swift filesystem client reads files in HTTP GET operations, asking for 
+a block of data at a time.
+
+The default value is 64KB. A larger value may be more efficient over faster
+networks, as it reduces the overhead of setting up the HTTP operation.
+
+However, if the file is read with many random accesses, requests for
+data will be made from different parts of the file -discarding some of the
+previously requested data. The benefits of larger request sizes may be wasted.
+
+
+The property `fs.swift.requestsize` sets the request size in KB.
+
+    <property>
+      <name>fs.swift.requestsize</name>
+      <value>128</value>
+    </property>
+    
+
+
 #### Connection timeout `fs.swift.connect.timeout`
 
 This sets the timeout in milliseconds to connect to a Swift service.
@@ -448,8 +470,8 @@ for use in-cluster.
 details, or check the XML configuration files into any revision control system
 to which you do not have exclusive access.
 
-1. Similarly, do not use your real account details in any documentation
-* or any bug reports submitted online*
+1. Similarly, do not use your real account details in any documentation *or any
+ bug reports submitted online*
 
 1. Prefer the apikey authentication over passwords as it is easier
 to revoke a key -and some service providers allow you to set

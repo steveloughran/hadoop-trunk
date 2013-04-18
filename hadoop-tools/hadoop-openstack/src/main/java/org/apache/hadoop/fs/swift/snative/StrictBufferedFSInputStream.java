@@ -16,22 +16,31 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.fs.swift.scale;
+package org.apache.hadoop.fs.swift.snative;
 
-import org.apache.hadoop.fs.swift.SwiftFileSystemBaseTest;
+import org.apache.hadoop.fs.BufferedFSInputStream;
+import org.apache.hadoop.fs.FSInputStream;
+
+import java.io.IOException;
 
 /**
- * Base class for scale tests; here is where the common scale configuration
- * keys are defined
+ * Add stricter compliance with the evolving FS specifications
  */
+public class StrictBufferedFSInputStream extends BufferedFSInputStream {
 
-public class SwiftScaleTestBase extends SwiftFileSystemBaseTest {
-  
-  public static final String SCALE_TEST = "scale.test.";
-  public static final String KEY_OPERATION_COUNT = SCALE_TEST + "operation.count";
-  public static final long DEFAULT_OPERATION_COUNT = 1;
-  
-  protected long getOperationCount() {
-    return getConf().getLong(KEY_OPERATION_COUNT, DEFAULT_OPERATION_COUNT);
+  public StrictBufferedFSInputStream(FSInputStream in,
+                                     int size) {
+    super(in, size);
+  }
+
+  @Override
+  public void seek(long pos) throws IOException {
+    if (pos < 0) {
+      throw new IOException("Negative position");
+    }
+    if (in == null) {
+      throw new IOException("Stream closed");
+    }
+    super.seek(pos);
   }
 }
