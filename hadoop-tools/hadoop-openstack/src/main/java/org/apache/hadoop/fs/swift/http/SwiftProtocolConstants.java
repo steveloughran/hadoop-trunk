@@ -140,6 +140,17 @@ public class SwiftProtocolConstants {
   public static final int DEFAULT_SWIFT_PARTITION_SIZE = 4608*1024;
 
   /**
+   * request size for reads in KB: {@value}
+   */
+  public static final String SWIFT_REQUEST_SIZE =
+    FS_SWIFT + ".requestsize";
+
+  /**
+   * The default reqeuest size for reads: {@value}
+   */
+  public static final int DEFAULT_SWIFT_REQUEST_SIZE = 64;
+
+  /**
    * Key for passing the service name as a property -not read from the
    * configuration : {@value}
    */

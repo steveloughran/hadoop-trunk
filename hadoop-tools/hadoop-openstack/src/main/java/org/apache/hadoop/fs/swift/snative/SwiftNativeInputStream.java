@@ -44,7 +44,7 @@ class SwiftNativeInputStream extends FSInputStream {
   /**
    *  range requested off the server: {@value}
    */
-  private static final long RANGE_SIZE = 64 * 1024 * 1024;
+  private long buffer_size;
 
   /**
    * File nativeStore instance
@@ -78,12 +78,17 @@ class SwiftNativeInputStream extends FSInputStream {
 
   public SwiftNativeInputStream(SwiftNativeFileSystemStore storeNative,
                                 FileSystem.Statistics statistics,
-                                Path path)
+                                Path path,
+                                long bufferSize)
           throws IOException {
     this.nativeStore = storeNative;
     this.statistics = statistics;
     this.in = storeNative.getObject(path);
     this.path = path;
+    if (bufferSize <= 0) {
+      throw new IllegalArgumentException("Invalid buffer size");
+    }
+    this.buffer_size = bufferSize;
   }
 
   /**
@@ -211,18 +216,27 @@ class SwiftNativeInputStream extends FSInputStream {
    */
   @Override
   public synchronized void seek(long targetPos) throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Seek to " + targetPos);
+    if (in == null) {
+      throw new IOException("Input stream is closed");
+    }
+    if (targetPos < 0) {
+      throw new IOException("Negative Seek offset not supported");
     }
     //there's some special handling of near-local data
     //as the seek can be omitted if it is in/adjacent
     long offset = targetPos - pos;
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Seek to " + targetPos + "; current pos =" + pos
+                + "; offset="+offset);
+    }
     if (offset == 0) {
       LOG.debug("seek is no-op");
       return;
     }
 
-    if (rangeOffset + offset < RANGE_SIZE) {
+    if (offset < 0) {
+      LOG.debug("seek is backwards");
+    } else if ((rangeOffset + offset < buffer_size)) {
       //if the seek is in  range of that requested, scan forwards
       //instead of closing and re-opening a new HTTP connection
       SwiftUtils.debug(LOG,
@@ -242,11 +256,17 @@ class SwiftNativeInputStream extends FSInputStream {
         return;
       }
       LOG.trace("chomping failed");
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Seek is beyond buffer size of " + buffer_size);
+      }
     }
 
     close();
-    in = nativeStore.getObject(path, targetPos, targetPos + RANGE_SIZE);
-    this.pos = targetPos;
+    long length = targetPos + buffer_size;
+    SwiftUtils.debug(LOG, "Fetching %d bytes starting at %d", targetPos, length);
+    in = nativeStore.getObject(path, targetPos, length);
+    updateStartOfBufferPosition(targetPos);
   }
 
   @Override
@@ -254,6 +274,14 @@ class SwiftNativeInputStream extends FSInputStream {
     return pos;
   }
 
+  /**
+   * This FS doesn't explicitly support multiple data sources, so 
+   * return false here.
+   * @param targetPos the desired target position
+   * @return true if a new source of the data has been set up
+   * as the source of future reads
+   * @throws IOException IO problems
+   */
   @Override
   public boolean seekToNewSource(long targetPos) throws IOException {
     return false;

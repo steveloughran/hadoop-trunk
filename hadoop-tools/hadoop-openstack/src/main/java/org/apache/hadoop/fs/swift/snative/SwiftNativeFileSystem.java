@@ -23,18 +23,17 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.BufferedFSInputStream;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftNotDirectoryException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftOperationFailedException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftPathExistsException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftUnsupportedFeatureException;
-import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.*;
 import org.apache.hadoop.fs.swift.util.SwiftObjectPath;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
 import org.apache.hadoop.util.Progressable;
@@ -494,9 +493,18 @@ public class SwiftNativeFileSystem extends FileSystem {
    */
   @Override
   public FSDataInputStream open(Path path, int bufferSize) throws IOException {
+    int bufferSizeKB = getStore().getBufferSizeKB();
+    if (bufferSize <= 0) {
+      throw new SwiftConfigurationException("Bad remote buffer size");
+    }
+    long readBlockSize = bufferSizeKB * 1024L;
     return new FSDataInputStream(
-            new BufferedFSInputStream(
-                    new SwiftNativeInputStream(store, statistics, path), bufferSize));
+            new StrictBufferedFSInputStream(
+                    new SwiftNativeInputStream(store,
+                                       statistics,
+                                       path,
+                                       readBlockSize),
+                    bufferSize));
   }
 
   /**

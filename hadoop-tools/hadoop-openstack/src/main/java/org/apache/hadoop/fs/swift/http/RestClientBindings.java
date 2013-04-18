@@ -158,15 +158,7 @@ public final class RestClientBindings {
     copyBool(conf, prefix + DOT_LOCATION_AWARE, props,
              SWIFT_LOCATION_AWARE_PROPERTY, false);
 
-    // copy in parameters that apply to all services
-    propagate(conf, props, SWIFT_PARTITION_SIZE);
-    propagate(conf, props, SWIFT_BLOCKSIZE);
-    propagate(conf, props, SWIFT_CONNECTION_TIMEOUT);
-    propagate(conf, props, SWIFT_RETRY_COUNT);
-    propagate(conf, props, SWIFT_PROXY_HOST_PROPERTY);
-    propagate(conf,props,SWIFT_PROXY_PORT_PROPERTY);
     return props;
-
   }
 
   /**
@@ -192,21 +184,6 @@ public final class RestClientBindings {
     }
   }
 
-  /**
-   * Propagate a property from the configuration to the properties -if it is 
-   * there.
-   * @param conf source configuration
-   * @param props destination properties
-   * @param key key to copy
-   * @throws SwiftConfigurationException
-   */
-  public static void propagate(Configuration conf,
-                               Properties props,
-                               String key) throws
-                                               SwiftConfigurationException {
-    copy(conf, key, props, key, false);
-  }
-  
   /**
    * Copy a (trimmed) property from the configuration file to the properties file.
    * <p/>
