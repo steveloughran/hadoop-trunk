@@ -63,10 +63,6 @@ public class TestSeek extends SwiftFileSystemBaseTest {
     super.setUp();
     //delete the test directory
     testPath = path("/test");
-/*
-    Path testSeekFile = new Path(testPath, "seekfile.txt");
-    createFile(testSeekFile);
-*/
     smallSeekFile = new Path(testPath, "seekfile.txt");
     byte[] block = SwiftTestUtils.dataset(256, 0, 255);
     //this file now has a simple rule: offset => value
