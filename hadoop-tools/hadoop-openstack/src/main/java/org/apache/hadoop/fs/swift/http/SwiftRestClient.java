@@ -212,6 +212,7 @@ public final class SwiftRestClient {
   private long blocksize;
   private final int partSizeKB;
   private final int blocksizeKB;
+  private final int bufferSizeKB;
 
   /**
    * objects query endpoint. This is synchronized
@@ -424,9 +425,6 @@ public final class SwiftRestClient {
     container = props.getProperty(SWIFT_CONTAINER_PROPERTY);
     String isPubProp = props.getProperty(SWIFT_PUBLIC_PROPERTY, "false");
     usePublicURL = "true".equals(isPubProp);
-    retryCount = getIntOption(props, SWIFT_RETRY_COUNT, DEFAULT_RETRY_COUNT);
-    connectTimeout = getIntOption(props, SWIFT_CONNECTION_TIMEOUT,
-            DEFAULT_CONNECT_TIMEOUT);
 
     if (apiKey == null && password == null) {
         throw new SwiftConfigurationException(
@@ -445,28 +443,50 @@ public final class SwiftRestClient {
                                                     new ApiKeyCredentials(
                                                       username, apiKey));
     }
-    //proxy options
-    proxyHost = props.getProperty(SWIFT_PROXY_HOST_PROPERTY, null);
-    proxyPort = getIntOption(props, SWIFT_PROXY_PORT_PROPERTY, 8080);
     locationAware = "true".equals(
       props.getProperty(SWIFT_LOCATION_AWARE_PROPERTY, "false"));
 
-    blocksizeKB = getIntOption(props,
-                                 SwiftProtocolConstants.SWIFT_BLOCKSIZE,
-                                 SwiftProtocolConstants.DEFAULT_SWIFT_BLOCKSIZE);
-    blocksize = 1024L * blocksizeKB;
-    if (blocksize <= 0) {
-      throw new SwiftConfigurationException("Invalid blocksize set in "
-                        + SwiftProtocolConstants.SWIFT_BLOCKSIZE
-                        + ": " + blocksize);
+    //now read in properties that are shared across all connections
+    
+    //connection and retries
+    try {
+      retryCount = conf.getInt(SWIFT_RETRY_COUNT, DEFAULT_RETRY_COUNT);
+      connectTimeout = conf.getInt(SWIFT_CONNECTION_TIMEOUT,
+                                   DEFAULT_CONNECT_TIMEOUT);
+
+      //proxy options
+      proxyHost = conf.get(SWIFT_PROXY_HOST_PROPERTY);
+      proxyPort = conf.getInt(SWIFT_PROXY_PORT_PROPERTY, 8080);
+
+      blocksizeKB = conf.getInt(SwiftProtocolConstants.SWIFT_BLOCKSIZE,
+                                SwiftProtocolConstants.DEFAULT_SWIFT_BLOCKSIZE);
+      blocksize = 1024L * blocksizeKB;
+      if (blocksize <= 0) {
+        throw new SwiftConfigurationException("Invalid blocksize set in "
+                          + SwiftProtocolConstants.SWIFT_BLOCKSIZE
+                          + ": " + blocksize);
+      }
+      partSizeKB = conf.getInt(SWIFT_PARTITION_SIZE,
+                               DEFAULT_SWIFT_PARTITION_SIZE);
+      if (partSizeKB <=0) {
+        throw new SwiftConfigurationException("Invalid partition size set in "
+                          + SwiftProtocolConstants.SWIFT_PARTITION_SIZE
+                          + ": " + partSizeKB);
+      }
+
+      bufferSizeKB = conf.getInt(SWIFT_REQUEST_SIZE,
+                                 DEFAULT_SWIFT_REQUEST_SIZE);
+      if (bufferSizeKB <=0) {
+        throw new SwiftConfigurationException("Invalid buffer size set in "
+                          + SwiftProtocolConstants.SWIFT_REQUEST_SIZE
+                          + ": " + bufferSizeKB);
+      }
+    } catch (NumberFormatException e) {
+      //convert exceptions raised parsing ints and longs into
+      // SwiftConfigurationException instances
+      throw new SwiftConfigurationException(e.toString(), e);
     }
-    partSizeKB = getIntOption(props, SWIFT_PARTITION_SIZE,
-                                  DEFAULT_SWIFT_PARTITION_SIZE);
-    if (partSizeKB <=0) {
-      throw new SwiftConfigurationException("Invalid partition size set in "
-                        + SwiftProtocolConstants.SWIFT_PARTITION_SIZE
-                        + ": " + partSizeKB);
-    }
+
     if (LOG.isDebugEnabled()) {
       //everything you need for diagnostics. The password is omitted.
       LOG.debug(String.format(
@@ -563,10 +583,16 @@ public final class SwiftRestClient {
                                           long offset,
                                           long length) throws IOException {
     if (offset < 0) {
-      throw new IOException("Invalid offset: " + offset + ".");
+      throw new IOException("Invalid offset: " + offset
+                            + " in getDataAsInputStream( path=" + path
+                            + ", offset=" + offset
+                            + ", length =" + length + ")");
     }
     if (length <= 0) {
-      throw new IOException("Invalid length: " + length + ".");
+      throw new IOException("Invalid length: " + length
+                + " in getDataAsInputStream( path="+ path
+                            + ", offset=" + offset
+                            + ", length ="+ length + ")");
     }
 
     final String range = String.format(SWIFT_RANGE_HEADER_FORMAT_PATTERN,
@@ -1678,6 +1704,14 @@ public final class SwiftRestClient {
    */
   public int getPartSizeKB() {
     return partSizeKB;
+  }
+
+  /**
+   * Get the buffer size in KB
+   * @return the buffer size wanted for reads
+   */
+  public int getBufferSizeKB() {
+    return bufferSizeKB;
   }
 
   public int getProxyPort() {
