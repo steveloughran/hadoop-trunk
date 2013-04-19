@@ -175,9 +175,8 @@ public class SwiftNativeFileSystem extends FileSystem {
 
   /**
    * The blocksize of this filesystem is set by the property
-   * {@link SwiftProtocolConstants#SWIFT_BLOCKSIZE};
-   * the default is the value of
-   * {@link SwiftProtocolConstants#DEFAULT_SWIFT_BLOCKSIZE};
+   * SwiftProtocolConstants.SWIFT_BLOCKSIZE;the default is the value of
+   * SwiftProtocolConstants.DEFAULT_SWIFT_BLOCKSIZE;
    * @return the blocksize for this FS.
    */
   @Override
