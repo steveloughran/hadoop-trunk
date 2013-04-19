@@ -1382,6 +1382,15 @@ public final class SwiftRestClient {
         fault = new EOFException(method.getStatusText());
         break;
 
+      case SC_UNAUTHORIZED:
+        //auth failure; should only happen on the second attempt
+        fault  = new SwiftAuthenticationFailedException(
+                        "Operation not authorized- current access token ="
+                            + token,
+                        method.getName(),
+                        uri,
+                        method);
+        break;
 
       default:
         //return a generic invalid HTTP response
