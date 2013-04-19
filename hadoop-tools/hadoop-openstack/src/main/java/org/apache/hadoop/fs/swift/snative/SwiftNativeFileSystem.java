@@ -196,6 +196,11 @@ public class SwiftNativeFileSystem extends FileSystem {
   }
 
   @Override
+  public long getBlockSize(Path f) throws IOException {
+    return getDefaultBlockSize(f);
+  }
+
+  @Override
   public boolean isFile(Path f) throws IOException {
     try {
       FileStatus fileStatus = getFileStatus(f);
