@@ -114,7 +114,7 @@ public class TestSwiftConfig extends Assert {
     int size = 127;
     configuration.set(SWIFT_BLOCKSIZE, Integer.toString(size));
     SwiftRestClient restClient = mkInstance(configuration);
-    assertEquals(size * 1024, restClient.getBlocksize());
+    assertEquals(size, restClient.getBlocksizeKB());
   }
 
   @Test
