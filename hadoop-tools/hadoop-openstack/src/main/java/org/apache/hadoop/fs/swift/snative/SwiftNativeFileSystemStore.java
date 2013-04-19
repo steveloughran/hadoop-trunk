@@ -88,7 +88,7 @@ public class SwiftNativeFileSystemStore {
    * which is used by the MapReduce splitter.
    */
   public long getBlocksize() {
-    return swiftRestClient.getBlocksize();
+    return 1024L * swiftRestClient.getBlocksizeKB();
   }
 
   public long getPartsizeKB() {
@@ -204,7 +204,7 @@ public class SwiftNativeFileSystemStore {
     Path correctSwiftPath = getCorrectSwiftPath(path);
     return new SwiftFileStatus(length,
                                isDir,
-                               0,
+                               1,
                                getBlocksize(),
                                lastModified,
                                correctSwiftPath);

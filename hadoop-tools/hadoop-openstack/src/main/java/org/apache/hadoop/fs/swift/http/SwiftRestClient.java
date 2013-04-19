@@ -206,11 +206,10 @@ public final class SwiftRestClient {
    */
   private final boolean locationAware;
 
+  private final int partSizeKB;
   /**
    * The blocksize of this FS
    */
-  private long blocksize;
-  private final int partSizeKB;
   private final int blocksizeKB;
   private final int bufferSizeKB;
 
@@ -460,11 +459,10 @@ public final class SwiftRestClient {
 
       blocksizeKB = conf.getInt(SwiftProtocolConstants.SWIFT_BLOCKSIZE,
                                 SwiftProtocolConstants.DEFAULT_SWIFT_BLOCKSIZE);
-      blocksize = 1024L * blocksizeKB;
-      if (blocksize <= 0) {
+      if (blocksizeKB <= 0) {
         throw new SwiftConfigurationException("Invalid blocksize set in "
                           + SwiftProtocolConstants.SWIFT_BLOCKSIZE
-                          + ": " + blocksize);
+                          + ": " + blocksizeKB);
       }
       partSizeKB = conf.getInt(SWIFT_PARTITION_SIZE,
                                DEFAULT_SWIFT_PARTITION_SIZE);
@@ -1703,8 +1701,8 @@ public final class SwiftRestClient {
    * Get the blocksize of this filesystem
    * @return a blocksize >0
    */
-  public long getBlocksize() {
-    return blocksize;
+  public long getBlocksizeKB() {
+    return blocksizeKB;
   }
 
   /**
