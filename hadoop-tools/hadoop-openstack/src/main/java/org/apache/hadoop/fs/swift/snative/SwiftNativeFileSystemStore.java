@@ -308,8 +308,11 @@ public class SwiftNativeFileSystemStore {
 
     for (SwiftObjectFileStatus status : fileStatusList) {
       if (status.getName() != null) {
-          files.add(new SwiftFileStatus(status.getBytes(), status.getBytes() == 0,
-                  1, 0, status.getLast_modified().getTime(),
+          files.add(new SwiftFileStatus(status.getBytes(),
+                                        status.getBytes() == 0,
+                  1,
+                  getBlocksize(),
+                  status.getLast_modified().getTime(),
                   getCorrectSwiftPath(new Path(status.getName()))));
       }
     }
