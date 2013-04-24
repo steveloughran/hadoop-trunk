@@ -36,11 +36,25 @@ public class Duration {
     finished = time();
   }
 
-  @Override
-  public String toString() {
-    return Long.toString(value());
+  public String getDurationString() {
+    return humanTime(value());
   }
 
+  public static String humanTime(long time) {
+    long seconds = (long) (time / 1000);
+    long minutes = (long) (seconds / 60);
+
+    return String.format("%d:%02d:%03d",
+                         minutes,
+                         seconds % 60,
+                         time % 1000);
+  }
+
+  @Override
+  public String toString() {
+    return getDurationString();
+  }
+  
   public long value() {
     return finished -started;
   }
