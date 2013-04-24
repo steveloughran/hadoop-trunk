@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.fs.swift.scale;
+package org.apache.hadoop.fs.swift.util;
 
 /**
  * Build ongoing statistics from duration data
