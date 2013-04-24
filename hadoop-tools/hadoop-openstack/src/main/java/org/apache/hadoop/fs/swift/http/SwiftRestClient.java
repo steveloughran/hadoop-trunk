@@ -1306,6 +1306,8 @@ public final class SwiftRestClient {
             new DefaultHttpMethodRetryHandler(
                     retryCount, false));
     methodParams.setSoTimeout(connectTimeout);
+    methodParams.setIntParameter(HttpMethodParams.HEAD_BODY_CHECK_TIMEOUT,
+                                 connectTimeout);
 
     try {
       int statusCode = exec(method);
