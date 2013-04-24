@@ -27,14 +27,14 @@ import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.junit.Test;
 
 /**
- * Add some HDFS-2 only assertions to {@link TestSwiftFileSystemDirectories} 
+ * Add some HDFS-2 only assertions to {@link TestSwiftFileSystemDirectories}
  */
 public class TestSwiftFileSystemDirectoriesHdfs2 extends
                                                  TestSwiftFileSystemDirectories {
 
 
   /**
-   * make assertions about fields that only appear in 
+   * make assertions about fields that only appear in
    * FileStatus in HDFS2
    * @param stat status to look at
    */

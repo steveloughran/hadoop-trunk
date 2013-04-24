@@ -348,7 +348,7 @@ option. This takes a value in KB.
 
 When should this value be changed from its default?
 
-While there is no need to ever change it for basic operation of 
+While there is no need to ever change it for basic operation of
 the Swift filesystem client, it can be tuned
 
 * If a Swift filesystem is location aware, then breaking a file up into
@@ -356,14 +356,14 @@ smaller partitions scatters the data round the cluster. For best performance,
 the property `fs.swift.blocksize` should be set to a smaller value than the
 partition size of files.
 
-* When writing to an unpartitioned file, the entire write is done in the 
+* When writing to an unpartitioned file, the entire write is done in the
 `close()` operation. When a file is partitioned, the outstanding data to
 be written whenever the outstanding amount of data is greater than the
 partition size. This means that data will be written more incrementally
 
 #### Request size `fs.swift.requestsize`
 
-The Swift filesystem client reads files in HTTP GET operations, asking for 
+The Swift filesystem client reads files in HTTP GET operations, asking for
 a block of data at a time.
 
 The default value is 64KB. A larger value may be more efficient over faster
@@ -380,7 +380,6 @@ The property `fs.swift.requestsize` sets the request size in KB.
       <name>fs.swift.requestsize</name>
       <value>128</value>
     </property>
-    
 
 
 #### Connection timeout `fs.swift.connect.timeout`
@@ -410,7 +409,7 @@ an HTTP request is made.
 The more retries, the more resilient it is to transient outages -and the
 less rapid it is at detecting and reporting server connectivity problems.
 
-#### HTTP Proxy 
+#### HTTP Proxy
 
 If the client can only access the Swift filesystem via a web proxy
 server, the client configuration must specify the proxy via
