@@ -1310,7 +1310,13 @@ public final class SwiftRestClient {
                                  connectTimeout);
 
     try {
-      int statusCode = exec(method);
+      int statusCode = 0;
+      try {
+        statusCode = exec(method);
+      } catch (IOException e) {
+        //rethrow with extra diagnostics and wiki links
+        throw ExceptionDiags.wrapException(uri.toString(), e);
+      }
 
       //look at the response and see if it was valid or not.
       //Valid is more than a simple 200; even 404 "not found" is considered
@@ -1329,7 +1335,6 @@ public final class SwiftRestClient {
       return processor.extractResult(method);
     } catch (IOException e) {
       //release the connection -always
-
       method.releaseConnection();
       throw e;
     }
