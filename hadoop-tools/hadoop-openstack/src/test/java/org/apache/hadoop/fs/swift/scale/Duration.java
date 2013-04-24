@@ -54,7 +54,7 @@ public class Duration {
   public String toString() {
     return getDurationString();
   }
-  
+
   public long value() {
     return finished -started;
   }

@@ -28,7 +28,7 @@ import org.junit.Test;
 public class TestWriteManySmallFiles extends SwiftScaleTestBase {
 
   public static final Log LOG = LogFactory.getLog(TestWriteManySmallFiles.class);
-  
+
   @Test
   public void testScaledWriteThenRead() throws Throwable {
     Path dir = new Path("/test/manysmallfiles");

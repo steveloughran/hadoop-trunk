@@ -476,7 +476,7 @@ public class SwiftNativeFileSystem extends FileSystem {
 
   /**
    * Create the swift output stream
-   * @param path path to write to 
+   * @param path path to write to
    * @return the new file
    * @throws IOException
    */
@@ -693,7 +693,7 @@ public class SwiftNativeFileSystem extends FileSystem {
     SwiftNativeOutputStream snos = (SwiftNativeOutputStream) wrappedStream;
     return snos.getPartitionsWritten();
   }
-  
+
   /**
    * Get the size of partitions written by an output stream
    * This is for testing
@@ -707,5 +707,5 @@ public class SwiftNativeFileSystem extends FileSystem {
     SwiftNativeOutputStream snos = (SwiftNativeOutputStream) wrappedStream;
     return snos.getFilePartSize();
   }
-  
+
 }

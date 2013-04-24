@@ -36,7 +36,7 @@ import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.readDataset;
 
 
 /**
- * Test partitioned uploads. 
+ * Test partitioned uploads.
  * This is done by forcing a very small partition size and verifying that it
  * is picked up.
  */
@@ -59,20 +59,17 @@ public class TestSwiftFileSystemPartitionedUploads extends
     return SwiftNativeFileSystem.getPartitionsWritten(out);
   }
 
-  
 @Test
   public void testPartitionPropertyPropagatesToConf() throws Throwable {
     assertEquals(1,
                  getConf().getInt(SwiftProtocolConstants.SWIFT_PARTITION_SIZE, 0));
   }
- 
 
   @Test
   public void testPartionPropertyPropagatesToStore() throws Throwable {
     assertEquals(1, fs.getStore().getPartsizeKB());
   }
- 
-  
+
   /**
    * tests functionality for big files ( > 5Gb) upload
    */
@@ -107,7 +104,7 @@ public class TestSwiftFileSystemPartitionedUploads extends
     byte[] dest = readDataset(fs, path, len);
     SwiftTestUtils.compareByteArrays(src, dest, len);
 
-    //now see what block location info comes back. 
+    //now see what block location info comes back.
     //This will vary depending on the Swift version, so the results
     //aren't checked -merely that the test actually worked
     BlockLocation[] locations = fs.getFileBlockLocations(status, 0, len);
