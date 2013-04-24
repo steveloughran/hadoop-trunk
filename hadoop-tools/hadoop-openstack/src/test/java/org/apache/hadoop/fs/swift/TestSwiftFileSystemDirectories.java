@@ -30,6 +30,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 /**
  * Test swift-specific directory logic.
+ * This class is HDFS-1 compatible; its designed to be subclases by something
+ * with HDFS2 extensions
  */
 public class TestSwiftFileSystemDirectories extends SwiftFileSystemBaseTest {
 
@@ -67,9 +69,16 @@ public class TestSwiftFileSystemDirectories extends SwiftFileSystemBaseTest {
     assertEquals("Wrong number of elements in file status", 1, statuses.length);
     SwiftFileStatus stat = (SwiftFileStatus) statuses[0];
     assertTrue("isDir(): Not a directory: " + stat, stat.isDir());
-    //HDFS2
-    assertTrue("isDirectory(): Not a directory: " + stat, stat.isDirectory());
-    assertFalse("isFile(): declares itself a file: " + stat, stat.isFile());
+    extraStatusAssertions(stat);
+
+  }
+
+  /**
+   * method for subclasses to add extra assertions
+   * @param stat status to look at
+   */
+  protected void extraStatusAssertions(SwiftFileStatus stat) {
+
   }
 
 
