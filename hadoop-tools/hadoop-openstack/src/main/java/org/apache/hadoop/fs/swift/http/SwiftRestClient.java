@@ -936,7 +936,7 @@ public final class SwiftRestClient {
         public byte[] extractResult(PutMethod method) throws IOException {
           return method.getResponseBody();
         }
-  
+
         @Override
         protected void setup(PutMethod method) throws
                                                SwiftInternalStateException {
