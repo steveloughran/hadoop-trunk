@@ -99,7 +99,11 @@ public class SwiftProtocolConstants {
    */
   public static final String X_NEWEST = "X-Newest";
 
+  public static final int SC_THROTTLED_498 = 498;
+  public static final int SC_TOO_MANY_REQUESTS_429 = 298;
+  
   public static final String FS_SWIFT = "fs.swift";
+
   /**
    * Prefix for all instance-specific values in the configuration: {@value}
    */
@@ -111,6 +115,17 @@ public class SwiftProtocolConstants {
   public static final String SWIFT_CONNECTION_TIMEOUT =
           FS_SWIFT + ".connect.timeout";
 
+  /**
+   * timeout for all connections: {@value}
+   */
+  public static final String SWIFT_SOCKET_TIMEOUT =
+          FS_SWIFT + ".socket.timeout";
+  /**
+   * the default socket timeout in millis {@value}.
+   * This controls how long the connection waits for responses from
+   * servers.
+   */
+  public static final int DEFAULT_SOCKET_TIMEOUT = 60000;
   /**
    * connection retry count for all connections: {@value}
    */
