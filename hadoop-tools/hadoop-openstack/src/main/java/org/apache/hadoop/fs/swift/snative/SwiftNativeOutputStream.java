@@ -160,8 +160,8 @@ class SwiftNativeOutputStream extends OutputStream {
     if(!closed) {
       LOG.warn("stream not closed");
     }
-    if(backupFile!=null) {
-      LOG.warn("Leaking backing file "+ backupFile);
+    if (backupFile != null) {
+      LOG.warn("Leaking backing file " + backupFile);
     }
   }
 
