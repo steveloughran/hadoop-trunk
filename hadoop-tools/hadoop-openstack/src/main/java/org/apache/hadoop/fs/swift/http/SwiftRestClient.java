@@ -32,6 +32,7 @@ import org.apache.commons.httpclient.methods.InputStreamRequestEntity;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
 import org.apache.commons.httpclient.methods.StringRequestEntity;
+import org.apache.commons.httpclient.params.HttpConnectionParams;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -53,6 +54,7 @@ import org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftInternalStateException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftInvalidResponseException;
+import org.apache.hadoop.fs.swift.exceptions.SwiftThrottledRequestException;
 import org.apache.hadoop.fs.swift.util.JSONUtil;
 import org.apache.hadoop.fs.swift.util.SwiftObjectPath;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
@@ -150,6 +152,7 @@ public final class SwiftRestClient {
    * The container this client is working with
    */
   private final String container;
+  private final String serviceDescription;
 
   /**
    * Access token (Secret)
@@ -189,6 +192,11 @@ public final class SwiftRestClient {
    * How long (in milliseconds) should a connection be attempted
    */
   private final int connectTimeout;
+  
+  /**
+   * How long (in milliseconds) should a connection be attempted
+   */
+  private final int socketTimeout;
   
   /**
    * How long (in milliseconds) between bulk operations
@@ -457,6 +465,8 @@ public final class SwiftRestClient {
       retryCount = conf.getInt(SWIFT_RETRY_COUNT, DEFAULT_RETRY_COUNT);
       connectTimeout = conf.getInt(SWIFT_CONNECTION_TIMEOUT,
                                    DEFAULT_CONNECT_TIMEOUT);
+      socketTimeout = conf.getInt(SWIFT_SOCKET_TIMEOUT,
+                                   DEFAULT_SOCKET_TIMEOUT);
 
       throttleDelay = conf.getInt(SWIFT_THROTTLE_DELAY,
                                   DEFAULT_THROTTLE_DELAY);
@@ -465,18 +475,18 @@ public final class SwiftRestClient {
       proxyHost = conf.get(SWIFT_PROXY_HOST_PROPERTY);
       proxyPort = conf.getInt(SWIFT_PROXY_PORT_PROPERTY, 8080);
 
-      blocksizeKB = conf.getInt(SwiftProtocolConstants.SWIFT_BLOCKSIZE,
-                                SwiftProtocolConstants.DEFAULT_SWIFT_BLOCKSIZE);
+      blocksizeKB = conf.getInt(SWIFT_BLOCKSIZE,
+                                DEFAULT_SWIFT_BLOCKSIZE);
       if (blocksizeKB <= 0) {
         throw new SwiftConfigurationException("Invalid blocksize set in "
-                          + SwiftProtocolConstants.SWIFT_BLOCKSIZE
+                          + SWIFT_BLOCKSIZE
                           + ": " + blocksizeKB);
       }
       partSizeKB = conf.getInt(SWIFT_PARTITION_SIZE,
                                DEFAULT_SWIFT_PARTITION_SIZE);
       if (partSizeKB <=0) {
         throw new SwiftConfigurationException("Invalid partition size set in "
-                          + SwiftProtocolConstants.SWIFT_PARTITION_SIZE
+                          + SWIFT_PARTITION_SIZE
                           + ": " + partSizeKB);
       }
 
@@ -484,7 +494,7 @@ public final class SwiftRestClient {
                                  DEFAULT_SWIFT_REQUEST_SIZE);
       if (bufferSizeKB <=0) {
         throw new SwiftConfigurationException("Invalid buffer size set in "
-                          + SwiftProtocolConstants.SWIFT_REQUEST_SIZE
+                          + SWIFT_REQUEST_SIZE
                           + ": " + bufferSizeKB);
       }
     } catch (NumberFormatException e) {
@@ -492,23 +502,36 @@ public final class SwiftRestClient {
       // SwiftConfigurationException instances
       throw new SwiftConfigurationException(e.toString(), e);
     }
-
+    //everything you need for diagnostics. The password is omitted.
+    serviceDescription = String.format(
+      "Service={%s} container={%s} uri={%s}"
+      + " tenant={%s} user={%s} region={%s}"
+      + " publicURL={%b}"
+      + " location aware={%b}"
+      + " partition size={%d KB}, buffer size={%d KB}"
+      + " block size={%d KB}"
+      + " connect timeout={%d}, retry count={%d}"
+      + " socket timeout={%d}"
+      + " throttle delay={%d}"
+      ,
+      serviceProvider,
+      container,
+      stringAuthUri,
+      tenant,
+      username,
+      region != null ? region : "(none)",
+      usePublicURL,
+      locationAware,
+      partSizeKB,
+      bufferSizeKB,
+      blocksizeKB,
+      connectTimeout,
+      retryCount,
+      socketTimeout,
+      throttleDelay
+      );
     if (LOG.isDebugEnabled()) {
-      //everything you need for diagnostics. The password is omitted.
-      LOG.debug(String.format(
-              "Service={%s} container={%s} uri={%s}"
-                      + " tenant={%s} user={%s} region={%s}"
-                      + " publicURL={%b}"
-                      + " connect timeout={%d}, retry count={%d}",
-              serviceProvider,
-              container,
-              stringAuthUri,
-              tenant,
-              username,
-              region != null ? region : "(none)",
-              usePublicURL,
-              connectTimeout,
-              retryCount));
+      LOG.debug(serviceDescription);
     }
     try {
       this.authUri = new URI(stringAuthUri);
@@ -1313,9 +1336,11 @@ public final class SwiftRestClient {
     methodParams.setParameter(HttpMethodParams.RETRY_HANDLER,
             new DefaultHttpMethodRetryHandler(
                     retryCount, false));
-    methodParams.setSoTimeout(connectTimeout);
     methodParams.setIntParameter(HttpMethodParams.HEAD_BODY_CHECK_TIMEOUT,
                                  connectTimeout);
+    methodParams.setIntParameter(HttpConnectionParams.CONNECTION_TIMEOUT,
+                                 connectTimeout);
+    methodParams.setSoTimeout(socketTimeout);
 
     try {
       int statusCode = 0;
@@ -1381,6 +1406,7 @@ public final class SwiftRestClient {
         fault = new FileNotFoundException("Operation " + method.getName()
                 + " on " + uri);
         break;
+
       case SC_BAD_REQUEST:
         //bad HTTP request
         fault =  new SwiftBadRequestException(
@@ -1400,6 +1426,16 @@ public final class SwiftRestClient {
         fault  = new SwiftAuthenticationFailedException(
                         "Operation not authorized- current access token ="
                             + token,
+                        method.getName(),
+                        uri,
+                        method);
+        break;
+
+      case SwiftProtocolConstants.SC_TOO_MANY_REQUESTS_429:
+      case SwiftProtocolConstants.SC_THROTTLED_498:
+        //response code that may mean the client is being throttled
+        fault  = new SwiftThrottledRequestException(
+                        "Client is being throttled: too many requests",
                         method.getName(),
                         uri,
                         method);
@@ -1662,12 +1698,7 @@ public final class SwiftRestClient {
 
   @Override
   public String toString() {
-    return "Swift client: " + filesystemURI
-           + " authURI=" + authUri
-           + " public endpoint=" + usePublicURL
-           + " location aware=" + locationAware
-           + " blocksize/KB = "+ blocksizeKB
-           + " partsize/KB = "+ partSizeKB;
+    return "Swift client: " + serviceDescription;
   }
 
   /**
