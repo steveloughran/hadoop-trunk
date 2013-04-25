@@ -189,6 +189,11 @@ public final class SwiftRestClient {
    * How long (in milliseconds) should a connection be attempted
    */
   private final int connectTimeout;
+  
+  /**
+   * How long (in milliseconds) between bulk operations
+   */
+  private final int throttleDelay;
 
   /**
   * the name of a proxy host (can be null, in which case there is no proxy)
@@ -452,6 +457,9 @@ public final class SwiftRestClient {
       retryCount = conf.getInt(SWIFT_RETRY_COUNT, DEFAULT_RETRY_COUNT);
       connectTimeout = conf.getInt(SWIFT_CONNECTION_TIMEOUT,
                                    DEFAULT_CONNECT_TIMEOUT);
+
+      throttleDelay = conf.getInt(SWIFT_THROTTLE_DELAY,
+                                  DEFAULT_THROTTLE_DELAY);
 
       //proxy options
       proxyHost = conf.get(SWIFT_PROXY_HOST_PROPERTY);
@@ -1315,7 +1323,7 @@ public final class SwiftRestClient {
         statusCode = exec(method);
       } catch (IOException e) {
         //rethrow with extra diagnostics and wiki links
-        throw ExceptionDiags.wrapException(uri.toString(), e);
+        throw ExceptionDiags.wrapException(uri.toString(), method.getName(), e);
       }
 
       //look at the response and see if it was valid or not.
@@ -1746,5 +1754,9 @@ public final class SwiftRestClient {
 
   public boolean isUsePublicURL() {
     return usePublicURL;
+  }
+
+  public int getThrottleDelay() {
+    return throttleDelay;
   }
 }
