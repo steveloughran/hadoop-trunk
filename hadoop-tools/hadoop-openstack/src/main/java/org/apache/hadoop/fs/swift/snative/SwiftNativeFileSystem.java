@@ -40,6 +40,7 @@ import org.apache.hadoop.util.Progressable;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.util.ArrayList;
@@ -643,11 +644,18 @@ public class SwiftNativeFileSystem extends FileSystem {
         //if there are children, unless this is a recursive operation, fail immediately
         throw new SwiftOperationFailedException("Directory " + path + " is not empty.");
       }
+      
       //delete the children
       for (FileStatus child : children) {
         Path childPath = child.getPath();
         try {
-          if (!innerDelete(childPath, true)) {
+          boolean deleted = false;
+          if (child.isDir()) {
+            deleted = innerDelete(childPath, true);
+          } else {
+            deleted = store.deleteObject(childPath);
+          }
+          if (!deleted) {
             if (LOG.isDebugEnabled()) {
               LOG.debug("Failed to recursively delete '" + childPath + "'");
             }
@@ -658,6 +666,7 @@ public class SwiftNativeFileSystem extends FileSystem {
           //do not fail, as the outcome is still OK.
           LOG.info("Path " + childPath + " is no longer present");
         }
+        store.throttle();
       }
       //here any children that existed have been deleted
       //so rm the directory
@@ -666,6 +675,8 @@ public class SwiftNativeFileSystem extends FileSystem {
 
     return true;
   }
+
+
 
   /**
    * Makes path absolute

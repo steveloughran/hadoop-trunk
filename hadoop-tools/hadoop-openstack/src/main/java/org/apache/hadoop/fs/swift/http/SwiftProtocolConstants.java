@@ -115,7 +115,18 @@ public class SwiftProtocolConstants {
    * connection retry count for all connections: {@value}
    */
   public static final String SWIFT_RETRY_COUNT =
-          FS_SWIFT + "connect.retry.count";
+          FS_SWIFT + ".connect.retry.count";
+
+  /**
+   * delay in millis between bulk (delete, rename, copy operations: {@value}
+   */
+  public static final String SWIFT_THROTTLE_DELAY =
+          FS_SWIFT + ".connect.throttle.delay";
+
+  /**
+   * the default throttle delay in millis {@value}
+   */
+  public static final int DEFAULT_THROTTLE_DELAY = 200;
 
   /**
    * blocksize for all filesystems: {@value}
