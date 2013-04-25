@@ -47,48 +47,34 @@ public class ExceptionDiags {
    * Take an IOException and a URI, wrap it where possible with
    * something that includes the URI
    *
-   * @param destURI target URI
+   * @param dest target URI
+   * @param operation operation
    * @param exception the caught exception.
    * @return an exception to throw
    */
-  public static IOException wrapException(final String destURI,
+  public static IOException wrapException(final String dest,
+                                          final String operation,
                                           final IOException exception) {
+    String action = operation + " " + dest;
+    String xref= null;
+    
     if (exception instanceof ConnectException) {
-      return wrapWithMessage(exception,
-                             "Connection to "
-                             + destURI
-                             + " failed on connection exception: "
-                             + exception
-                             + ";"
-                             + see("ConnectionRefused"));
+      xref = "ConnectionRefused";
     } else if (exception instanceof UnknownHostException) {
-      return wrapWithMessage(exception,
-                             "Invalid host name: "
-                             + destURI
-                             + exception
-                             + ";"
-                             + see("UnknownHost"));
+      xref = "UnknownHost";
     } else if (exception instanceof SocketTimeoutException) {
-      return wrapWithMessage(exception,
-                             "Call to " + destURI 
-                             + " failed on socket timeout exception: " +
-                             exception
-                             + ";"
-                             + see("SocketTimeout"));
+      xref = "SocketTimeout";
     } else if (exception instanceof NoRouteToHostException) {
-      return wrapWithMessage(exception,
-                             "No Route to Host to " +
-                             exception
-                             + ";"
-                             + see("NoRouteToHost"));
-    } else {
-      return (IOException) new IOException("Failed on local exception: "
-                                           + exception
-                                           + "; Host Details : "
-                                           + destURI)
-        .initCause(exception);
-
+      xref = "NoRouteToHost";
     }
+    String msg = action
+                 + " failed on exception: "
+                 + exception;
+    if (xref!=null) {
+      xref = xref + ";" + see(xref);
+    }
+    return wrapWithMessage(exception, msg);
+
   }
 
   private static String see(final String entry) {

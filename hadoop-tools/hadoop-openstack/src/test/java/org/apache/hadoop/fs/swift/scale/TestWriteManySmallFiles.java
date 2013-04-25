@@ -52,6 +52,7 @@ public class TestWriteManySmallFiles extends SwiftScaleTestBase {
       SwiftTestUtils.writeTextFile(fs, p, name, false);
       d.finished();
       writeStats.add(d);
+      Thread.sleep(5000);
     }
     //at this point, the directory is full.
     Duration ls2 = new Duration();

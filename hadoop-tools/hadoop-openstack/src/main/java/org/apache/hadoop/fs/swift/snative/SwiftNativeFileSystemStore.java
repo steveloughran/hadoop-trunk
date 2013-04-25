@@ -39,6 +39,7 @@ import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.text.ParseException;
@@ -99,6 +100,9 @@ public class SwiftNativeFileSystemStore {
     return swiftRestClient.getBufferSizeKB();
   }
 
+  public int getThrottleDelay() {
+    return swiftRestClient.getThrottleDelay();
+  }
   /**
    * Upload a file/input stream of a specific length.
    *
@@ -209,7 +213,6 @@ public class SwiftNativeFileSystemStore {
                                lastModified,
                                correctSwiftPath);
   }
-
 
   /**
    * Get the object as an input stream
@@ -566,7 +569,10 @@ public class SwiftNativeFileSystemStore {
 
       logDirectory("Directory to copy ", srcObject, fileStatuses);
 
-      //iterative copy of everything under the directory
+      // iterative copy of everything under the directory.
+      // by listing all children this can be done iteratively
+      // rather than recursively -everything in this list is either a file
+      // or a 0-byte-len file pretending to be a directory.
       String srcURI = src.toUri().toString();
       int prefixStripCount = srcURI.length() + 1;
       for (FileStatus fileStatus : fileStatuses) {
@@ -592,6 +598,8 @@ public class SwiftNativeFileSystemStore {
         } catch (FileNotFoundException e) {
           LOG.info("Skipping rename of " + copySourcePath);
         }
+        //add a throttle delay
+        throttle();
       }
       //now rename self. If missing, create the dest directory and warn
       if (!SwiftUtils.isRootDir(srcObject)) {
@@ -723,5 +731,22 @@ public class SwiftNativeFileSystemStore {
       }
     }
     return result;
+  }
+
+  /**
+   * Insert a throttled wait if the throttle delay >0
+   * @throws InterruptedIOException if interrupted during sleep
+   */
+  public void throttle() throws InterruptedIOException {
+    int throttleDelay = getThrottleDelay();
+    if (throttleDelay > 0) {
+      try {
+        Thread.sleep(throttleDelay);
+      } catch (InterruptedException e) {
+        //convert to an IOE
+        throw (InterruptedIOException) new InterruptedIOException(e.toString())
+          .initCause(e);
+      }
+    }
   }
 }
