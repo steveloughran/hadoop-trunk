@@ -309,7 +309,11 @@ The property has a unit of kilobytes; the default value is `32*1024`: 32 MB
       <value>32768</value>
     </property>
 
-Note that the mapreduce engine's split logic can be tuned independently by setting
+This blocksize has no influence on how files are stored in Swift; it only controls
+what the reported size of blocks are - a value used in Hadoop MapReduce to
+divide work.
+
+Note that the MapReduce engine's split logic can be tuned independently by setting
 the `mapred.min.split.size` and `mapred.max.split.size` properties,
 which can be done in specific job configurations.
 
@@ -395,6 +399,18 @@ A shorter timeout means that connection failures are raised faster -but
 may trigger more false alarms. A longer timeout is more resilient to network
 problems -and may be needed when talking to remote filesystems.
 
+#### Connection timeout `fs.swift.socket.timeout`
+
+This sets the timeout in milliseconds to wait for data from a connected socket.
+
+    <property>
+      <name>fs.swift.socket.timeout</name>
+      <value>60000</value>
+    </property>
+
+A shorter timeout means that connection failures are raised faster -but
+may trigger more false alarms. A longer timeout is more resilient to network
+problems -and may be needed when talking to remote filesystems.
 
 #### Connection Retry Count `fs.swift.connect.retry.count`
 
@@ -408,6 +424,22 @@ an HTTP request is made.
 
 The more retries, the more resilient it is to transient outages -and the
 less rapid it is at detecting and reporting server connectivity problems.
+
+#### Connection Throttle Delay `fs.swift.connect.throttle.delay`
+
+This property adds a delay between bulk file copy and delete operations,
+to prevent requests being throttled or blocked by the remote service
+
+    <property>
+      <name>fs.swift.connect.throttle.delay</name>
+      <value>0</value>
+    </property>
+
+It is measured in milliseconds; "0" means do not add any delay.
+
+Throttling is enabled on the public endpoints of some Swift services.
+If `rename()` or `delete()` operations fail with `SwiftThrottledRequestException`
+exceptions, try setting this property.
 
 #### HTTP Proxy
 
@@ -460,7 +492,7 @@ by setting the password.
 
 This happens if the client application is running outside an OpenStack cluster,
 where it does not have access to the private hostname/IP address for filesystem
-operations. Set the public flag to true -but remember to set it to false
+operations. Set the `public` flag to true -but remember to set it to false
 for use in-cluster.
 
 ## Warnings
