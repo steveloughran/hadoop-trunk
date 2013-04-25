@@ -141,7 +141,7 @@ public class SwiftProtocolConstants {
   /**
    * the default throttle delay in millis {@value}
    */
-  public static final int DEFAULT_THROTTLE_DELAY = 200;
+  public static final int DEFAULT_THROTTLE_DELAY = 0;
 
   /**
    * blocksize for all filesystems: {@value}
