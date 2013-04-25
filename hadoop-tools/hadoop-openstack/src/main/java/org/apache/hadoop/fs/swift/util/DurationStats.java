@@ -69,7 +69,7 @@ public class DurationStats {
   }
 
   public double getVariance() {
-    return m2 / (n - 1);
+    return n > 0 ? (m2 / (n - 1)) : 0;
   }
 
   public double getDeviation() {
