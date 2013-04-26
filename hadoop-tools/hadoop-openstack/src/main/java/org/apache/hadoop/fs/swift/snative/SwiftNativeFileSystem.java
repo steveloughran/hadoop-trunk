@@ -158,7 +158,6 @@ public class SwiftNativeFileSystem extends FileSystem {
     if (LOG.isDebugEnabled()) {
       LOG.debug("SwiftFileSystem.setWorkingDirectory to " + dir);
     }
-
     workingDir = dir;
   }
 
@@ -169,9 +168,9 @@ public class SwiftNativeFileSystem extends FileSystem {
    * @return a FileStatus object
    */
   @Override
-  public FileStatus getFileStatus(Path f) throws IOException {
-
-    return store.getObjectMetadata(f);
+  public FileStatus getFileStatus(Path path) throws IOException {
+    Path absolutePath = makeAbsolute(path);
+    return store.getObjectMetadata(absolutePath);
   }
 
   /**
@@ -197,8 +196,8 @@ public class SwiftNativeFileSystem extends FileSystem {
   }
 
   @Override
-  public long getBlockSize(Path f) throws IOException {
-    return getDefaultBlockSize(f);
+  public long getBlockSize(Path path) throws IOException {
+    return store.getBlocksize();
   }
 
   @Override
@@ -417,16 +416,16 @@ public class SwiftNativeFileSystem extends FileSystem {
    * List the statuses of the files/directories in the given path if the path is
    * a directory.
    *
-   * @param f given path
+   * @param path given path
    * @return the statuses of the files/directories in the given path
    * @throws IOException
    */
   @Override
-  public FileStatus[] listStatus(Path f) throws IOException {
+  public FileStatus[] listStatus(Path path) throws IOException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("SwiftFileSystem.listStatus for: " + f);
+      LOG.debug("SwiftFileSystem.listStatus for: " + path);
     }
-    return store.listSubPaths(f);
+    return store.listSubPaths(makeAbsolute(path));
   }
 
   /**
@@ -450,15 +449,16 @@ public class SwiftNativeFileSystem extends FileSystem {
     LOG.debug("SwiftFileSystem.create");
 
     FileStatus fileStatus = null;
+    Path absolutePath = makeAbsolute(file);
     try {
-      fileStatus = getFileStatus(makeAbsolute(file));
+      fileStatus = getFileStatus(absolutePath);
     } catch (FileNotFoundException e) {
       //nothing to do
     }
 
     if (fileStatus != null && !SwiftUtils.isDirectory(fileStatus)) {
       if (overwrite) {
-        delete(file, true);
+        store.deleteObject(absolutePath);
       } else {
         throw new SwiftPathExistsException("File already exists: " + file);
       }
@@ -502,12 +502,13 @@ public class SwiftNativeFileSystem extends FileSystem {
     if (bufferSize <= 0) {
       throw new SwiftConfigurationException("Bad remote buffer size");
     }
+    Path absolutePath = makeAbsolute(path);
     long readBlockSize = bufferSizeKB * 1024L;
     return new FSDataInputStream(
             new StrictBufferedFSInputStream(
                     new SwiftNativeInputStream(store,
                                        statistics,
-                                       path,
+                                       absolutePath,
                                        readBlockSize),
                     bufferSize));
   }
@@ -593,9 +594,9 @@ public class SwiftNativeFileSystem extends FileSystem {
    *                               and recursive is true)
    */
   private boolean innerDelete(Path path, boolean recursive) throws IOException {
-    Path absolutePath = makeAbsolute(path);
     final FileStatus fileStatus;
-    fileStatus = getFileStatus(path);
+    Path absolutePath = makeAbsolute(path);
+    fileStatus = getFileStatus(absolutePath);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Deleting path '" + path + "'");
     }
