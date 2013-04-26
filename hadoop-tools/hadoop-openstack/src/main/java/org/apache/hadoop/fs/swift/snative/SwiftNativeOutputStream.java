@@ -23,6 +23,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.exceptions.SwiftException;
+import org.apache.hadoop.fs.swift.exceptions.SwiftInternalStateException;
+import org.apache.hadoop.fs.swift.util.SwiftUtils;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -51,7 +53,10 @@ class SwiftNativeOutputStream extends OutputStream {
   private boolean closed;
   private int partNumber;
   private long blockOffset;
+  private long bytesWritten;
+  private long bytesUploaded;
   private boolean partUpload = false;
+  final byte[] oneByte = new byte[1];
 
   /**
    * Create an output stream
@@ -121,18 +126,19 @@ class SwiftNativeOutputStream extends OutputStream {
       closed = true;
       //formally declare as closed.
       backupStream.close();
+      backupStream = null;
       Path keypath = new Path(key);
       if (partUpload) {
-        partUpload();
+        partUpload(true);
         nativeStore.createManifestForPartUpload(keypath);
       } else {
         uploadOnClose(keypath);
       }
     } finally {
       delete(backupFile);
-      backupStream = null;
       backupFile = null;
     }
+    assert backupStream == null: "backup stream has been reopened";
   }
 
   /**
@@ -142,18 +148,18 @@ class SwiftNativeOutputStream extends OutputStream {
    * @throws IOException IO Problems
    */
   private void uploadOnClose(Path keypath) throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(String.format("Closing write of file %s;" +
+    long uploadLen = backupFile.length();
+    SwiftUtils.debug(LOG, "Closing write of file %s;" +
                               " localfile=%s of length %d",
                               key,
                               backupFile,
-                              backupFile.length()));
-    }
+                              uploadLen);
 
     nativeStore.uploadFile(keypath,
                            new FileInputStream(backupFile),
-                           backupFile.length());
-  }
+                           uploadLen);
+    bytesUploaded += uploadLen;
+}
 
   @Override
   protected void finalize() throws Throwable {
@@ -166,62 +172,124 @@ class SwiftNativeOutputStream extends OutputStream {
   }
 
   private void delete(File file) {
-    if (!file.delete()) {
-      LOG.warn("Could not delete " + file);
+    if (file != null) {
+      SwiftUtils.debug(LOG, "deleting %s", file);
+      if (!file.delete()) {
+        LOG.warn("Could not delete " + file);
+      }
     }
   }
 
   @Override
   public void write(int b) throws IOException {
-    verifyOpen();
-    backupStream.write(b);
+    //insert to a one byte array
+    oneByte[0] = (byte) b;
+    //then delegate to the array writing routine
+    write(oneByte, 0, 1);
   }
 
   @Override
-  public synchronized void write(byte[] b, int off, int len) throws IOException {
+  public synchronized void write(byte[] buffer, int offset, int len) throws
+                                                                     IOException {
     //validate args
-    if (off < 0 || len < 0 || (off + len) > b.length) {
+    if (offset < 0 || len < 0 || (offset + len) > buffer.length) {
       throw new IndexOutOfBoundsException("Invalid offset/length for write");
     }
+    //validate the output stream
     verifyOpen();
+    SwiftUtils.debug(LOG, " write(offset=%d, len=%d)", offset, len);
 
     // if the size of file is greater than the partition limit
-    if (blockOffset + len >= filePartSize) {
-      // - then partition the blob and upload the first part
+    while (blockOffset + len >= filePartSize) {
+      // - then partition the blob and upload as many partitions 
+      // are needed.
+      //how many bytes to write for this partition.
+      int subWriteLen = (int) (filePartSize - blockOffset);
+      if (subWriteLen < 0 || subWriteLen > len) {
+        throw new SwiftInternalStateException("Invalid subwrite len: "
+                                              + subWriteLen
+                                              + " -buffer len: " + len);
+      }
+      writeToBackupStream(buffer, offset, subWriteLen);
+      //move the offset along and length down
+      offset += subWriteLen;
+      len -= subWriteLen;
+      //now upload the partition that has just been filled up
       // (this also sets blockOffset=0)
-      partUpload();
+      partUpload(false);
+    }
+    //any remaining data is now written
+    writeToBackupStream(buffer, offset, len);
+  }
+
+  /**
+   * Write to the backup stream.
+   * Guarantees:
+   * <ol>
+   *   <li>backupStream is open</li>
+   *   <li>blockOffset + len &lt; filePartSize</li>
+   * </ol>
+   * @param buffer buffer to write
+   * @param offset offset in buffer
+   * @param len length of write.
+   * @throws IOException backup stream write failing
+   */
+  private void writeToBackupStream(byte[] buffer, int offset, int len) throws
+                                                                       IOException {
+    assert len >= 0  : "remainder to write is negative";
+    SwiftUtils.debug(LOG," writeToBackupStream(offset=%d, len=%d)", offset, len);
+    if (len == 0) {
+      //no remainder -downgrade to noop
+      return;
     }
 
-    //now update
+    //write the new data out to the backup stream
+    backupStream.write(buffer, offset, len);
+    //increment the counters
     blockOffset += len;
-    backupStream.write(b, off, len);
+    bytesWritten += len;
   }
 
   /**
    * Upload a single partition. This deletes the local backing-file,
    * and re-opens it to create a new one.
+   * @param closingUpload is this the final upload of an upload
    * @throws IOException on IO problems
    */
-  private void partUpload() throws IOException {
-    partUpload = true;
-    backupStream.close();
-    if(LOG.isDebugEnabled()) {
-      LOG.debug(String.format("Uploading part %d of file %s;" +
-                              " localfile=%s of length %d",
-                              partNumber,
-                              key,
-                              backupFile,
-                              backupFile.length()));
+  private void partUpload(boolean closingUpload) throws IOException {
+    if (backupStream != null) {
+      backupStream.close();
     }
-    nativeStore.uploadFilePart(new Path(key),
-            partNumber,
-            new FileInputStream(backupFile),
-            backupFile.length());
-    delete(backupFile);
-    backupFile = newBackupFile();
-    backupStream = new BufferedOutputStream(new FileOutputStream(backupFile));
-    blockOffset = 0;
-    partNumber++;
+    long uploadLen = backupFile.length();
+    SwiftUtils.debug(LOG, "Uploading part %d of file %s;" +
+                          " localfile=%s of length %d",
+                     partNumber,
+                     key,
+                     backupFile,
+                     uploadLen);
+    if (closingUpload && partUpload && uploadLen == 0) {
+      //skipping the upload if
+      // - it is close time
+      // - the final partition is 0 bytes long
+      // - one part has already been written
+      SwiftUtils.debug(LOG, "skipping upload of 0 byte final partition");
+    } else {
+      partUpload = true;
+      nativeStore.uploadFilePart(new Path(key),
+                                 partNumber,
+                                 new FileInputStream(backupFile),
+                                 uploadLen);
+      bytesUploaded += uploadLen;
+      delete(backupFile);
+      partNumber++;
+      blockOffset = 0;
+      if (!closingUpload) {
+        //if not the final upload, create a new output stream
+        backupFile = newBackupFile();
+        backupStream =
+          new BufferedOutputStream(new FileOutputStream(backupFile));
+      }
+    }
   }
 
   /**
@@ -241,6 +309,24 @@ class SwiftNativeOutputStream extends OutputStream {
     return partNumber - 1;
   }
 
+  /**
+   * Get the number of bytes written to the output stream.
+   * This should always be less than or equal to bytesUploaded.
+   * @return the number of bytes written to this stream
+   */
+  long getBytesWritten() {
+    return bytesWritten;
+  }
+
+  /**
+   * Get the number of bytes uploaded to remote Swift cluster.
+   * bytesUploaded -bytesWritten = the number of bytes left to upload
+   * @return the number of bytes written to the remote endpoint
+   */
+  long getBytesUploaded() {
+    return bytesUploaded;
+  }
+
   @Override
   public String toString() {
     return "SwiftNativeOutputStream{" +
@@ -252,6 +338,8 @@ class SwiftNativeOutputStream extends OutputStream {
            ", blockOffset=" + blockOffset +
            ", partUpload=" + partUpload +
            ", nativeStore=" + nativeStore +
+           ", bytesWritten=" + bytesWritten +
+           ", bytesUploaded=" + bytesUploaded +
            '}';
   }
 }

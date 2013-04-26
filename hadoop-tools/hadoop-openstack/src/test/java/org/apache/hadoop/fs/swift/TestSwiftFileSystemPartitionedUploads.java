@@ -23,12 +23,11 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.http.SwiftProtocolConstants;
-import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
+import org.apache.hadoop.fs.swift.util.SwiftUtils;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 
@@ -45,21 +44,20 @@ public class TestSwiftFileSystemPartitionedUploads extends
 
   public static final String WRONG_PARTITION_COUNT =
     "wrong number of partitions written into ";
+  public static final int PART_SIZE = 1;
+  public static final int PART_SIZE_BYTES = PART_SIZE * 1024;
+  public static final int BLOCK_SIZE = 1024;
   private URI uri;
 
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
     //set the partition size to 1 KB
-    conf.setInt(SwiftProtocolConstants.SWIFT_PARTITION_SIZE, 1);
+    conf.setInt(SwiftProtocolConstants.SWIFT_PARTITION_SIZE, PART_SIZE);
     return conf;
   }
 
-  protected int getPartitionsWritten(FSDataOutputStream out) {
-    return SwiftNativeFileSystem.getPartitionsWritten(out);
-  }
-
-@Test
+  @Test
   public void testPartitionPropertyPropagatesToConf() throws Throwable {
     assertEquals(1,
                  getConf().getInt(SwiftProtocolConstants.SWIFT_PARTITION_SIZE, 0));
@@ -82,26 +80,42 @@ public class TestSwiftFileSystemPartitionedUploads extends
     final byte[] src = SwiftTestUtils.dataset(len, 32, 144);
     FSDataOutputStream out = fs.create(path,
                                false,
-                               fs.getConf().getInt("io.file.buffer.size", 4096),
+                               getBufferSize(),
                                (short) 1,
-                               1024);
+                               BLOCK_SIZE);
     
-    assertPartitionsWritten(out, 0);
-    //write first half
-    out.write(src, 0, len / 2);
-    assertPartitionsWritten(out, 1);
-    //write second half
-    out.write(src, len / 2, len / 2);
-    assertPartitionsWritten(out, 2);
+    int totalPartitionsToWrite = len/ PART_SIZE_BYTES;
+    assertPartitionsWritten("Startup", out, 0);
+    //write 2048
+    int firstWriteLen = 2048;
+    out.write(src, 0, firstWriteLen);
+    //assert
+    long expected = getExpectedPartitionsWritten(firstWriteLen,
+                                                 PART_SIZE_BYTES,
+                                                 false);
+    SwiftUtils.debug(LOG,"First write: predict %d partitions written",expected);
+    assertPartitionsWritten("First write completed", out, expected);
+    //write the rest
+    int remainder = len - firstWriteLen;
+    SwiftUtils.debug(LOG, "remainder: writing: %d bytes",remainder);
+
+    out.write(src, firstWriteLen, remainder);
+    expected =
+      getExpectedPartitionsWritten(len, PART_SIZE_BYTES, false);
+    assertPartitionsWritten("Remaining data", out, expected);
     out.close();
-    assertPartitionsWritten(out, 3);
+    expected =
+      getExpectedPartitionsWritten(len, PART_SIZE_BYTES, true);
+    assertPartitionsWritten("Stream closed", out, expected);
 
     assertTrue("Exists", fs.exists(path));
     FileStatus status = fs.getFileStatus(path);
     assertEquals("Length", len, status.getLen());
-
-
+    String fileInfo = path + "  " + status;
+    assertFalse("File claims to be a directory " + fileInfo,
+                status.isDir());
     byte[] dest = readDataset(fs, path, len);
+    //compare data
     SwiftTestUtils.compareByteArrays(src, dest, len);
 
     //now see what block location info comes back.
@@ -113,11 +127,50 @@ public class TestSwiftFileSystemPartitionedUploads extends
                locations.length > 0);
   }
 
-  private void assertPartitionsWritten(FSDataOutputStream out, int expected) {
-    OutputStream nativeStream = out.getWrappedStream();
-    assertEquals(WRONG_PARTITION_COUNT + nativeStream ,
-                 expected, getPartitionsWritten(out));
+  private int getExpectedPartitionsWritten(long uploaded,
+                                            int partSizeBytes,
+                                            boolean closed) {
+    //#of partitions in total
+    int partitions = (int) (uploaded / partSizeBytes);
+    //#of bytes past the last partition
+    int remainder = (int) (uploaded % partSizeBytes);
+    if (closed) {
+      //all data is written, so if there was any remainder, it went up
+      //too
+      return partitions + ((remainder > 0) ? 1 : 0);
+    } else {
+      //not closed. All the remainder is buffered,
+      return partitions;
+    }
   }
 
+  private int getBufferSize() {
+    return fs.getConf().getInt("io.file.buffer.size", 4096);
+  }
+
+  /**
+   * Test that when a partitioned file is overwritten by a smaller one,
+   * all the old partitioned files go away
+   * @throws Throwable
+   */
+  //@Test
+  public void testOverwritePartitionedFile() throws Throwable {
+    final Path path = new Path("/test/partitioned-file");
+
+    int len = 8192;
+    final byte[] src = SwiftTestUtils.dataset(len, 32, 144);
+    FSDataOutputStream out = fs.create(path,
+                                       false,
+                                       getBufferSize(),
+                                       (short) 1,
+                                       1024);
+    out.write(src, 0, len);
+    out.close();
+    assertPartitionsWritten("", out, 3);
+
+    assertTrue("Exists", fs.exists(path));
+    FileStatus status = fs.getFileStatus(path);
+    assertEquals("Length", len, status.getLen());
+  }
 
 }

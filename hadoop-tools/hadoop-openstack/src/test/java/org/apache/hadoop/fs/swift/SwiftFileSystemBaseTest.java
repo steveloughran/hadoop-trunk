@@ -38,6 +38,7 @@ import org.junit.Before;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 
@@ -270,5 +271,21 @@ public class SwiftFileSystemBaseTest extends Assert {
   protected void assertNotEqual(String message, int expected, int actual) {
     assertTrue(message,
                actual != expected);
+  }
+
+  protected int getPartitionsWritten(FSDataOutputStream out) {
+    return SwiftNativeFileSystem.getPartitionsWritten(out);
+  }
+
+  protected void assertPartitionsWritten(String action, FSDataOutputStream out,
+                                         long expected) {
+    OutputStream nativeStream = out.getWrappedStream();
+    int written = getPartitionsWritten(out);
+    if(written !=expected) {
+    Assert.fail(action + ": " +
+                TestSwiftFileSystemPartitionedUploads.WRONG_PARTITION_COUNT 
+                + " + expected: " + expected + " actual: " + written
+                + " -- " + nativeStream);
+    }
   }
 }
