@@ -672,11 +672,8 @@ public class SwiftNativeFileSystem extends FileSystem {
       //so rm the directory
       store.rmdir(absolutePath);
     }
-
     return true;
   }
-
-
 
   /**
    * Makes path absolute
@@ -691,7 +688,6 @@ public class SwiftNativeFileSystem extends FileSystem {
     return new Path(workingDir, path);
   }
 
-
   /**
    * Get the number of partitions written by an output stream
    * This is for testing
@@ -700,9 +696,14 @@ public class SwiftNativeFileSystem extends FileSystem {
    */
   @InterfaceAudience.Private
   public static int getPartitionsWritten(FSDataOutputStream outputStream) {
-    OutputStream wrappedStream = outputStream.getWrappedStream();
-    SwiftNativeOutputStream snos = (SwiftNativeOutputStream) wrappedStream;
+    SwiftNativeOutputStream snos = getSwiftNativeOutputStream(outputStream);
     return snos.getPartitionsWritten();
+  }
+
+  private static SwiftNativeOutputStream getSwiftNativeOutputStream(
+    FSDataOutputStream outputStream) {
+    OutputStream wrappedStream = outputStream.getWrappedStream();
+    return (SwiftNativeOutputStream) wrappedStream;
   }
 
   /**
@@ -714,9 +715,35 @@ public class SwiftNativeFileSystem extends FileSystem {
    */
   @InterfaceAudience.Private
   public static long getPartitionSize(FSDataOutputStream outputStream) {
-    OutputStream wrappedStream = outputStream.getWrappedStream();
-    SwiftNativeOutputStream snos = (SwiftNativeOutputStream) wrappedStream;
+    SwiftNativeOutputStream snos = getSwiftNativeOutputStream(outputStream);
     return snos.getFilePartSize();
+  }
+
+  /**
+   * Get the the number of bytes written to an output stream
+   * This is for testing
+   *
+   * @param outputStream output stream
+   * @return partition size in bytes
+   */
+  @InterfaceAudience.Private
+  public static long getBytesWritten(FSDataOutputStream outputStream) {
+    SwiftNativeOutputStream snos = getSwiftNativeOutputStream(outputStream);
+    return snos.getBytesWritten();
+  }
+
+  /**
+   * Get the the number of bytes uploaded by an output stream
+   * to the swift cluster.
+   * This is for testing
+   *
+   * @param outputStream output stream
+   * @return partition size in bytes
+   */
+  @InterfaceAudience.Private
+  public static long getBytesUploaded(FSDataOutputStream outputStream) {
+    SwiftNativeOutputStream snos = getSwiftNativeOutputStream(outputStream);
+    return snos.getBytesUploaded();
   }
 
 }
