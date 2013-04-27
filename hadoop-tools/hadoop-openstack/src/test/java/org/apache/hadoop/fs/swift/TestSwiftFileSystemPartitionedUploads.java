@@ -60,13 +60,13 @@ public class TestSwiftFileSystemPartitionedUploads extends
     return conf;
   }
 
-  @Test
+  @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
   public void testPartitionPropertyPropagatesToConf() throws Throwable {
     assertEquals(1,
                  getConf().getInt(SwiftProtocolConstants.SWIFT_PARTITION_SIZE, 0));
   }
 
-  @Test
+  @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
   public void testPartionPropertyPropagatesToStore() throws Throwable {
     assertEquals(1, fs.getStore().getPartsizeKB());
   }
@@ -74,7 +74,7 @@ public class TestSwiftFileSystemPartitionedUploads extends
   /**
    * tests functionality for big files ( > 5Gb) upload
    */
-  @Test(timeout = 1800000)
+  @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
   public void testFilePartUpload() throws IOException, URISyntaxException {
 
     final Path path = new Path("/test/testFilePartUpload");
@@ -160,7 +160,7 @@ public class TestSwiftFileSystemPartitionedUploads extends
    * it comes back unchanged. 
    * @throws Throwable
    */
-  @Test(timeout = 1800000)
+  @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
   public void testManyPartitionedFile() throws Throwable {
     final Path path = new Path("/test/testManyPartionedFile");
 
@@ -194,7 +194,7 @@ public class TestSwiftFileSystemPartitionedUploads extends
    * @throws Throwable
    */
   @Ignore
-  @Test(timeout = 1800000)
+  @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
   public void testOverwritePartitionedFile() throws Throwable {
     final Path path = new Path("/test/testOverwritePartitionedFile");
 

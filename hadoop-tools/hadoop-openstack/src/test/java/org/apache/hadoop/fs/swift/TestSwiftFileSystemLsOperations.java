@@ -65,7 +65,7 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
     }
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testListLevelTest() throws Exception {
     createTestSubdirs();
     FileStatus[] paths = fs.listStatus(path("/test"));
@@ -73,7 +73,7 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
     assertEquals(path("/test/hadoop"), paths[0].getPath());
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testListLevelTestHadoop() throws Exception {
     createTestSubdirs();
     FileStatus[] paths;
@@ -85,7 +85,7 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
     assertEquals(stats, path("/test/hadoop/c"), paths[2].getPath());
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testListStatusEmptyDirectory() throws Exception {
     createTestSubdirs();
     FileStatus[] paths;
@@ -94,7 +94,7 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
                  paths.length);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testListStatusFile() throws Exception {
     describe("Create a single file under /test;" +
              " assert that listStatus(/test) finds it");
@@ -106,7 +106,7 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
                  paths.length);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testListEmptyRoot() throws Throwable {
     describe("Empty the root dir and verify that an LS / returns {}");
     cleanup("testListEmptyRoot", fs, "/test");
@@ -115,7 +115,7 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
     assertEquals(0, fileStatuses.length);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testListNonEmptyRoot() throws Throwable {
     Path file = path("/test");
     touch(fs, file);
@@ -125,7 +125,7 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
     assertEquals(file, status.getPath());
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testListStatusRootDir() throws Throwable {
     Path dir = path("/");
     Path child = path("/test");

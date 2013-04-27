@@ -35,7 +35,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Unit tests for SwiftObjectPath class.
  */
-public class TestSwiftObjectPath {
+public class TestSwiftObjectPath implements SwiftTestConstants {
   private static final Log LOG = LogFactory.getLog(TestSwiftObjectPath.class);
 
   /**
@@ -45,7 +45,7 @@ public class TestSwiftObjectPath {
   private static final String ENDPOINT =
           "https://storage101.region1.example.org/v1/MossoCloudFS_9fb40cc0-1234-5678-9abc-def000c9a66";
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testParsePath() throws Exception {
     final String pathString = "/home/user/files/file1";
     final Path path = new Path(pathString);
@@ -58,7 +58,7 @@ public class TestSwiftObjectPath {
     assertEquals(expected, actual);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testParseUrlPath() throws Exception {
     final String pathString = "swift://container.service1/home/user/files/file1";
     final URI uri = new URI(pathString);
@@ -71,7 +71,7 @@ public class TestSwiftObjectPath {
     assertEquals(expected, actual);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testParseAuthenticatedUrl() throws Exception {
     final String pathString = "swift://container.service1/v2/AUTH_00345h34l93459y4/home/tom/documents/finance.docx";
     final URI uri = new URI(pathString);
@@ -84,7 +84,7 @@ public class TestSwiftObjectPath {
     assertEquals(expected, actual);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testConvertToPath() throws Throwable {
     String initialpath = "/dir/file1";
     Path ipath = new Path(initialpath);
@@ -96,13 +96,13 @@ public class TestSwiftObjectPath {
     LOG.info("Merged URI=" + uri);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRootDirProbeEmptyPath() throws Throwable {
     SwiftObjectPath object=new SwiftObjectPath("container","");
     assertTrue(SwiftUtils.isRootDir(object));
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRootDirProbeRootPath() throws Throwable {
     SwiftObjectPath object=new SwiftObjectPath("container","/");
     assertTrue(SwiftUtils.isRootDir(object));
@@ -118,7 +118,7 @@ public class TestSwiftObjectPath {
       p2));
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testChildOfProbe() throws Throwable {
     SwiftObjectPath parent = new SwiftObjectPath("container",
                                                  "/parent");
@@ -140,7 +140,7 @@ public class TestSwiftObjectPath {
     assertNotParentOf(grandchild, parent);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testChildOfRoot() throws Throwable {
     SwiftObjectPath root = new SwiftObjectPath("container", "/");
     SwiftObjectPath child = new SwiftObjectPath("container", "child");

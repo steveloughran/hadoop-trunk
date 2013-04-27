@@ -44,7 +44,7 @@ public class TestSwiftFileSystemConcurrency extends SwiftFileSystemBaseTest {
   /**
    * test on concurrent file system changes
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRaceConditionOnDirDeleteTest() throws Exception {
     SwiftTestUtils.skip("Skipping unreliable test");
 
