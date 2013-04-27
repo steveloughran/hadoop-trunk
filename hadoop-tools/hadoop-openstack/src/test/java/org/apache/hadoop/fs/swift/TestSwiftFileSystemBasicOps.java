@@ -45,14 +45,14 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
   private static final Log LOG =
           LogFactory.getLog(TestSwiftFileSystemBasicOps.class);
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testlsRoot() throws Throwable {
     Path path = new Path("/");
     FileStatus[] statuses = fs.listStatus(path);
   }
 
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testMkDir() throws Throwable {
     Path path = new Path("/test/MkDir");
     fs.mkdirs(path);
@@ -61,14 +61,14 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
   }
 
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testDeleteNonexistentFile() throws Throwable {
     Path path = new Path("/test/DeleteNonexistentFile");
     assertFalse("delete returned true", fs.delete(path, false));
   }
 
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testPutFile() throws Throwable {
     Path path = new Path("/test/PutFile");
     Exception caught = null;
@@ -76,7 +76,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
     assertDeleted(path, false);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testPutGetFile() throws Throwable {
     Path path = new Path("/test/PutGetFile");
     try {
@@ -91,7 +91,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
     }
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testPutDeleteFileInSubdir() throws Throwable {
     Path path =
             new Path("/test/PutDeleteFileInSubdir/testPutDeleteFileInSubdir");
@@ -103,7 +103,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
     assertDeleted(new Path("/test/PutDeleteFileInSubdir"), false);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRecursiveDelete() throws Throwable {
     Path childpath =
             new Path("/test/testRecursiveDelete");
@@ -135,7 +135,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
     }
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testOverwrite() throws Throwable {
     Path path = new Path("/test/Overwrite");
     try {
@@ -154,7 +154,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
     }
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testFileStatus() throws Throwable {
     Path path = new Path("/test/FileStatus");
     try {
@@ -172,7 +172,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
    *
    * @throws Throwable if not, or if something else failed
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testDirStatus() throws Throwable {
     Path path = new Path("/test/DirStatus");
     try {
@@ -189,7 +189,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
    *
    * @throws Throwable if not, or if something else failed
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testDirStaysADir() throws Throwable {
     Path path = new Path("/test/dirStaysADir");
     Path child = new Path(path, "child");
@@ -209,7 +209,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
     }
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testCreateMultilevelDir() throws Throwable {
     Path base = new Path("/test/CreateMultilevelDir");
     Path path = new Path(base, "1/2/3");
@@ -217,7 +217,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
     fs.delete(base, true);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testCreateDirWithFileParent() throws Throwable {
     Path path = new Path("/test/CreateDirWithFileParent");
     Path child = new Path(path, "subdir/child");
@@ -236,7 +236,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
   }
 
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testLongObjectNamesForbidden() throws Throwable {
     StringBuilder buffer = new StringBuilder(1200);
     buffer.append("/");
@@ -257,7 +257,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
     }
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testLsNonExistentFile() throws Exception {
     try {
       Path path = new Path("/test/hadoop/file");

@@ -42,7 +42,9 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-public class SwiftFileSystemBaseTest extends Assert {
+public class SwiftFileSystemBaseTest extends Assert implements
+                                                    SwiftTestConstants {
+
   protected static final Log LOG =
           LogFactory.getLog(SwiftFileSystemBaseTest.class);
   protected SwiftNativeFileSystem fs;

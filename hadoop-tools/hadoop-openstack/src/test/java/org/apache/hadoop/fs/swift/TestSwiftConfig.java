@@ -74,6 +74,7 @@ public class TestSwiftConfig extends Assert {
     mkInstance(configuration);
   }
 
+  @Test
   public void testGoodRetryCount() throws Exception {
     final Configuration configuration = createCoreConfig();
     configuration.set(SWIFT_RETRY_COUNT, "3");

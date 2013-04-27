@@ -33,7 +33,7 @@ import java.io.IOException;
 public class TestSwiftFileSystemBlockLocation extends SwiftFileSystemBaseTest {
 
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testLocateSingleFileBlocks() throws Throwable {
     describe("verify that a file returns 1+ blocks");
     FileStatus fileStatus = createFileAndGetStatus();
@@ -63,7 +63,7 @@ public class TestSwiftFileSystemBlockLocation extends SwiftFileSystemBaseTest {
     return fs.getFileStatus(path);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testLocateNullStatus() throws Throwable {
     describe("verify that a null filestatus maps to a null location array");
     BlockLocation[] locations =
@@ -71,7 +71,7 @@ public class TestSwiftFileSystemBlockLocation extends SwiftFileSystemBaseTest {
     assertNull(locations);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testLocateNegativeSeek() throws Throwable {
     describe("verify that a negative offset is illegal");
     try {
@@ -85,7 +85,7 @@ public class TestSwiftFileSystemBlockLocation extends SwiftFileSystemBaseTest {
     }
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testLocateNegativeLen() throws Throwable {
     describe("verify that a negative length is illegal");
     try {
@@ -100,7 +100,7 @@ public class TestSwiftFileSystemBlockLocation extends SwiftFileSystemBaseTest {
   }
 
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testLocateOutOfRangeLen() throws Throwable {
     describe("overshooting the length is legal, as long as the" +
              " origin location is valid");
@@ -113,7 +113,7 @@ public class TestSwiftFileSystemBlockLocation extends SwiftFileSystemBaseTest {
     assertTrue(locations.length > 0);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testLocateOutOfRangeSrc() throws Throwable {
     describe("Seeking out of the file length returns an empty array");
 
@@ -131,7 +131,7 @@ public class TestSwiftFileSystemBlockLocation extends SwiftFileSystemBaseTest {
     }
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testLocateDirectory() throws Throwable {
     describe("verify that locating a directory is an error");
     createFile(path("/test/filename"));
@@ -146,7 +146,7 @@ public class TestSwiftFileSystemBlockLocation extends SwiftFileSystemBaseTest {
   }
 
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testLocateRootDirectory() throws Throwable {
     describe("verify that locating the root directory is an error");
     FileStatus status = fs.getFileStatus(path("/"));
