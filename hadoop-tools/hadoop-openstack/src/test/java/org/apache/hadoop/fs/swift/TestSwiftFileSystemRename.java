@@ -35,7 +35,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
    *
    * @throws Exception
    */
-  @Test
+  @Test(timeout = 1800000)
   public void testRenameFileIntoExistingDirectory() throws Exception {
     assumeRenameSupported();
 
@@ -56,7 +56,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
   }
 
 
-  @Test
+  @Test(timeout = 1800000)
   public void testRenameFile() throws Exception {
     assumeRenameSupported();
 
@@ -80,7 +80,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
     assertEquals(new String(message), new String(buffer));
   }
 
-  @Test
+  @Test(timeout = 1800000)
   public void testRenameDirectory() throws Exception {
     assumeRenameSupported();
 
@@ -92,7 +92,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
     rename(old, newPath, true, false, true);
   }
 
-  @Test
+  @Test(timeout = 1800000)
   public void testRenameTheSameDirectory() throws Exception {
     assumeRenameSupported();
 
