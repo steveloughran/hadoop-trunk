@@ -90,4 +90,15 @@ public final class SwiftUtils {
     }
   }
 
+  /**
+   * Given a partition number, calculate the partition value.
+   * This is used in the SwiftNativeOutputStream, and is placed
+   * here for tests to be able to calculate the filename of
+   * a partition.
+   * @param partNumber part number
+   * @return a string to use as the filename
+   */
+  public static String partitionFilenameFromNumber(int partNumber) {
+    return String.format("%06d", partNumber);
+  }
 }

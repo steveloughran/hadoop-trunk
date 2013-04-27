@@ -130,10 +130,12 @@ public class SwiftNativeFileSystemStore {
           throws IOException {
 
     String stringPath = path.toUri().toString();
+    String partitionFilename = SwiftUtils.partitionFilenameFromNumber(
+      partNumber);
     if (stringPath.endsWith("/")) {
-      stringPath = stringPath.concat(String.valueOf(partNumber));
+      stringPath = stringPath.concat(partitionFilename);
     } else {
-      stringPath = stringPath.concat("/").concat(String.valueOf(partNumber));
+      stringPath = stringPath.concat("/").concat(partitionFilename);
     }
 
     swiftRestClient.upload(

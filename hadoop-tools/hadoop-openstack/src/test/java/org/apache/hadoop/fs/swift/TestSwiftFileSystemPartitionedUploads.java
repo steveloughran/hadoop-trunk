@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.swift.http.SwiftProtocolConstants;
 import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
+import org.apache.hadoop.io.IOUtils;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -85,48 +86,52 @@ public class TestSwiftFileSystemPartitionedUploads extends
                                getBufferSize(),
                                (short) 1,
                                BLOCK_SIZE);
-    
-    int totalPartitionsToWrite = len / PART_SIZE_BYTES;
-    assertPartitionsWritten("Startup", out, 0);
-    //write 2048
-    int firstWriteLen = 2048;
-    out.write(src, 0, firstWriteLen);
-    //assert
-    long expected = getExpectedPartitionsWritten(firstWriteLen,
-                                                 PART_SIZE_BYTES,
-                                                 false);
-    SwiftUtils.debug(LOG,"First write: predict %d partitions written",expected);
-    assertPartitionsWritten("First write completed", out, expected);
-    //write the rest
-    int remainder = len - firstWriteLen;
-    SwiftUtils.debug(LOG, "remainder: writing: %d bytes",remainder);
 
-    out.write(src, firstWriteLen, remainder);
-    expected =
-      getExpectedPartitionsWritten(len, PART_SIZE_BYTES, false);
-    assertPartitionsWritten("Remaining data", out, expected);
-    out.close();
-    expected =
-      getExpectedPartitionsWritten(len, PART_SIZE_BYTES, true);
-    assertPartitionsWritten("Stream closed", out, expected);
+    try {
+      int totalPartitionsToWrite = len / PART_SIZE_BYTES;
+      assertPartitionsWritten("Startup", out, 0);
+      //write 2048
+      int firstWriteLen = 2048;
+      out.write(src, 0, firstWriteLen);
+      //assert
+      long expected = getExpectedPartitionsWritten(firstWriteLen,
+                                                   PART_SIZE_BYTES,
+                                                   false);
+      SwiftUtils.debug(LOG,"First write: predict %d partitions written",expected);
+      assertPartitionsWritten("First write completed", out, expected);
+      //write the rest
+      int remainder = len - firstWriteLen;
+      SwiftUtils.debug(LOG, "remainder: writing: %d bytes",remainder);
 
-    assertTrue("Exists", fs.exists(path));
-    FileStatus status = fs.getFileStatus(path);
-    assertEquals("Length", len, status.getLen());
-    String fileInfo = path + "  " + status;
-    assertFalse("File claims to be a directory " + fileInfo,
-                status.isDir());
-    byte[] dest = readDataset(fs, path, len);
-    //compare data
-    SwiftTestUtils.compareByteArrays(src, dest, len);
+      out.write(src, firstWriteLen, remainder);
+      expected =
+        getExpectedPartitionsWritten(len, PART_SIZE_BYTES, false);
+      assertPartitionsWritten("Remaining data", out, expected);
+      out.close();
+      expected =
+        getExpectedPartitionsWritten(len, PART_SIZE_BYTES, true);
+      assertPartitionsWritten("Stream closed", out, expected);
 
-    //now see what block location info comes back.
-    //This will vary depending on the Swift version, so the results
-    //aren't checked -merely that the test actually worked
-    BlockLocation[] locations = fs.getFileBlockLocations(status, 0, len);
-    assertNotNull("Null getFileBlockLocations()", locations);
-    assertTrue("empty array returned for getFileBlockLocations()",
-               locations.length > 0);
+      assertTrue("Exists", fs.exists(path));
+      FileStatus status = fs.getFileStatus(path);
+      assertEquals("Length of written file", len, status.getLen());
+      String fileInfo = path + "  " + status;
+      assertFalse("File claims to be a directory " + fileInfo,
+                  status.isDir());
+      byte[] dest = readDataset(fs, path, len);
+      //compare data
+      SwiftTestUtils.compareByteArrays(src, dest, len);
+
+      //now see what block location info comes back.
+      //This will vary depending on the Swift version, so the results
+      //aren't checked -merely that the test actually worked
+      BlockLocation[] locations = fs.getFileBlockLocations(status, 0, len);
+      assertNotNull("Null getFileBlockLocations()", locations);
+      assertTrue("empty array returned for getFileBlockLocations()",
+                 locations.length > 0);
+    } finally {
+      IOUtils.closeStream(out);
+    }
   }
 
   private int getExpectedPartitionsWritten(long uploaded,
