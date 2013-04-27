@@ -23,8 +23,10 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.http.SwiftProtocolConstants;
+import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -71,10 +73,10 @@ public class TestSwiftFileSystemPartitionedUploads extends
   /**
    * tests functionality for big files ( > 5Gb) upload
    */
-  @Test
+  @Test(timeout = 1800000)
   public void testFilePartUpload() throws IOException, URISyntaxException {
 
-    final Path path = new Path("/test/huge-file");
+    final Path path = new Path("/test/testFilePartUpload");
 
     int len = 8192;
     final byte[] src = SwiftTestUtils.dataset(len, 32, 144);
@@ -84,7 +86,7 @@ public class TestSwiftFileSystemPartitionedUploads extends
                                (short) 1,
                                BLOCK_SIZE);
     
-    int totalPartitionsToWrite = len/ PART_SIZE_BYTES;
+    int totalPartitionsToWrite = len / PART_SIZE_BYTES;
     assertPartitionsWritten("Startup", out, 0);
     //write 2048
     int firstWriteLen = 2048;
@@ -149,13 +151,47 @@ public class TestSwiftFileSystemPartitionedUploads extends
   }
 
   /**
+   * Test sticks up a very large partitioned file and verifies that
+   * it comes back unchanged. 
+   * @throws Throwable
+   */
+  @Test(timeout = 1800000)
+  public void testManyPartitionedFile() throws Throwable {
+    final Path path = new Path("/test/testManyPartionedFile");
+
+    int len = PART_SIZE_BYTES * 15;
+    final byte[] src = SwiftTestUtils.dataset(len, 32, 144);
+    FSDataOutputStream out = fs.create(path,
+                                       false,
+                                       getBufferSize(),
+                                       (short) 1,
+                                       BLOCK_SIZE);
+
+    out.write(src, 0, src.length);
+    int expected =
+      getExpectedPartitionsWritten(len, PART_SIZE_BYTES, true);
+    out.close();
+    assertPartitionsWritten("write completed", out, expected);
+    assertEquals("too few bytes written", len,
+                 SwiftNativeFileSystem.getBytesWritten(out));
+    assertEquals("too few bytes uploaded",len,
+                 SwiftNativeFileSystem.getBytesUploaded(out));
+    //now we verify that the data comes back. If it
+    //doesn't, it means that the ordering of the partitions
+    //isn't right
+    byte[] dest = readDataset(fs, path, len);
+    //compare data
+    SwiftTestUtils.compareByteArrays(src, dest, len);
+  }
+  /**
    * Test that when a partitioned file is overwritten by a smaller one,
    * all the old partitioned files go away
    * @throws Throwable
    */
-  //@Test
+  @Ignore
+  @Test(timeout = 1800000)
   public void testOverwritePartitionedFile() throws Throwable {
-    final Path path = new Path("/test/partitioned-file");
+    final Path path = new Path("/test/testOverwritePartitionedFile");
 
     int len = 8192;
     final byte[] src = SwiftTestUtils.dataset(len, 32, 144);
