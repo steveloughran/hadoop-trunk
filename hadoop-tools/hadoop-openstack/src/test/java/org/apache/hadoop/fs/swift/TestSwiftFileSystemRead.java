@@ -40,7 +40,7 @@ public class TestSwiftFileSystemRead extends SwiftFileSystemBaseTest {
    * Read past the end of a file: expect the operation to fail
    * @throws IOException
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testOverRead() throws IOException {
     final String message = "message";
     final Path filePath = new Path("/test/file.txt");
@@ -59,7 +59,7 @@ public class TestSwiftFileSystemRead extends SwiftFileSystemBaseTest {
    * Read and write some JSON
    * @throws IOException
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRWJson() throws IOException {
     final String message = "{" +
                            " 'json': { 'i':43, 'b':true}," +
@@ -79,7 +79,7 @@ public class TestSwiftFileSystemRead extends SwiftFileSystemBaseTest {
    * Read and write some XML
    * @throws IOException
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRWXML() throws IOException {
     final String message = "<x>" +
                            " <json i='43' 'b'=true/>" +

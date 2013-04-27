@@ -35,7 +35,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
    *
    * @throws Exception
    */
-  @Test(timeout = 1800000)
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRenameFileIntoExistingDirectory() throws Exception {
     assumeRenameSupported();
 
@@ -56,7 +56,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
   }
 
 
-  @Test(timeout = 1800000)
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRenameFile() throws Exception {
     assumeRenameSupported();
 
@@ -80,7 +80,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
     assertEquals(new String(message), new String(buffer));
   }
 
-  @Test(timeout = 1800000)
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRenameDirectory() throws Exception {
     assumeRenameSupported();
 
@@ -92,7 +92,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
     rename(old, newPath, true, false, true);
   }
 
-  @Test(timeout = 1800000)
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRenameTheSameDirectory() throws Exception {
     assumeRenameSupported();
 
@@ -101,7 +101,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
     rename(old, old, false, true, true);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRenameDirectoryIntoExistingDirectory() throws Exception {
     assumeRenameSupported();
 
@@ -131,7 +131,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
    * trying to rename a directory onto itself should fail,
    * preserving everything underneath.
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRenameDirToSelf() throws Throwable {
     assumeRenameSupported();
     Path parentdir = path("/test/parentdir");
@@ -149,7 +149,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
    *
    * @throws Exception on failures
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRenameRootDirForbidden() throws Exception {
     assumeRenameSupported();
     rename(path("/"),
@@ -163,7 +163,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
    *
    * @throws Exception on failures
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRenameChildDirForbidden() throws Exception {
     assumeRenameSupported();
 
@@ -180,7 +180,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
     rename(parentdir, childchilddir, false, true, false);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRenameFileAndVerifyContents() throws IOException {
     assumeRenameSupported();
 
@@ -197,7 +197,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
   }
 
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testMoveFileUnderParent() throws Throwable {
     if (!renameSupported()) return;
     Path filepath = path("test/file");
@@ -208,7 +208,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
     assertIsFile(filepath);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testMoveDirUnderParent() throws Throwable {
     if (!renameSupported()) {
       return;
@@ -224,7 +224,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
   /**
    * trying to rename a file onto itself should succeed (it's a no-op)
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRenameFileToSelf() throws Throwable {
     if (!renameSupported()) return;
     Path filepath = path("test/file");
@@ -235,7 +235,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
     assertIsFile(filepath);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRenamedConsistence() throws IOException {
     assumeRenameSupported();
     describe("verify that overwriting a file with new data doesn't impact" +
@@ -255,7 +255,7 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
     String reread = readBytesToString(fs, newFilePath, 20);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRenameMissingFile() throws Throwable {
     assumeRenameSupported();
     Path path = path("/test/RenameMissingFile");

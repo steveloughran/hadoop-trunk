@@ -31,7 +31,7 @@ public class TestWriteManySmallFiles extends SwiftScaleTestBase {
 
   public static final Log LOG = LogFactory.getLog(TestWriteManySmallFiles.class);
 
-  @Test
+  @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
   public void testScaledWriteThenRead() throws Throwable {
     Path dir = new Path("/test/manysmallfiles");
     Duration rm1 = new Duration();

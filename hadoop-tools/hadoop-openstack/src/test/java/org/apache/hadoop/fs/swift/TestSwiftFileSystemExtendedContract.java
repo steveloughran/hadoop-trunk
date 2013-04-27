@@ -36,7 +36,7 @@ import java.util.Properties;
 
 public class TestSwiftFileSystemExtendedContract extends SwiftFileSystemBaseTest {
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testOpenNonExistingFile() throws IOException {
     final Path p = new Path("/test/testOpenNonExistingFile");
     //open it as a file, should get FileNotFoundException
@@ -50,12 +50,12 @@ public class TestSwiftFileSystemExtendedContract extends SwiftFileSystemBaseTest
   }
 
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testFilesystemHasURI() throws Throwable {
     assertNotNull(fs.getUri());
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testCreateFile() throws Exception {
     final Path f = new Path("/test/testCreateFile");
     final FSDataOutputStream fsDataOutputStream = fs.create(f);
@@ -64,7 +64,7 @@ public class TestSwiftFileSystemExtendedContract extends SwiftFileSystemBaseTest
   }
 
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testWriteReadFile() throws Exception {
     final Path f = new Path("/test/test");
     final FSDataOutputStream fsDataOutputStream = fs.create(f);
@@ -84,20 +84,20 @@ public class TestSwiftFileSystemExtendedContract extends SwiftFileSystemBaseTest
     }
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testConfDefinesFilesystem() throws Throwable {
     Configuration conf = new Configuration();
     SwiftTestUtils.getServiceURI(conf);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testConfIsValid() throws Throwable {
     Configuration conf = new Configuration();
     URI fsURI = SwiftTestUtils.getServiceURI(conf);
     RestClientBindings.bind(fsURI, conf);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testGetSchemeImplemented() throws Throwable {
     String scheme = fs.getScheme();
     assertEquals(SwiftNativeFileSystem.SWIFT,scheme);
@@ -110,7 +110,7 @@ public class TestSwiftFileSystemExtendedContract extends SwiftFileSystemBaseTest
    *
    * @throws Exception failures
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testFilesystemIsCaseSensitive() throws Exception {
     String mixedCaseFilename = "/test/UPPER.TXT";
     Path upper = path(mixedCaseFilename);

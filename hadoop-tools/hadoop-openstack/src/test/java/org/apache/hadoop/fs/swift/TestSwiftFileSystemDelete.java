@@ -30,7 +30,7 @@ import static org.junit.Assert.assertTrue;
  */
 public class TestSwiftFileSystemDelete extends SwiftFileSystemBaseTest {
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testDeleteEmptyFile() throws IOException {
     final Path file = new Path("/test/testDeleteFile");
     createEmptyFile(file);
@@ -38,11 +38,17 @@ public class TestSwiftFileSystemDelete extends SwiftFileSystemBaseTest {
     assertDeleted(file, true);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testDeleteNonEmptyFile() throws IOException {
     final Path file = new Path("/test/testDeleteFile");
     createFile(file);
     assertDeleted(file, true);
+  }
+  
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
+  public void testDeleteTestDir() throws IOException {
+    final Path file = new Path("/test/");
+    fs.delete(file, true);
   }
 
 
@@ -50,7 +56,7 @@ public class TestSwiftFileSystemDelete extends SwiftFileSystemBaseTest {
    * Test recursive root directory deletion fails if there is an entry underneath
    * @throws Throwable
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRmRootDirRecursiveIsForbidden() throws Throwable {
     Path root = path("/");
     Path testFile = path("/test");

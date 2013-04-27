@@ -100,7 +100,7 @@ public class TestV2LsOperations extends SwiftFileSystemBaseTest {
                found);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testListFilesRootDir() throws Throwable {
     Path dir = path("/");
     Path child = new Path(dir, "test");
@@ -108,7 +108,7 @@ public class TestV2LsOperations extends SwiftFileSystemBaseTest {
     assertListFilesFinds(fs, dir, child, false);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testListFilesSubDir() throws Throwable {
     createTestSubdirs();
     Path dir = path("/test");
@@ -117,7 +117,7 @@ public class TestV2LsOperations extends SwiftFileSystemBaseTest {
     assertListFilesFinds(fs, dir, child, false);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testListFilesRecursive() throws Throwable {
     createTestSubdirs();
     Path dir = path("/test");

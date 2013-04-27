@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.swift.http;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.swift.SwiftTestConstants;
 import org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException;
 import org.junit.Assert;
 import org.junit.Before;
@@ -31,7 +32,8 @@ import java.util.Properties;
 import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.assertPropertyEquals;
 import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.*;
 
-public class TestRestClientBindings extends Assert {
+public class TestRestClientBindings extends Assert
+  implements SwiftTestConstants {
 
   private static final String SERVICE = "sname";
   private static final String CONTAINER = "cname";
@@ -63,13 +65,11 @@ public class TestRestClientBindings extends Assert {
     conf.set(confkey, val);
   }
 
-  @Test
   public void testPrefixBuilder() throws Throwable {
     String built = RestClientBindings.buildSwiftInstancePrefix(SERVICE);
     assertEquals("fs.swift.service." + SERVICE, built);
   }
 
-  @Test
   public void testBindAgainstConf() throws Exception {
     Properties props = RestClientBindings.bind(filesysURI, conf);
     assertPropertyEquals(props, SWIFT_CONTAINER_PROPERTY, CONTAINER);
@@ -101,7 +101,6 @@ public class TestRestClientBindings extends Assert {
     }
   }
 
-  @Test
   public void testBindAgainstConfMissingInstance() throws Exception {
     Configuration badConf = new Configuration();
     expectBindingFailure(filesysURI, badConf);
@@ -158,30 +157,30 @@ public class TestRestClientBindings extends Assert {
     }
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testEmptyHostname() throws Throwable {
     expectExtractContainerFail("");
     expectExtractServiceFail("");
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testDot() throws Throwable {
     expectExtractContainerFail(".");
     expectExtractServiceFail(".");
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testSimple() throws Throwable {
     expectExtractContainerFail("simple");
     expectExtractServiceFail("simple");
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testTrailingDot() throws Throwable {
     expectExtractServiceFail("simple.");
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testLeadingDot() throws Throwable {
     expectExtractServiceFail(".leading");
   }

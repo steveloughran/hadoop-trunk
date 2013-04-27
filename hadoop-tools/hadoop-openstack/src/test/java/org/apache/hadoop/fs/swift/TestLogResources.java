@@ -27,7 +27,7 @@ import java.net.URL;
 /**
  * This test just debugs which log resources are being picked up
  */
-public class TestLogResources {
+public class TestLogResources implements SwiftTestConstants {
   protected static final Log LOG =
     LogFactory.getLog(TestLogResources.class);
 
@@ -37,17 +37,17 @@ public class TestLogResources {
     LOG.info(msg);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testWhichLog4JPropsFile() throws Throwable {
     locateResource("log4j.properties");
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testWhichLog4JXMLFile() throws Throwable {
     locateResource("log4j.XML");
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testCommonsLoggingProps() throws Throwable {
     locateResource("commons-logging.properties");
   }

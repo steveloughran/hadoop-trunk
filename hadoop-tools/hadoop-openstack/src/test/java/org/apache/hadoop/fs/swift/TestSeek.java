@@ -75,7 +75,7 @@ public class TestSeek extends SwiftFileSystemBaseTest {
     hFile = null;
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testSeekZeroByteFile() throws Throwable {
     Path testEmptyFile = new Path(testPath, "empty");
     createEmptyFile(testEmptyFile);
@@ -88,7 +88,7 @@ public class TestSeek extends SwiftFileSystemBaseTest {
     assertEquals(-1, result);
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testSeekClosedFile() throws Throwable {
     Path testEmptyFile = new Path(testPath, "empty");
     createEmptyFile(testEmptyFile);
@@ -104,7 +104,7 @@ public class TestSeek extends SwiftFileSystemBaseTest {
   }
 
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testNegativeSeek() throws Throwable {
     hFile = fs.open(smallSeekFile);
     assertEquals(0, hFile.getPos());
@@ -122,7 +122,7 @@ public class TestSeek extends SwiftFileSystemBaseTest {
     assertEquals(0, hFile.getPos());
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testSeekFile() throws Throwable {
     FSDataInputStream hFile = fs.open(smallSeekFile);
     assertEquals(0, hFile.getPos());
@@ -148,7 +148,7 @@ public class TestSeek extends SwiftFileSystemBaseTest {
     return conf;
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testSeekBigFile() throws Throwable {
     Path testSeekFile = new Path(testPath, "bigseekfile.txt");
     byte[] block = SwiftTestUtils.dataset(65536, 0, 255);
@@ -173,7 +173,7 @@ public class TestSeek extends SwiftFileSystemBaseTest {
     assertEquals("@0", 0, (byte) hFile.read());
   }
 
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testBulkReadDoesntChangePosition() throws Throwable {
     Path testSeekFile = new Path(testPath, "bigseekfile.txt");
     byte[] block = SwiftTestUtils.dataset(65536, 0, 255);
