@@ -328,12 +328,14 @@ public class SwiftNativeFileSystemStore {
   /**
    * List all elements in this directory
    *
+   *
    * @param path     path to work with
+   * @param recursive
    * @return the file statuses, or an empty array if there are no children
    * @throws IOException           on IO problems
    * @throws FileNotFoundException if the path is nonexistent
    */
-  public FileStatus[] listSubPaths(Path path) throws IOException {
+  public FileStatus[] listSubPaths(Path path, boolean recursive) throws IOException {
     final Collection<FileStatus> fileStatuses;
     fileStatuses = listDirectory(toDirPath(path), false);
     return fileStatuses.toArray(new FileStatus[fileStatuses.size()]);

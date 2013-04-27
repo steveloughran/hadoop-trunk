@@ -24,10 +24,8 @@ import org.apache.hadoop.fs.swift.snative.SwiftFileStatus;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import java.io.FileNotFoundException;
+
 /**
  * Test swift-specific directory logic.
  * This class is HDFS-1 compatible; its designed to be subclases by something
@@ -41,12 +39,25 @@ public class TestSwiftFileSystemDirectories extends SwiftFileSystemBaseTest {
    *
    * @throws Exception on failures
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testZeroByteFilesAreDirectories() throws Exception {
     Path src = path("/test/testZeroByteFilesAreFiles");
     //create a zero byte file
     SwiftTestUtils.touch(fs, src);
     SwiftTestUtils.assertIsDirectory(fs, src);
+  }
+
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
+  public void testNoStatusForMissingDirectories() throws Throwable {
+    Path missing = path("/test/testNoStatusForMissingDirectories");
+    assertPathDoesNotExist("leftover?", missing);
+    try {
+      FileStatus[] statuses = fs.listStatus(missing);
+      //not expected
+      fail("Expected a FileNotFoundException, got the status " + statuses);
+    } catch (FileNotFoundException expected) {
+      //expected
+    }
   }
 
   /**
@@ -55,10 +66,17 @@ public class TestSwiftFileSystemDirectories extends SwiftFileSystemBaseTest {
    *
    * @throws Exception on failures
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testDirectoriesHaveMatchingFileStatus() throws Exception {
     Path test = path("/test");
+    fs.delete(test, true);
     mkdirs(test);
+    FileStatus[] statuses = fs.listStatus(test);
+    assertNotNull(statuses);
+    String statusString = statusToString(statuses);
+    assertEquals("Wrong number of elements in file status " + statusString, 1,
+                 statuses.length);
+
     Path src = path("/test/file");
 
     //create a zero byte file
@@ -66,11 +84,22 @@ public class TestSwiftFileSystemDirectories extends SwiftFileSystemBaseTest {
     //stat it
     FileStatus[] statuses = fs.listStatus(test);
     assertNotNull(statuses);
-    assertEquals("Wrong number of elements in file status", 1, statuses.length);
+    String statusString = statusToString(statuses);
+    assertEquals("Wrong number of elements in file status " + statusString, 1,
+                 statuses.length);
     SwiftFileStatus stat = (SwiftFileStatus) statuses[0];
     assertTrue("isDir(): Not a directory: " + stat, stat.isDir());
     extraStatusAssertions(stat);
+  }
 
+  private String statusToString(FileStatus[] statuses) {
+    assertNotNull("statuses);
+    StringBuilder sb = new StringBuilder();
+    sb.append("entries: ").append(statuses.length).append(": ");
+    for (FileStatus status : statuses) {
+      sb.append(status.getPath()).append(" ");
+    }
+    return sb.toString();
   }
 
   /**
@@ -88,7 +117,7 @@ public class TestSwiftFileSystemDirectories extends SwiftFileSystemBaseTest {
    *
    * @throws Exception on failures
    */
-  @Test
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testMultiByteFilesAreFiles() throws Exception {
     Path src = path("/test/testMultiByteFilesAreFiles");
     SwiftTestUtils.writeTextFile(fs, src, "testMultiByteFilesAreFiles", false);
