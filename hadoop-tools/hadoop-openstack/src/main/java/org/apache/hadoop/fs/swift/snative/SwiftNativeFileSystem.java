@@ -40,7 +40,6 @@ import org.apache.hadoop.util.Progressable;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.util.ArrayList;
@@ -251,7 +250,8 @@ public class SwiftNativeFileSystem extends FileSystem {
     // Check if requested file in Swift is more than 5Gb. In this case
     // each block has its own location -which may be determinable
     // from the Swift client API, depending on the remote server
-    final FileStatus[] listOfFileBlocks = store.listSubPaths(file.getPath());
+    final FileStatus[] listOfFileBlocks = store.listSubPaths(file.getPath(),
+                                                             false);
     List<URI> locations = new ArrayList<URI>();
     if (listOfFileBlocks.length > 1) {
       for (FileStatus fileStatus : listOfFileBlocks) {
@@ -425,7 +425,7 @@ public class SwiftNativeFileSystem extends FileSystem {
     if (LOG.isDebugEnabled()) {
       LOG.debug("SwiftFileSystem.listStatus for: " + path);
     }
-    return store.listSubPaths(makeAbsolute(path));
+    return store.listSubPaths(makeAbsolute(path), false);
   }
 
   /**
@@ -687,6 +687,19 @@ public class SwiftNativeFileSystem extends FileSystem {
       return path;
     }
     return new Path(workingDir, path);
+  }
+
+  /**
+   * Low level method to do a deep listing of all entries, not stopping
+   * at the next directory entry. This is to let tests be confident that
+   * recursive deletes &c really are working.
+   * @param path path to recurse down
+   * @return a potentially empty arrady of file status
+   * @throws IOException any problem
+   */
+  @InterfaceAudience.Private
+  public FileStatus[] listRawFileStatus(Path path) throws IOException {
+    return store.listSubPaths(makeAbsolute(path),true);
   }
 
   /**
