@@ -134,6 +134,13 @@ public class TestSwiftFileSystemPartitionedUploads extends
     }
   }
 
+  /**
+   * Calculate the #of partitions expected from the upload
+   * @param uploaded number of bytes uploaded
+   * @param partSizeBytes the partition size
+   * @param closed whether or not the stream has closed
+   * @return the expected number of partitions, for use in assertions.
+   */
   private int getExpectedPartitionsWritten(long uploaded,
                                             int partSizeBytes,
                                             boolean closed) {
@@ -207,7 +214,7 @@ public class TestSwiftFileSystemPartitionedUploads extends
                                        1024);
     out.write(src, 0, len);
     out.close();
-    assertPartitionsWritten("", out, 3);
+    assertPartitionsWritten("initial upload", out, 3);
 
     assertTrue("Exists", fs.exists(path));
     FileStatus status = fs.getFileStatus(path);
