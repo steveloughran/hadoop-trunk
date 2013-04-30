@@ -175,10 +175,27 @@ public class SwiftNativeFileSystemStore {
    * @throws FileNotFoundException if there is nothing at the end
    */
   public SwiftFileStatus getObjectMetadata(Path path) throws IOException {
+    return getObjectMetadata(path, true);
+  }
+
+  /**
+   * 
+   * Get the metadata of an object
+   *
+   * @param path path
+   * @param newest flag to say "set the newest header", otherwise take any entry
+   * @return file metadata. -or null if no headers were received back from the server.
+   * @throws IOException           on a problem
+   * @throws FileNotFoundException if there is nothing at the end
+   */
+  public SwiftFileStatus getObjectMetadata(Path path, boolean newest) throws IOException {
     SwiftObjectPath objectPath = toObjectPath(path);
     final Header[] headers;
-    headers = swiftRestClient.headRequest(objectPath,
-            SwiftRestClient.NEWEST);
+    if (newest) {
+    headers = swiftRestClient.headRequest(objectPath, SwiftRestClient.NEWEST);
+    } else {
+      headers = swiftRestClient.headRequest(objectPath);
+    }
     //no headers is treated as a missing file
     if (headers.length == 0) {
       throw new FileNotFoundException("Not Found " + path.toUri());
@@ -186,7 +203,7 @@ public class SwiftNativeFileSystemStore {
 
     boolean isDir = false;
     long length = 0;
-    long lastModified = System.currentTimeMillis();
+    long lastModified = 0 ;
     for (Header header : headers) {
       String headerName = header.getName();
       if (headerName.equals(SwiftProtocolConstants.X_CONTAINER_OBJECT_COUNT) ||
@@ -205,6 +222,9 @@ public class SwiftNativeFileSystemStore {
           throw new SwiftException("Failed to parse " + header.toString(), e);
         }
       }
+    }
+    if (lastModified == 0) {
+      lastModified = System.currentTimeMillis();
     }
 
     Path correctSwiftPath = getCorrectSwiftPath(path);
@@ -248,13 +268,21 @@ public class SwiftNativeFileSystemStore {
    * List a directory.
    * This is O(n) for the number of objects in this path.
    *
+   *
+   *
    * @param path working path
+   * @param listDeep ask for all the data
+   * @param newest ask for the newest data
    * @return Collection of file statuses
    * @throws IOException IO problems
+   * @throws FileNotFoundException if the path does not exist
    */
-  private List<FileStatus> listDirectory(SwiftObjectPath path, boolean listDeep) throws IOException {
+  private List<FileStatus> listDirectory(SwiftObjectPath path,
+                                         boolean listDeep,
+                                         boolean newest) throws IOException {
     final byte[] bytes;
     final ArrayList<FileStatus> files = new ArrayList<FileStatus>();
+    final Path correctSwiftPath = getCorrectSwiftPath(path);
     try {
       bytes = swiftRestClient.listDeepObjectsInDirectory(path, listDeep);
     } catch (FileNotFoundException e) {
@@ -277,7 +305,7 @@ public class SwiftNativeFileSystemStore {
           //NO_CONTENT returned on something other than the root directory;
           //see if it is there, and convert to empty list or not found
           //depending on whether the entry exists.
-          FileStatus stat = getObjectMetadata(getCorrectSwiftPath(path));
+          FileStatus stat = getObjectMetadata(correctSwiftPath, newest);
 
           if (stat.isDir()) {
             //it's an empty directory. state that
@@ -303,7 +331,8 @@ public class SwiftNativeFileSystemStore {
     //this can happen if user lists file /data/files/file
     //in this case swift will return empty array
     if (fileStatusList.isEmpty()) {
-      final SwiftFileStatus objectMetadata = getObjectMetadata(getCorrectSwiftPath(path));
+      SwiftFileStatus objectMetadata = getObjectMetadata(correctSwiftPath,
+                                                         newest);
       if (objectMetadata.isFile()) {
         files.add(objectMetadata);
       }
@@ -329,15 +358,19 @@ public class SwiftNativeFileSystemStore {
    * List all elements in this directory
    *
    *
+   *
    * @param path     path to work with
-   * @param recursive
+   * @param recursive do a recursive get
+   * @param newest ask for the newest, or can some out of date data work?
    * @return the file statuses, or an empty array if there are no children
    * @throws IOException           on IO problems
    * @throws FileNotFoundException if the path is nonexistent
    */
-  public FileStatus[] listSubPaths(Path path, boolean recursive) throws IOException {
+  public FileStatus[] listSubPaths(Path path,
+                                   boolean recursive,
+                                   boolean newest) throws IOException {
     final Collection<FileStatus> fileStatuses;
-    fileStatuses = listDirectory(toDirPath(path), false);
+    fileStatuses = listDirectory(toDirPath(path), recursive, newest);
     return fileStatuses.toArray(new FileStatus[fileStatuses.size()]);
   }
 
@@ -567,7 +600,7 @@ public class SwiftNativeFileSystemStore {
           "cannot move a directory under itself");
       }
       //enum the child entries and everything underneath
-      List<FileStatus> fileStatuses = listDirectory(srcObject, true);
+      List<FileStatus> fileStatuses = listDirectory(srcObject, true, true);
 
       LOG.info("mv  " + srcObject + " " + targetPath);
 
@@ -662,12 +695,13 @@ public class SwiftNativeFileSystemStore {
       throw new SwiftException(
         "Can't copy " + srcObject + " onto " + destObject);
     }
+    //do the copy
     boolean copySucceeded = swiftRestClient.copyObject(srcObject, destObject);
     if (copySucceeded) {
-      //if the copy worked delete the original
       if (getObjectMetadata(getCorrectSwiftPath(destObject)) == null) {
         innerCreateDirectory(destObject);
       }
+      //if the copy worked delete the original
       swiftRestClient.delete(srcObject);
     } else {
       throw new SwiftException("Copy of " + srcObject + " to "
@@ -675,6 +709,13 @@ public class SwiftNativeFileSystemStore {
     }
   }
 
+  /**
+   * Take a Hadoop path and return one which uses the URI prefix and authority
+   * of this FS. It doesn't make a relative path absolute
+   * @param path path in
+   * @return path with a URI bound to this FS
+   * @throws SwiftException URI cannot be created.
+   */
   private Path getCorrectSwiftPath(Path path) throws
           SwiftException {
     try {
@@ -690,6 +731,13 @@ public class SwiftNativeFileSystemStore {
     }
   }
 
+  /**
+   * Builds a hadoop-Path from a swift path, inserting the URI authority
+   * of this FS instance
+   * @param path swift object path
+   * @return Hadoop path
+   * @throws SwiftException if the URI couldn't be created.
+   */
   private Path getCorrectSwiftPath(SwiftObjectPath path) throws
           SwiftException {
     try {

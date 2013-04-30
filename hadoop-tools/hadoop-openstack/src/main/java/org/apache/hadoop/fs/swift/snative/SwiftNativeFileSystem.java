@@ -251,7 +251,8 @@ public class SwiftNativeFileSystem extends FileSystem {
     // each block has its own location -which may be determinable
     // from the Swift client API, depending on the remote server
     final FileStatus[] listOfFileBlocks = store.listSubPaths(file.getPath(),
-                                                             false);
+                                                             false,
+                                                             true);
     List<URI> locations = new ArrayList<URI>();
     if (listOfFileBlocks.length > 1) {
       for (FileStatus fileStatus : listOfFileBlocks) {
@@ -425,7 +426,7 @@ public class SwiftNativeFileSystem extends FileSystem {
     if (LOG.isDebugEnabled()) {
       LOG.debug("SwiftFileSystem.listStatus for: " + path);
     }
-    return store.listSubPaths(makeAbsolute(path), false);
+    return store.listSubPaths(makeAbsolute(path), false, true);
   }
 
   /**
@@ -453,20 +454,32 @@ public class SwiftNativeFileSystem extends FileSystem {
     try {
       fileStatus = getFileStatus(absolutePath);
     } catch (FileNotFoundException e) {
-      //nothing to do
+      //the 
     }
 
-    if (fileStatus != null && !SwiftUtils.isDirectory(fileStatus)) {
-      if (overwrite) {
-        store.deleteObject(absolutePath);
-      } else {
-        throw new SwiftPathExistsException("File already exists: " + file);
+    if (fileStatus != null) {
+      //the path exists -action depends on whether or not it is a directory,
+      //and what the overwrite policy is.
+
+      //What is clear at this point is that if the entry exists, there's
+      //no need to bother creating any parent entries
+      if (!SwiftUtils.isDirectory(fileStatus)) {
+        //entry is a file
+        if (overwrite) {
+          //overwrite set -> delete the object. This could be postponed
+          //until at the end of the write.
+          store.deleteObject(absolutePath);
+        } else {
+          throw new SwiftPathExistsException("File already exists: " + file);
+        }
       }
     } else {
+      // destination does not exist -trigger creation of the parent
       Path parent = file.getParent();
       if (parent != null) {
         if (!mkdirs(parent)) {
-          throw new SwiftOperationFailedException("Mkdirs failed to create " + parent);
+          throw new SwiftOperationFailedException(
+            "Mkdirs failed to create " + parent);
         }
       }
     }
@@ -596,38 +609,40 @@ public class SwiftNativeFileSystem extends FileSystem {
   private boolean innerDelete(Path path, boolean recursive) throws IOException {
     final FileStatus fileStatus;
     Path absolutePath = makeAbsolute(path);
-    fileStatus = getFileStatus(absolutePath);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Deleting path '" + path + "'");
+      LOG.debug("Deleting path '" + absolutePath + "'; recursive=" + recursive);
     }
+    //ask for the dir status, but don't demand the newest, as we
+    //don't mind if the directory has changed
+    fileStatus = store.getObjectMetadata(absolutePath, false);
     if (!SwiftUtils.isDirectory(fileStatus)) {
       //simple file: delete it
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Deleting simple file '" + path + "'");
+        LOG.debug("Deleting simple file '" + absolutePath + "'");
       }
       store.deleteObject(absolutePath);
     } else {
       //it's a directory
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Deleting directory '" + path + "'");
+        LOG.debug("Deleting directory '" + absolutePath + "'");
       }
-      FileStatus[] contents = listStatus(absolutePath);
-      if (contents == null) {
+      FileStatus[] statuses = store.listSubPaths(absolutePath, false, false);
+      if (statuses == null) {
         //the directory went away during the non-atomic stages of the operation.
         // Return false as it was not this thread doing the deletion.
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Path '" + path + "' has no status -it has 'gone away'");
+          LOG.debug("Path '" + absolutePath + "' has no status -it has 'gone away'");
         }
         return false;
       }
-      //now build a list without ourselves in it
+      //now build a list of all child entries
       Path dirPath = fileStatus.getPath();
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Found " + contents.length + " child entries under " + dirPath);
+        LOG.debug("Found " + statuses.length + " child entries under " + dirPath);
       }
       ArrayList<FileStatus> children =
-              new ArrayList<FileStatus>(contents.length);
-      for (FileStatus child : contents) {
+              new ArrayList<FileStatus>(statuses.length);
+      for (FileStatus child : statuses) {
         if (!(child.getPath().equals(dirPath))) {
           if (LOG.isDebugEnabled()) {
             LOG.debug(child.toString());
@@ -639,11 +654,15 @@ public class SwiftNativeFileSystem extends FileSystem {
           }
         }
       }
+      if(LOG.isDebugEnabled()) {
+        LOG.debug("#of children in directory: " + children.size());
+      }
 
       //look to see if there are now any children
       if (!children.isEmpty() && !recursive) {
         //if there are children, unless this is a recursive operation, fail immediately
-        throw new SwiftOperationFailedException("Directory " + path + " is not empty.");
+        throw new SwiftOperationFailedException("Directory " + absolutePath
+                                                + " is not empty.");
       }
       
       //delete the children
@@ -694,12 +713,13 @@ public class SwiftNativeFileSystem extends FileSystem {
    * at the next directory entry. This is to let tests be confident that
    * recursive deletes &c really are working.
    * @param path path to recurse down
-   * @return a potentially empty arrady of file status
+   * @param newest ask for the newest data, potentially slower than not.
+   * @return a potentially empty array of file status
    * @throws IOException any problem
    */
   @InterfaceAudience.Private
-  public FileStatus[] listRawFileStatus(Path path) throws IOException {
-    return store.listSubPaths(makeAbsolute(path),true);
+  public FileStatus[] listRawFileStatus(Path path, boolean newest) throws IOException {
+    return store.listSubPaths(makeAbsolute(path), true, newest);
   }
 
   /**
