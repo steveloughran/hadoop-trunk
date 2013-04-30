@@ -120,12 +120,14 @@ public class SwiftProtocolConstants {
    */
   public static final String SWIFT_SOCKET_TIMEOUT =
           FS_SWIFT + ".socket.timeout";
+
   /**
    * the default socket timeout in millis {@value}.
    * This controls how long the connection waits for responses from
    * servers.
    */
   public static final int DEFAULT_SOCKET_TIMEOUT = 60000;
+
   /**
    * connection retry count for all connections: {@value}
    */
