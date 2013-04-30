@@ -138,8 +138,7 @@ public class SwiftFileSystemBaseTest extends Assert implements
    * @throws IOException on any problem
    */
   protected void createFile(Path path) throws IOException {
-    byte[] sourceData = data;
-    createFile(path, sourceData);
+    createFile(path, data);
   }
 
   /**
