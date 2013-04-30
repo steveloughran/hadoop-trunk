@@ -607,18 +607,21 @@ public final class SwiftRestClient {
    * @param offset offset from file beginning
    * @param length file length
    * @return The input stream -which must be closed afterwards.
+   * @throws IOException Problems
+   * @throws SwiftException swift specific error
+   * @throws FileNotFoundException path is not there
    */
   public InputStream getDataAsInputStream(SwiftObjectPath path,
                                           long offset,
                                           long length) throws IOException {
     if (offset < 0) {
-      throw new IOException("Invalid offset: " + offset
+      throw new SwiftException("Invalid offset: " + offset
                             + " in getDataAsInputStream( path=" + path
                             + ", offset=" + offset
                             + ", length =" + length + ")");
     }
     if (length <= 0) {
-      throw new IOException("Invalid length: " + length
+      throw new SwiftException("Invalid length: " + length
                 + " in getDataAsInputStream( path="+ path
                             + ", offset=" + offset
                             + ", length ="+ length + ")");
@@ -836,7 +839,8 @@ public final class SwiftRestClient {
    * @throws FileNotFoundException if nothing is at the end of the URI -that is,
    *                               the directory is empty
    */
-  public byte[] listDeepObjectsInDirectory(SwiftObjectPath path, boolean listDeep,
+  public byte[] listDeepObjectsInDirectory(SwiftObjectPath path,
+                                           boolean listDeep,
                                        final Header... requestHeaders)
           throws IOException {
     preRemoteCommand("listDeepObjectsInDirectory");
