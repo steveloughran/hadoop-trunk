@@ -73,7 +73,7 @@ public class TestSwiftFileSystemDirectories extends SwiftFileSystemBaseTest {
     mkdirs(test);
     assertExists("created test directory", test);
     FileStatus[] statuses = fs.listStatus(test);
-    String statusString = statusToString(statuses);
+    String statusString = statusToString(test.toString(), statuses);
     assertEquals("Wrong number of elements in file status " + statusString, 1,
                  statuses.length);
 
@@ -83,8 +83,7 @@ public class TestSwiftFileSystemDirectories extends SwiftFileSystemBaseTest {
     SwiftTestUtils.touch(fs, src);
     //stat it
     statuses = fs.listStatus(test);
-    assertNotNull(statuses);
-    statusString = statusToString(statuses);
+    statusString = statusToString(test.toString(), statuses);
     assertEquals("Wrong number of elements in file status " + statusString, 1,
                  statuses.length);
     SwiftFileStatus stat = (SwiftFileStatus) statuses[0];
@@ -92,14 +91,10 @@ public class TestSwiftFileSystemDirectories extends SwiftFileSystemBaseTest {
     extraStatusAssertions(stat);
   }
 
-  private String statusToString(FileStatus[] statuses) {
-    assertNotNull("Null statuses" , statuses);
-    StringBuilder sb = new StringBuilder();
-    sb.append("entries: ").append(statuses.length).append(": ");
-    for (FileStatus status : statuses) {
-      sb.append(status.getPath()).append(" ");
-    }
-    return sb.toString();
+  private String statusToString(String pathname,
+                                FileStatus[] statuses) {
+    assertNotNull(statuses);
+    return SwiftTestUtils.dumpStats(pathname,statuses);
   }
 
   /**

@@ -51,7 +51,7 @@ public class TestSeek extends SwiftFileSystemBaseTest {
 
   private Path testPath;
   private Path smallSeekFile;
-  private FSDataInputStream hFile;
+  private FSDataInputStream instream;
 
   /**
    * Setup creates dirs under test/hadoop
@@ -71,8 +71,8 @@ public class TestSeek extends SwiftFileSystemBaseTest {
 
   @After
   public void cleanFile() {
-    IOUtils.closeStream(hFile);
-    hFile = null;
+    IOUtils.closeStream(instream);
+    instream = null;
   }
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
@@ -80,11 +80,11 @@ public class TestSeek extends SwiftFileSystemBaseTest {
     Path testEmptyFile = new Path(testPath, "empty");
     createEmptyFile(testEmptyFile);
 
-    hFile = fs.open(testEmptyFile);
-    assertEquals(0, hFile.getPos());
+    instream = fs.open(testEmptyFile);
+    assertEquals(0, instream.getPos());
     //expect that seek to 0 works
-    hFile.seek(0);
-    int result = hFile.read();
+    instream.seek(0);
+    int result = instream.read();
     assertEquals(-1, result);
   }
 
@@ -93,11 +93,11 @@ public class TestSeek extends SwiftFileSystemBaseTest {
     Path testEmptyFile = new Path(testPath, "empty");
     createEmptyFile(testEmptyFile);
 
-    hFile = fs.open(testEmptyFile);
-    hFile.seek(0);
-    hFile.close();
+    instream = fs.open(testEmptyFile);
+    instream.seek(0);
+    instream.close();
     try {
-      hFile.seek(0);
+      instream.seek(0);
     } catch (IOException e) {
       //expected a closed file
     }
@@ -106,20 +106,20 @@ public class TestSeek extends SwiftFileSystemBaseTest {
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testNegativeSeek() throws Throwable {
-    hFile = fs.open(smallSeekFile);
-    assertEquals(0, hFile.getPos());
+    instream = fs.open(smallSeekFile);
+    assertEquals(0, instream.getPos());
     //expect that seek to 0 works
     try {
-      hFile.seek(-1);
-      long p = hFile.getPos();
+      instream.seek(-1);
+      long p = instream.getPos();
       LOG.warn("Seek to -1 returned a position of " + p);
-      int result = hFile.read();
+      int result = instream.read();
       fail(
         "expected an exception, got data " + result + " at a position of " + p);
     } catch (IOException e) {
       //bad seek -expected
     }
-    assertEquals(0, hFile.getPos());
+    assertEquals(0, instream.getPos());
   }
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)

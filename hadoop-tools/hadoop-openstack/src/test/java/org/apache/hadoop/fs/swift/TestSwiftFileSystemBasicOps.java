@@ -214,7 +214,11 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
     Path base = new Path("/test/CreateMultilevelDir");
     Path path = new Path(base, "1/2/3");
     fs.mkdirs(path);
+    assertExists("deep multilevel dir not created", path);
     fs.delete(base, true);
+    assertPathDoesNotExist("Multilevel delete failed", path);
+    assertPathDoesNotExist("Multilevel delete failed", base);
+
   }
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
@@ -234,7 +238,6 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
       fs.delete(path, true);
     }
   }
-
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testLongObjectNamesForbidden() throws Throwable {
