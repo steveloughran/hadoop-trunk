@@ -454,7 +454,7 @@ public class SwiftNativeFileSystem extends FileSystem {
     try {
       fileStatus = getFileStatus(absolutePath);
     } catch (FileNotFoundException e) {
-      //the 
+      //the file isn't there.
     }
 
     if (fileStatus != null) {
@@ -566,7 +566,7 @@ public class SwiftNativeFileSystem extends FileSystem {
   @Override
   public boolean delete(Path path, boolean recursive) throws IOException {
     try {
-      return innerDelete(path, recursive);
+      return fastDelete(path, recursive);
     } catch (FileNotFoundException e) {
       //base path was not found.
       return false;
@@ -691,6 +691,94 @@ public class SwiftNativeFileSystem extends FileSystem {
       //here any children that existed have been deleted
       //so rm the directory
       store.rmdir(absolutePath);
+    }
+    return true;
+  }
+
+  /**
+   * Delete the entire tree. This is an internal one with slightly different
+   * behavior: if an entry is missing, a {@link FileNotFoundException} is
+   * raised. This lets the caller distinguish a file not found with
+   * other reasons for failure, so handles race conditions in recursive
+   * directory deletes better.
+   * <p/>
+   * The problem being addressed is: caller A requests a recursive directory
+   * of directory /dir ; caller B requests a delete of a file /dir/file,
+   * between caller A enumerating the files contents, and requesting a delete
+   * of /dir/file. We want to recognise the special case
+   * "directed file is no longer there" and not convert that into a failure
+   *
+   * @param path      the path to delete.
+   * @param recursive if path is a directory and set to
+   *                  true, the directory is deleted else throws an exception if the
+   *                  directory is not empty
+   *                  case of a file the recursive can be set to either true or false.
+   * @return true if the object was deleted
+   * @throws IOException           IO problems
+   * @throws FileNotFoundException if a file/dir being deleted is not there -
+   *                               this includes entries below the specified path, (if the path is a dir
+   *                               and recursive is true)
+   */
+  private boolean fastDelete(Path path, boolean recursive) throws IOException {
+    final FileStatus fileStatus;
+    Path absolutePath = makeAbsolute(path);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Deleting path '" + absolutePath + "'; recursive=" + recursive);
+    }
+    //ask for the dir status, but don't demand the newest, as we
+    //don't mind if the directory has changed
+    //list all entries under this directory.
+    //this will throw FileNotFoundException if the file isn't there
+    FileStatus[] statuses = listRawFileStatus(path, true);
+    if (statuses == null) {
+      //the directory went away during the non-atomic stages of the operation.
+      // Return false as it was not this thread doing the deletion.
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+          "Path '" + absolutePath + "' has no status -it has 'gone away'");
+      }
+      return false;
+    }
+    int filecount = statuses.length;
+    SwiftUtils.debug(LOG, "Path '%s' %d status entries'",
+                     absolutePath, filecount);
+    if (filecount == 0) {
+      //it's an empty directory or a path
+      store.rmdir(absolutePath);
+    } else if (filecount == 1 && path.equals(statuses[0].getPath())) {
+      // 1 entry => simple file and it is us
+      //simple file: delete it
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Deleting simple file '" + absolutePath + "'");
+      }
+      store.deleteObject(absolutePath);
+    } else {
+      //>1 entry implies directory with children. Run through them,
+      // but first check for the recursive flag
+      SwiftUtils.debug(LOG, "Path '%s' has no status -it has 'gone away'",
+                       absolutePath);
+      if (!recursive) {
+        //if there are children, unless this is a recursive operation, fail immediately
+        throw new SwiftOperationFailedException("Directory " + absolutePath
+                                                + " is not empty.");
+      }
+      //delete the entries. including ourself.
+      for (FileStatus entryStatus : statuses) {
+        Path entryPath = entryStatus.getPath();
+        try {
+          boolean deleted = store.deleteObject(entryPath);
+          if (!deleted) {
+            SwiftUtils.debug(LOG,  "Failed to delete entry '%s'; continuing",
+                             entryPath);
+            }
+        } catch (FileNotFoundException e) {
+          //the path went away -race conditions.
+          //do not fail, as the outcome is still OK.
+          SwiftUtils.debug(LOG, "Path '%s' is no longer present\"; continuing",
+                           entryPath);
+        }
+        store.throttle();
+      }
     }
     return true;
   }
