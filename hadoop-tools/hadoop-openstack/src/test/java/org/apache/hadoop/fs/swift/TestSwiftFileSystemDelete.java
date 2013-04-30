@@ -40,7 +40,7 @@ public class TestSwiftFileSystemDelete extends SwiftFileSystemBaseTest {
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testDeleteNonEmptyFile() throws IOException {
-    final Path file = new Path("/test/testDeleteFile");
+    final Path file = new Path("/test/testDeleteNonEmptyFile");
     createFile(file);
     assertDeleted(file, true);
   }
@@ -49,8 +49,8 @@ public class TestSwiftFileSystemDelete extends SwiftFileSystemBaseTest {
   public void testDeleteTestDir() throws IOException {
     final Path file = new Path("/test/");
     fs.delete(file, true);
+    assertPathDoesNotExist("Test dir found", file);
   }
-
 
   /**
    * Test recursive root directory deletion fails if there is an entry underneath
@@ -65,6 +65,5 @@ public class TestSwiftFileSystemDelete extends SwiftFileSystemBaseTest {
     assertExists("Root dir is missing", root);
     assertPathDoesNotExist("test file not deleted", testFile);
   }
-
 
 }
