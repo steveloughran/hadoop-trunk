@@ -55,6 +55,9 @@ import org.apache.hadoop.fs.swift.exceptions.SwiftException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftInternalStateException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftInvalidResponseException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftThrottledRequestException;
+import org.apache.hadoop.fs.swift.util.Duration;
+import org.apache.hadoop.fs.swift.util.DurationStats;
+import org.apache.hadoop.fs.swift.util.DurationStatsTable;
 import org.apache.hadoop.fs.swift.util.JSONUtil;
 import org.apache.hadoop.fs.swift.util.SwiftObjectPath;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
@@ -226,6 +229,7 @@ public final class SwiftRestClient {
   private final int blocksizeKB;
   private final int bufferSizeKB;
 
+  private final DurationStatsTable durationStats = new DurationStatsTable();
   /**
    * objects query endpoint. This is synchronized
    * to handle a simultaneous update of all auth data in one
@@ -1793,5 +1797,14 @@ public final class SwiftRestClient {
 
   public int getThrottleDelay() {
     return throttleDelay;
+  }
+
+  /**
+   * Get the current operation statistics
+   * @return a snapshot of the statistics
+   */
+
+  public List<DurationStats> getOperationStatistics() {
+    return durationStats.getDurationStatistics();
   }
 }

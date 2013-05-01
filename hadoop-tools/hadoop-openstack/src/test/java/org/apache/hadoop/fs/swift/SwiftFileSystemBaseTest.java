@@ -30,8 +30,10 @@ import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystemStore;
 
 import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.*;
 
+import org.apache.hadoop.fs.swift.util.DurationStats;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
@@ -41,6 +43,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.List;
 
 public class SwiftFileSystemBaseTest extends Assert implements
                                                     SwiftTestConstants {
@@ -48,6 +51,7 @@ public class SwiftFileSystemBaseTest extends Assert implements
   protected static final Log LOG =
           LogFactory.getLog(SwiftFileSystemBaseTest.class);
   protected SwiftNativeFileSystem fs;
+  protected static SwiftNativeFileSystem lastFs;
   protected byte[] data = SwiftTestUtils.dataset(getBlockSize() * 2, 0, 255);
   private Configuration conf;
 
@@ -66,6 +70,8 @@ public class SwiftFileSystemBaseTest extends Assert implements
       fs = null;
       throw e;
     }
+    //remember the last FS
+    lastFs = fs;
     noteAction("setup complete");
   }
 
@@ -82,6 +88,17 @@ public class SwiftFileSystemBaseTest extends Assert implements
   public void tearDown() throws Exception {
     cleanupInTeardown(fs, "/test");
   }
+
+  @AfterClass
+  public static void classTearDown() throws Exception {
+    if (lastFs  != null) {
+      List<DurationStats> statistics = lastFs.getOperationStatistics();
+      for (DurationStats stat : statistics) {
+        LOG.info(stat.toString());
+      }
+    }
+  }
+
 
   /**
    * Get the configuration used to set up the FS

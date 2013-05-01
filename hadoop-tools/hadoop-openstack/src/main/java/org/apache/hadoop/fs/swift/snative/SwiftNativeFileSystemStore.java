@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.swift.exceptions.SwiftInvalidResponseException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftOperationFailedException;
 import org.apache.hadoop.fs.swift.http.SwiftProtocolConstants;
 import org.apache.hadoop.fs.swift.http.SwiftRestClient;
+import org.apache.hadoop.fs.swift.util.DurationStats;
 import org.apache.hadoop.fs.swift.util.JSONUtil;
 import org.apache.hadoop.fs.swift.util.SwiftObjectPath;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
@@ -800,5 +801,13 @@ public class SwiftNativeFileSystemStore {
           .initCause(e);
       }
     }
+  }
+
+  /**
+   * Get the current operation statistics
+   * @return a snapshot of the statistics
+   */
+  public List<DurationStats> getOperationStatistics() {
+    return swiftRestClient.getOperationStatistics();
   }
 }
