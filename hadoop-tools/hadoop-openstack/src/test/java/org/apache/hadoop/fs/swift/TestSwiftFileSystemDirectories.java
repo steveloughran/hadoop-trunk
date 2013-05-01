@@ -61,20 +61,20 @@ public class TestSwiftFileSystemDirectories extends SwiftFileSystemBaseTest {
   }
 
   /**
-   * Asserts that a zero byte file has a status of file and not
-   * directory or symlink
+   * test that a dir off root has a listStatus() call that
+   * works as expected. and that when a child is added. it changes
    *
    * @throws Exception on failures
    */
   @Test(timeout = SWIFT_TEST_TIMEOUT)
-  public void testDirectoriesHaveMatchingFileStatus() throws Exception {
+  public void testDirectoriesOffRootHaveMatchingFileStatus() throws Exception {
     Path test = path("/test");
     fs.delete(test, true);
     mkdirs(test);
     assertExists("created test directory", test);
     FileStatus[] statuses = fs.listStatus(test);
     String statusString = statusToString(test.toString(), statuses);
-    assertEquals("Wrong number of elements in file status " + statusString, 1,
+    assertEquals("Wrong number of elements in file status " + statusString, 0,
                  statuses.length);
 
     Path src = path("/test/file");
@@ -89,6 +89,24 @@ public class TestSwiftFileSystemDirectories extends SwiftFileSystemBaseTest {
     SwiftFileStatus stat = (SwiftFileStatus) statuses[0];
     assertTrue("isDir(): Not a directory: " + stat, stat.isDir());
     extraStatusAssertions(stat);
+  }
+  
+  /**
+   * test that a dir two levels down has a listStatus() call that
+   * works as expected.
+   *
+   * @throws Exception on failures
+   */
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
+  public void testDirectoriesLowerDownHaveMatchingFileStatus() throws Exception {
+    Path test = path("/test/testDirectoriesLowerDownHaveMatchingFileStatus");
+    fs.delete(test, true);
+    mkdirs(test);
+    assertExists("created test sub directory", test);
+    FileStatus[] statuses = fs.listStatus(test);
+    String statusString = statusToString(test.toString(), statuses);
+    assertEquals("Wrong number of elements in file status " + statusString,0,
+                 statuses.length);
   }
 
   private String statusToString(String pathname,
