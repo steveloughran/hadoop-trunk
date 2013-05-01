@@ -20,6 +20,11 @@ package org.apache.hadoop.fs.swift.util;
 
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
 
 /**
  * Various utility classes for SwiftFS support
@@ -101,4 +106,37 @@ public final class SwiftUtils {
   public static String partitionFilenameFromNumber(int partNumber) {
     return String.format("%06d", partNumber);
   }
+
+  public static String ls(FileSystem fileSystem, Path path) throws
+                                                            IOException {
+    if (path == null) {
+      //surfaces when someone calls getParent() on something at the top of the path
+      return "/";
+    }
+    FileStatus[] stats;
+    String pathtext = "ls " + path;
+    try {
+      stats = fileSystem.listStatus(path);
+    } catch (FileNotFoundException e) {
+      return pathtext + " -file not found";
+    } catch (IOException e) {
+      return pathtext + " -failed: " + e;
+    }
+    return pathtext + fileStatsToString(stats, "\n");
+  }
+
+  /**
+   * Take an array of filestats and convert to a string (prefixed w/ a [01] counter
+   * @param stats array of stats
+   * @param separator separator after every entry
+   * @return a stringified set
+   */
+  public static String fileStatsToString(FileStatus[] stats, String separator) {
+    StringBuilder buf = new StringBuilder(stats.length * 128);
+    for (int i = 0; i < stats.length; i++) {
+      buf.append(String.format("[%02d] %s", i, stats[i])).append(separator);
+    }
+    return buf.toString();
+  }
+  
 }

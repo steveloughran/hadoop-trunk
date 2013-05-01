@@ -436,30 +436,11 @@ public class SwiftTestUtils extends org.junit.Assert {
   }
 
   public static String ls(FileSystem fileSystem, Path path) throws IOException {
-    if (path == null) {
-      //surfaces when someone calls getParent() on something at the top of the path
-      return "/";
-    }
-    FileStatus[] stats;
-    try {
-      stats = fileSystem.listStatus(path);
-    } catch (FileNotFoundException e) {
-      return "ls " + path + " -file not found";
-    } catch (IOException e) {
-      return "ls " + path + " -failed: "+ e;
-    }
-    String pathname = path.toString();
-    return dumpStats(pathname, stats);
+    return SwiftUtils.ls(fileSystem, path);
   }
 
   public static String dumpStats(String pathname, FileStatus[] stats) {
-    StringBuilder buf = new StringBuilder(stats.length * 128);
-    buf.append("ls ").append(pathname).append(": ").append(stats.length)
-       .append("\n");
-    for (int i = 0; i < stats.length; i++) {
-      buf.append(String.format("[%02d] %s\n", i, stats[i]));
-    }
-    return buf.toString();
+    return pathname + SwiftUtils.fileStatsToString(stats,"\n");
   }
 
   /**
