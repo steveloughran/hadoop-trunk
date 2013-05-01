@@ -723,6 +723,7 @@ public class SwiftNativeFileSystem extends FileSystem {
   private boolean fastDelete(Path path, boolean recursive) throws IOException {
     final FileStatus fileStatus;
     Path absolutePath = makeAbsolute(path);
+    Path swiftPath = store.getCorrectSwiftPath(absolutePath);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Deleting path '" + absolutePath + "'; recursive=" + recursive);
     }
@@ -746,22 +747,31 @@ public class SwiftNativeFileSystem extends FileSystem {
     if (filecount == 0) {
       //it's an empty directory or a path
       store.rmdir(absolutePath);
-    } else if (filecount == 1 && path.equals(statuses[0].getPath())) {
+      return true;
+    }
+
+    if (LOG.isDebugEnabled()) {
+      SwiftUtils.debug(LOG, SwiftUtils.fileStatsToString(statuses, "\n"));
+    }
+
+    if (filecount == 1) {
+      swiftPath.equals(statuses[0].getPath());
       // 1 entry => simple file and it is us
       //simple file: delete it
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Deleting simple file '" + absolutePath + "'");
+        LOG.debug("Deleting simple file");
       }
       store.deleteObject(absolutePath);
-    } else {
+      return true;
+    } 
+    
       //>1 entry implies directory with children. Run through them,
       // but first check for the recursive flag
-      SwiftUtils.debug(LOG, "Path '%s' has no status -it has 'gone away'",
-                       absolutePath);
       if (!recursive) {
         //if there are children, unless this is a recursive operation, fail immediately
         throw new SwiftOperationFailedException("Directory " + absolutePath
-                                                + " is not empty.");
+                                                + " is not empty: "
+                    + SwiftUtils.fileStatsToString(statuses, "; "));
       }
       //delete the entries. including ourself.
       for (FileStatus entryStatus : statuses) {
@@ -780,7 +790,6 @@ public class SwiftNativeFileSystem extends FileSystem {
         }
         store.throttle();
       }
-    }
     return true;
   }
 
