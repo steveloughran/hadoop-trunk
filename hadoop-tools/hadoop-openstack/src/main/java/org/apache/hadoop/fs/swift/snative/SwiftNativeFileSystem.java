@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.swift.exceptions.SwiftNotDirectoryException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftOperationFailedException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftPathExistsException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftUnsupportedFeatureException;
+import org.apache.hadoop.fs.swift.util.DurationStats;
 import org.apache.hadoop.fs.swift.util.SwiftObjectPath;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
 import org.apache.hadoop.util.Progressable;
@@ -794,6 +795,15 @@ public class SwiftNativeFileSystem extends FileSystem {
       return path;
     }
     return new Path(workingDir, path);
+  }
+
+
+  /**
+   * Get the current operation statistics
+   * @return a snapshot of the statistics
+   */
+  public List<DurationStats> getOperationStatistics() {
+    return store.getOperationStatistics();
   }
 
   /**
