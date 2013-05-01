@@ -625,7 +625,7 @@ public final class SwiftRestClient {
    */
   public long getContentLength(URI uri) throws IOException {
     preRemoteCommand("getContentLength");
-    return perform(uri, new HeadMethodProcessor<Long>() {
+    return perform("getContentLength", uri, new HeadMethodProcessor<Long>() {
       @Override
       public Long extractResult(HeadMethod method) throws IOException {
         return method.getResponseContentLength();
@@ -684,7 +684,7 @@ public final class SwiftRestClient {
     }
     preRemoteCommand("getObjectLocation");
     try {
-      return perform(pathToObjectLocation(path),
+      return perform("getObjectLocation", pathToObjectLocation(path),
               new GetMethodProcessor<byte[]>() {
                 @Override
                 protected int[] getAllowedStatusCodes() {
@@ -779,7 +779,7 @@ public final class SwiftRestClient {
       throw new SwiftException("Bad URI: " + dataLocationURI, e);
     }
 
-    return perform(uri, new GetMethodProcessor<byte[]>() {
+    return perform("findObjectsByPrefix", uri, new GetMethodProcessor<byte[]>() {
       @Override
       public byte[] extractResult(GetMethod method) throws IOException {
         if (method.getStatusCode() == SC_NOT_FOUND) {
@@ -867,7 +867,7 @@ public final class SwiftRestClient {
       throw new SwiftException("Bad URI: " + location, e);
     }
 
-    return perform(uri, new GetMethodProcessor<byte[]>() {
+    return perform("findObjects", uri, new GetMethodProcessor<byte[]>() {
       @Override
       public byte[] extractResult(GetMethod method) throws IOException {
         if (method.getStatusCode() == SC_NOT_FOUND) {
@@ -909,7 +909,7 @@ public final class SwiftRestClient {
 
     preRemoteCommand("copyObject");
 
-    return perform(pathToURI(src), new CopyMethodProcessor<Boolean>() {
+    return perform("copy", pathToURI(src), new CopyMethodProcessor<Boolean>() {
       @Override
       public Boolean extractResult(CopyMethod method) throws IOException {
         return method.getStatusCode() != SC_NOT_FOUND;
@@ -942,7 +942,7 @@ public final class SwiftRestClient {
     preRemoteCommand("upload");
 
     try {
-      perform(pathToURI(path), new PutMethodProcessor<byte[]>() {
+      perform("upload", pathToURI(path), new PutMethodProcessor<byte[]>() {
         @Override
         public byte[] extractResult(PutMethod method) throws IOException {
           return method.getResponseBody();
@@ -973,7 +973,7 @@ public final class SwiftRestClient {
   public boolean delete(SwiftObjectPath path, final Header... requestHeaders) throws IOException {
     preRemoteCommand("delete");
 
-    return perform(pathToURI(path), new DeleteMethodProcessor<Boolean>() {
+    return perform("", pathToURI(path), new DeleteMethodProcessor<Boolean>() {
       @Override
       public Boolean extractResult(DeleteMethod method) throws IOException {
         return method.getStatusCode() == SC_NO_CONTENT;
@@ -998,9 +998,25 @@ public final class SwiftRestClient {
    */
   public Header[] headRequest(SwiftObjectPath path, final Header... requestHeaders)
           throws IOException {
+    return headRequest("", path, requestHeaders);
+  }
+
+  /**
+   * Issue a head request
+   *
+   * @param path path to query
+   * @param requestHeaders request header
+   * @return the response headers. This may be an empty list
+   * @throws IOException IO problems
+   * @throws FileNotFoundException if there is nothing at the end
+   */
+  public Header[] headRequest(String reason,
+                              SwiftObjectPath path,
+                              final Header... requestHeaders)
+          throws IOException {
 
     preRemoteCommand("headRequest");
-    return perform(pathToURI(path), new HeadMethodProcessor<Header[]>() {
+    return perform(reason, pathToURI(path), new HeadMethodProcessor<Header[]>() {
       @Override
       public Header[] extractResult(HeadMethod method) throws IOException {
         if (method.getStatusCode() == SC_NOT_FOUND) {
@@ -1062,7 +1078,7 @@ public final class SwiftRestClient {
         }
 
     LOG.debug("started authentication");
-    return perform(authUri, new PostMethodProcessor<AccessToken>() {
+    return perform("authentication", authUri, new PostMethodProcessor<AccessToken>() {
 
 
       @Override
@@ -1230,7 +1246,7 @@ public final class SwiftRestClient {
     SwiftObjectPath objectPath = new SwiftObjectPath(containerName, "");
     try {
       //see if the data is there
-      headRequest(objectPath, NEWEST);
+      headRequest("createContainer", objectPath, NEWEST);
     } catch (FileNotFoundException ex) {
       int status = 0;
       try {
@@ -1313,6 +1329,34 @@ public final class SwiftRestClient {
    */
   private <M extends HttpMethod, R> R perform(URI uri,
                       HttpMethodProcessor<M, R> processor)
+    throws IOException,
+           SwiftBadRequestException,
+           SwiftInternalStateException,
+           SwiftInvalidResponseException,
+           FileNotFoundException {
+    return perform("",uri, processor);
+  }
+
+  /**
+   * Performs the HTTP request, validates the response code and returns
+   * the received data. HTTP Status codes are converted into exceptions.
+   * @parm reason: why is this operation taking place. Used for statistics
+   * @param uri URI to source
+   * @param processor HttpMethodProcessor
+   * @param <M> method
+   * @param <R> result type
+   * @return result of HTTP request
+   * @throws IOException IO problems
+   * @throws SwiftBadRequestException the status code indicated "Bad request"
+   * @throws SwiftInvalidResponseException the status code is out of range
+   * for the action (excluding 404 responses)
+   * @throws SwiftInternalStateException the internal state of this client
+   * is invalid
+   * @throws FileNotFoundException a 404 response was returned
+   */
+  private <M extends HttpMethod, R> R perform(String reason,
+                                              URI uri,
+                                              HttpMethodProcessor<M, R> processor)
       throws IOException, SwiftBadRequestException, SwiftInternalStateException,
             SwiftInvalidResponseException, FileNotFoundException {
     checkNotNull(uri);
@@ -1365,7 +1409,7 @@ public final class SwiftRestClient {
       throw e;
     } finally {
       duration.finished();
-      durationStats.add(method.getName(), duration, success);
+      durationStats.add(method.getName()+" " + reason, duration, success);
     }
   }
 
@@ -1458,7 +1502,7 @@ public final class SwiftRestClient {
    * @throws IOException
    */
   private InputStream doGet(final URI uri, final Header... requestHeaders) throws IOException {
-    return perform(uri, new GetMethodProcessor<InputStream>() {
+    return perform("", uri, new GetMethodProcessor<InputStream>() {
       @Override
       public InputStream extractResult(GetMethod method) throws IOException {
         return new HttpInputStreamWithRelease(uri, method);
@@ -1468,7 +1512,6 @@ public final class SwiftRestClient {
       protected void setup(GetMethod method) throws
                     SwiftInternalStateException {
         setHeaders(method, requestHeaders);
-
       }
     });
   }

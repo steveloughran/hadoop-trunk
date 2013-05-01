@@ -193,9 +193,11 @@ public class SwiftNativeFileSystemStore {
     SwiftObjectPath objectPath = toObjectPath(path);
     final Header[] headers;
     if (newest) {
-    headers = swiftRestClient.headRequest(objectPath, SwiftRestClient.NEWEST);
+      headers = swiftRestClient.headRequest("getObjectMetadata-newest",
+                                            objectPath, SwiftRestClient.NEWEST);
     } else {
-      headers = swiftRestClient.headRequest(objectPath);
+      headers = swiftRestClient.headRequest("getObjectMetadata",
+                                            objectPath);
     }
     //no headers is treated as a missing file
     if (headers.length == 0) {
@@ -470,8 +472,9 @@ public class SwiftNativeFileSystemStore {
    */
   public boolean objectExists(SwiftObjectPath path) throws IOException {
     try {
-      Header[] headers = swiftRestClient.headRequest(path,
-              SwiftRestClient.NEWEST);
+      Header[] headers = swiftRestClient.headRequest("objectExists",
+                                                     path,
+                                                     SwiftRestClient.NEWEST);
       //no headers is treated as a missing file
       return headers.length != 0;
     } catch (FileNotFoundException e) {
@@ -717,7 +720,7 @@ public class SwiftNativeFileSystemStore {
    * @return path with a URI bound to this FS
    * @throws SwiftException URI cannot be created.
    */
-  private Path getCorrectSwiftPath(Path path) throws
+  public Path getCorrectSwiftPath(Path path) throws
           SwiftException {
     try {
       final URI fullUri = new URI(uri.getScheme(),
