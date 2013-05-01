@@ -152,6 +152,15 @@ public final class SwiftRestClient {
   private final AuthenticationRequest authRequest;
 
   /**
+   * This auth request is similar to @see authRequest,
+   * with one difference: it has another json representation when
+   * authRequest one is not applicable
+   */
+  private AuthenticationRequest keystoneAuthRequest;
+
+  private boolean useKeystoneAuthentication = false;
+
+    /**
    * The container this client is working with
    */
   private final String container;
@@ -259,9 +268,9 @@ public final class SwiftRestClient {
    * It is up to the reader to read all three fields in their own
    * synchronized block to be sure that they are all consistent.
    *
-   * @param endpoint       endpoint URI
+   * @param endpoint endpoint URI
    * @param objectLocation object location URI
-   * @param authToken      auth token
+   * @param authToken auth token
    */
   private void setAuthDetails(URI endpoint,
                               URI objectLocation,
@@ -442,22 +451,26 @@ public final class SwiftRestClient {
     String isPubProp = props.getProperty(SWIFT_PUBLIC_PROPERTY, "false");
     usePublicURL = "true".equals(isPubProp);
 
-    if (apiKey == null && password == null) {
-        throw new SwiftConfigurationException(
-          "Configuration for " + filesystemURI +" must contain either "
-          + SWIFT_PASSWORD_PROPERTY + " or "
-          + SWIFT_APIKEY_PROPERTY);
-    }
-    //create the (reusable) authentication request
-    if (password != null) {
-      authRequest = new PasswordAuthenticationRequest(tenant,
-                                                      new PasswordCredentials(
-                                                        username,
-                                                        password));
-    } else {
-      authRequest = new ApiKeyAuthenticationRequest(tenant,
-                                                    new ApiKeyCredentials(
-                                                      username, apiKey));
+        if (apiKey == null && password == null) {
+            throw new SwiftConfigurationException(
+                    "Configuration for " + filesystemURI +" must contain either "
+                            + SWIFT_PASSWORD_PROPERTY + " or "
+                            + SWIFT_APIKEY_PROPERTY);
+        }
+        //create the (reusable) authentication request
+        if (password != null) {
+            authRequest = new PasswordAuthenticationRequest(tenant,
+                    new PasswordCredentials(
+                            username,
+                            password));
+        } else {
+            authRequest = new ApiKeyAuthenticationRequest(tenant,
+                    new ApiKeyCredentials(
+                            username, apiKey));
+/*
+            keystoneAuthRequest = new KeyStoneAuthRequest(tenant,
+                    new KeystoneApiKeyCredentials(username, apiKey));
+*/
     }
     locationAware = "true".equals(
       props.getProperty(SWIFT_LOCATION_AWARE_PROPERTY, "false"));
@@ -564,47 +577,6 @@ public final class SwiftRestClient {
   }
 
   /**
-   * Get an integer option from the property object
-   * @param props property object
-   * @param key configuration
-   * @param def default value
-   * @return the value in the property file, or the default.
-   * @throws SwiftConfigurationException if the property file-supplied
-   * value cannot be parsed to an integer
-   */
-  private int getIntOption(Properties props, String key, int def) throws
-          SwiftConfigurationException {
-    String val = props.getProperty(key, Integer.toString(def));
-    try {
-      return Integer.decode(val);
-    } catch (NumberFormatException e) {
-      throw new SwiftConfigurationException("Failed to parse (numeric) value" +
-              " of property" + key
-              + " : " + val, e);
-    }
-  }
-  /**
-   * Get an integer option from the property object
-   * @param props property object
-   * @param key configuration
-   * @param def default value
-   * @return the value in the property file, or the default.
-   * @throws SwiftConfigurationException if the property file-supplied
-   * value cannot be parsed to an integer
-   */
-  private long getLongOption(Properties props, String key, long def) throws
-          SwiftConfigurationException {
-    String val = props.getProperty(key, Long.toString(def));
-    try {
-      return Long.decode(val);
-    } catch (NumberFormatException e) {
-      throw new SwiftConfigurationException("Failed to parse (numeric) value" +
-              " of property" + key
-              + " : " + val, e);
-    }
-  }
-
-  /**
    * Make an HTTP GET request to Swift to get a range of data in the object.
    *
    * @param path   path to object
@@ -649,7 +621,7 @@ public final class SwiftRestClient {
    * @param uri file URI
    * @return object length
    * @throws SwiftException on swift-related issues
-   * @throws IOException    on network/IO problems
+   * @throws IOException on network/IO problems
    */
   public long getContentLength(URI uri) throws IOException {
     preRemoteCommand("getContentLength");
@@ -682,10 +654,10 @@ public final class SwiftRestClient {
    * <b>Warning:</b> this input stream must be closed to avoid
    * keeping Http connections open.
    *
-   * @param path           path to file
+   * @param path path to file
    * @param requestHeaders http headers
    * @return byte[] file data or null if the object was not found
-   * @throws IOException           on IO Faults
+   * @throws IOException on IO Faults
    * @throws FileNotFoundException if there is nothing at the path
    */
   public InputStream getDataAsInputStream(SwiftObjectPath path,
@@ -699,7 +671,7 @@ public final class SwiftRestClient {
   /**
    * Returns object location as byte[]
    *
-   * @param path           path to file
+   * @param path path to file
    * @param requestHeaders http headers
    * @return byte[] file data or null if the object was not found
    * @throws IOException on IO Faults
@@ -778,12 +750,12 @@ public final class SwiftRestClient {
   /**
    * Find objects under a prefix
    *
-   * @param path           path prefix
+   * @param path path prefix
    * @param requestHeaders optional request headers
    * @return byte[] file data or null if the object was not found
-   * @throws IOException           on IO Faults
+   * @throws IOException on IO Faults
    * @throws FileNotFoundException if nothing is at the end of the URI -that is,
-   *                               the directory is empty
+   * the directory is empty
    */
   public byte[] findObjectsByPrefix(SwiftObjectPath path,
                                     final Header... requestHeaders) throws IOException {
@@ -827,7 +799,7 @@ public final class SwiftRestClient {
 
       @Override
       protected void setup(GetMethod method) throws
-                                             SwiftInternalStateException {
+                     SwiftInternalStateException {
         setHeaders(method, requestHeaders);
       }
     });
@@ -836,12 +808,12 @@ public final class SwiftRestClient {
   /**
    * Find objects in a directory
    *
-   * @param path           path prefix
+   * @param path path prefix
    * @param requestHeaders optional request headers
    * @return byte[] file data or null if the object was not found
-   * @throws IOException           on IO Faults
+   * @throws IOException on IO Faults
    * @throws FileNotFoundException if nothing is at the end of the URI -that is,
-   *                               the directory is empty
+   * the directory is empty
    */
   public byte[] listDeepObjectsInDirectory(SwiftObjectPath path,
                                            boolean listDeep,
@@ -926,8 +898,8 @@ public final class SwiftRestClient {
    * which is required to handle this WebDAV-level extension to the
    * base HTTP operations.
    *
-   * @param src     source path
-   * @param dst     destination path
+   * @param src source path
+   * @param dst destination path
    * @param headers any headers
    * @return true if the status code was considered successful
    * @throws IOException on IO Faults
@@ -945,7 +917,7 @@ public final class SwiftRestClient {
 
       @Override
       protected void setup(CopyMethod method) throws
-                                              SwiftInternalStateException {
+                     SwiftInternalStateException {
         setHeaders(method, headers);
         method.addRequestHeader(HEADER_DESTINATION, dst.toUriPath());
       }
@@ -956,9 +928,9 @@ public final class SwiftRestClient {
    * Uploads file as Input Stream to Swift.
    * The data stream will be closed after the request.
    *
-   * @param path           path to Swift
-   * @param data           object data
-   * @param length         length of data
+   * @param path path to Swift
+   * @param data object data
+   * @param length length of data
    * @param requestHeaders http headers
    * @throws IOException on IO Faults
    */
@@ -978,7 +950,7 @@ public final class SwiftRestClient {
 
         @Override
         protected void setup(PutMethod method) throws
-                                               SwiftInternalStateException {
+                        SwiftInternalStateException {
           method.setRequestEntity(new InputStreamRequestEntity(data, length));
           setHeaders(method, requestHeaders);
         }
@@ -1009,7 +981,7 @@ public final class SwiftRestClient {
 
       @Override
       protected void setup(DeleteMethod method) throws
-                                                SwiftInternalStateException {
+                    SwiftInternalStateException {
         setHeaders(method, requestHeaders);
       }
     });
@@ -1018,10 +990,10 @@ public final class SwiftRestClient {
   /**
    * Issue a head request
    *
-   * @param path           path to query
+   * @param path path to query
    * @param requestHeaders request header
    * @return the response headers. This may be an empty list
-   * @throws IOException           IO problems
+   * @throws IOException IO problems
    * @throws FileNotFoundException if there is nothing at the end
    */
   public Header[] headRequest(SwiftObjectPath path, final Header... requestHeaders)
@@ -1040,7 +1012,7 @@ public final class SwiftRestClient {
 
       @Override
       protected void setup(HeadMethod method) throws
-                                              SwiftInternalStateException {
+                    SwiftInternalStateException {
         setHeaders(method, requestHeaders);
       }
     });
@@ -1059,7 +1031,7 @@ public final class SwiftRestClient {
 
       @Override
       protected void setup(PutMethod method) throws
-                                             SwiftInternalStateException {
+                    SwiftInternalStateException {
         setHeaders(method, requestHeaders);
       }
     });
@@ -1082,6 +1054,13 @@ public final class SwiftRestClient {
    * @return authenticated access token
    */
   public AccessToken authenticate() throws IOException {
+        final AuthenticationRequest authenticationRequest;
+        if (useKeystoneAuthentication) {
+            authenticationRequest = keystoneAuthRequest;
+        } else {
+            authenticationRequest = authRequest;
+        }
+
     LOG.debug("started authentication");
     return perform(authUri, new PostMethodProcessor<AccessToken>() {
 
@@ -1090,9 +1069,9 @@ public final class SwiftRestClient {
       protected void setup(PostMethod method) throws SwiftException {
 
         final String data = JSONUtil.toJSON(new AuthenticationRequestWrapper(
-          authRequest));
+                        authenticationRequest));
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Authenticating with " + authRequest);
+                    LOG.debug("Authenticating with " + authenticationRequest);
         }
         //WARNING: some back-ends to commons-logging
         //upgrade trace to debug, which can leak secrets.
@@ -1119,7 +1098,8 @@ public final class SwiftRestClient {
                 SC_NO_CONTENT,
                 SC_RESET_CONTENT,
                 SC_PARTIAL_CONTENT,
-                SC_MULTI_STATUS
+                SC_MULTI_STATUS,
+                SC_UNAUTHORIZED //if request unauthorized, try another method
         };
       }
 
@@ -1128,8 +1108,9 @@ public final class SwiftRestClient {
         //initial check for failure codes leading to authentication failures
         if (method.getStatusCode() == SC_BAD_REQUEST) {
           throw new SwiftAuthenticationFailedException(
-            authRequest.toString(), "POST", authUri, method);
+                   authenticationRequest.toString(), "POST", authUri, method);
         }
+
         final AuthenticationResponse access =
                 JSONUtil.toObject(method.getResponseBodyAsString(),
                         AuthenticationWrapper.class).getAccess();
@@ -1166,7 +1147,7 @@ public final class SwiftRestClient {
               String endpointRegion = endpoint.getRegion();
               URI publicURL = endpoint.getPublicURL();
               URI internalURL = endpoint.getInternalURL();
-              descr = String.format("[%s =>  %s / %s]; ",
+              descr = String.format("[%s => %s / %s]; ",
                       endpointRegion,
                       publicURL,
                       internalURL);
@@ -1191,9 +1172,9 @@ public final class SwiftRestClient {
                   ("regions: " + regionList)
                   : "No regions");
           throw new SwiftInvalidResponseException(message,
-                                                  SC_OK,
-                                                  "authenticating",
-                                                  authUri);
+                  SC_OK,
+                  "authenticating",
+                  authUri);
 
         }
 
@@ -1241,8 +1222,8 @@ public final class SwiftRestClient {
    * Create a container -if it already exists, do nothing
    *
    * @param containerName the container name
-   * @throws IOException                   IO problems
-   * @throws SwiftBadRequestException      invalid container name
+   * @throws IOException IO problems
+   * @throws SwiftBadRequestException invalid container name
    * @throws SwiftInvalidResponseException error from the server
    */
   public void createContainer(String containerName) throws IOException {
@@ -1317,10 +1298,10 @@ public final class SwiftRestClient {
    * Performs the HTTP request, validates the response code and returns
    * the received data. HTTP Status codes are converted into exceptions.
    *
-   * @param uri       URI to source
+   * @param uri URI to source
    * @param processor HttpMethodProcessor
-   * @param <M>       method
-   * @param <R>       result type
+   * @param <M> method
+   * @param <R> result type
    * @return result of HTTP request
    * @throws IOException IO problems
    * @throws SwiftBadRequestException the status code indicated "Bad request"
@@ -1333,7 +1314,7 @@ public final class SwiftRestClient {
   private <M extends HttpMethod, R> R perform(URI uri,
                       HttpMethodProcessor<M, R> processor)
       throws IOException, SwiftBadRequestException, SwiftInternalStateException,
-             SwiftInvalidResponseException, FileNotFoundException {
+            SwiftInvalidResponseException, FileNotFoundException {
     checkNotNull(uri);
     checkNotNull(processor);
 
@@ -1350,6 +1331,8 @@ public final class SwiftRestClient {
                                  connectTimeout);
     methodParams.setSoTimeout(socketTimeout);
 
+    Duration duration = new Duration();
+    boolean success = false;
     try {
       int statusCode = 0;
       try {
@@ -1373,11 +1356,16 @@ public final class SwiftRestClient {
         throw ioe;
       }
 
-      return processor.extractResult(method);
+      R r = processor.extractResult(method);
+      success = true;
+      return r;
     } catch (IOException e) {
       //release the connection -always
       method.releaseConnection();
       throw e;
+    } finally {
+      duration.finished();
+      durationStats.add(method.getName(), duration, success);
     }
   }
 
@@ -1386,10 +1374,10 @@ public final class SwiftRestClient {
    * specific exceptions (e.g. FileNotFound), as well as the default
    * {@link SwiftInvalidResponseException}.
    *
-   * @param uri        URI for operation
-   * @param method     operation that failed
+   * @param uri URI for operation
+   * @param method operation that failed
    * @param statusCode status code
-   * @param <M>        method type
+   * @param <M> method type
    * @return an exception to throw
    */
   private <M extends HttpMethod> IOException buildException(URI uri,
@@ -1464,7 +1452,7 @@ public final class SwiftRestClient {
   /**
    * Exec a GET request and return the input stream of the response
    *
-   * @param uri            URI to GET
+   * @param uri URI to GET
    * @param requestHeaders request headers
    * @return the input stream. This must be closed to avoid log errors
    * @throws IOException
@@ -1478,7 +1466,7 @@ public final class SwiftRestClient {
 
       @Override
       protected void setup(GetMethod method) throws
-                                             SwiftInternalStateException {
+                    SwiftInternalStateException {
         setHeaders(method, requestHeaders);
 
       }
@@ -1489,7 +1477,7 @@ public final class SwiftRestClient {
    * Create an instance against a specific FS URI,
    *
    * @param filesystemURI filesystem to bond to
-   * @param config        source of configuration data
+   * @param config source of configuration data
    * @return REST client instance
    * @throws IOException on instantiation problems
    */
@@ -1505,7 +1493,7 @@ public final class SwiftRestClient {
    * @param data data
    * @return the data
    * @throws SwiftException if for some very unexpected reason it's impossible
-   *                        to convert the data to UTF-8.
+   * to convert the data to UTF-8.
    */
   private static StringRequestEntity toJsonEntity(String data) throws
           SwiftException {
@@ -1522,7 +1510,7 @@ public final class SwiftRestClient {
    * Converts Swift path to URI to make request.
    * This is public for unit testing
    *
-   * @param path        path to object
+   * @param path path to object
    * @param endpointURI damain url e.g. http://domain.com
    * @return valid URI for object
    */
@@ -1589,7 +1577,7 @@ public final class SwiftRestClient {
   /**
    * Set the auth key header of the method to the token ID supplied
    *
-   * @param method      method
+   * @param method method
    * @param accessToken access token
    * @throws SwiftInternalStateException if the client is not yet authenticated
    */
@@ -1604,7 +1592,7 @@ public final class SwiftRestClient {
    * If the auth failed, authenticate then retry the method.
    *
    * @param method methot to exec
-   * @param <M>    Method type
+   * @param <M> Method type
    * @return the status code
    * @throws IOException on any failure
    */
@@ -1622,9 +1610,9 @@ public final class SwiftRestClient {
       if (method.getURI().toString().equals(authUri.toString())) {
         //unauth response from the AUTH URI itself.
         throw new SwiftAuthenticationFailedException(authRequest.toString(),
-                                                     "auth",
-                                                     authUri,
-                                                     method);
+                "auth",
+                authUri,
+                method);
       } else {
         //any other URL: try again
         if (LOG.isDebugEnabled()) {
@@ -1675,12 +1663,12 @@ public final class SwiftRestClient {
    * @throws NullPointerException if {@code reference} is null
    */
   private static <T> T checkNotNull(T reference) throws
-                                                 SwiftInternalStateException {
+            SwiftInternalStateException {
     return checkNotNull(reference, "Null Reference");
   }
 
   private static <T> T checkNotNull(T reference, String message) throws
-                                                                 SwiftInternalStateException {
+            SwiftInternalStateException {
     if (reference == null) {
       throw new SwiftInternalStateException(message);
     }
@@ -1690,7 +1678,7 @@ public final class SwiftRestClient {
   /**
    * Check for a status code being expected -takes a list of expected values
    *
-   * @param status   received status
+   * @param status received status
    * @param expected expected value
    * @return true iff status is an element of [expected]
    */
