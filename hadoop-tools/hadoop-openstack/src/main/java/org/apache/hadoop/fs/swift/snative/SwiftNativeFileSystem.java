@@ -469,7 +469,7 @@ public class SwiftNativeFileSystem extends FileSystem {
         if (overwrite) {
           //overwrite set -> delete the object. This could be postponed
           //until at the end of the write.
-          store.fastDelete(absolutePath, true);
+          store.delete(absolutePath, true);
         } else {
           throw new SwiftPathExistsException("File already exists: " + file);
         }
@@ -570,7 +570,7 @@ public class SwiftNativeFileSystem extends FileSystem {
   @Override
   public boolean delete(Path path, boolean recursive) throws IOException {
     try {
-      return store.fastDelete(path, recursive);
+      return store.delete(path, recursive);
     } catch (FileNotFoundException e) {
       //base path was not found.
       return false;
