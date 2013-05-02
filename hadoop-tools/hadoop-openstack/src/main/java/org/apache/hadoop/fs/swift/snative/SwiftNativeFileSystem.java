@@ -731,7 +731,7 @@ public class SwiftNativeFileSystem extends FileSystem {
     //don't mind if the directory has changed
     //list all entries under this directory.
     //this will throw FileNotFoundException if the file isn't there
-    FileStatus[] statuses = listRawFileStatus(path, true);
+    FileStatus[] statuses = listRawFileStatus(absolutePath, true);
     if (statuses == null) {
       //the directory went away during the non-atomic stages of the operation.
       // Return false as it was not this thread doing the deletion.
