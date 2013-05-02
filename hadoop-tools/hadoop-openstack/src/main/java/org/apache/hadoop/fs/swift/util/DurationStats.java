@@ -141,7 +141,7 @@ public class DurationStats {
   @Override
   public String toString() {
     return String.format(
-      "'%s count=%d total=%.3fs mean=%.3fs stddev=%.3fs min=%.3fs max=%.3fs",
+      "%s count=%d total=%.3fs mean=%.3fs stddev=%.3fs min=%.3fs max=%.3fs",
       operation,
       n,
       sum / 1000.0,
