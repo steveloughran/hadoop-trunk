@@ -195,30 +195,62 @@ public class TestSwiftFileSystemPartitionedUploads extends
     //compare data
     SwiftTestUtils.compareByteArrays(src, dest, len);
   }
+  
   /**
    * Test that when a partitioned file is overwritten by a smaller one,
    * all the old partitioned files go away
    * @throws Throwable
    */
-  @Ignore
   @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
   public void testOverwritePartitionedFile() throws Throwable {
     final Path path = new Path("/test/testOverwritePartitionedFile");
 
-    int len = 8192;
-    final byte[] src = SwiftTestUtils.dataset(len, 32, 144);
+    final int len1 = 8192;
+    final byte[] src1 = SwiftTestUtils.dataset(len1, 'A','Z');
     FSDataOutputStream out = fs.create(path,
                                        false,
                                        getBufferSize(),
                                        (short) 1,
                                        1024);
-    out.write(src, 0, len);
+    out.write(src1, 0, len1);
     out.close();
-    assertPartitionsWritten("initial upload", out, 3);
-
-    assertTrue("Exists", fs.exists(path));
+    long expected = getExpectedPartitionsWritten(len1,
+                                                 PART_SIZE_BYTES,
+                                                 false);
+    assertPartitionsWritten("initial upload", out, expected);
+    assertExists("Exists", path);
     FileStatus status = fs.getFileStatus(path);
-    assertEquals("Length", len, status.getLen());
+    assertEquals("Length", len1, status.getLen());
+    //now write a shorter file with a different dataset
+    final int len2 = 4095;
+    final byte[] src2 = SwiftTestUtils.dataset(len2, 'a', 'z');
+    out = fs.create(path,
+                    true,
+                    getBufferSize(),
+                    (short) 1,
+                    1024);
+    out.write(src2, 0, len2);
+    out.close();
+    status = fs.getFileStatus(path);
+    assertEquals("Length", len2, status.getLen());
+    byte[] dest = readDataset(fs, path, len2);
+    //compare data
+    SwiftTestUtils.compareByteArrays(src2, dest, len2);
   }
+
+  @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
+  public void testDeletePartitionedFile() throws Throwable {
+    final Path path = new Path("/test/testDeletePartitionedFile");
+
+    SwiftTestUtils.writeDataset(fs, path, data, data.length, 1024, false);
+    assertExists("Exists", path);
+
+    Path partPath = new Path(path, SwiftUtils.partitionFilenameFromNumber(1));
+    assertExists("Partition Exists", partPath);
+    fs.delete(path, false);
+    assertPathDoesNotExist("deleted file still there", path);
+    assertPathDoesNotExist("partition file still there", partPath);
+  }
+
 
 }
