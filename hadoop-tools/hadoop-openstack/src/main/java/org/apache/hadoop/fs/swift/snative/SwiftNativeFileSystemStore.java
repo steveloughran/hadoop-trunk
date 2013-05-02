@@ -839,12 +839,11 @@ public class SwiftNativeFileSystemStore {
    *                               this includes entries below the specified path, (if the path is a dir
    *                               and recursive is true)
    */
-  public boolean fastDelete(Path absolutePath, boolean recursive) throws IOException {
-    final FileStatus fileStatus;
+  public boolean delete(Path absolutePath, boolean recursive) throws IOException {
     Path swiftPath = getCorrectSwiftPath(absolutePath);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Deleting path '" + absolutePath + "'; recursive=" + recursive);
-    }
+    SwiftUtils.debug(LOG, "Deleting path '%s' recursive=%b",
+                     absolutePath,
+                     recursive);
     //ask for the dir status, but don't demand the newest, as we
     //don't mind if the directory has changed
     //list all entries under this directory.
@@ -853,10 +852,9 @@ public class SwiftNativeFileSystemStore {
     if (statuses == null) {
       //the directory went away during the non-atomic stages of the operation.
       // Return false as it was not this thread doing the deletion.
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(
-          "Path '" + absolutePath + "' has no status -it has 'gone away'");
-      }
+      SwiftUtils.debug(LOG, "Path '%s' has no status -it has 'gone away'",
+                       absolutePath,
+                       recursive);
       return false;
     }
     int filecount = statuses.length;
@@ -876,9 +874,7 @@ public class SwiftNativeFileSystemStore {
       swiftPath.equals(statuses[0].getPath());
       // 1 entry => simple file and it is us
       //simple file: delete it
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Deleting simple file");
-      }
+      LOG.debug("Deleting simple file");
       deleteObject(absolutePath);
       return true;
     }
@@ -890,7 +886,7 @@ public class SwiftNativeFileSystemStore {
       throw new SwiftOperationFailedException("Directory " + absolutePath
                                               + " is not empty: "
                                               + SwiftUtils.fileStatsToString(
-        statuses, "; "));
+                                                        statuses, "; "));
     }
     //delete the entries. including ourself.
     for (FileStatus entryStatus : statuses) {
