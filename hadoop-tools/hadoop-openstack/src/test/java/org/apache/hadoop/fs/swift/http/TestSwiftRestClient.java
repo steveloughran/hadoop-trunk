@@ -24,6 +24,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.SwiftTestConstants;
+import org.apache.hadoop.fs.swift.util.Duration;
+import org.apache.hadoop.fs.swift.util.DurationStats;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.apache.hadoop.fs.swift.util.SwiftObjectPath;
 import org.junit.Assert;
@@ -86,7 +88,13 @@ public class TestSwiftRestClient implements SwiftTestConstants {
     stuff[0] = 'a';
     client.upload(sobject, new ByteArrayInputStream(stuff), stuff.length);
     //check file exists
-    client.headRequest(sobject, SwiftRestClient.NEWEST);
+    Duration head = new Duration();
+    Header[] responseHeaders = client.headRequest(sobject, SwiftRestClient.NEWEST);
+    head.finished();
+    LOG.info("head request duration " + head);
+    for (Header header: responseHeaders) {
+      LOG.info(header.toString());
+    }
     //delete the file
     client.delete(sobject);
     //check file is gone
@@ -97,7 +105,9 @@ public class TestSwiftRestClient implements SwiftTestConstants {
     } catch (FileNotFoundException e) {
       //expected
     }
-
+    for (DurationStats stats: client.getOperationStatistics()) {
+      LOG.info(stats);
+    }
   }
 
 }
