@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.http.RestClientBindings;
 import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
+import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
@@ -72,8 +73,9 @@ public class TestSwiftFileSystemExtendedContract extends SwiftFileSystemBaseTest
     fsDataOutputStream.write(message.getBytes());
     fsDataOutputStream.close();
     assertExists("created file", f);
+    FSDataInputStream open = null;
     try {
-      final FSDataInputStream open = fs.open(f);
+      open = fs.open(f);
       final byte[] bytes = new byte[512];
       final int read = open.read(bytes);
       final byte[] buffer = new byte[read];
@@ -81,6 +83,7 @@ public class TestSwiftFileSystemExtendedContract extends SwiftFileSystemBaseTest
       assertEquals(message, new String(buffer));
     } finally {
       fs.delete(f, false);
+      IOUtils.closeStream(open);
     }
   }
 
