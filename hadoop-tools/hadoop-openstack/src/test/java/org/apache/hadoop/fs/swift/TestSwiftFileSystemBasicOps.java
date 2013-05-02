@@ -155,6 +155,20 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
   }
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
+  public void testOverwriteDirectory() throws Throwable {
+    Path path = new Path("/test/testOverwriteDirectory");
+    try {
+      fs.mkdirs(path);
+      String text = "Testing a put to a file "
+              + System.currentTimeMillis();
+      writeTextFile(fs, path, text, false);
+      assertFileHasLength(fs, path, text.length());
+    } finally {
+      delete(fs, path);
+    }
+  }
+
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testFileStatus() throws Throwable {
     Path path = new Path("/test/FileStatus");
     try {
