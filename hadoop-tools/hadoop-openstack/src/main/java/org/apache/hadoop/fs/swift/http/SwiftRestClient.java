@@ -989,21 +989,7 @@ public final class SwiftRestClient {
 
   /**
    * Issue a head request
-   *
-   * @param path path to query
-   * @param requestHeaders request header
-   * @return the response headers. This may be an empty list
-   * @throws IOException IO problems
-   * @throws FileNotFoundException if there is nothing at the end
-   */
-  public Header[] headRequest(SwiftObjectPath path, final Header... requestHeaders)
-          throws IOException {
-    return headRequest("", path, requestHeaders);
-  }
-
-  /**
-   * Issue a head request
-   *
+   * @param reason reason -used in logs
    * @param path path to query
    * @param requestHeaders request header
    * @return the response headers. This may be an empty list
@@ -1015,7 +1001,7 @@ public final class SwiftRestClient {
                               final Header... requestHeaders)
           throws IOException {
 
-    preRemoteCommand("headRequest");
+    preRemoteCommand("headRequest: "+ reason);
     return perform(reason, pathToURI(path), new HeadMethodProcessor<Header[]>() {
       @Override
       public Header[] extractResult(HeadMethod method) throws IOException {
