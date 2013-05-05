@@ -180,6 +180,21 @@ public class SwiftNativeFileSystemStore {
   }
 
   /**
+   * Get the HTTP headers, in case you really need the low-level
+   * metadata
+   * @param path path to probe
+   * @param newest newest or oldest?
+   * @return the header list
+   * @throws IOException IO problem
+   * @throws FileNotFoundException if there is nothing at the end
+   */
+  public Header[] getObjectHeaders(Path path, boolean newest)
+    throws IOException, FileNotFoundException {
+    SwiftObjectPath objectPath = toObjectPath(path);
+    return stat(objectPath, newest);
+  }
+  
+  /**
    * 
    * Get the metadata of an object
    *
@@ -189,16 +204,11 @@ public class SwiftNativeFileSystemStore {
    * @throws IOException           on a problem
    * @throws FileNotFoundException if there is nothing at the end
    */
-  public SwiftFileStatus getObjectMetadata(Path path, boolean newest) throws IOException {
+  public SwiftFileStatus getObjectMetadata(Path path, boolean newest)
+    throws IOException, FileNotFoundException {
+
     SwiftObjectPath objectPath = toObjectPath(path);
-    final Header[] headers;
-    if (newest) {
-      headers = swiftRestClient.headRequest("getObjectMetadata-newest",
-                                            objectPath, SwiftRestClient.NEWEST);
-    } else {
-      headers = swiftRestClient.headRequest("getObjectMetadata",
-                                            objectPath);
-    }
+    final Header[] headers = stat(objectPath, newest);
     //no headers is treated as a missing file
     if (headers.length == 0) {
       throw new FileNotFoundException("Not Found " + path.toUri());
@@ -237,6 +247,19 @@ public class SwiftNativeFileSystemStore {
                                getBlocksize(),
                                lastModified,
                                correctSwiftPath);
+  }
+
+  private Header[] stat(SwiftObjectPath objectPath, boolean newest) throws
+                                                                    IOException {
+    Header[] headers;
+    if (newest) {
+      headers = swiftRestClient.headRequest("getObjectMetadata-newest",
+                                            objectPath, SwiftRestClient.NEWEST);
+    } else {
+      headers = swiftRestClient.headRequest("getObjectMetadata",
+                                            objectPath);
+    }
+    return headers;
   }
 
   /**
@@ -346,7 +369,7 @@ public class SwiftNativeFileSystemStore {
     for (SwiftObjectFileStatus status : fileStatusList) {
       if (status.getName() != null) {
           files.add(new SwiftFileStatus(status.getBytes(),
-                                        status.getBytes() == 0,
+                  status.getBytes() == 0,
                   1,
                   getBlocksize(),
                   status.getLast_modified().getTime(),
@@ -859,7 +882,9 @@ public class SwiftNativeFileSystemStore {
     }
     int filecount = statuses.length;
     SwiftUtils.debug(LOG, "Path '%s' %d status entries'",
-                     absolutePath, filecount);
+                     absolutePath,
+                     filecount);
+    
     if (filecount == 0) {
       //it's an empty directory or a path
       rmdir(absolutePath);
@@ -888,6 +913,7 @@ public class SwiftNativeFileSystemStore {
                                               + SwiftUtils.fileStatsToString(
                                                         statuses, "; "));
     }
+
     //delete the entries. including ourself.
     for (FileStatus entryStatus : statuses) {
       Path entryPath = entryStatus.getPath();
@@ -900,7 +926,7 @@ public class SwiftNativeFileSystemStore {
       } catch (FileNotFoundException e) {
         //the path went away -race conditions.
         //do not fail, as the outcome is still OK.
-        SwiftUtils.debug(LOG, "Path '%s' is no longer present\"; continuing",
+        SwiftUtils.debug(LOG, "Path '%s' is no longer present; continuing",
                          entryPath);
       }
       throttle();
