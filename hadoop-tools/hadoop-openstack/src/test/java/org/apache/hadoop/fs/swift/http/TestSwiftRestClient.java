@@ -89,7 +89,9 @@ public class TestSwiftRestClient implements SwiftTestConstants {
     client.upload(sobject, new ByteArrayInputStream(stuff), stuff.length);
     //check file exists
     Duration head = new Duration();
-    Header[] responseHeaders = client.headRequest(sobject, SwiftRestClient.NEWEST);
+    Header[] responseHeaders = client.headRequest("expect success",
+                                                  sobject,
+                                                  SwiftRestClient.NEWEST);
     head.finished();
     LOG.info("head request duration " + head);
     for (Header header: responseHeaders) {
@@ -99,7 +101,9 @@ public class TestSwiftRestClient implements SwiftTestConstants {
     client.delete(sobject);
     //check file is gone
     try {
-      Header[] headers = client.headRequest(sobject, SwiftRestClient.NEWEST);
+      Header[] headers = client.headRequest("expect fail",
+                                            sobject,
+                                            SwiftRestClient.NEWEST);
       Assert.fail("Expected deleted file, but object is still present: "
                   + sobject);
     } catch (FileNotFoundException e) {
