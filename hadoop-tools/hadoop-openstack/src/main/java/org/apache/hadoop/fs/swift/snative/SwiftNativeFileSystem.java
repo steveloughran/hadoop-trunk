@@ -586,120 +586,7 @@ public class SwiftNativeFileSystem extends FileSystem {
     return delete(f, true);
   }
 
-  /**
-   * Delete the entire tree. This is an internal one with slightly different
-   * behavior: if an entry is missing, a {@link FileNotFoundException} is
-   * raised. This lets the caller distinguish a file not found with
-   * other reasons for failure, so handles race conditions in recursive
-   * directory deletes better.
-   * <p/>
-   * The problem being addressed is: caller A requests a recursive directory
-   * of directory /dir ; caller B requests a delete of a file /dir/file,
-   * between caller A enumerating the files contents, and requesting a delete
-   * of /dir/file. We want to recognise the special case
-   * "directed file is no longer there" and not convert that into a failure
-   *
-   * @param path      the path to delete.
-   * @param recursive if path is a directory and set to
-   *                  true, the directory is deleted else throws an exception if the
-   *                  directory is not empty
-   *                  case of a file the recursive can be set to either true or false.
-   * @return true if the object was deleted
-   * @throws IOException           IO problems
-   * @throws FileNotFoundException if a file/dir being deleted is not there -
-   *                               this includes entries below the specified path, (if the path is a dir
-   *                               and recursive is true)
-   */
-  @Deprecated
-  private boolean innerDelete(Path path, boolean recursive) throws IOException {
-    final FileStatus fileStatus;
-    Path absolutePath = makeAbsolute(path);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Deleting path '" + absolutePath + "'; recursive=" + recursive);
-    }
-    //ask for the dir status, but don't demand the newest, as we
-    //don't mind if the directory has changed
-    fileStatus = store.getObjectMetadata(absolutePath, false);
-    if (!SwiftUtils.isDirectory(fileStatus)) {
-      //simple file: delete it
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Deleting simple file '" + absolutePath + "'");
-      }
-      store.deleteObject(absolutePath);
-    } else {
-      //it's a directory
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Deleting directory '" + absolutePath + "'");
-      }
-      FileStatus[] statuses = store.listSubPaths(absolutePath, false, false);
-      if (statuses == null) {
-        //the directory went away during the non-atomic stages of the operation.
-        // Return false as it was not this thread doing the deletion.
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Path '" + absolutePath + "' has no status -it has 'gone away'");
-        }
-        return false;
-      }
-      //now build a list of all child entries
-      Path dirPath = fileStatus.getPath();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Found " + statuses.length + " child entries under " + dirPath);
-      }
-      ArrayList<FileStatus> children =
-              new ArrayList<FileStatus>(statuses.length);
-      for (FileStatus child : statuses) {
-        if (!(child.getPath().equals(dirPath))) {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug(child.toString());
-          }
-          children.add(child);
-        } else {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("skipping own entry");
-          }
-        }
-      }
-      if(LOG.isDebugEnabled()) {
-        LOG.debug("#of children in directory: " + children.size());
-      }
-
-      //look to see if there are now any children
-      if (!children.isEmpty() && !recursive) {
-        //if there are children, unless this is a recursive operation, fail immediately
-        throw new SwiftOperationFailedException("Directory " + absolutePath
-                                                + " is not empty.");
-      }
-      
-      //delete the children
-      for (FileStatus child : children) {
-        Path childPath = child.getPath();
-        try {
-          boolean deleted = false;
-          if (child.isDir()) {
-            deleted = innerDelete(childPath, true);
-          } else {
-            deleted = store.deleteObject(childPath);
-          }
-          if (!deleted) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Failed to recursively delete '" + childPath + "'");
-            }
-            return false;
-          }
-        } catch (FileNotFoundException e) {
-          //the path went away -race conditions.
-          //do not fail, as the outcome is still OK.
-          LOG.info("Path " + childPath + " is no longer present");
-        }
-        store.throttle();
-      }
-      //here any children that existed have been deleted
-      //so rm the directory
-      store.rmdir(absolutePath);
-    }
-    return true;
-  }
-
+  
   /**
    * Makes path absolute
    *
@@ -712,7 +599,6 @@ public class SwiftNativeFileSystem extends FileSystem {
     }
     return new Path(workingDir, path);
   }
-
 
   /**
    * Get the current operation statistics
