@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.fs.swift;
 
+import org.apache.commons.httpclient.Header;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -34,6 +35,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.assertPathExists;
 import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.readDataset;
 
 
@@ -112,7 +114,10 @@ public class TestSwiftFileSystemPartitionedUploads extends
         getExpectedPartitionsWritten(len, PART_SIZE_BYTES, true);
       assertPartitionsWritten("Stream closed", out, expected);
 
-      assertTrue("Exists", fs.exists(path));
+      Header[] headers = fs.getStore().getObjectHeaders(path, true);
+      for (Header header:headers) {
+        LOG.info(header.toString());
+      }
       FileStatus status = fs.getFileStatus(path);
       assertEquals("Length of written file", len, status.getLen());
       String fileInfo = path + "  " + status;
@@ -250,6 +255,26 @@ public class TestSwiftFileSystemPartitionedUploads extends
     fs.delete(path, false);
     assertPathDoesNotExist("deleted file still there", path);
     assertPathDoesNotExist("partition file still there", partPath);
+  }
+
+
+  @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
+  public void testRenamePartitionedFile() throws Throwable {
+    Path src = new Path("/test/testRenamePartitionedFileSrc");
+
+    SwiftTestUtils.writeDataset(fs, src, data, data.length, 1024, false);
+    assertExists("Exists", src);
+
+    String partOneName = SwiftUtils.partitionFilenameFromNumber(1);
+    Path srcPart = new Path(src, partOneName);
+    Path dest = new Path("/test/testRenamePartitionedFileDest");
+    Path destPart = new Path(src, partOneName);
+    assertExists("Partition Exists", srcPart);
+    fs.rename(src, dest);
+    assertPathDoesNotExist("deleted file still there", src);
+    assertPathDoesNotExist("partition file still there", srcPart);
+    assertPathExists(fs, "dest file missing", dest);
+    assertPathExists(fs, "dest part1 missing", destPart);
   }
 
 
