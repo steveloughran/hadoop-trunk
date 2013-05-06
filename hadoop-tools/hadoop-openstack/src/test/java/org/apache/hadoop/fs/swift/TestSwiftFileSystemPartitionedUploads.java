@@ -174,7 +174,7 @@ public class TestSwiftFileSystemPartitionedUploads extends
    */
   @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
   public void testManyPartitionedFile() throws Throwable {
-    final Path path = new Path("/test/testManyPartionedFile");
+    final Path path = new Path("/test/testManyPartitionedFile");
 
     int len = PART_SIZE_BYTES * 15;
     final byte[] src = SwiftTestUtils.dataset(len, 32, 144);
@@ -199,6 +199,11 @@ public class TestSwiftFileSystemPartitionedUploads extends
     byte[] dest = readDataset(fs, path, len);
     //compare data
     SwiftTestUtils.compareByteArrays(src, dest, len);
+    //finally, check the data
+    FileStatus[] stats = fs.listStatus(path);
+    assertEquals("wrong entry count in " 
+                 + SwiftTestUtils.dumpStats(path.toString(), stats), 
+                 expected, stats.length);
   }
   
   /**
@@ -250,11 +255,16 @@ public class TestSwiftFileSystemPartitionedUploads extends
     SwiftTestUtils.writeDataset(fs, path, data, data.length, 1024, false);
     assertExists("Exists", path);
 
-    Path partPath = new Path(path, SwiftUtils.partitionFilenameFromNumber(1));
-    assertExists("Partition Exists", partPath);
+    Path part_0001 = new Path(path, SwiftUtils.partitionFilenameFromNumber(1));
+    Path part_0002 = new Path(path, SwiftUtils.partitionFilenameFromNumber(1));
+    String ls = SwiftTestUtils.ls(fs, path);
+    assertExists("Partition 0001 Exists in " + ls, part_0001);
+    assertExists("Partition 0002 Exists in " + ls, part_0001);
     fs.delete(path, false);
     assertPathDoesNotExist("deleted file still there", path);
-    assertPathDoesNotExist("partition file still there", partPath);
+    ls = SwiftTestUtils.ls(fs, path);
+    assertPathDoesNotExist("partition 0001 file still under " + ls, part_0001);
+    assertPathDoesNotExist("partition 0002 file still under " + ls, part_0002);
   }
 
 
@@ -262,7 +272,8 @@ public class TestSwiftFileSystemPartitionedUploads extends
   public void testRenamePartitionedFile() throws Throwable {
     Path src = new Path("/test/testRenamePartitionedFileSrc");
 
-    SwiftTestUtils.writeDataset(fs, src, data, data.length, 1024, false);
+    int len = data.length;
+    SwiftTestUtils.writeDataset(fs, src, data, len, 1024, false);
     assertExists("Exists", src);
 
     String partOneName = SwiftUtils.partitionFilenameFromNumber(1);
@@ -271,10 +282,19 @@ public class TestSwiftFileSystemPartitionedUploads extends
     Path destPart = new Path(src, partOneName);
     assertExists("Partition Exists", srcPart);
     fs.rename(src, dest);
-    assertPathDoesNotExist("deleted file still there", src);
-    assertPathDoesNotExist("partition file still there", srcPart);
     assertPathExists(fs, "dest file missing", dest);
-    assertPathExists(fs, "dest part1 missing", destPart);
+    FileStatus status = fs.getFileStatus(dest);
+    assertEquals("Length of renamed file is wrong", len, status.getLen());
+    byte[] destData = readDataset(fs, dest, len);
+    //compare data
+    SwiftTestUtils.compareByteArrays(data, destData, len);
+    String srcLs = SwiftTestUtils.ls(fs, src);
+    String destLs = SwiftTestUtils.ls(fs, dest);
+
+    assertPathDoesNotExist("deleted file still found in " + srcLs, src);
+
+    assertPathDoesNotExist("partition file still found in " + srcLs, srcPart);
+    assertPathExists(fs, "dest part1 missing from "+ destLs, destPart);
   }
 
 
