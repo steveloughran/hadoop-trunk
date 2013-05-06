@@ -533,9 +533,9 @@ public class SwiftNativeFileSystemStore {
       throw new SwiftOperationFailedException("cannot rename root dir");
     }
 
-    final FileStatus srcMetadata;
+    final SwiftFileStatus srcMetadata;
     srcMetadata = getObjectMetadata(src);
-    FileStatus dstMetadata;
+    SwiftFileStatus dstMetadata;
     try {
       dstMetadata = getObjectMetadata(dst);
     } catch (FileNotFoundException e) {
@@ -566,7 +566,7 @@ public class SwiftNativeFileSystemStore {
     SwiftObjectPath destPath;
 
 
-    boolean srcIsFile = !SwiftUtils.isDirectory(srcMetadata);
+    boolean srcIsFile = !srcMetadata.isDir();
     if (srcIsFile) {
 
       //source is a simple file
@@ -867,11 +867,14 @@ public class SwiftNativeFileSystemStore {
     SwiftUtils.debug(LOG, "Deleting path '%s' recursive=%b",
                      absolutePath,
                      recursive);
-    //ask for the dir status, but don't demand the newest, as we
+    boolean askForNewest = true;
+    SwiftFileStatus fileStatus = getObjectMetadata(swiftPath, askForNewest);
+    
+    //ask for the file/dir status, but don't demand the newest, as we
     //don't mind if the directory has changed
     //list all entries under this directory.
     //this will throw FileNotFoundException if the file isn't there
-    FileStatus[] statuses = listSubPaths(absolutePath, true, true);
+    FileStatus[] statuses = listSubPaths(absolutePath, true, askForNewest);
     if (statuses == null) {
       //the directory went away during the non-atomic stages of the operation.
       // Return false as it was not this thread doing the deletion.
@@ -899,16 +902,18 @@ public class SwiftNativeFileSystemStore {
       swiftPath.equals(statuses[0].getPath());
       // 1 entry => simple file and it is us
       //simple file: delete it
-      LOG.debug("Deleting simple file");
+      SwiftUtils.debug(LOG, "Deleting simple file %s", absolutePath);
       deleteObject(absolutePath);
       return true;
     }
 
     //>1 entry implies directory with children. Run through them,
     // but first check for the recursive flag
-    if (!recursive) {
+    if (!fileStatus.isDir()) {
+      LOG.debug("Multiple child entries but entry has data: assume partitioned");
+    } else if (!recursive) {
       //if there are children, unless this is a recursive operation, fail immediately
-      throw new SwiftOperationFailedException("Directory " + absolutePath
+      throw new SwiftOperationFailedException("Directory " + fileStatus
                                               + " is not empty: "
                                               + SwiftUtils.fileStatsToString(
                                                         statuses, "; "));
@@ -931,6 +936,10 @@ public class SwiftNativeFileSystemStore {
       }
       throttle();
     }
+    //now delete self
+    SwiftUtils.debug(LOG, "Deleting base entry %s", absolutePath);
+    deleteObject(absolutePath);
+
     return true;
   }
 }
