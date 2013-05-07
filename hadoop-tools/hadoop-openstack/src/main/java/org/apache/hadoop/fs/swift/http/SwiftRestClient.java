@@ -96,16 +96,6 @@ public final class SwiftRestClient {
   private static final Log LOG = LogFactory.getLog(SwiftRestClient.class);
 
   /**
-   * Default number of attempts to retry a connect request: {@value}
-   */
-  private static final int DEFAULT_RETRY_COUNT = 3;
-
-  /**
-   * Default timeout in milliseconds for connection requests: {@value}
-   */
-  private static final int DEFAULT_CONNECT_TIMEOUT = 15000;
-
-  /**
    * Header that says "use newest version" -ensures that
    * the query doesn't pick up older versions served by
    * an eventually consistent filesystem (except in the special case

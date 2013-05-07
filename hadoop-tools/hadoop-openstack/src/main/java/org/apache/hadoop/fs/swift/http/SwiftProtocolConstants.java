@@ -231,4 +231,12 @@ public class SwiftProtocolConstants {
   public static final String SWIFT_PROXY_PORT_PROPERTY = FS_SWIFT + DOT_PROXY_PORT;
   public static final String HTTP_ROUTE_DEFAULT_PROXY =
     "http.route.default-proxy";
+  /**
+   * Default number of attempts to retry a connect request: {@value}
+   */
+  static final int DEFAULT_RETRY_COUNT = 3;
+  /**
+   * Default timeout in milliseconds for connection requests: {@value}
+   */
+  static final int DEFAULT_CONNECT_TIMEOUT = 15000;
 }
