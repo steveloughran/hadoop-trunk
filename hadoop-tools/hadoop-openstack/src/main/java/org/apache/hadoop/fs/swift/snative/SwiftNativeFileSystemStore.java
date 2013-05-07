@@ -410,6 +410,13 @@ public class SwiftNativeFileSystemStore {
     innerCreateDirectory(toDirPath(path));
   }
 
+  /**
+   * The inner directory creation option. This only creates 
+   * the dir at the given path, not any parent dirs.
+   * @param swiftObjectPath swift object path at which a 0-byte blob should be 
+   * put
+   * @throws IOException IO problems
+   */
   private void innerCreateDirectory(SwiftObjectPath swiftObjectPath)
           throws IOException {
 
@@ -565,11 +572,12 @@ public class SwiftNativeFileSystemStore {
     //calculate the destination
     SwiftObjectPath destPath;
 
-
+    //enum the child entries and everything underneath
+    List<FileStatus> childStats = listDirectory(srcObject, true, true);
     boolean srcIsFile = !srcMetadata.isDir();
     if (srcIsFile) {
 
-      //source is a simple file
+      //source is a simple file OR a partitioned file
       // outcomes:
       // #1 dest exists and is file: fail
       // #2 dest exists and is dir: destination path becomes under dest dir
@@ -594,8 +602,25 @@ public class SwiftNativeFileSystemStore {
         //outcome #3 -new entry
         destPath = toObjectPath(dst);
       }
+      int childCount = childStats.size();
+      //here there is one of:
+      // - a single object ==> standard file
+      // ->
+      if (childCount == 0) {
+        copyThenDeleteObject(srcObject, destPath);
+      } else {
+        //do the copy
+        SwiftUtils.debug(LOG, "Source file appears to be partitioned." +
+                              " copying file and deleting children");
 
-      copyThenDeleteObject(srcObject, destPath);
+        copyObject(srcObject, destPath);
+        for (FileStatus stat : childStats) {
+          SwiftUtils.debug(LOG, "Deleting partitioned file %s ", stat);
+          deleteObject(stat.getPath());
+        }
+        
+        swiftRestClient.delete(srcObject);
+      }
     } else {
 
       //here the source exists and is a directory
@@ -626,12 +651,11 @@ public class SwiftNativeFileSystemStore {
         throw new SwiftOperationFailedException(
           "cannot move a directory under itself");
       }
-      //enum the child entries and everything underneath
-      List<FileStatus> fileStatuses = listDirectory(srcObject, true, true);
+
 
       LOG.info("mv  " + srcObject + " " + targetPath);
 
-      logDirectory("Directory to copy ", srcObject, fileStatuses);
+      logDirectory("Directory to copy ", srcObject, childStats);
 
       // iterative copy of everything under the directory.
       // by listing all children this can be done iteratively
@@ -639,7 +663,7 @@ public class SwiftNativeFileSystemStore {
       // or a 0-byte-len file pretending to be a directory.
       String srcURI = src.toUri().toString();
       int prefixStripCount = srcURI.length() + 1;
-      for (FileStatus fileStatus : fileStatuses) {
+      for (FileStatus fileStatus : childStats) {
         Path copySourcePath = fileStatus.getPath();
         String copySourceURI = copySourcePath.toUri().toString();
 
@@ -705,32 +729,40 @@ public class SwiftNativeFileSystemStore {
 
 
   /**
-   * Copy and object then, if the copy worked, delete it.
+   * Copy an object then, if the copy worked, delete it.
    * If the copy failed, the source object is not deleted.
    *
    * @param srcObject  source object path
    * @param destObject destination object path
-   * @throws IOException
+   * @throws IOException IO problems
+
    */
   private void copyThenDeleteObject(SwiftObjectPath srcObject,
                                     SwiftObjectPath destObject) throws
           IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Copying " + srcObject + " to " + destObject);
-    }
+
+
+    //do the copy
+    copyObject(srcObject, destObject);
+    //getting here means the copy worked
+    swiftRestClient.delete(srcObject);
+  }
+  /**
+   * Copy an object
+   * @param srcObject  source object path
+   * @param destObject destination object path
+   * @throws IOException IO problems
+   */
+  private void copyObject(SwiftObjectPath srcObject,
+                                    SwiftObjectPath destObject) throws
+          IOException {
     if (srcObject.isEqualToOrParentOf(destObject)) {
       throw new SwiftException(
         "Can't copy " + srcObject + " onto " + destObject);
     }
     //do the copy
     boolean copySucceeded = swiftRestClient.copyObject(srcObject, destObject);
-    if (copySucceeded) {
-      if (getObjectMetadata(getCorrectSwiftPath(destObject)) == null) {
-        innerCreateDirectory(destObject);
-      }
-      //if the copy worked delete the original
-      swiftRestClient.delete(srcObject);
-    } else {
+    if (!copySucceeded) {
       throw new SwiftException("Copy of " + srcObject + " to "
               + destObject + "failed");
     }
@@ -898,9 +930,8 @@ public class SwiftNativeFileSystemStore {
       SwiftUtils.debug(LOG, SwiftUtils.fileStatsToString(statuses, "\n"));
     }
 
-    if (filecount == 1) {
-      swiftPath.equals(statuses[0].getPath());
-      // 1 entry => simple file and it is us
+    if (filecount == 1 && swiftPath.equals(statuses[0].getPath())) {
+      // 1 entry => simple file and it is the target
       //simple file: delete it
       SwiftUtils.debug(LOG, "Deleting simple file %s", absolutePath);
       deleteObject(absolutePath);
@@ -908,7 +939,8 @@ public class SwiftNativeFileSystemStore {
     }
 
     //>1 entry implies directory with children. Run through them,
-    // but first check for the recursive flag
+    // but first check for the recursive flag and reject it *unless it looks
+    // like a partitioned file (len > 0 && has children)
     if (!fileStatus.isDir()) {
       LOG.debug("Multiple child entries but entry has data: assume partitioned");
     } else if (!recursive) {
