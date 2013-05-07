@@ -1010,6 +1010,13 @@ public final class SwiftRestClient {
     });
   }
 
+  /**
+   * Issue a put request
+   * @param path path
+   * @param requestHeaders optional headers
+   * @return the HTTP response
+   * @throws IOException any problem
+   */
   public int putRequest(SwiftObjectPath path, final Header... requestHeaders)
           throws IOException {
 
