@@ -1448,7 +1448,7 @@ public final class SwiftRestClient {
         //auth failure; should only happen on the second attempt
         fault  = new SwiftAuthenticationFailedException(
                         "Operation not authorized- current access token ="
-                            + token,
+                            + getToken(),
                         method.getName(),
                         uri,
                         method);
