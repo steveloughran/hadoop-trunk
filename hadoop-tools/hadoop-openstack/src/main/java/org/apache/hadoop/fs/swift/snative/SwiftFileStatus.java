@@ -104,12 +104,10 @@ public class SwiftFileStatus extends FileStatus {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append(getClass().getSimpleName());
-    sb.append("{");
+    sb.append("{ ");
     sb.append("path=").append(getPath());
     sb.append("; isDirectory=").append(isDir());
-    if (!isDirectory()) {
-      sb.append("; length=").append(getLen());
-    }
+    sb.append("; length=").append(getLen());
     sb.append("; blocksize=").append(getBlockSize());
     sb.append("; modification_time=").append(getModificationTime());
     sb.append("}");
