@@ -42,6 +42,7 @@ public class TestWriteManySmallFiles extends SwiftScaleTestBase {
     FileStatus[] status1 = (FileStatus[]) fs.listStatus(dir);
     ls1.finished();
     long count = getOperationCount();
+    SwiftTestUtils.noteAction("Beginning Write of "+ count + " files ");
     DurationStats writeStats = new DurationStats("write");
     DurationStats readStats = new DurationStats("read");
     String format = "%08d";
@@ -52,12 +53,17 @@ public class TestWriteManySmallFiles extends SwiftScaleTestBase {
       SwiftTestUtils.writeTextFile(fs, p, name, false);
       d.finished();
       writeStats.add(d);
-      Thread.sleep(5000);
+      Thread.sleep(1000);
     }
     //at this point, the directory is full.
+    SwiftTestUtils.noteAction("Beginning ls");
+
     Duration ls2 = new Duration();
     FileStatus[] status2 = (FileStatus[]) fs.listStatus(dir);
     ls2.finished();
+    assertEquals("Not enough entries in the directory", count, status2.length);
+
+    SwiftTestUtils.noteAction("Beginning read");
 
     for (long l = 0; l < count; l++) {
       String name = String.format(format, l);
@@ -68,7 +74,8 @@ public class TestWriteManySmallFiles extends SwiftScaleTestBase {
       d.finished();
       readStats.add(d);
     }
-    //do a recursive delete again
+    //do a recursive delete
+    SwiftTestUtils.noteAction("Beginning delete");
     Duration rm2 = new Duration();
     fs.delete(dir, true);
     rm2.finished();
