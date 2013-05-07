@@ -249,6 +249,27 @@ public class TestSwiftFileSystemPartitionedUploads extends
   }
 
   @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
+  public void testDeleteSmallPartitionedFile() throws Throwable {
+    final Path path = new Path("/test/testDeleteSmallPartitionedFile");
+
+    final int len1 = 1024;
+    final byte[] src1 = SwiftTestUtils.dataset(len1, 'A', 'Z');
+    SwiftTestUtils.writeDataset(fs, path, src1, len1, 1024, false);
+    assertExists("Exists", path);
+
+    Path part_0001 = new Path(path, SwiftUtils.partitionFilenameFromNumber(1));
+    Path part_0002 = new Path(path, SwiftUtils.partitionFilenameFromNumber(2));
+    String ls = SwiftTestUtils.ls(fs, path);
+    assertExists("Partition 0001 Exists in " + ls, part_0001);
+    assertPathDoesNotExist("partition 0002 found under " + ls, part_0002);
+    assertExists("Partition 0002 Exists in " + ls, part_0001);
+    fs.delete(path, false);
+    assertPathDoesNotExist("deleted file still there", path);
+    ls = SwiftTestUtils.ls(fs, path);
+    assertPathDoesNotExist("partition 0001 file still under " + ls, part_0001);
+  }
+
+  @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
   public void testDeletePartitionedFile() throws Throwable {
     final Path path = new Path("/test/testDeletePartitionedFile");
 
@@ -256,7 +277,7 @@ public class TestSwiftFileSystemPartitionedUploads extends
     assertExists("Exists", path);
 
     Path part_0001 = new Path(path, SwiftUtils.partitionFilenameFromNumber(1));
-    Path part_0002 = new Path(path, SwiftUtils.partitionFilenameFromNumber(1));
+    Path part_0002 = new Path(path, SwiftUtils.partitionFilenameFromNumber(2));
     String ls = SwiftTestUtils.ls(fs, path);
     assertExists("Partition 0001 Exists in " + ls, part_0001);
     assertExists("Partition 0002 Exists in " + ls, part_0001);
@@ -294,7 +315,6 @@ public class TestSwiftFileSystemPartitionedUploads extends
     assertPathDoesNotExist("deleted file still found in " + srcLs, src);
 
     assertPathDoesNotExist("partition file still found in " + srcLs, srcPart);
-    assertPathExists(fs, "dest part1 missing from "+ destLs, destPart);
   }
 
 
