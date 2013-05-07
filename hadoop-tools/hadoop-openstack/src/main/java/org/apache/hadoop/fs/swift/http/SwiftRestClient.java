@@ -1352,8 +1352,6 @@ public final class SwiftRestClient {
     methodParams.setParameter(HttpMethodParams.RETRY_HANDLER,
             new DefaultHttpMethodRetryHandler(
                     retryCount, false));
-    methodParams.setIntParameter(HttpMethodParams.HEAD_BODY_CHECK_TIMEOUT,
-                                 connectTimeout);
     methodParams.setIntParameter(HttpConnectionParams.CONNECTION_TIMEOUT,
                                  connectTimeout);
     methodParams.setSoTimeout(socketTimeout);
