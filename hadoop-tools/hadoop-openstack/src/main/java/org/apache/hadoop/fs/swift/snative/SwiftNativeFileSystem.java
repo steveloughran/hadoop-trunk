@@ -164,7 +164,7 @@ public class SwiftNativeFileSystem extends FileSystem {
   /**
    * Return a file status object that represents the path.
    *
-   * @param f The path we want information from
+   * @param path The path we want information from
    * @return a FileStatus object
    */
   @Override
