@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.fs.swift.http;
 
+import org.apache.hadoop.util.VersionInfo;
+
 /**
  * Constants used in the Swift REST protocol,
  * and in the properties used to configure the {@link SwiftRestClient}.
@@ -184,7 +186,8 @@ public class SwiftProtocolConstants {
 
   public static final String HEADER_USER_AGENT="User-Agent";
   
-  public static final String SWIFT_USER_AGENT= "Apache Hadoop Swift FileSystem";
+  public static final String SWIFT_USER_AGENT= "Apache Hadoop Swift Client "
+                                               + VersionInfo.getBuildVersion();
   
   
   /**
