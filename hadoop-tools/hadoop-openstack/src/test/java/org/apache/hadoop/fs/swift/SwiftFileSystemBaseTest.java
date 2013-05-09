@@ -132,14 +132,28 @@ public class SwiftFileSystemBaseTest extends Assert implements
     return 1024;
   }
 
+  /**
+   * Is rename supported?
+   * @return true
+   */
   protected boolean renameSupported() {
     return true;
   }
 
+  /**
+   * assume in a test that rename is supported;
+   * skip it if not
+   */
   protected void assumeRenameSupported() {
     Assume.assumeTrue(renameSupported());
   }
 
+  /**
+   * Take an unqualified path, and qualify it w.r.t the
+   * current filesystem
+   * @param pathString source path
+   * @return a qualified path instance
+   */
   protected Path path(String pathString) {
     return new Path(pathString).makeQualified(fs);
   }
@@ -307,6 +321,12 @@ public class SwiftFileSystemBaseTest extends Assert implements
     }
   }
 
+  /**
+   * Assert that the result value == -1; which implies
+   * that a read was successful
+   * @param text text to include in a message (usually the operation)
+   * @param result read result to validate
+   */
   protected void assertMinusOne(String text, int result) {
     assertEquals(text + " wrong read result " + result, -1, result);
   }
