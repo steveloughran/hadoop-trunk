@@ -50,6 +50,9 @@ public class SwiftProtocolConstants {
   /** HTTP standard {@value} header */
   public static final String HEADER_CONTENT_LENGTH = "Content-Length";
 
+  /** HTTP standard {@value} header */
+  public static final String HEADER_CONTENT_RANGE = "Content-Range";
+
   /**
    * Patten for range headers
    */
@@ -178,6 +181,12 @@ public class SwiftProtocolConstants {
    */
   public static final int DEFAULT_SWIFT_REQUEST_SIZE = 64;
 
+
+  public static final String HEADER_USER_AGENT="User-Agent";
+  
+  public static final String SWIFT_USER_AGENT= "Apache Hadoop Swift FileSystem";
+  
+  
   /**
    * Key for passing the service name as a property -not read from the
    * configuration : {@value}

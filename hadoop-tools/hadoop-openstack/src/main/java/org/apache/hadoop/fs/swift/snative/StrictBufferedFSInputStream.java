@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.swift.snative;
 
 import org.apache.hadoop.fs.BufferedFSInputStream;
 import org.apache.hadoop.fs.FSInputStream;
+import org.apache.hadoop.fs.swift.exceptions.SwiftConnectionClosedException;
 
 import java.io.IOException;
 
@@ -39,7 +40,7 @@ public class StrictBufferedFSInputStream extends BufferedFSInputStream {
       throw new IOException("Negative position");
     }
     if (in == null) {
-      throw new IOException("Stream closed");
+      throw new SwiftConnectionClosedException("Stream closed");
     }
     super.seek(pos);
   }

@@ -577,9 +577,9 @@ public final class SwiftRestClient {
    * @throws SwiftException swift specific error
    * @throws FileNotFoundException path is not there
    */
-  public InputStream getDataAsInputStream(SwiftObjectPath path,
-                                          long offset,
-                                          long length) throws IOException {
+  public HttpBodyContent getData(SwiftObjectPath path,
+                                 long offset,
+                                 long length) throws IOException {
     if (offset < 0) {
       throw new SwiftException("Invalid offset: " + offset
                             + " in getDataAsInputStream( path=" + path
@@ -597,12 +597,12 @@ public final class SwiftRestClient {
             offset,
             offset + length - 1);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("getDataAsInputStream(" + offset + "," + length + ")");
+      LOG.debug("getData:" + range);
     }
 
-    return getDataAsInputStream(path,
-            new Header(HEADER_RANGE, range),
-            SwiftRestClient.NEWEST);
+    return getData(path,
+                   new Header(HEADER_RANGE, range),
+                   SwiftRestClient.NEWEST);
   }
 
   /**
@@ -650,10 +650,10 @@ public final class SwiftRestClient {
    * @throws IOException on IO Faults
    * @throws FileNotFoundException if there is nothing at the path
    */
-  public InputStream getDataAsInputStream(SwiftObjectPath path,
-                                          final Header... requestHeaders)
+  public HttpBodyContent getData(SwiftObjectPath path,
+                                 final Header... requestHeaders)
           throws IOException {
-    preRemoteCommand("getDataAsInputStream");
+    preRemoteCommand("getData");
     return doGet(pathToURI(path),
             requestHeaders);
   }
@@ -1355,7 +1355,7 @@ public final class SwiftRestClient {
     methodParams.setIntParameter(HttpConnectionParams.CONNECTION_TIMEOUT,
                                  connectTimeout);
     methodParams.setSoTimeout(socketTimeout);
-
+    method.addRequestHeader(HEADER_USER_AGENT, SWIFT_USER_AGENT);
     Duration duration = new Duration();
     boolean success = false;
     try {
@@ -1439,7 +1439,19 @@ public final class SwiftRestClient {
 
       case SC_REQUESTED_RANGE_NOT_SATISFIABLE:
         //out of range
-        fault = new EOFException(method.getStatusText());
+        StringBuilder errorText = new StringBuilder(method.getStatusText());
+        //get the requested length
+        Header requestContentLen = method.getRequestHeader(HEADER_CONTENT_LENGTH);
+        if (requestContentLen!=null) {
+          errorText.append(" requested ").append(requestContentLen.getValue());
+        }
+        //and the result
+        Header availableContentRange = method.getResponseHeader(
+          HEADER_CONTENT_RANGE);
+        if (requestContentLen!=null) {
+          errorText.append(" available ").append(availableContentRange.getValue());
+        }
+        fault = new EOFException(errorText.toString());
         break;
 
       case SC_UNAUTHORIZED:
@@ -1482,11 +1494,14 @@ public final class SwiftRestClient {
    * @return the input stream. This must be closed to avoid log errors
    * @throws IOException
    */
-  private InputStream doGet(final URI uri, final Header... requestHeaders) throws IOException {
-    return perform("", uri, new GetMethodProcessor<InputStream>() {
+  private HttpBodyContent doGet(final URI uri, final Header... requestHeaders) throws IOException {
+    return perform("", uri, new GetMethodProcessor<HttpBodyContent>() {
       @Override
-      public InputStream extractResult(GetMethod method) throws IOException {
-        return new HttpInputStreamWithRelease(uri, method);
+      public HttpBodyContent extractResult(GetMethod method) throws IOException {
+        return
+          new HttpBodyContent(
+            new HttpInputStreamWithRelease(uri, method), method.getResponseContentLength()
+          );
       }
 
       @Override

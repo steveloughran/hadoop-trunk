@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftInvalidResponseException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftOperationFailedException;
+import org.apache.hadoop.fs.swift.http.HttpBodyContent;
 import org.apache.hadoop.fs.swift.http.SwiftProtocolConstants;
 import org.apache.hadoop.fs.swift.http.SwiftRestClient;
 import org.apache.hadoop.fs.swift.util.DurationStats;
@@ -270,9 +271,9 @@ public class SwiftNativeFileSystemStore {
    * @throws IOException           IO problems
    * @throws FileNotFoundException path doesn't resolve to an object
    */
-  public InputStream getObject(Path path) throws IOException {
-    return swiftRestClient.getDataAsInputStream(toObjectPath(path),
-            SwiftRestClient.NEWEST);
+  public HttpBodyContent getObject(Path path) throws IOException {
+    return swiftRestClient.getData(toObjectPath(path),
+                                   SwiftRestClient.NEWEST);
   }
 
   /**
@@ -284,10 +285,10 @@ public class SwiftNativeFileSystemStore {
    * @return an input stream that must be closed
    * @throws IOException IO problems
    */
-  public InputStream getObject(Path path, long byteRangeStart, long length)
+  public HttpBodyContent getObject(Path path, long byteRangeStart, long length)
           throws IOException {
-    return swiftRestClient.getDataAsInputStream(
-            toObjectPath(path), byteRangeStart, length);
+    return swiftRestClient.getData(
+      toObjectPath(path), byteRangeStart, length);
   }
 
   /**

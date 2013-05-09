@@ -23,11 +23,14 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.swift.exceptions.SwiftConnectionClosedException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftException;
+import org.apache.hadoop.fs.swift.http.HttpBodyContent;
+import org.apache.hadoop.fs.swift.http.HttpInputStreamWithRelease;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
 
+import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
 
 /**
  * The input stream from remote Swift blobs.
@@ -44,7 +47,7 @@ class SwiftNativeInputStream extends FSInputStream {
   /**
    *  range requested off the server: {@value}
    */
-  private long buffer_size;
+  private long bufferSize;
 
   /**
    * File nativeStore instance
@@ -59,7 +62,7 @@ class SwiftNativeInputStream extends FSInputStream {
   /**
    * Data input stream
    */
-  private InputStream in;
+  private HttpInputStreamWithRelease httpStream;
 
   /**
    * File path
@@ -72,6 +75,16 @@ class SwiftNativeInputStream extends FSInputStream {
   private long pos = 0;
 
   /**
+   * Length of the file picked up at start time
+   */
+  private long contentLength = -1;
+
+  /**
+   * Why the stream is closed
+   */
+  private String reasonClosed = "unopened";
+  
+  /**
    * Offset in the range requested last
    */
   private long rangeOffset = 0;
@@ -83,12 +96,14 @@ class SwiftNativeInputStream extends FSInputStream {
           throws IOException {
     this.nativeStore = storeNative;
     this.statistics = statistics;
-    this.in = storeNative.getObject(path);
     this.path = path;
     if (bufferSize <= 0) {
       throw new IllegalArgumentException("Invalid buffer size");
     }
-    this.buffer_size = bufferSize;
+    this.bufferSize = bufferSize;
+    //initial buffer fill
+    this.httpStream = storeNative.getObject(path).getInputStream();
+    //fillBuffer(0);
   }
 
   /**
@@ -105,28 +120,34 @@ class SwiftNativeInputStream extends FSInputStream {
   /**
    * Update the start of the buffer; always call from a sync'd clause
    * @param seekPos position sought.
+   * @param contentLength content length provided by response (may be -1)
    */
-  private synchronized void updateStartOfBufferPosition(long seekPos) {
+  private synchronized void updateStartOfBufferPosition(long seekPos,
+                                                        long contentLength) {
     //reset the seek pointer
     pos = seekPos;
     //and put the buffer offset to 0
     rangeOffset = 0;
-    SwiftUtils.trace(LOG, "Move: pos=%d bufferOffset=%d", pos, rangeOffset);
+    this.contentLength = contentLength;
+    SwiftUtils.trace(LOG, "Move: pos=%d; bufferOffset=%d; contentLength=%d",
+                     pos,
+                     rangeOffset,
+                     contentLength);
   }
 
   @Override
   public synchronized int read() throws IOException {
-    int result;
+    verifyOpen();
+    int result = -1;
     try {
-      result = in.read();
+      result = httpStream.read();
     } catch (IOException e) {
       String msg = "IOException while reading " + path
                    + ": ' +e, attempting to reopen.";
-      LOG.info(msg);
       LOG.debug(msg, e);
-
-      seek(pos);
-      result = in.read();
+      if (reopenBuffer()) {
+        result = httpStream.read();
+      }
     }
     if (result != -1) {
       incPos(1);
@@ -139,14 +160,20 @@ class SwiftNativeInputStream extends FSInputStream {
 
   @Override
   public synchronized int read(byte[] b, int off, int len) throws IOException {
+    SwiftUtils.debug(LOG, "read(buffer, %d, %d)", off, len);
+    SwiftUtils.validateReadArgs(b, off, len);
     int result = -1;
     try {
-      result = in.read(b, off, len);
+      verifyOpen();
+      result = httpStream.read(b, off, len);
     } catch (IOException e) {
+      //other IO problems are viewed as transient and re-attempted
       LOG.info("Received IOException while reading '" + path +
-               "', attempting to reopen.");
-      seek(pos);
-      result = in.read(b, off, len);
+               "', attempting to reopen: " + e);
+      LOG.debug("IOE on read()" + e, e);
+      if (reopenBuffer()) {
+        result = httpStream.read(b, off, len);
+      }
     }
     if (result > 0) {
       incPos(result);
@@ -159,20 +186,67 @@ class SwiftNativeInputStream extends FSInputStream {
   }
 
   /**
-   * close the stream. After this the stream is not usable.
+   * Re-open the buffer
+   * @return true iff more data could be added to the buffer
+   * @throws IOException if not
+   */
+  private boolean reopenBuffer() throws IOException {
+    innerClose("reopening buffer to trigger refresh");
+    boolean success = false;
+    try {
+      fillBuffer(pos);
+      success =  true;
+    } catch (EOFException eof) {
+      //the EOF has been reached
+      this.reasonClosed = "End of file";
+    }
+    return success;
+  }
+
+  /**
+   * close the stream. After this the stream is not usable -unless and until
+   * it is re-opened (which can happen on some of the buffer ops)
    * This method is thread-safe and idempotent.
    *
    * @throws IOException on IO problems.
    */
   @Override
   public synchronized void close() throws IOException {
+    innerClose("closed");
+  }
+
+  private void innerClose(String reason) throws IOException {
     try {
-      if (in != null) {
-        in.close();
+      if (httpStream != null) {
+        reasonClosed = reason;
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Closing HTTP input stream : " + reason);
+        }
+        httpStream.close();
       }
     } finally {
-      in = null;
+      httpStream = null;
     }
+  }
+
+  /**
+   * Assume that the connection is not closed: throws an exception if it is
+   * @throws SwiftConnectionClosedException
+   */
+  private void verifyOpen() throws SwiftConnectionClosedException {
+    if (httpStream == null) {
+      throw new SwiftConnectionClosedException(reasonClosed);
+    }
+  }
+
+  @Override
+  public synchronized String toString() {
+    return "SwiftNativeInputStream" +
+           " position=" + pos
+           + " buffer size = " + bufferSize
+           + " "
+           + (httpStream != null ? httpStream.toString()
+                                 : (" no input stream: " + reasonClosed));
   }
 
   /**
@@ -182,9 +256,10 @@ class SwiftNativeInputStream extends FSInputStream {
    */
   @Override
   protected void finalize() throws Throwable {
-    if (in != null) {
+    if (httpStream != null) {
       LOG.error(
-        "Input stream is leaking handles by not being closed() properly!");
+        "Input stream is leaking handles by not being closed() properly: "
+        + httpStream.toString());
     }
   }
 
@@ -194,19 +269,27 @@ class SwiftNativeInputStream extends FSInputStream {
    * compared to the read(bytes[]) method offered by input streams.
    * However, if you look at the code that implements that method, it comes
    * down to read() one char at a time -only here the return value is discarded.
+   * 
+   *<p/>
+   * This is a no-op if the stream is closed
    * @param bytes number of bytes to read.
    * @throws IOException IO problems
    * @throws SwiftException if a read returned -1.
    */
-  private void chompBytes(long bytes) throws IOException {
-    int result;
-    for (long i = 0; i < bytes; i++) {
-      result = in.read();
-      if (result <= 0) {
-        throw new SwiftException("Received error code while chomping input");
+  private int chompBytes(long bytes) throws IOException {
+    int count = 0;
+    if (httpStream != null) {
+      int result;
+      for (long i = 0; i < bytes; i++) {
+        result = httpStream.read();
+        if (result < 0) {
+          throw new SwiftException("Received error code while chomping input");
+        }
+        count ++;
+        incPos(1);
       }
-      incPos(1);
     }
+    return count;
   }
 
   /**
@@ -216,9 +299,6 @@ class SwiftNativeInputStream extends FSInputStream {
    */
   @Override
   public synchronized void seek(long targetPos) throws IOException {
-    if (in == null) {
-      throw new IOException("Input stream is closed");
-    }
     if (targetPos < 0) {
       throw new IOException("Negative Seek offset not supported");
     }
@@ -236,7 +316,7 @@ class SwiftNativeInputStream extends FSInputStream {
 
     if (offset < 0) {
       LOG.debug("seek is backwards");
-    } else if ((rangeOffset + offset < buffer_size)) {
+    } else if ((rangeOffset + offset < bufferSize)) {
       //if the seek is in  range of that requested, scan forwards
       //instead of closing and re-opening a new HTTP connection
       SwiftUtils.debug(LOG,
@@ -246,7 +326,7 @@ class SwiftNativeInputStream extends FSInputStream {
                        pos, targetPos, offset, rangeOffset);
       try {
         LOG.debug("chomping ");
-        chompBytes(offset);
+        int chomped = chompBytes(offset);
       } catch (IOException e) {
         //this is assumed to be recoverable with a seek -or more likely to fail
         LOG.debug("while chomping ",e);
@@ -258,15 +338,27 @@ class SwiftNativeInputStream extends FSInputStream {
       LOG.trace("chomping failed");
     } else {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Seek is beyond buffer size of " + buffer_size);
+        LOG.debug("Seek is beyond buffer size of " + bufferSize);
       }
     }
 
-    close();
-    long length = targetPos + buffer_size;
-    SwiftUtils.debug(LOG, "Fetching %d bytes starting at %d", targetPos, length);
-    in = nativeStore.getObject(path, targetPos, length);
-    updateStartOfBufferPosition(targetPos);
+    innerClose("seeking to " + targetPos);
+    fillBuffer(targetPos);
+  }
+
+  /**
+   * Fill the buffer from the target position 
+   * If the target position == current position, the
+   * read still goes ahead; this is a way of handling partial read failures
+   * @param targetPos target position
+   * @throws IOException IO problems on the read
+   */
+  private void fillBuffer(long targetPos) throws IOException {
+    long length = targetPos + bufferSize;
+    SwiftUtils.debug(LOG, "Fetching %d bytes starting at %d", length, targetPos);
+    HttpBodyContent blob = nativeStore.getObject(path, targetPos, length);
+    httpStream = blob.getInputStream();
+    updateStartOfBufferPosition(targetPos, blob.getContentLength());
   }
 
   @Override
