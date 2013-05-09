@@ -165,7 +165,6 @@ public class HttpInputStreamWithRelease extends InputStream {
 
   @Override
   public int read() throws IOException {
-    LOG.debug("read()");
     assumeNotReleased();
     int read = 0;
     try {
@@ -187,7 +186,6 @@ public class HttpInputStreamWithRelease extends InputStream {
 
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
-    SwiftUtils.debug(LOG,"read(buffer, %d, %d)", off, len);
     SwiftUtils.validateReadArgs(b, off, len);
     //if the stream is already closed, then report an exception.
     assumeNotReleased();
