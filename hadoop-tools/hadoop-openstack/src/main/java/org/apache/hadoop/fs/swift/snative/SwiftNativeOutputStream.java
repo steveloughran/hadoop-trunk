@@ -42,6 +42,7 @@ import java.io.OutputStream;
  * the final partition to be written, along with a partition manifest.
  */
 class SwiftNativeOutputStream extends OutputStream {
+  public static final int ATTEMPT_LIMIT = 3;
   private long filePartSize;
   private static final Log LOG =
           LogFactory.getLog(SwiftNativeOutputStream.class);
@@ -148,18 +149,36 @@ class SwiftNativeOutputStream extends OutputStream {
    * @throws IOException IO Problems
    */
   private void uploadOnClose(Path keypath) throws IOException {
+    boolean uploadSuccess = false;
+    int attempt = 0;
+    while (!uploadSuccess) {
+      try {
+        ++attempt;
+        bytesUploaded += uploadFileAttempt(keypath, attempt);
+        uploadSuccess = true;
+      } catch (IOException e) {
+        LOG.info("Upload failed " + e, e);
+        if (attempt > ATTEMPT_LIMIT) {
+          throw e;
+        }
+      }
+    }
+}
+
+  private long uploadFileAttempt(Path keypath, int attempt) throws IOException {
     long uploadLen = backupFile.length();
     SwiftUtils.debug(LOG, "Closing write of file %s;" +
-                              " localfile=%s of length %d",
-                              key,
-                              backupFile,
-                              uploadLen);
+                          " localfile=%s of length %d - attempt %d",
+                     key,
+                     backupFile,
+                     uploadLen,
+                     attempt);
 
     nativeStore.uploadFile(keypath,
                            new FileInputStream(backupFile),
                            uploadLen);
-    bytesUploaded += uploadLen;
-}
+    return uploadLen;
+  }
 
   @Override
   protected void finalize() throws Throwable {
@@ -260,26 +279,31 @@ class SwiftNativeOutputStream extends OutputStream {
     if (backupStream != null) {
       backupStream.close();
     }
-    long uploadLen = backupFile.length();
-    SwiftUtils.debug(LOG, "Uploading part %d of file %s;" +
-                          " localfile=%s of length %d",
-                     partNumber,
-                     key,
-                     backupFile,
-                     uploadLen);
-    if (closingUpload && partUpload && uploadLen == 0) {
+    
+
+    if (closingUpload && partUpload && backupFile.length() == 0) {
       //skipping the upload if
       // - it is close time
       // - the final partition is 0 bytes long
       // - one part has already been written
       SwiftUtils.debug(LOG, "skipping upload of 0 byte final partition");
+      delete(backupFile);
     } else {
       partUpload = true;
-      nativeStore.uploadFilePart(new Path(key),
-                                 partNumber,
-                                 new FileInputStream(backupFile),
-                                 uploadLen);
-      bytesUploaded += uploadLen;
+      boolean uploadSuccess = false;
+      int attempt = 0;
+      while(!uploadSuccess) {
+        try {
+          ++attempt;
+          bytesUploaded += uploadFilePartAttempt(attempt);
+          uploadSuccess = true;
+        } catch (IOException e) {
+          LOG.info("Upload failed " + e, e);
+          if (attempt > ATTEMPT_LIMIT) {
+            throw e;
+          }
+        }
+      }
       delete(backupFile);
       partNumber++;
       blockOffset = 0;
@@ -290,6 +314,22 @@ class SwiftNativeOutputStream extends OutputStream {
           new BufferedOutputStream(new FileOutputStream(backupFile));
       }
     }
+  }
+
+  private long uploadFilePartAttempt(int attempt) throws IOException {
+    long uploadLen = backupFile.length();
+    SwiftUtils.debug(LOG, "Uploading part %d of file %s;" +
+                          " localfile=%s of length %d  - attempt %d",
+                     partNumber,
+                     key,
+                     backupFile,
+                     uploadLen,
+                     attempt);
+    nativeStore.uploadFilePart(new Path(key),
+                               partNumber,
+                               new FileInputStream(backupFile),
+                               uploadLen);
+    return uploadLen;
   }
 
   /**

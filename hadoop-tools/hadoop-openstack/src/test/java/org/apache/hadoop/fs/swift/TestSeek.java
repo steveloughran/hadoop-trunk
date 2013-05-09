@@ -23,12 +23,14 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.swift.exceptions.SwiftConnectionClosedException;
 import org.apache.hadoop.fs.swift.http.SwiftProtocolConstants;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.After;
 import org.junit.Test;
 
+import java.io.EOFException;
 import java.io.IOException;
 
 /**
@@ -48,9 +50,11 @@ import java.io.IOException;
 public class TestSeek extends SwiftFileSystemBaseTest {
   protected static final Log LOG =
     LogFactory.getLog(TestSeek.class);
+  public static final int SMALL_SEEK_FILE_LEN = 256;
 
   private Path testPath;
   private Path smallSeekFile;
+  private Path zeroByteFile;
   private FSDataInputStream instream;
 
   /**
@@ -64,9 +68,11 @@ public class TestSeek extends SwiftFileSystemBaseTest {
     //delete the test directory
     testPath = path("/test");
     smallSeekFile = new Path(testPath, "seekfile.txt");
-    byte[] block = SwiftTestUtils.dataset(256, 0, 255);
+    zeroByteFile = new Path(testPath, "zero.txt");
+    byte[] block = SwiftTestUtils.dataset(SMALL_SEEK_FILE_LEN, 0, 255);
     //this file now has a simple rule: offset => value
     createFile(smallSeekFile, block);
+    createEmptyFile(zeroByteFile);
   }
 
   @After
@@ -77,38 +83,57 @@ public class TestSeek extends SwiftFileSystemBaseTest {
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testSeekZeroByteFile() throws Throwable {
-    Path testEmptyFile = new Path(testPath, "empty");
-    createEmptyFile(testEmptyFile);
-
-    instream = fs.open(testEmptyFile);
+    instream = fs.open(zeroByteFile);
     assertEquals(0, instream.getPos());
+    //expect initial read to fai;
+    int result = instream.read();
+    assertMinusOne("initial byte read", result);
+    byte[] buffer = new byte[1];
     //expect that seek to 0 works
     instream.seek(0);
-    int result = instream.read();
-    assertEquals(-1, result);
+    //reread, expect same exception
+    result = instream.read();
+    assertMinusOne("post-seek byte read", result);
+    result = instream.read(buffer, 0, 1);
+    assertMinusOne("post-seek buffer read", result);
   }
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
-  public void testSeekClosedFile() throws Throwable {
-    Path testEmptyFile = new Path(testPath, "empty");
-    createEmptyFile(testEmptyFile);
+  public void testBlockReadZeroByteFile() throws Throwable {
+    instream = fs.open(zeroByteFile);
+    assertEquals(0, instream.getPos());
+    //expect that seek to 0 works
+    byte[] buffer = new byte[1];
+    int result = instream.read(buffer, 0, 1);
+    assertMinusOne("block read zero byte file", result);
+  }
 
-    instream = fs.open(testEmptyFile);
-    instream.seek(0);
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
+  public void testSeekReadClosedFile() throws Throwable {
+    instream = fs.open(smallSeekFile);
     instream.close();
     try {
       instream.seek(0);
+    } catch (SwiftConnectionClosedException e) {
+      //expected a closed file
+    }
+    try {
+      instream.read();
+    } catch (IOException e) {
+      //expected a closed file
+    }
+    try {
+      byte[] buffer = new byte[1];
+      int result = instream.read(buffer, 0, 1);
     } catch (IOException e) {
       //expected a closed file
     }
   }
 
-
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testNegativeSeek() throws Throwable {
     instream = fs.open(smallSeekFile);
     assertEquals(0, instream.getPos());
-    //expect that seek to 0 works
     try {
       instream.seek(-1);
       long p = instream.getPos();
@@ -124,22 +149,64 @@ public class TestSeek extends SwiftFileSystemBaseTest {
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testSeekFile() throws Throwable {
-    FSDataInputStream hFile = fs.open(smallSeekFile);
-    assertEquals(0, hFile.getPos());
+    instream = fs.open(smallSeekFile);
+    assertEquals(0, instream.getPos());
     //expect that seek to 0 works
-    hFile.seek(0);
-    int result = hFile.read();
+    instream.seek(0);
+    int result = instream.read();
     assertEquals(0, result);
-    assertEquals(1, hFile.read());
-    assertEquals(2, hFile.getPos());
-    assertEquals(2, hFile.read());
-    assertEquals(3, hFile.getPos());
-    hFile.seek(128);
-    assertEquals(128, hFile.getPos());
-    assertEquals(128, hFile.read());
-    hFile.seek(63);
-    assertEquals(63, hFile.read());
+    assertEquals(1, instream.read());
+    assertEquals(2, instream.getPos());
+    assertEquals(2, instream.read());
+    assertEquals(3, instream.getPos());
+    instream.seek(128);
+    assertEquals(128, instream.getPos());
+    assertEquals(128, instream.read());
+    instream.seek(63);
+    assertEquals(63, instream.read());
   }
+
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
+  public void testSeekAndReadPastEndOfFile() throws Throwable {
+    instream = fs.open(smallSeekFile);
+    assertEquals(0, instream.getPos());
+    //expect that seek to 0 works
+    //go just before the end
+    instream.seek(SMALL_SEEK_FILE_LEN - 2);
+    assertTrue("Premature EOF", instream.read() != -1);
+    assertTrue("Premature EOF", instream.read() != -1);
+    assertMinusOne("read past end of file", instream.read());
+  }
+
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
+  public void testSeekAndPastEndOfFileThenReseekAndRead() throws Throwable {
+    instream = fs.open(smallSeekFile);
+    //go just before the end
+    try {
+      instream.seek(SMALL_SEEK_FILE_LEN);
+      fail("expected an EOFException, have position " + instream.getPos());
+    } catch (EOFException expected) {
+
+    }
+    instream.seek(1);
+    assertTrue("Premature EOF", instream.read() != -1);
+  }
+
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
+  public void testSeekBulkReadPastEndOfFile() throws Throwable {
+    instream = fs.open(smallSeekFile);
+    assertEquals(0, instream.getPos());
+    //expect that seek to 0 works
+    //go just before the end
+    try {
+      instream.seek(SMALL_SEEK_FILE_LEN + 1);
+      fail("overseek unexpectedly passed");
+    } catch (EOFException e) {
+      LOG.debug("Seek raised EOF " + e, e);
+    }
+    assertEquals(0, instream.getPos());
+  }
+
 
   @Override
   protected Configuration createConfiguration() {
@@ -153,46 +220,56 @@ public class TestSeek extends SwiftFileSystemBaseTest {
     Path testSeekFile = new Path(testPath, "bigseekfile.txt");
     byte[] block = SwiftTestUtils.dataset(65536, 0, 255);
     createFile(testSeekFile, block);
-    FSDataInputStream hFile = fs.open(testSeekFile);
-    assertEquals(0, hFile.getPos());
+    instream = fs.open(testSeekFile);
+    assertEquals(0, instream.getPos());
     //expect that seek to 0 works
-    hFile.seek(0);
-    int result = hFile.read();
+    instream.seek(0);
+    int result = instream.read();
     assertEquals(0, result);
-    assertEquals(1, hFile.read());
-    assertEquals(2, hFile.read());
+    assertEquals(1, instream.read());
+    assertEquals(2, instream.read());
 
     //do seek 32KB ahead
-    hFile.seek(32768);
-    assertEquals("@32768", block[32768], (byte) hFile.read());
-    hFile.seek(40000);
-    assertEquals("@40000", block[40000], (byte) hFile.read());
-    hFile.seek(8191);
-    assertEquals("@8191", block[8191], (byte) hFile.read());
-    hFile.seek(0);
-    assertEquals("@0", 0, (byte) hFile.read());
+    instream.seek(32768);
+    assertEquals("@32768", block[32768], (byte) instream.read());
+    instream.seek(40000);
+    assertEquals("@40000", block[40000], (byte) instream.read());
+    instream.seek(8191);
+    assertEquals("@8191", block[8191], (byte) instream.read());
+    instream.seek(0);
+    assertEquals("@0", 0, (byte) instream.read());
   }
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
-  public void testBulkReadDoesntChangePosition() throws Throwable {
+  public void testPositionedBulkReadDoesntChangePosition() throws Throwable {
     Path testSeekFile = new Path(testPath, "bigseekfile.txt");
     byte[] block = SwiftTestUtils.dataset(65536, 0, 255);
     createFile(testSeekFile, block);
-    FSDataInputStream hFile = fs.open(testSeekFile);
-    hFile.seek(40000);
-    assertEquals(40000, hFile.getPos());
+    instream = fs.open(testSeekFile);
+    instream.seek(40000);
+    assertEquals(40000, instream.getPos());
+    assertTrue(-1 != instream.read());
     byte[] readBuffer = new byte[256];
-    hFile.read(128, readBuffer, 0, readBuffer.length);
+    instream.read(128, readBuffer, 0, readBuffer.length);
     //have gone back
-    assertEquals(40000, hFile.getPos());
+    assertEquals(40000, instream.getPos());
     //content is the same too
-    assertEquals("@40000", block[40000], (byte) hFile.read());
+    assertEquals("@40000", block[40000], (byte) instream.read());
     //now verify the picked up data
     for (int i = 0; i < 256; i++) {
       assertEquals("@" + i, block[i + 128], readBuffer[i]);
     }
   }
 
+  /**
+   * Read past the buffer size and verify that it refreshed
+   * @throws Throwable
+   */
+  @Test
+  public void testReadPastBufferSize() throws Throwable {
+    
+  }
+  
   /**
    * work out the expected byte from a specific offset
    * @param offset offset in the file
