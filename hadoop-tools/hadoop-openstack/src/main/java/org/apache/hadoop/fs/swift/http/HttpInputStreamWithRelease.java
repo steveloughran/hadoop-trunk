@@ -21,8 +21,11 @@ package org.apache.hadoop.fs.swift.http;
 import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.swift.exceptions.SwiftConnectionClosedException;
+import org.apache.hadoop.fs.swift.util.SwiftUtils;
 
 import java.io.ByteArrayInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -56,6 +59,11 @@ public class HttpInputStreamWithRelease extends InputStream {
    */
   private final Exception constructionStack;
 
+  /**
+   * Why the stream is closed
+   */
+  private String reasonClosed = "unopened";
+
   public HttpInputStreamWithRelease(URI uri, HttpMethod method) throws
                                                                 IOException {
     this.uri = uri;
@@ -68,7 +76,7 @@ public class HttpInputStreamWithRelease extends InputStream {
       inStream = method.getResponseBodyAsStream();
     } catch (IOException e) {
       inStream = new ByteArrayInputStream(new byte[]{});
-      throw releaseAndRethrow("getResponseBodyAsStream() in constructor", e);
+      throw releaseAndRethrow("getResponseBodyAsStream() in constructor -" + e, e);
     }
   }
 
@@ -87,6 +95,7 @@ public class HttpInputStreamWithRelease extends InputStream {
   private synchronized boolean release(String reason, Exception ex) throws
                                                                    IOException {
     if (!released) {
+      reasonClosed = reason;
       try {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Releasing connection to " + uri + ":  " + reason, ex);
@@ -125,7 +134,7 @@ public class HttpInputStreamWithRelease extends InputStream {
     try {
       release(operation, ex);
     } catch (IOException ioe) {
-      LOG.debug("Exception during release", ioe);
+      LOG.debug("Exception during release: " + operation + " - " + ioe, ioe);
       //make this the exception if there was none before
       if (ex == null) {
         ex = ioe;
@@ -136,12 +145,11 @@ public class HttpInputStreamWithRelease extends InputStream {
 
   /**
    * Assume that the connection is not released: throws an exception if it is
-   * @throws IOException
+   * @throws SwiftConnectionClosedException
    */
-  private void assumeNotReleased() throws IOException {
-    if (released) {
-      throw new IOException(
-        "Operation failed as connection is closed to " + uri);
+  private void assumeNotReleased() throws SwiftConnectionClosedException {
+    if (released || inStream == null) {
+      throw new SwiftConnectionClosedException(reasonClosed);
     }
   }
 
@@ -151,17 +159,22 @@ public class HttpInputStreamWithRelease extends InputStream {
     try {
       return inStream.available();
     } catch (IOException e) {
-      throw releaseAndRethrow("available()", e);
+      throw releaseAndRethrow("available() failed -" + e, e);
     }
   }
 
-
   @Override
   public int read() throws IOException {
+    LOG.debug("read()");
     assumeNotReleased();
     int read = 0;
     try {
       read = inStream.read();
+    } catch (EOFException e) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("EOF exception " + e, e);
+      }
+      read = -1;
     } catch (IOException e) {
       throw releaseAndRethrow("read()", e);
     }
@@ -174,10 +187,19 @@ public class HttpInputStreamWithRelease extends InputStream {
 
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
+    SwiftUtils.debug(LOG,"read(buffer, %d, %d)", off, len);
+    SwiftUtils.validateReadArgs(b, off, len);
+    //if the stream is already closed, then report an exception.
     assumeNotReleased();
+    //now read in a buffer, reacting differently to different operations
     int read;
     try {
       read = inStream.read(b, off, len);
+    } catch (EOFException e) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("EOF exception " + e, e);
+      }
+      read = -1;
     } catch (IOException e) {
       throw releaseAndRethrow("read(b, off, " + len + ")", e);
     }
@@ -209,6 +231,7 @@ public class HttpInputStreamWithRelease extends InputStream {
   @Override
   public String toString() {
     return "HttpInputStreamWithRelease working with " + uri
-      +" released=" + released;
+      +" released=" + released
+      +" dataConsumed=" + dataConsumed;
   }
 }

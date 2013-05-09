@@ -50,7 +50,6 @@ public class TestSwiftFileSystemExtendedContract extends SwiftFileSystemBaseTest
     }
   }
 
-
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testFilesystemHasURI() throws Throwable {
     assertNotNull(fs.getUri());

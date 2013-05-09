@@ -306,4 +306,8 @@ public class SwiftFileSystemBaseTest extends Assert implements
                 + " -- " + nativeStream);
     }
   }
+
+  protected void assertMinusOne(String text, int result) {
+    assertEquals(text + " wrong read result " + result, -1, result);
+  }
 }

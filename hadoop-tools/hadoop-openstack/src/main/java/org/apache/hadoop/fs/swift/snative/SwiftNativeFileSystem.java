@@ -516,11 +516,25 @@ public class SwiftNativeFileSystem extends FileSystem {
   @Override
   public FSDataInputStream open(Path path, int bufferSize) throws IOException {
     int bufferSizeKB = getStore().getBufferSizeKB();
-    if (bufferSize <= 0) {
+    long readBlockSize = bufferSizeKB * 1024L;
+    return open(path, bufferSize, readBlockSize);
+  }
+
+  /**
+   * Low-level operation to also set the block size for this operation
+   * @param path
+   * @param bufferSize
+   * @param readBlockSize
+   * @return
+   * @throws IOException
+   */
+  public FSDataInputStream open(Path path,
+                                int bufferSize,
+                                long readBlockSize) throws IOException {
+    if (readBlockSize <= 0) {
       throw new SwiftConfigurationException("Bad remote buffer size");
     }
     Path absolutePath = makeAbsolute(path);
-    long readBlockSize = bufferSizeKB * 1024L;
     return new FSDataInputStream(
             new StrictBufferedFSInputStream(
                     new SwiftNativeInputStream(store,
