@@ -512,6 +512,9 @@ public class SwiftNativeFileSystem extends FileSystem {
    *
    * @param path       the file name to open
    * @param bufferSize the size of the buffer to be used.
+   * @return the input stream
+   * @throws FileNotFoundException if the file is not found
+   * @throws IOException any IO problem
    */
   @Override
   public FSDataInputStream open(Path path, int bufferSize) throws IOException {
@@ -522,11 +525,12 @@ public class SwiftNativeFileSystem extends FileSystem {
 
   /**
    * Low-level operation to also set the block size for this operation
-   * @param path
-   * @param bufferSize
-   * @param readBlockSize
-   * @return
-   * @throws IOException
+   * @param path       the file name to open
+   * @param bufferSize the size of the buffer to be used.
+   * @param readBlockSize how big should the read blockk/buffer size be? 
+   * @return the input stream
+   * @throws FileNotFoundException if the file is not found
+   * @throws IOException any IO problem
    */
   public FSDataInputStream open(Path path,
                                 int bufferSize,
