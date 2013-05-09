@@ -118,11 +118,33 @@ public class TestSwiftFileSystemPartitionedUploads extends
       for (Header header:headers) {
         LOG.info(header.toString());
       }
+      
+      //verify that the length is what was written in a direct status check
       FileStatus status = fs.getFileStatus(path);
       assertEquals("Length of written file", len, status.getLen());
       String fileInfo = path + "  " + status;
       assertFalse("File claims to be a directory " + fileInfo,
                   status.isDir());
+      
+      //now do an ls of the parent and verify that this file is there
+      //and of the given size.
+      FileStatus[] parentDirListing = fs.listStatus(path.getParent());
+      FileStatus listedFileStat = null;
+      StringBuilder listing = new StringBuilder();
+      for (FileStatus stat: parentDirListing) {
+        listing.append(stat).append("\n");
+        if (stat.getPath().equals(path)) {
+          listedFileStat = stat;
+        }
+      }
+      String parentDirLS = parentDirListing.toString();
+      assertNotNull("Did not find " + path + " in " + parentDirLS,
+                    listedFileStat);
+      //file is in the parent dir. Now validate it's stats
+      assertEquals("Wrong len for " + path + " in listing " + parentDirLS,
+                   len,
+                   listedFileStat.getLen());
+
       byte[] dest = readDataset(fs, path, len);
       //compare data
       SwiftTestUtils.compareByteArrays(src, dest, len);

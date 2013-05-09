@@ -21,6 +21,8 @@ package org.apache.hadoop.fs.swift;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.*;
+
+import org.apache.hadoop.fs.PathFilter;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -100,10 +102,14 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
              " assert that listStatus(/test) finds it");
     Path file = path("/test/filename");
     createFile(file);
-    FileStatus[] paths = fs.listStatus(file);
-    assertEquals(dumpStats("/test/", paths),
+    FileStatus[] pathStats = fs.listStatus(file);
+    assertEquals(dumpStats("/test/", pathStats),
                  1,
-                 paths.length);
+                 pathStats.length);
+    //and assert that the len of that ls'd path is the same as the original
+    FileStatus lsStat = pathStats[0];
+    assertEquals("Wrong file len in listing of " + lsStat,
+      data.length, lsStat.getLen());
   }
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
@@ -132,4 +138,25 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
     touch(fs, child);
     assertListStatusFinds(fs, dir, child);
   }
+
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
+  public void testListStatusFiltered() throws Throwable {
+    Path dir = path("/");
+    Path child = path("/test");
+    touch(fs, child);
+    FileStatus[] stats = fs.listStatus(dir, new AcceptAllFilter());
+    boolean found = false;
+    StringBuilder builder = new StringBuilder();
+    for (FileStatus stat : stats) {
+      builder.append(stat.toString()).append('\n');
+      if (stat.getPath().equals(child)) {
+        found = true;
+      }
+    }
+    assertTrue("Path " + child
+                      + " not found in directory " + dir + ":" + builder,
+                      found);
+  }
+
+
 }
