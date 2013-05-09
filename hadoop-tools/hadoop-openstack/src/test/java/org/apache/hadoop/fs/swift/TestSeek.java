@@ -181,32 +181,18 @@ public class TestSeek extends SwiftFileSystemBaseTest {
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testSeekAndPastEndOfFileThenReseekAndRead() throws Throwable {
     instream = fs.open(smallSeekFile);
-    //go just before the end
+    //go just before the end. This may or may not fail; it may be delayed until the
+    //read
     try {
       instream.seek(SMALL_SEEK_FILE_LEN);
-      fail("expected an EOFException, have position " + instream.getPos());
+      //if this doesn't trigger, then read() is expected to fail
+      assertMinusOne("read after seeking past EOF", instream.read());
     } catch (EOFException expected) {
-
+      //here an exception was raised in seek
     }
     instream.seek(1);
     assertTrue("Premature EOF", instream.read() != -1);
   }
-
-  @Test(timeout = SWIFT_TEST_TIMEOUT)
-  public void testSeekBulkReadPastEndOfFile() throws Throwable {
-    instream = fs.open(smallSeekFile);
-    assertEquals(0, instream.getPos());
-    //expect that seek to 0 works
-    //go just before the end
-    try {
-      instream.seek(SMALL_SEEK_FILE_LEN + 1);
-      fail("overseek unexpectedly passed");
-    } catch (EOFException e) {
-      LOG.debug("Seek raised EOF " + e, e);
-    }
-    assertEquals(0, instream.getPos());
-  }
-
 
   @Override
   protected Configuration createConfiguration() {
@@ -246,9 +232,10 @@ public class TestSeek extends SwiftFileSystemBaseTest {
     byte[] block = SwiftTestUtils.dataset(65536, 0, 255);
     createFile(testSeekFile, block);
     instream = fs.open(testSeekFile);
-    instream.seek(40000);
-    assertEquals(40000, instream.getPos());
+    instream.seek(39999);
     assertTrue(-1 != instream.read());
+    assertEquals (40000, instream.getPos());
+    
     byte[] readBuffer = new byte[256];
     instream.read(128, readBuffer, 0, readBuffer.length);
     //have gone back
