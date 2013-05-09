@@ -508,7 +508,7 @@ public class SwiftTestUtils extends org.junit.Assert {
    */
   public static void assertPathDoesNotExist(FileSystem fileSystem,
                                             String message,
-                                     Path path) throws IOException {
+                                            Path path) throws IOException {
     try {
       FileStatus status = fileSystem.getFileStatus(path);
       fail(message + ": unexpectedly found " + path + " as  " + status);
@@ -519,7 +519,15 @@ public class SwiftTestUtils extends org.junit.Assert {
   }
 
 
-  public static void assertListStatusFinds(FileSystem fs, Path dir,
+  /**
+   * Assert that a FileSystem.listStatus on a dir finds the subdir/child entry
+   * @param fs filesystem
+   * @param dir directory to scan
+   * @param subdir full path to look for 
+   * @throws IOException IO probles
+   */
+  public static void assertListStatusFinds(FileSystem fs,
+                                           Path dir,
                                            Path subdir) throws IOException {
     FileStatus[] stats = fs.listStatus(dir);
     boolean found = false;
