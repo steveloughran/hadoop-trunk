@@ -28,7 +28,6 @@ import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
 import org.apache.hadoop.io.IOUtils;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -65,7 +64,8 @@ public class TestSwiftFileSystemPartitionedUploads extends
   @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
   public void testPartitionPropertyPropagatesToConf() throws Throwable {
     assertEquals(1,
-                 getConf().getInt(SwiftProtocolConstants.SWIFT_PARTITION_SIZE, 0));
+                 getConf().getInt(SwiftProtocolConstants.SWIFT_PARTITION_SIZE,
+                                  0));
   }
 
   @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)
@@ -84,10 +84,10 @@ public class TestSwiftFileSystemPartitionedUploads extends
     int len = 8192;
     final byte[] src = SwiftTestUtils.dataset(len, 32, 144);
     FSDataOutputStream out = fs.create(path,
-                               false,
-                               getBufferSize(),
-                               (short) 1,
-                               BLOCK_SIZE);
+                                       false,
+                                       getBufferSize(),
+                                       (short) 1,
+                                       BLOCK_SIZE);
 
     try {
       int totalPartitionsToWrite = len / PART_SIZE_BYTES;
@@ -99,11 +99,12 @@ public class TestSwiftFileSystemPartitionedUploads extends
       long expected = getExpectedPartitionsWritten(firstWriteLen,
                                                    PART_SIZE_BYTES,
                                                    false);
-      SwiftUtils.debug(LOG,"First write: predict %d partitions written",expected);
+      SwiftUtils.debug(LOG, "First write: predict %d partitions written",
+                       expected);
       assertPartitionsWritten("First write completed", out, expected);
       //write the rest
       int remainder = len - firstWriteLen;
-      SwiftUtils.debug(LOG, "remainder: writing: %d bytes",remainder);
+      SwiftUtils.debug(LOG, "remainder: writing: %d bytes", remainder);
 
       out.write(src, firstWriteLen, remainder);
       expected =
@@ -115,39 +116,15 @@ public class TestSwiftFileSystemPartitionedUploads extends
       assertPartitionsWritten("Stream closed", out, expected);
 
       Header[] headers = fs.getStore().getObjectHeaders(path, true);
-      for (Header header:headers) {
+      for (Header header : headers) {
         LOG.info(header.toString());
       }
-      
-      //verify that the length is what was written in a direct status check
-      FileStatus status = fs.getFileStatus(path);
-      assertEquals("Length of written file", len, status.getLen());
-      String fileInfo = path + "  " + status;
-      assertFalse("File claims to be a directory " + fileInfo,
-                  status.isDir());
-      
-      //now do an ls of the parent and verify that this file is there
-      //and of the given size.
-      FileStatus[] parentDirListing = fs.listStatus(path.getParent());
-      FileStatus listedFileStat = null;
-      StringBuilder listing = new StringBuilder();
-      for (FileStatus stat: parentDirListing) {
-        listing.append(stat).append("\n");
-        if (stat.getPath().equals(path)) {
-          listedFileStat = stat;
-        }
-      }
-      String parentDirLS = parentDirListing.toString();
-      assertNotNull("Did not find " + path + " in " + parentDirLS,
-                    listedFileStat);
-      //file is in the parent dir. Now validate it's stats
-      assertEquals("Wrong len for " + path + " in listing " + parentDirLS,
-                   len,
-                   listedFileStat.getLen());
 
       byte[] dest = readDataset(fs, path, len);
+      LOG.info("Read dataset from " + path + ": data length =" + len);
       //compare data
       SwiftTestUtils.compareByteArrays(src, dest, len);
+      FileStatus status = validatePathLen(path, len);
 
       //now see what block location info comes back.
       //This will vary depending on the Swift version, so the results
@@ -161,6 +138,38 @@ public class TestSwiftFileSystemPartitionedUploads extends
     }
   }
 
+  private FileStatus validatePathLen(Path path, int len) throws IOException {
+    //verify that the length is what was written in a direct status check
+    FileStatus status = fs.getFileStatus(path);
+    assertEquals("Length of written file "+ path + " from status check " + status, len,
+                 status.getLen());
+    String fileInfo = path + "  " + status;
+    assertFalse("File claims to be a directory " + fileInfo,
+                status.isDir());
+
+    //now do an ls of the parent and verify that this file is there
+    //and of the given size.
+    final Path qualifiedPath = path.makeQualified(fs);
+
+    FileStatus[] parentDirListing = fs.listStatus(path.getParent());
+    FileStatus listedFileStat = null;
+    StringBuilder listing = new StringBuilder();
+    for (FileStatus stat : parentDirListing) {
+      listing.append(stat).append("\n");
+      if (stat.getPath().equals(qualifiedPath)) {
+        listedFileStat = stat;
+      }
+    }
+    String parentDirLS = listing.toString();
+    assertNotNull("Did not find " + path + " in " + parentDirLS,
+                  listedFileStat);
+    //file is in the parent dir. Now validate it's stats
+    assertEquals("Wrong len for " + path + " in listing " + parentDirLS,
+                 len,
+                 listedFileStat.getLen());
+    return status;
+  }
+
   /**
    * Calculate the #of partitions expected from the upload
    * @param uploaded number of bytes uploaded
@@ -169,8 +178,8 @@ public class TestSwiftFileSystemPartitionedUploads extends
    * @return the expected number of partitions, for use in assertions.
    */
   private int getExpectedPartitionsWritten(long uploaded,
-                                            int partSizeBytes,
-                                            boolean closed) {
+                                           int partSizeBytes,
+                                           boolean closed) {
     //#of partitions in total
     int partitions = (int) (uploaded / partSizeBytes);
     //#of bytes past the last partition
@@ -213,7 +222,7 @@ public class TestSwiftFileSystemPartitionedUploads extends
     assertPartitionsWritten("write completed", out, expected);
     assertEquals("too few bytes written", len,
                  SwiftNativeFileSystem.getBytesWritten(out));
-    assertEquals("too few bytes uploaded",len,
+    assertEquals("too few bytes uploaded", len,
                  SwiftNativeFileSystem.getBytesUploaded(out));
     //now we verify that the data comes back. If it
     //doesn't, it means that the ordering of the partitions
@@ -223,11 +232,11 @@ public class TestSwiftFileSystemPartitionedUploads extends
     SwiftTestUtils.compareByteArrays(src, dest, len);
     //finally, check the data
     FileStatus[] stats = fs.listStatus(path);
-    assertEquals("wrong entry count in " 
-                 + SwiftTestUtils.dumpStats(path.toString(), stats), 
+    assertEquals("wrong entry count in "
+                 + SwiftTestUtils.dumpStats(path.toString(), stats),
                  expected, stats.length);
   }
-  
+
   /**
    * Test that when a partitioned file is overwritten by a smaller one,
    * all the old partitioned files go away
@@ -238,7 +247,7 @@ public class TestSwiftFileSystemPartitionedUploads extends
     final Path path = new Path("/test/testOverwritePartitionedFile");
 
     final int len1 = 8192;
-    final byte[] src1 = SwiftTestUtils.dataset(len1, 'A','Z');
+    final byte[] src1 = SwiftTestUtils.dataset(len1, 'A', 'Z');
     FSDataOutputStream out = fs.create(path,
                                        false,
                                        getBufferSize(),
