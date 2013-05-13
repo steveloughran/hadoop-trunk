@@ -46,4 +46,10 @@ public class AuthenticationRequest {
     this.tenantName = tenantName;
   }
 
+  @Override
+  public String toString() {
+    return "AuthenticationRequest{" +
+           "tenantName='" + tenantName + '\'' +
+           '}';
+  }
 }

@@ -81,7 +81,7 @@ public class AccessToken {
   @Override
   public String toString() {
     return "AccessToken{" +
-//            "id='" + id + '\'' +
+            "id='" + id + '\'' +
             ", tenant=" + tenant +
             ", expires='" + expires + '\'' +
             '}';
