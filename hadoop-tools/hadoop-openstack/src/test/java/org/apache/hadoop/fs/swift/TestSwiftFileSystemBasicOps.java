@@ -46,7 +46,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
           LogFactory.getLog(TestSwiftFileSystemBasicOps.class);
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
-  public void testlsRoot() throws Throwable {
+  public void testLsRoot() throws Throwable {
     Path path = new Path("/");
     FileStatus[] statuses = fs.listStatus(path);
   }

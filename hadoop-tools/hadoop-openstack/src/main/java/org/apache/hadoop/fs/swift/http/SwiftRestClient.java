@@ -43,6 +43,8 @@ import org.apache.hadoop.fs.swift.auth.AuthenticationRequest;
 import org.apache.hadoop.fs.swift.auth.AuthenticationRequestWrapper;
 import org.apache.hadoop.fs.swift.auth.AuthenticationResponse;
 import org.apache.hadoop.fs.swift.auth.AuthenticationWrapper;
+import org.apache.hadoop.fs.swift.auth.KeyStoneAuthRequest;
+import org.apache.hadoop.fs.swift.auth.KeystoneApiKeyCredentials;
 import org.apache.hadoop.fs.swift.auth.PasswordAuthenticationRequest;
 import org.apache.hadoop.fs.swift.auth.PasswordCredentials;
 import org.apache.hadoop.fs.swift.auth.entities.AccessToken;
@@ -457,10 +459,8 @@ public final class SwiftRestClient {
             authRequest = new ApiKeyAuthenticationRequest(tenant,
                     new ApiKeyCredentials(
                             username, apiKey));
-/*
             keystoneAuthRequest = new KeyStoneAuthRequest(tenant,
                     new KeystoneApiKeyCredentials(username, apiKey));
-*/
     }
     locationAware = "true".equals(
       props.getProperty(SWIFT_LOCATION_AWARE_PROPERTY, "false"));
@@ -493,8 +493,8 @@ public final class SwiftRestClient {
                                DEFAULT_SWIFT_PARTITION_SIZE);
       if (partSizeKB <=0) {
         throw new SwiftConfigurationException("Invalid partition size set in "
-                          + SWIFT_PARTITION_SIZE
-                          + ": " + partSizeKB);
+                                              + SWIFT_PARTITION_SIZE
+                                              + ": " + partSizeKB);
       }
 
       bufferSizeKB = conf.getInt(SWIFT_REQUEST_SIZE,
@@ -762,7 +762,6 @@ public final class SwiftRestClient {
               .concat(path.getContainer())
               .concat("/?prefix=")
               .concat(object)
- //             .concat("&delimiter=/")
       ;
       uri = new URI(dataLocationURI);
     } catch (URISyntaxException e) {
@@ -1053,12 +1052,12 @@ public final class SwiftRestClient {
    * @return authenticated access token
    */
   public AccessToken authenticate() throws IOException {
-        final AuthenticationRequest authenticationRequest;
-        if (useKeystoneAuthentication) {
-            authenticationRequest = keystoneAuthRequest;
-        } else {
-            authenticationRequest = authRequest;
-        }
+    final AuthenticationRequest authenticationRequest;
+    if (useKeystoneAuthentication) {
+      authenticationRequest = keystoneAuthRequest;
+    } else {
+      authenticationRequest = authRequest;
+    }
 
     LOG.debug("started authentication");
     return perform("authentication", authUri, new PostMethodProcessor<AccessToken>() {
@@ -1067,19 +1066,8 @@ public final class SwiftRestClient {
       @Override
       protected void setup(PostMethod method) throws SwiftException {
 
-        final String data = JSONUtil.toJSON(new AuthenticationRequestWrapper(
-                        authenticationRequest));
-        if (LOG.isDebugEnabled()) {
-                    LOG.debug("Authenticating with " + authenticationRequest);
+        method.setRequestEntity(getAuthenticationRequst(authenticationRequest));
         }
-        //WARNING: some back-ends to commons-logging
-        //upgrade trace to debug, which can leak secrets.
-        //
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("JSON message: " + "\n" + data);
-        }
-        method.setRequestEntity(toJsonEntity(data));
-      }
 
       /**
        * specification says any of the 2xxs are OK, so list all
@@ -1207,6 +1195,22 @@ public final class SwiftRestClient {
     });
   }
 
+  private StringRequestEntity getAuthenticationRequst(AuthenticationRequest authenticationRequest)
+          throws SwiftException {
+    final String data = JSONUtil.toJSON(new AuthenticationRequestWrapper(
+            authenticationRequest));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Authenticating with " + authenticationRequest);
+    }
+    //WARNING: some back-ends to commons-logging
+    //upgrade trace to debug, which can leak secrets.
+    //
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("JSON message: " + "\n" + data);
+    }
+    return toJsonEntity(data);
+  }
+
   /**
    * create default container if it doesn't exist for Hadoop Swift integration.
    * non-reentrant, as this should only be needed once.
@@ -1323,7 +1327,7 @@ public final class SwiftRestClient {
   /**
    * Performs the HTTP request, validates the response code and returns
    * the received data. HTTP Status codes are converted into exceptions.
-   * @parm reason: why is this operation taking place. Used for statistics
+   * @param reason: why is this operation taking place. Used for statistics
    * @param uri URI to source
    * @param processor HttpMethodProcessor
    * @param <M> method
@@ -1639,10 +1643,24 @@ public final class SwiftRestClient {
     final HttpClient client = new HttpClient();
     if (proxyHost != null) {
       client.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY,
-                                      new HttpHost(proxyHost, proxyPort));
+              new HttpHost(proxyHost, proxyPort));
     }
 
     int statusCode = execWithDebugOutput(method, client);
+    if ((method.getStatusCode() == HttpStatus.SC_UNAUTHORIZED
+            || method.getStatusCode() == HttpStatus.SC_BAD_REQUEST)
+            && !useKeystoneAuthentication) {
+      if(LOG.isDebugEnabled()) {
+        LOG.debug("Operation failed with status " + method.getStatusCode() +
+                 " attempting keystone auth");
+      }
+      //if rackspace key authentication failed - try custom Keystone authentication
+      useKeystoneAuthentication = true;
+      final PostMethod authentication = (PostMethod) method;
+      //replace rackspace auth with keystone one
+      authentication.setRequestEntity(getAuthenticationRequst(keystoneAuthRequest));
+      statusCode = execWithDebugOutput(method, client);
+    }
     if (method.getStatusCode() == HttpStatus.SC_UNAUTHORIZED) {
       //unauthed -look at what raised the response
 
@@ -1680,8 +1698,8 @@ public final class SwiftRestClient {
           IOException {
     if (LOG.isDebugEnabled()) {
       StringBuilder builder = new StringBuilder(
-        method.getName() + " " + method.getURI()+"\n");
-      for (Header header:method.getRequestHeaders()) {
+              method.getName() + " " + method.getURI() + "\n");
+      for (Header header : method.getRequestHeaders()) {
         builder.append(header.toString());
       }
       LOG.debug(builder);
