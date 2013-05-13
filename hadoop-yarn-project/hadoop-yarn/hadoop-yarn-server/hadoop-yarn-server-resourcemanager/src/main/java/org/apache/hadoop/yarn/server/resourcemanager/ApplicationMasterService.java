@@ -107,7 +107,7 @@ public class ApplicationMasterService extends AbstractService implements
   }
 
   @Override
-  protected void innerStart() throws Exception {
+  protected void serviceStart() throws Exception {
     Configuration conf = getConfig();
     YarnRPC rpc = YarnRPC.create(conf);
 
@@ -133,7 +133,7 @@ public class ApplicationMasterService extends AbstractService implements
     this.bindAddress =
         conf.updateConnectAddr(YarnConfiguration.RM_SCHEDULER_ADDRESS,
                                server.getListenerAddress());
-    super.innerStart();
+    super.serviceStart();
   }
 
   @Private
@@ -447,10 +447,10 @@ public class ApplicationMasterService extends AbstractService implements
   }
   
   @Override
-  protected void innerStop() throws Exception {
+  protected void serviceStop() throws Exception {
     if (this.server != null) {
       this.server.stop();
     }
-    super.innerStop();
+    super.serviceStop();
   }
 }
