@@ -166,7 +166,6 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
       LOG.error(errorMessage, e);
       throw new YarnRuntimeException(e);
     }
-    super.serviceStart();
   }
 
   @Override
