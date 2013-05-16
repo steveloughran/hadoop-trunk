@@ -46,6 +46,11 @@ public class Endpoint {
   private URI publicURL;
 
   /**
+   * public accessible URL#2
+   */
+  private URI publicURL2;
+
+  /**
    * Openstack region name
    */
   private String region;
@@ -127,6 +132,13 @@ public class Endpoint {
     this.publicURL = publicURL;
   }
 
+  public URI getPublicURL2() {
+    return publicURL2;
+  }
+
+  public void setPublicURL2(URI publicURL2) {
+    this.publicURL2 = publicURL2;
+  }
 
   /**
    * @return Openstack region name
