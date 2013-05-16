@@ -1064,7 +1064,7 @@ public final class SwiftRestClient {
 
 
       @Override
-      protected void setup(PostMethod method) throws SwiftException {
+      protected void setup(PostMethod method) throws IOException {
 
         method.setRequestEntity(getAuthenticationRequst(authenticationRequest));
         }
@@ -1196,7 +1196,7 @@ public final class SwiftRestClient {
   }
 
   private StringRequestEntity getAuthenticationRequst(AuthenticationRequest authenticationRequest)
-          throws SwiftException {
+    throws IOException {
     final String data = JSONUtil.toJSON(new AuthenticationRequestWrapper(
             authenticationRequest));
     if (LOG.isDebugEnabled()) {

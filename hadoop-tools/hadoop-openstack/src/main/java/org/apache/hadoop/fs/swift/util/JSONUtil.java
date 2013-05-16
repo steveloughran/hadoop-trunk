@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.swift.util;
 
+import org.apache.hadoop.fs.swift.exceptions.SwiftJsonMarshallingException;
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -44,18 +45,19 @@ public class JSONUtil {
    *
    * @param object The object to convert.
    * @return The JSON string representation.
+   * @throws IOException IO issues
+   * @throws SwiftJsonMarshallingException failure to generate JSON
    */
-  public static String toJSON(Object object) {
+  public static String toJSON(Object object) throws
+                                             IOException {
     Writer json = new StringWriter();
     try {
       jsonMapper.writeValue(json, object);
       return json.toString();
     } catch (JsonGenerationException e) {
-      throw new RuntimeException("Error generating response", e);
+      throw new SwiftJsonMarshallingException(e.toString(), e);
     } catch (JsonMappingException e) {
-      throw new RuntimeException("Error generating response", e);
-    } catch (IOException e) {
-      throw new RuntimeException("Error generating response", e);
+      throw new SwiftJsonMarshallingException(e.toString(), e);
     }
   }
 
@@ -67,15 +69,18 @@ public class JSONUtil {
    * @param klazz The class to convert.
    * @return The Object of the given class.
    */
-  public static <T> T toObject(String value, Class<T> klazz) {
+  public static <T> T toObject(String value, Class<T> klazz) throws
+                                                             IOException {
     try {
       return jsonMapper.readValue(value, klazz);
     } catch (JsonGenerationException e) {
-      throw new RuntimeException("Error generating response", e);
+      throw new SwiftJsonMarshallingException(e.toString()
+                                              + " source: " + value,
+                                              e);
     } catch (JsonMappingException e) {
-      throw new RuntimeException("Error generating response", e);
-    } catch (IOException e) {
-      throw new RuntimeException("Error generating response", e);
+      throw new SwiftJsonMarshallingException(e.toString()
+                                              + " source: " + value,
+                                              e);
     }
   }
 
@@ -85,15 +90,15 @@ public class JSONUtil {
    * @param <T>           type
    * @return deserialized  T object
    */
-  public static <T> T toObject(String value, final TypeReference<T> typeReference) {
+  public static <T> T toObject(String value,
+                               final TypeReference<T> typeReference)
+            throws IOException {
     try {
       return jsonMapper.readValue(value, typeReference);
     } catch (JsonGenerationException e) {
-      throw new RuntimeException("Error generating response", e);
+      throw new SwiftJsonMarshallingException("Error generating response", e);
     } catch (JsonMappingException e) {
-      throw new RuntimeException("Error generating response", e);
-    } catch (IOException e) {
-      throw new RuntimeException("Error generating response", e);
+      throw new SwiftJsonMarshallingException("Error generating response", e);
     }
   }
 
@@ -103,15 +108,19 @@ public class JSONUtil {
    * @param <T>            type
    * @return deserialized  T object
    */
-  public static <T> T toObject(String value, final CollectionType collectionType) {
+  public static <T> T toObject(String value,
+                               final CollectionType collectionType)
+              throws IOException {
     try {
       return jsonMapper.readValue(value, collectionType);
     } catch (JsonGenerationException e) {
-      throw new RuntimeException("Error generating response", e);
+      throw new SwiftJsonMarshallingException(e.toString()
+                                              + " source: " + value,
+                                              e);
     } catch (JsonMappingException e) {
-      throw new RuntimeException("Error generating response", e);
-    } catch (IOException e) {
-      throw new RuntimeException("Error generating response", e);
+      throw new SwiftJsonMarshallingException(e.toString()
+                                              + " source: " + value,
+                                              e);
     }
   }
 
