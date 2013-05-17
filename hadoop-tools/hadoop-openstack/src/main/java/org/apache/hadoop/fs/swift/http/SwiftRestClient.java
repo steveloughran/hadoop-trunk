@@ -341,6 +341,31 @@ public final class SwiftRestClient {
     }
   }
 
+  /**
+   * There's a special type for auth messages, so that low-level
+   * message handlers can react to auth failures differently from everything
+   * else.
+   */
+  private static class AuthPostMethod extends PostMethod {
+
+
+    private AuthPostMethod(String uri) {
+      super(uri);
+    }
+  }
+
+  /**
+   * Generate an auth message
+   * @param <R> response
+   */
+  private static abstract class AuthMethodProcessor<R> extends
+                                                       HttpMethodProcessor<AuthPostMethod, R> {
+    @Override
+    protected final AuthPostMethod doCreateMethod(String uri) {
+      return new AuthPostMethod(uri);
+    }
+  }
+
   private static abstract class PutMethodProcessor<R> extends HttpMethodProcessor<PutMethod, R> {
     @Override
     protected final PutMethod doCreateMethod(String uri) {
@@ -1060,139 +1085,147 @@ public final class SwiftRestClient {
     }
 
     LOG.debug("started authentication");
-    return perform("authentication", authUri, new PostMethodProcessor<AccessToken>() {
+    return perform("authentication",
+                   authUri,
+                   new AuthenticationPost(authenticationRequest)); 
+  }
 
+  private class AuthenticationPost extends AuthMethodProcessor<AccessToken> {
+    final AuthenticationRequest authenticationRequest;
 
-      @Override
-      protected void setup(PostMethod method) throws IOException {
+    private AuthenticationPost(AuthenticationRequest authenticationRequest) {
+      this.authenticationRequest = authenticationRequest;
+    }
 
-        method.setRequestEntity(getAuthenticationRequst(authenticationRequest));
-        }
+    @Override
+    protected void setup(AuthPostMethod method) throws IOException {
 
-      /**
-       * specification says any of the 2xxs are OK, so list all
-       * the standard ones
-       * @return a set of 2XX status codes.
-       */
-      @Override
-      protected int[] getAllowedStatusCodes() {
-        return new int[]{
-                SC_OK,
-                SC_BAD_REQUEST,
-                SC_CREATED,
-                SC_ACCEPTED,
-                SC_NON_AUTHORITATIVE_INFORMATION,
-                SC_NO_CONTENT,
-                SC_RESET_CONTENT,
-                SC_PARTIAL_CONTENT,
-                SC_MULTI_STATUS,
-                SC_UNAUTHORIZED //if request unauthorized, try another method
-        };
+      method.setRequestEntity(getAuthenticationRequst(authenticationRequest));
+    }
+
+    /**
+     * specification says any of the 2xxs are OK, so list all
+     * the standard ones
+     * @return a set of 2XX status codes.
+     */
+    @Override
+    protected int[] getAllowedStatusCodes() {
+      return new int[]{
+        SC_OK,
+        SC_BAD_REQUEST,
+        SC_CREATED,
+        SC_ACCEPTED,
+        SC_NON_AUTHORITATIVE_INFORMATION,
+        SC_NO_CONTENT,
+        SC_RESET_CONTENT,
+        SC_PARTIAL_CONTENT,
+        SC_MULTI_STATUS,
+        SC_UNAUTHORIZED //if request unauthorized, try another method
+      };
+    }
+
+    @Override
+    public AccessToken extractResult(AuthPostMethod method) throws IOException {
+      //initial check for failure codes leading to authentication failures
+      if (method.getStatusCode() == SC_BAD_REQUEST) {
+        throw new SwiftAuthenticationFailedException(
+          authenticationRequest.toString(), "POST", authUri, method);
       }
 
-      @Override
-      public AccessToken extractResult(PostMethod method) throws IOException {
-        //initial check for failure codes leading to authentication failures
-        if (method.getStatusCode() == SC_BAD_REQUEST) {
-          throw new SwiftAuthenticationFailedException(
-                   authenticationRequest.toString(), "POST", authUri, method);
-        }
+      final AuthenticationResponse access =
+        JSONUtil.toObject(method.getResponseBodyAsString(),
+                          AuthenticationWrapper.class).getAccess();
+      final List<Catalog> serviceCatalog = access.getServiceCatalog();
+      //locate the specific service catalog that defines Swift; variations
+      //in the name of this add complexity to the search
+      boolean catalogMatch = false;
+      StringBuilder catList = new StringBuilder();
+      StringBuilder regionList = new StringBuilder();
 
-        final AuthenticationResponse access =
-                JSONUtil.toObject(method.getResponseBodyAsString(),
-                        AuthenticationWrapper.class).getAccess();
-        final List<Catalog> serviceCatalog = access.getServiceCatalog();
-        //locate the specific service catalog that defines Swift; variations
-        //in the name of this add complexity to the search
-        boolean catalogMatch = false;
-        StringBuilder catList = new StringBuilder();
-        StringBuilder regionList = new StringBuilder();
+      //these fields are all set together at the end of the operation
+      URI endpointURI = null;
+      URI objectLocation;
+      Endpoint swiftEndpoint = null;
+      AccessToken accessToken;
 
-        //these fields are all set together at the end of the operation
-        URI endpointURI = null;
-        URI objectLocation;
-        Endpoint swiftEndpoint = null;
-        AccessToken accessToken;
-
-        for (Catalog catalog : serviceCatalog) {
-          String name = catalog.getName();
-          String type = catalog.getType();
-          String descr = String.format("[%s: %s]; ", name, type);
-          catList.append(descr);
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Catalog entry " + descr);
-          }
-          if (name.equals(SERVICE_CATALOG_SWIFT)
-                  || name.equals(SERVICE_CATALOG_CLOUD_FILES)
-                  || type.equals(SERVICE_CATALOG_OBJECT_STORE)) {
-            //swift is found
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Found swift catalog as " + name + " => " + type);
-            }
-            //now go through the endpoints
-            for (Endpoint endpoint : catalog.getEndpoints()) {
-              String endpointRegion = endpoint.getRegion();
-              URI publicURL = endpoint.getPublicURL();
-              URI internalURL = endpoint.getInternalURL();
-              descr = String.format("[%s => %s / %s]; ",
-                      endpointRegion,
-                      publicURL,
-                      internalURL);
-              regionList.append(descr);
-              if (LOG.isDebugEnabled()) {
-                LOG.debug("Endpoint " + descr);
-              }
-              if (region == null || endpointRegion.equals(region)) {
-                endpointURI = usePublicURL ? publicURL : internalURL;
-                swiftEndpoint = endpoint;
-                break;
-              }
-            }
-          }
-        }
-        if (endpointURI == null) {
-          String message = "Could not find swift service from auth URL "
-                  + authUri
-                  + " and region '" + region + "'. "
-                  + "Categories: " + catList
-                  + ((regionList.length() > 0) ?
-                  ("regions: " + regionList)
-                  : "No regions");
-          throw new SwiftInvalidResponseException(message,
-                  SC_OK,
-                  "authenticating",
-                  authUri);
-
-        }
-
-
-        accessToken = access.getToken();
-        String path = SWIFT_OBJECT_AUTH_ENDPOINT
-                + swiftEndpoint.getTenantId();
-        String host = endpointURI.getHost();
-        try {
-          objectLocation = new URI(endpointURI.getScheme(),
-                  null,
-                  host,
-                  endpointURI.getPort(),
-                  path,
-                  null,
-                  null);
-        } catch (URISyntaxException e) {
-          throw new SwiftException("object endpoint URI is incorrect: "
-                  + endpointURI
-                  + " + " + path,
-                  e);
-        }
-        setAuthDetails(endpointURI, objectLocation, accessToken);
-
+      for (Catalog catalog : serviceCatalog) {
+        String name = catalog.getName();
+        String type = catalog.getType();
+        String descr = String.format("[%s: %s]; ", name, type);
+        catList.append(descr);
         if (LOG.isDebugEnabled()) {
-          LOG.debug("authenticated against " + endpointURI);
+          LOG.debug("Catalog entry " + descr);
         }
-        createDefaultContainer();
-        return accessToken;
+        if (name.equals(SERVICE_CATALOG_SWIFT)
+            || name.equals(SERVICE_CATALOG_CLOUD_FILES)
+            || type.equals(SERVICE_CATALOG_OBJECT_STORE)) {
+          //swift is found
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Found swift catalog as " + name + " => " + type);
+          }
+          //now go through the endpoints
+          for (Endpoint endpoint : catalog.getEndpoints()) {
+            String endpointRegion = endpoint.getRegion();
+            URI publicURL = endpoint.getPublicURL();
+            URI internalURL = endpoint.getInternalURL();
+            descr = String.format("[%s => %s / %s]; ",
+                                  endpointRegion,
+                                  publicURL,
+                                  internalURL);
+            regionList.append(descr);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Endpoint " + descr);
+            }
+            if (region == null || endpointRegion.equals(region)) {
+              endpointURI = usePublicURL ? publicURL : internalURL;
+              swiftEndpoint = endpoint;
+              break;
+            }
+          }
+        }
       }
-    });
+      if (endpointURI == null) {
+        String message = "Could not find swift service from auth URL "
+                         + authUri
+                         + " and region '" + region + "'. "
+                         + "Categories: " + catList
+                         + ((regionList.length() > 0) ?
+                            ("regions: " + regionList)
+                                                      : "No regions");
+        throw new SwiftInvalidResponseException(message,
+                                                SC_OK,
+                                                "authenticating",
+                                                authUri);
+
+      }
+
+
+      accessToken = access.getToken();
+      String path = SWIFT_OBJECT_AUTH_ENDPOINT
+                    + swiftEndpoint.getTenantId();
+      String host = endpointURI.getHost();
+      try {
+        objectLocation = new URI(endpointURI.getScheme(),
+                                 null,
+                                 host,
+                                 endpointURI.getPort(),
+                                 path,
+                                 null,
+                                 null);
+      } catch (URISyntaxException e) {
+        throw new SwiftException("object endpoint URI is incorrect: "
+                                 + endpointURI
+                                 + " + " + path,
+                                 e);
+      }
+      setAuthDetails(endpointURI, objectLocation, accessToken);
+
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("authenticated against " + endpointURI);
+      }
+      createDefaultContainer();
+      return accessToken;
+    }
   }
 
   private StringRequestEntity getAuthenticationRequst(AuthenticationRequest authenticationRequest)
@@ -1647,40 +1680,43 @@ public final class SwiftRestClient {
     }
 
     int statusCode = execWithDebugOutput(method, client);
-    if ((method.getStatusCode() == HttpStatus.SC_UNAUTHORIZED
-            || method.getStatusCode() == HttpStatus.SC_BAD_REQUEST)
+
+    if ((statusCode == HttpStatus.SC_UNAUTHORIZED 
+            || statusCode == HttpStatus.SC_BAD_REQUEST)
+            && method instanceof AuthPostMethod
             && !useKeystoneAuthentication) {
-      if(LOG.isDebugEnabled()) {
+      if (LOG.isDebugEnabled()) {
         LOG.debug("Operation failed with status " + method.getStatusCode() +
                  " attempting keystone auth");
       }
       //if rackspace key authentication failed - try custom Keystone authentication
       useKeystoneAuthentication = true;
-      final PostMethod authentication = (PostMethod) method;
+      final AuthPostMethod authentication = (AuthPostMethod) method;
       //replace rackspace auth with keystone one
       authentication.setRequestEntity(getAuthenticationRequst(keystoneAuthRequest));
       statusCode = execWithDebugOutput(method, client);
     }
-    if (method.getStatusCode() == HttpStatus.SC_UNAUTHORIZED) {
-      //unauthed -look at what raised the response
 
-      if (method.getURI().toString().equals(authUri.toString())) {
-        //unauth response from the AUTH URI itself.
-        throw new SwiftAuthenticationFailedException(authRequest.toString(),
-                "auth",
-                authUri,
-                method);
-      } else {
-        //any other URL: try again
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Reauthenticating");
-        }
-        authenticate();
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Retrying original request");
-        }
-        statusCode = execWithDebugOutput(method, client);
+    if (statusCode == HttpStatus.SC_UNAUTHORIZED ) {
+      //unauthed -or the auth uri rejected it.
+
+      if (method instanceof AuthPostMethod) {
+          //unauth response from the AUTH URI itself.
+          throw new SwiftAuthenticationFailedException(authRequest.toString(),
+                                                       "auth",
+                                                       authUri,
+                                                       method);
       }
+      //any other URL: try again
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Reauthenticating");
+      }
+      //re-auth, this may recurse into the same dir
+      authenticate();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Retrying original request");
+      }
+      statusCode = execWithDebugOutput(method, client);
     }
     return statusCode;
   }
