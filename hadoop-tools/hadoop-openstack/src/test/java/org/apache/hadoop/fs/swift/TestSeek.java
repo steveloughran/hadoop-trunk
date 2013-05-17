@@ -249,15 +249,6 @@ public class TestSeek extends SwiftFileSystemBaseTest {
   }
 
   /**
-   * Read past the buffer size and verify that it refreshed
-   * @throws Throwable
-   */
-  @Test
-  public void testReadPastBufferSize() throws Throwable {
-    
-  }
-  
-  /**
    * work out the expected byte from a specific offset
    * @param offset offset in the file
    * @return the value
