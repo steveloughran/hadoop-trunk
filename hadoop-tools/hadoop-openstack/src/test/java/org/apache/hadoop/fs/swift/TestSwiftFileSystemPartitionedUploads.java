@@ -140,34 +140,48 @@ public class TestSwiftFileSystemPartitionedUploads extends
 
   private FileStatus validatePathLen(Path path, int len) throws IOException {
     //verify that the length is what was written in a direct status check
-    FileStatus status = fs.getFileStatus(path);
-    assertEquals("Length of written file "+ path + " from status check " + status, len,
+    final Path qualifiedPath = path.makeQualified(fs);
+    FileStatus[] parentDirListing = fs.listStatus(qualifiedPath.getParent());
+    StringBuilder listing = lsToString(parentDirListing);
+    String parentDirLS = listing.toString();
+    FileStatus status = fs.getFileStatus(qualifiedPath);
+    assertEquals("Length of written file " + qualifiedPath
+                 + " from status check " + status
+                 + " in dir " + listing,
+                 len,
                  status.getLen());
-    String fileInfo = path + "  " + status;
+    String fileInfo = qualifiedPath + "  " + status;
     assertFalse("File claims to be a directory " + fileInfo,
                 status.isDir());
 
-    //now do an ls of the parent and verify that this file is there
-    //and of the given size.
-    final Path qualifiedPath = path.makeQualified(fs);
-
-    FileStatus[] parentDirListing = fs.listStatus(path.getParent());
-    FileStatus listedFileStat = null;
-    StringBuilder listing = new StringBuilder();
-    for (FileStatus stat : parentDirListing) {
-      listing.append(stat).append("\n");
-      if (stat.getPath().equals(qualifiedPath)) {
-        listedFileStat = stat;
-      }
-    }
-    String parentDirLS = listing.toString();
+    FileStatus listedFileStat = resolveChild(parentDirListing, qualifiedPath);
     assertNotNull("Did not find " + path + " in " + parentDirLS,
                   listedFileStat);
     //file is in the parent dir. Now validate it's stats
     assertEquals("Wrong len for " + path + " in listing " + parentDirLS,
                  len,
                  listedFileStat.getLen());
+    listedFileStat.toString();
     return status;
+  }
+
+  private FileStatus resolveChild(FileStatus[] parentDirListing,
+                                  Path childPath) {
+    FileStatus listedFileStat = null;
+    for (FileStatus stat : parentDirListing) {
+      if (stat.getPath().equals(childPath)) {
+        listedFileStat = stat;
+      }
+    }
+    return listedFileStat;
+  }
+
+  private StringBuilder lsToString(FileStatus[] parentDirListing) {
+    StringBuilder listing = new StringBuilder();
+    for (FileStatus stat : parentDirListing) {
+      listing.append(stat).append("\n");
+    }
+    return listing;
   }
 
   /**
