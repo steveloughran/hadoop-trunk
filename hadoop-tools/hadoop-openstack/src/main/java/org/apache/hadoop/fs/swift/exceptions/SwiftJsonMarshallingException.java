@@ -19,7 +19,7 @@
 package org.apache.hadoop.fs.swift.exceptions;
 
 /**
- * Exception raised when the J/O mapping fails. 
+ * Exception raised when the J/O mapping fails.
  *
  */
 public class SwiftJsonMarshallingException extends SwiftException {

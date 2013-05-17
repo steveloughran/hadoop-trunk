@@ -83,7 +83,7 @@ class SwiftNativeInputStream extends FSInputStream {
    * Why the stream is closed
    */
   private String reasonClosed = "unopened";
-  
+
   /**
    * Offset in the range requested last
    */
@@ -269,7 +269,7 @@ class SwiftNativeInputStream extends FSInputStream {
    * compared to the read(bytes[]) method offered by input streams.
    * However, if you look at the code that implements that method, it comes
    * down to read() one char at a time -only here the return value is discarded.
-   * 
+   *
    *<p/>
    * This is a no-op if the stream is closed
    * @param bytes number of bytes to read.
@@ -347,7 +347,7 @@ class SwiftNativeInputStream extends FSInputStream {
   }
 
   /**
-   * Fill the buffer from the target position 
+   * Fill the buffer from the target position
    * If the target position == current position, the
    * read still goes ahead; this is a way of handling partial read failures
    * @param targetPos target position

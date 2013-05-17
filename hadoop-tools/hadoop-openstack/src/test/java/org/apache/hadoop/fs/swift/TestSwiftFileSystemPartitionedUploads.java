@@ -214,7 +214,7 @@ public class TestSwiftFileSystemPartitionedUploads extends
 
   /**
    * Test sticks up a very large partitioned file and verifies that
-   * it comes back unchanged. 
+   * it comes back unchanged.
    * @throws Throwable
    */
   @Test(timeout = SWIFT_BULK_IO_TEST_TIMEOUT)

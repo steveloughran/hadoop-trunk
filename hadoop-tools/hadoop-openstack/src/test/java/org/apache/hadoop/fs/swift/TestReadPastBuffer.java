@@ -122,8 +122,8 @@ public class TestReadPastBuffer extends SwiftFileSystemBaseTest {
     //and this one
     result = instream.read(buffer, 0, 1);
     assertMinusOne("read past end of file", result);
-    
-    //now do an 0-byte read and expect it to 
+
+    //now do an 0-byte read and expect it to
     //to be checked first
     result = instream.read(buffer, 0, 0);
     assertEquals("EOF checks coming before read range check", 0, result);
