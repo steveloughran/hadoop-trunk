@@ -235,7 +235,7 @@ public class TestSeek extends SwiftFileSystemBaseTest {
     instream.seek(39999);
     assertTrue(-1 != instream.read());
     assertEquals (40000, instream.getPos());
-    
+
     byte[] readBuffer = new byte[256];
     instream.read(128, readBuffer, 0, readBuffer.length);
     //have gone back

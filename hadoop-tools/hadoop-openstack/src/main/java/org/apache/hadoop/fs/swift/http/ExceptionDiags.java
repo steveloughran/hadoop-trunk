@@ -56,8 +56,8 @@ public class ExceptionDiags {
                                           final String operation,
                                           final IOException exception) {
     String action = operation + " " + dest;
-    String xref= null;
-    
+    String xref = null;
+
     if (exception instanceof ConnectException) {
       xref = "ConnectionRefused";
     } else if (exception instanceof UnknownHostException) {
@@ -70,7 +70,7 @@ public class ExceptionDiags {
     String msg = action
                  + " failed on exception: "
                  + exception;
-    if (xref!=null) {
+    if (xref != null) {
       xref = xref + ";" + see(xref);
     }
     return wrapWithMessage(exception, msg);

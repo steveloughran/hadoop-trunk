@@ -46,8 +46,7 @@ public class TestSwiftConfig extends Assert {
     mkInstance(configuration);
   }
 
-
-  @Test
+@Test
   public void testEmptyTenant() throws Exception {
     final Configuration configuration = new Configuration();
     set(configuration, DOT_AUTH_URL, "http://localhost:8080");
@@ -133,7 +132,7 @@ public class TestSwiftConfig extends Assert {
     SwiftRestClient restClient = mkInstance(configuration);
     assertFalse(restClient.isLocationAware());
   }
-  
+
   @Test(expected = org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException.class)
   public void testNegativePartsize() throws Exception {
     final Configuration configuration = createCoreConfig();
