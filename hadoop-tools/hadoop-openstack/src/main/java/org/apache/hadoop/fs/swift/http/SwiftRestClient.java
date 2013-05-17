@@ -196,12 +196,12 @@ public final class SwiftRestClient {
    * How long (in milliseconds) should a connection be attempted
    */
   private final int connectTimeout;
-  
+
   /**
    * How long (in milliseconds) should a connection be attempted
    */
   private final int socketTimeout;
-  
+
   /**
    * How long (in milliseconds) between bulk operations
    */
@@ -491,7 +491,7 @@ public final class SwiftRestClient {
       props.getProperty(SWIFT_LOCATION_AWARE_PROPERTY, "false"));
 
     //now read in properties that are shared across all connections
-    
+
     //connection and retries
     try {
       retryCount = conf.getInt(SWIFT_RETRY_COUNT, DEFAULT_RETRY_COUNT);
@@ -1087,7 +1087,7 @@ public final class SwiftRestClient {
     LOG.debug("started authentication");
     return perform("authentication",
                    authUri,
-                   new AuthenticationPost(authenticationRequest)); 
+                   new AuthenticationPost(authenticationRequest));
   }
 
   private class AuthenticationPost extends AuthMethodProcessor<AccessToken> {
@@ -1681,7 +1681,7 @@ public final class SwiftRestClient {
 
     int statusCode = execWithDebugOutput(method, client);
 
-    if ((statusCode == HttpStatus.SC_UNAUTHORIZED 
+    if ((statusCode == HttpStatus.SC_UNAUTHORIZED
             || statusCode == HttpStatus.SC_BAD_REQUEST)
             && method instanceof AuthPostMethod
             && !useKeystoneAuthentication) {

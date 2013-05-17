@@ -279,7 +279,6 @@ class SwiftNativeOutputStream extends OutputStream {
     if (backupStream != null) {
       backupStream.close();
     }
-    
 
     if (closingUpload && partUpload && backupFile.length() == 0) {
       //skipping the upload if

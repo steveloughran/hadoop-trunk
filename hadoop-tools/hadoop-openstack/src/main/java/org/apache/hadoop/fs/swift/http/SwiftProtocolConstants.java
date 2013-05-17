@@ -104,9 +104,15 @@ public class SwiftProtocolConstants {
    */
   public static final String X_NEWEST = "X-Newest";
 
+  /**
+   * throttled response sent by some endpoints.
+   */
   public static final int SC_THROTTLED_498 = 498;
-  public static final int SC_TOO_MANY_REQUESTS_429 = 298;
-  
+  /**
+   * W3C recommended status code for throttled operations
+   */
+  public static final int SC_TOO_MANY_REQUESTS_429 = 429;
+
   public static final String FS_SWIFT = "fs.swift";
 
   /**
@@ -188,8 +194,7 @@ public class SwiftProtocolConstants {
   
   public static final String SWIFT_USER_AGENT= "Apache Hadoop Swift Client "
                                                + VersionInfo.getBuildVersion();
-  
-  
+
   /**
    * Key for passing the service name as a property -not read from the
    * configuration : {@value}

@@ -619,7 +619,7 @@ public class SwiftNativeFileSystemStore {
           SwiftUtils.debug(LOG, "Deleting partitioned file %s ", stat);
           deleteObject(stat.getPath());
         }
-        
+
         swiftRestClient.delete(srcObject);
       }
     } else {
@@ -902,7 +902,7 @@ public class SwiftNativeFileSystemStore {
                      recursive);
     boolean askForNewest = true;
     SwiftFileStatus fileStatus = getObjectMetadata(swiftPath, askForNewest);
-    
+
     //ask for the file/dir status, but don't demand the newest, as we
     //don't mind if the directory has changed
     //list all entries under this directory.
@@ -920,7 +920,7 @@ public class SwiftNativeFileSystemStore {
     SwiftUtils.debug(LOG, "Path '%s' %d status entries'",
                      absolutePath,
                      filecount);
-    
+
     if (filecount == 0) {
       //it's an empty directory or a path
       rmdir(absolutePath);
