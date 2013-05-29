@@ -40,6 +40,8 @@ public class TestSwiftFileSystemConcurrency extends SwiftFileSystemBaseTest {
   protected static final Log LOG =
     LogFactory.getLog(TestSwiftFileSystemConcurrency.class);
   private Exception thread1Ex, thread2Ex;
+  public static final String TEST_RACE_CONDITION_ON_DELETE_DIR =
+    "/test/testraceconditionondirdeletetest";
 
   /**
    * test on concurrent file system changes
@@ -49,18 +51,20 @@ public class TestSwiftFileSystemConcurrency extends SwiftFileSystemBaseTest {
     SwiftTestUtils.skip("Skipping unreliable test");
 
     final String message = "message";
-    final Path fileToRead = new Path("/test/huge/files/many-files/file");
+    final Path fileToRead = new Path(
+      TEST_RACE_CONDITION_ON_DELETE_DIR +"/files/many-files/file");
     final ExecutorService executorService = Executors.newFixedThreadPool(2);
-    fs.create(new Path("/test/huge/file/test/file1"));
-    fs.create(new Path("/test/huge/documents/doc1"));
-    fs.create(new Path("/test/huge/pictures/picture"));
+    fs.create(new Path(TEST_RACE_CONDITION_ON_DELETE_DIR +"/file/test/file1"));
+    fs.create(new Path(TEST_RACE_CONDITION_ON_DELETE_DIR + "/documents/doc1"));
+    fs.create(new Path(
+      TEST_RACE_CONDITION_ON_DELETE_DIR + "/pictures/picture"));
 
 
     executorService.execute(new Runnable() {
       @Override
       public void run() {
         try {
-          assertDeleted(new Path("/test/huge/"), true);
+          assertDeleted(new Path(TEST_RACE_CONDITION_ON_DELETE_DIR), true);
         } catch (IOException e) {
           LOG.warn("deletion thread:" + e, e);
           thread1Ex = e;
