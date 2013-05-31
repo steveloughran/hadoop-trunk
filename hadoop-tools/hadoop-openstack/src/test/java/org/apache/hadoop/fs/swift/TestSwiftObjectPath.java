@@ -155,7 +155,4 @@ public class TestSwiftObjectPath implements SwiftTestConstants {
     assertNotParentOf(grandchild, root);
   }
 
-
-
-  
 }
