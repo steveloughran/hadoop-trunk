@@ -158,7 +158,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
   public void testOverwriteDirectory() throws Throwable {
     Path path = new Path("/test/testOverwriteDirectory");
     try {
-      fs.mkdirs(path);
+      fs.mkdirs(path.getParent());
       String text = "Testing a put to a file "
               + System.currentTimeMillis();
       writeTextFile(fs, path, text, false);
@@ -239,7 +239,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
   public void testCreateDirWithFileParent() throws Throwable {
     Path path = new Path("/test/CreateDirWithFileParent");
     Path child = new Path(path, "subdir/child");
-    fs.mkdirs(path);
+    fs.mkdirs(path.getParent());
     try {
       //create the child dir
       writeTextFile(fs, path, "parent", true);
