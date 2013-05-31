@@ -475,7 +475,13 @@ public class SwiftNativeFileSystem extends FileSystem {
         }
       } else {
         //here someone is trying to create a file over a directory
+
+/*    we can't throw an exception here as there is no easy way to distinguish
+     a file from the dir
         
+        throw new SwiftPathExistsException("Cannot create a file over a directory:"
+                                           + file);
+*/
       }
     } else {
       // destination does not exist -trigger creation of the parent
@@ -604,7 +610,6 @@ public class SwiftNativeFileSystem extends FileSystem {
     return delete(f, true);
   }
 
-  
   /**
    * Makes path absolute
    *
