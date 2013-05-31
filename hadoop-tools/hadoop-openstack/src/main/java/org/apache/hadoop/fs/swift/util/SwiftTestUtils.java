@@ -397,6 +397,7 @@ public class SwiftTestUtils extends org.junit.Assert {
    */
   public static void touch(FileSystem fs,
                            Path path) throws IOException {
+    fs.delete(path, true);
     writeTextFile(fs, path, null, false);
   }
 

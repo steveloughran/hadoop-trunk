@@ -104,6 +104,7 @@ public class TestV2LsOperations extends SwiftFileSystemBaseTest {
   public void testListFilesRootDir() throws Throwable {
     Path dir = path("/");
     Path child = new Path(dir, "test");
+    fs.delete(child, true);
     SwiftTestUtils.writeTextFile(fs, child, "text", false);
     assertListFilesFinds(fs, dir, child, false);
   }

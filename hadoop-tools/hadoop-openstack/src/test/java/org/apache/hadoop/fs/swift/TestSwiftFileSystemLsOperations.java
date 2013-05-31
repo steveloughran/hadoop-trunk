@@ -123,12 +123,12 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testListNonEmptyRoot() throws Throwable {
-    Path file = path("/test");
-    touch(fs, file);
+    Path test = path("/test");
+    touch(fs, test);
     FileStatus[] fileStatuses = fs.listStatus(path("/"));
     assertEquals(1, fileStatuses.length);
     FileStatus status = fileStatuses[0];
-    assertEquals(file, status.getPath());
+    assertEquals(test, status.getPath());
   }
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
