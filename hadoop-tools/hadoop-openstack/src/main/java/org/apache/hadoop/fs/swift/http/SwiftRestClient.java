@@ -693,7 +693,7 @@ public final class SwiftRestClient {
    */
   public byte[] getObjectLocation(SwiftObjectPath path,
                                   final Header... requestHeaders) throws IOException {
-    if(!isLocationAware()) {
+    if (!isLocationAware()) {
       //if the filesystem is not location aware, do not ask for this information
       return null;
     }

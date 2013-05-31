@@ -44,7 +44,7 @@ public class TestSwiftFileSystemDelete extends SwiftFileSystemBaseTest {
     createFile(file);
     assertDeleted(file, true);
   }
-  
+
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testDeleteTestDir() throws IOException {
     final Path file = new Path("/test/");

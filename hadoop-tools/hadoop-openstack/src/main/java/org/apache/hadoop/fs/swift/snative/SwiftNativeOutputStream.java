@@ -220,7 +220,7 @@ class SwiftNativeOutputStream extends OutputStream {
 
     // if the size of file is greater than the partition limit
     while (blockOffset + len >= filePartSize) {
-      // - then partition the blob and upload as many partitions 
+      // - then partition the blob and upload as many partitions
       // are needed.
       //how many bytes to write for this partition.
       int subWriteLen = (int) (filePartSize - blockOffset);
