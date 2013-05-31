@@ -69,8 +69,7 @@ Hadoop OpenStack Support: Swift Object Store
   The Hadoop Swift filesystem library adds another concept, the <service>, which
   defines which Swift blobstore hosts a container -and how to connect to it.
 
-*** Containers and Objects
-
+** Containers and Objects
 
     * Containers are created by users with accounts on the Swift filestore, and hold
     <objects>.
@@ -102,6 +101,8 @@ Hadoop OpenStack Support: Swift Object Store
   container, with a new name, containing the old data. There is no rename
   operation itself, objects need to be copied -then the original entry deleted.
 
+** Eventual Consistency
+
   The Swift Filesystem is *eventually consistent*: an operation on an object may
   not be immediately visible to that client, or other clients. This is a
   consequence of the goal of the filesystem: to span a set of machines, across
@@ -116,24 +117,59 @@ Hadoop OpenStack Support: Swift Object Store
   MapReduce engine, but there may be still be occasions when eventual consistency
   causes surprises.
 
-*** Services
+** Non-atomic "directory" operations.
 
-  The Swift Filesystem client for Apache Hadoop is designed to work with multiple
+  Hadoop expects some
+  operations to be atomic, especially <<<rename()>>>, which is something
+  the MapReduce layer relies on to commit the output of a job, renaming data
+  from a temp directory to the final path. Because a rename
+  is implemented as a copy of every blob under the directory's path, followed
+  by a delete of the originals, the intermediate state of the operation
+  will be visible to other clients. If two Reducer tasks to rename their temp
+  directory to the final path, both operations may succeed, with the result that
+  output directory contains mixed data. This can happen if MapReduce jobs
+  are being run with <speculation> enabled and Swift used as the direct output
+  of the MR job (it can also happen against Amazon S3). 
+  
+  Other consequences of the non-atomic operations are:
+  
+  1. If a program is looking for the presence of the directory before acting
+  on the data -it may start prematurely. This can be avoided by using
+  other mechanisms to co-ordinate the programs, such as the presence of a file
+  that is written <after> any bulk directory operations.
+  
+  2. A <<<rename()>>> or <<<delete()>>> operation may include files added under
+  the source directory tree during the operation, may unintentionally delete
+  it, or delete the 0-byte swift entries that mimic directories and act
+  as parents for the files. Try to avoid doing this.
+  
+  The best ways to avoid all these problems is not using Swift as
+  the filesystem between MapReduce jobs or other Hadoop workflows. It 
+  can act as a source of data, and a final destination, but it doesn't meet
+  all of Hadoop's expectations of what a filesystem is -it's a <blobstore>.
+  
+* Working with Swift Object Stores in Hadoop
+
+  Once installed, the Swift FileSystem client can be used by any Hadoop application
+  to read from or write to data stored in a Swift container. 
+  
+  Data stored in Swift can be used as the direct input to a MapReduce job 
+  -simply use the <<<swift:>>> URL (see below) to declare the source of the data.
+  
+  This Swift Filesystem client is designed to work with multiple
   Swift object stores, both public and private. This allows the client to work
   with different clusters, reading and writing data to and from either of them.
 
   It can also work with the same object stores using multiple login details.
 
-  Both these features are achieved by one basic concept: using a service name in
+  These features are achieved by one basic concept: using a service name in
   the URI referring to a swift filesystem, and looking up all the connection and
   login details for that specific service. Different service names can be defined
   in the Hadoop XML configuration file, so defining different clusters, or
   providing different login details for the same object store(s).
 
-* Working with Swift Object Stores in Hadoop
 
-
-** Filesystem URIs
+** Swift Filesystem URIs
 
   Hadoop uses URIs to refer to files within a filesystem. Some common examples
   are:
@@ -297,9 +333,9 @@ Hadoop OpenStack Support: Swift Object Store
 
   A reference to this service would use the <<<hpcloud>>> service name:
 
----
++--
     swift://hadoop-container.hpcloud/
----
++--
 
 ** General Swift Filesystem configuration options
 
@@ -323,12 +359,12 @@ Hadoop OpenStack Support: Swift Object Store
 
   The property has a unit of kilobytes; the default value is <<<32*1024>>>: 32 MB
 
----
++--
     <property>
       <name>fs.swift.blocksize</name>
       <value>32768</value>
     </property>
----
++--
 
   This blocksize has no influence on how files are stored in Swift; it only controls
   what the reported size of blocks are - a value used in Hadoop MapReduce to
@@ -338,7 +374,7 @@ Hadoop OpenStack Support: Swift Object Store
   the <<<mapred.min.split.size>>> and <<<mapred.max.split.size>>> properties,
   which can be done in specific job configurations.
 
----
++--
     <property>
       <name>mapred.min.split.size</name>
       <value>524288</value>
@@ -348,8 +384,7 @@ Hadoop OpenStack Support: Swift Object Store
       <name>mapred.max.split.size</name>
       <value>1048576</value>
     </property>
-
----
++--
 
   In an Apache Pig script, these properties would be set as:
 
@@ -407,23 +442,23 @@ Hadoop OpenStack Support: Swift Object Store
 
   The property <<<fs.swift.requestsize>>> sets the request size in KB.
 
----
++--
     <property>
       <name>fs.swift.requestsize</name>
       <value>128</value>
     </property>
----
++--
 
 *** Connection timeout fs.swift.connect.timeout
 
   This sets the timeout in milliseconds to connect to a Swift service.
 
----
++--
     <property>
       <name>fs.swift.connect.timeout</name>
       <value>15000</value>
     </property>
----
++--
 
   A shorter timeout means that connection failures are raised faster -but
   may trigger more false alarms. A longer timeout is more resilient to network
@@ -433,12 +468,12 @@ Hadoop OpenStack Support: Swift Object Store
 
   This sets the timeout in milliseconds to wait for data from a connected socket.
 
----
++--
     <property>
       <name>fs.swift.socket.timeout</name>
       <value>60000</value>
     </property>
----
++--
 
   A shorter timeout means that connection failures are raised faster -but
   may trigger more false alarms. A longer timeout is more resilient to network
@@ -449,12 +484,12 @@ Hadoop OpenStack Support: Swift Object Store
   This sets the number of times to try to connect to a service whenever
   an HTTP request is made.
 
----
++--
     <property>
       <name>fs.swift.connect.retry.count</name>
       <value>3</value>
     </property>
----
++--
 
   The more retries, the more resilient it is to transient outages -and the
   less rapid it is at detecting and reporting server connectivity problems.
@@ -485,7 +520,7 @@ Hadoop OpenStack Support: Swift Object Store
   the <<<fs.swift.connect.proxy.host>>> and <<<fs.swift.connect.proxy.port>>>
   properties.
 
----
++--
     <property>
       <name>fs.swift.proxy.host</name>
       <value>web-proxy</value>
@@ -495,7 +530,7 @@ Hadoop OpenStack Support: Swift Object Store
       <name>fs.swift.proxy.port</name>
       <value>8088</value>
     </property>
----
++--
 
   If the host is declared, the proxy port must be set to a valid integer value.
 
@@ -526,6 +561,9 @@ Hadoop OpenStack Support: Swift Object Store
 
     [[1]] Try switching from API key authentication to password-based authentication,
     by setting the password.
+    
+    [[1]] Change your credentials. As with Amazon AWS clients, some credentials
+    don't seem to like going over the network.
 
 *** Timeout connecting to the Swift Service
 
@@ -569,5 +607,80 @@ Hadoop OpenStack Support: Swift Object Store
 
     * Maximum size of a binary object: no absolute limit. Files > 5GB are
       partitioned into separate files in the native filesystem, and merged during
-      retrieval.
+      retrieval. <Warning:> the partitioned/large file support is the 
+      most complex part of the Hadoop/Swift FS integration, and, along with
+      authentication, the most troublesome to support.
 
+** Testing the hadoop-openstack module
+
+  The <<<hadoop-openstack>>> can be remotely tested against any public
+  or private cloud infrastructure which supports the OpenStack Keystone
+  authentication mechanism. It can also be tested against private
+  OpenStack clusters. OpenStack Development teams are strongly encouraged to test
+  the Hadoop swift filesystem client against any version of Swift that they
+  are developing or deploying, to stress their cluster and to identify
+  bugs early.
+  
+  The module comes with a large suite of JUnit tests -tests that are
+  only executed if the source tree includes credentials to test against a
+  specific cluster.
+  
+  After checking out the Hadoop source tree, create the file:
+ 
++--
+  hadoop-tools/hadoop-openstack/src/test/resources/auth-keys.xml
++--
+
+  Into this file, insert the credentials needed to bond to the test filesystem,
+  as decribed above.
+  
+  Next set the property <<<test.fs.swift.name>>> to the URL of a
+  swift container to test against. The tests expect exclusive access
+  to this container -do not keep any other data on it, or expect it
+  to be preserved.
+
++--
+    <property>
+      <name>test.fs.swift.name</name>
+      <value>swift://test.myswift/</value>
+    </property>
++--
+
+  In the base hadoop directory, run:
+
++--   
+   mvn clean install -DskipTests
++--
+
+  This builds a set of Hadoop JARs consistent with the <<<hadoop-openstack>>>
+  module that is about to be tested.
+   
+  In the <<<hadoop-tools/hadoop-openstack>>> directory run
+
++--   
+   mvn test -Dtest=TestSwiftRestClient
++--    
+
+  This runs some simple tests which include authenticating
+  against the remote swift service. If these tests fail, so will all
+  the rest. If it does fail: check your authentication.
+
+  Once this test succeeds, you can run the full test suite
+
++--
+    mvn test
++--
+
+  Be advised that these tests can take an hour or more, especially against a
+  remote Swift service -or one that throttles bulk operations.
+     
+  Once the <<<auth-keys.xml>>> file is in place, the <<<mvn test>>> runs from
+  the Hadoop source base directory will automatically run these OpenStack tests
+  While this ensures that no regressions have occurred, it can also add significant
+  time to test runs, and may run up bills, depending on who is providing\
+  the Swift storage service. We recommend having a separate source tree
+  set up purely for the Swift tests, and running it manually or by the CI tooling
+  at a lower frequency than normal test runs.
+    
+  Finally: Apache Hadoop is an open source project. Contributions of code
+  -including more tests- are very welcome.
