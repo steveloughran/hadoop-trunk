@@ -95,7 +95,7 @@ public final class SwiftUtils {
    * is not at debug level, the printf operation is skipped, so
    * no time is spent generating the string.
    * @param log log to use
-   * @param text text message 
+   * @param text text message
    * @param args args arguments to the print statement
    */
   public static void debug(Log log, String text, Object... args) {
@@ -121,7 +121,7 @@ public final class SwiftUtils {
    * is not at trace level, the printf operation is skipped, so
    * no time is spent generating the string.
    * @param log log to use
-   * @param text text message 
+   * @param text text message
    * @param args args arguments to the print statement
    */
   public static void trace(Log log, String text, Object... args) {
@@ -198,7 +198,7 @@ public final class SwiftUtils {
     if (off < 0 ) {
       throw new IndexOutOfBoundsException("Negative buffer offset "
                                           + off
-                                          + " in " + READ); 
+                                          + " in " + READ);
     }
     if (len < 0 ) {
       throw new IndexOutOfBoundsException("Negative read length "
@@ -206,9 +206,9 @@ public final class SwiftUtils {
                                           + " in " + READ);
     }
     if (off > buffer.length) {
-      throw new IndexOutOfBoundsException("Buffer offset of " 
-                                          + off 
-                                          + "beyond buffer size of " 
+      throw new IndexOutOfBoundsException("Buffer offset of "
+                                          + off
+                                          + "beyond buffer size of "
                                           + buffer.length
                                           + " in " + READ);
     }

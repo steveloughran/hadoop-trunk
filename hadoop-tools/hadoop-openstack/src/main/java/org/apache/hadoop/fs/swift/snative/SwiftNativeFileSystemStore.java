@@ -194,9 +194,8 @@ public class SwiftNativeFileSystemStore {
     SwiftObjectPath objectPath = toObjectPath(path);
     return stat(objectPath, newest);
   }
-  
+
   /**
-   * 
    * Get the metadata of an object
    *
    * @param path path

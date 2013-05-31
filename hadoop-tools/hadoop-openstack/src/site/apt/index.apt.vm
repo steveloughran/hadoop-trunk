@@ -65,7 +65,7 @@ Hadoop OpenStack Support: Swift Object Store
 
   OpenStack swift is an <Object Store>; also known as a <blobstore>. It stores
   arbitrary binary objects by name in a <container>.
-  
+
   The Hadoop Swift filesystem library adds another concept, the <service>, which
   defines which Swift blobstore hosts a container -and how to connect to it.
 
@@ -75,7 +75,7 @@ Hadoop OpenStack Support: Swift Object Store
     <objects>.
 
     * Objects can be zero bytes long, or they can contain data.
-    
+
     * Objects in the container can be up to 5GB; there is a special support for
       larger files than this, which merges multiple objects in to one.
 
@@ -129,33 +129,33 @@ Hadoop OpenStack Support: Swift Object Store
   directory to the final path, both operations may succeed, with the result that
   output directory contains mixed data. This can happen if MapReduce jobs
   are being run with <speculation> enabled and Swift used as the direct output
-  of the MR job (it can also happen against Amazon S3). 
-  
+  of the MR job (it can also happen against Amazon S3).
+
   Other consequences of the non-atomic operations are:
-  
+
   1. If a program is looking for the presence of the directory before acting
   on the data -it may start prematurely. This can be avoided by using
   other mechanisms to co-ordinate the programs, such as the presence of a file
   that is written <after> any bulk directory operations.
-  
+
   2. A <<<rename()>>> or <<<delete()>>> operation may include files added under
   the source directory tree during the operation, may unintentionally delete
   it, or delete the 0-byte swift entries that mimic directories and act
   as parents for the files. Try to avoid doing this.
-  
+
   The best ways to avoid all these problems is not using Swift as
-  the filesystem between MapReduce jobs or other Hadoop workflows. It 
+  the filesystem between MapReduce jobs or other Hadoop workflows. It
   can act as a source of data, and a final destination, but it doesn't meet
   all of Hadoop's expectations of what a filesystem is -it's a <blobstore>.
-  
+
 * Working with Swift Object Stores in Hadoop
 
   Once installed, the Swift FileSystem client can be used by any Hadoop application
-  to read from or write to data stored in a Swift container. 
-  
-  Data stored in Swift can be used as the direct input to a MapReduce job 
+  to read from or write to data stored in a Swift container.
+
+  Data stored in Swift can be used as the direct input to a MapReduce job
   -simply use the <<<swift:>>> URL (see below) to declare the source of the data.
-  
+
   This Swift Filesystem client is designed to work with multiple
   Swift object stores, both public and private. This allows the client to work
   with different clusters, reading and writing data to and from either of them.
@@ -211,11 +211,11 @@ Hadoop OpenStack Support: Swift Object Store
 ** Configuring
 
   To talk to a swift service, the user must must provide:
-  
+
     [[1]] The URL defining the container and the service.
-    
+
     [[1]] In the cluster/job configuration, the login details of that service.
-  
+
   Multiple service definitions can co-exist in the same configuration file: just
   use different names for them.
 
@@ -252,7 +252,7 @@ Hadoop OpenStack Support: Swift Object Store
   endpoint for Swift operations.
 
   This configuration also selects one of the regions, DFW, for its data.
-  
+
   A reference to this service would use the <<<rackspace>>> service name:
 
 ---
@@ -301,7 +301,7 @@ Hadoop OpenStack Support: Swift Object Store
 *** Example: HP cloud service definition
 
   Here is an example that connects to the HP Cloud object store.
-  
+
 +--
     <property>
       <name>fs.swift.service.hpcloud.auth.url</name>
@@ -429,7 +429,7 @@ Hadoop OpenStack Support: Swift Object Store
   partition size. This means that data will be written more incrementally
 
 *** Request size fs.swift.requestsize
-  
+
   The Swift filesystem client reads files in HTTP GET operations, asking for
   a block of data at a time.
 
@@ -561,7 +561,7 @@ Hadoop OpenStack Support: Swift Object Store
 
     [[1]] Try switching from API key authentication to password-based authentication,
     by setting the password.
-    
+
     [[1]] Change your credentials. As with Amazon AWS clients, some credentials
     don't seem to like going over the network.
 
@@ -596,7 +596,7 @@ Hadoop OpenStack Support: Swift Object Store
 
     [[1]] Unix-style permissions are not supported. All accounts with write access to
     a repository have unlimited access; the same goes for those with read access.
-    
+
     [[1]] In the public clouds, do not make the containers public unless you are happy
     with anyone reading your data, and are prepared to pay the costs of their
     downloads.
@@ -607,7 +607,7 @@ Hadoop OpenStack Support: Swift Object Store
 
     * Maximum size of a binary object: no absolute limit. Files > 5GB are
       partitioned into separate files in the native filesystem, and merged during
-      retrieval. <Warning:> the partitioned/large file support is the 
+      retrieval. <Warning:> the partitioned/large file support is the
       most complex part of the Hadoop/Swift FS integration, and, along with
       authentication, the most troublesome to support.
 
@@ -620,20 +620,20 @@ Hadoop OpenStack Support: Swift Object Store
   the Hadoop swift filesystem client against any version of Swift that they
   are developing or deploying, to stress their cluster and to identify
   bugs early.
-  
+
   The module comes with a large suite of JUnit tests -tests that are
   only executed if the source tree includes credentials to test against a
   specific cluster.
-  
+
   After checking out the Hadoop source tree, create the file:
- 
+
 +--
   hadoop-tools/hadoop-openstack/src/test/resources/auth-keys.xml
 +--
 
   Into this file, insert the credentials needed to bond to the test filesystem,
   as decribed above.
-  
+
   Next set the property <<<test.fs.swift.name>>> to the URL of a
   swift container to test against. The tests expect exclusive access
   to this container -do not keep any other data on it, or expect it
@@ -648,7 +648,7 @@ Hadoop OpenStack Support: Swift Object Store
 
   In the base hadoop directory, run:
 
-+--   
++--
    mvn clean install -DskipTests
 +--
 
@@ -659,7 +659,7 @@ Hadoop OpenStack Support: Swift Object Store
 
 +--   
    mvn test -Dtest=TestSwiftRestClient
-+--    
++--
 
   This runs some simple tests which include authenticating
   against the remote swift service. If these tests fail, so will all
@@ -673,7 +673,7 @@ Hadoop OpenStack Support: Swift Object Store
 
   Be advised that these tests can take an hour or more, especially against a
   remote Swift service -or one that throttles bulk operations.
-     
+
   Once the <<<auth-keys.xml>>> file is in place, the <<<mvn test>>> runs from
   the Hadoop source base directory will automatically run these OpenStack tests
   While this ensures that no regressions have occurred, it can also add significant
@@ -681,6 +681,6 @@ Hadoop OpenStack Support: Swift Object Store
   the Swift storage service. We recommend having a separate source tree
   set up purely for the Swift tests, and running it manually or by the CI tooling
   at a lower frequency than normal test runs.
-    
+
   Finally: Apache Hadoop is an open source project. Contributions of code
   -including more tests- are very welcome.
