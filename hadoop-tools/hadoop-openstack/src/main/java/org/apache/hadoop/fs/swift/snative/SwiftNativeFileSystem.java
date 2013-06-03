@@ -464,16 +464,7 @@ public class SwiftNativeFileSystem extends FileSystem {
 
       //What is clear at this point is that if the entry exists, there's
       //no need to bother creating any parent entries
-      if (!fileStatus.isDir()) {
-        //entry is a file
-        if (overwrite) {
-          //overwrite set -> delete the object. This could be postponed
-          //until at the end of the write.
-          store.delete(absolutePath, true);
-        } else {
-          throw new SwiftPathExistsException("File already exists: " + file);
-        }
-      } else {
+      if (fileStatus.isDir()) {
         //here someone is trying to create a file over a directory
 
 /*    we can't throw an exception here as there is no easy way to distinguish
@@ -481,7 +472,16 @@ public class SwiftNativeFileSystem extends FileSystem {
         
         throw new SwiftPathExistsException("Cannot create a file over a directory:"
                                            + file);
-*/
+ */
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Overwriting either an empty file or a directory");
+        }
+      }
+      if (overwrite) {
+        //overwrite set -> delete the object.
+        store.delete(absolutePath, true);
+      } else {
+        throw new SwiftPathExistsException("Path exists: " + file);
       }
     } else {
       // destination does not exist -trigger creation of the parent
