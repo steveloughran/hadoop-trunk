@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.net;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -756,11 +757,17 @@ public class NetUtils {
       return wrapWithMessage(exception,
           "No Route to Host from  "
               + localHost + " to " + destHost + ":" + destPort
-              + " failed on socket timeout exception: " + exception
+              + " failed on NoRouteToHostException : " + exception
               + ";"
               + see("NoRouteToHost"));
-    }
-    else {
+    } else if (exception instanceof EOFException) {
+      return wrapWithMessage(exception,
+          "EOFException from  "
+              + getHostDetailsAsString(destHost, destPort, localHost)
+              + exception
+              + ";"
+              + see("EOFException"));
+    } else {
       return (IOException) new IOException("Failed on local exception: "
                                                + exception
                                                + "; Host Details : "
