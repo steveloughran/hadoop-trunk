@@ -125,6 +125,9 @@ public class CompositeService extends AbstractService {
     List<Service> services = getServices();
     for (int i = numOfServicesStarted - 1; i >= 0; i--) {
       Service service = services.get(i);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Stopping service #" + i + ": " + service);
+      }
       STATE state = service.getServiceState();
       //depending on the stop police
       if (state == STATE.STARTED 
