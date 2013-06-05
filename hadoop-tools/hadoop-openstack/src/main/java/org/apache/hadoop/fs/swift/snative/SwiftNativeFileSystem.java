@@ -271,7 +271,13 @@ public class SwiftNativeFileSystem extends FileSystem {
       LOG.debug("No locations returned for " + file.getPath());
       //no locations were returned for the object
       //fall back to the superclass
-      return super.getFileBlockLocations(file, start, len);
+
+      String[] name = { "/default-rack/swift" };
+      String[] host = { "localhost" };
+      String[] topology={"/swift/unknown"};
+      return new BlockLocation[] {
+        new BlockLocation(name, host, topology,0, file.getLen()) 
+        };
     }
 
     final String[] names = new String[locations.size()];
