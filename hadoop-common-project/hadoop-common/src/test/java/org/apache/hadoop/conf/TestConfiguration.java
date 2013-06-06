@@ -51,7 +51,9 @@ import org.codehaus.jackson.map.ObjectMapper;
 public class TestConfiguration extends TestCase {
 
   private Configuration conf;
-  final static String CONFIG = new File("./test-config-TestConfiguration.xml").getAbsolutePath();
+  public static final String TEST_CONFIG_XML =
+    "test-config-TestConfiguration.xml";
+  final static String CONFIG = new File("./"+ TEST_CONFIG_XML).getAbsolutePath();
   final static String CONFIG2 = new File("./test-config2-TestConfiguration.xml").getAbsolutePath();
   final static Random RAN = new Random();
   final static String XMLHEADER = 
@@ -1246,8 +1248,7 @@ public class TestConfiguration extends TestCase {
       fail("Expected a failure");
     } catch (RuntimeException e) {
       String msg = e.toString();
-      assertTrue("wrong error text "+ msg,
-                 msg.contains("test-config.xml"));
+      assertTrue("wrong error text "+ msg, msg.contains(TEST_CONFIG_XML));
     }
   }
 
