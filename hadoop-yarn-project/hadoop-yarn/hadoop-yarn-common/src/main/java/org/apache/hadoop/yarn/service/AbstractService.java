@@ -97,6 +97,8 @@ public abstract class AbstractService implements Service {
    */
   private final Map<String,String> blockerMap = new HashMap<String, String>();
 
+  private final Object stateChangeLock = new Object();
+ 
   /**
    * Construct the service.
    * @param name service name
@@ -141,24 +143,29 @@ public abstract class AbstractService implements Service {
    * the state change not permitted, or something else went wrong
    */
   @Override
-  public synchronized void init(Configuration conf) {
+  public /*synchronized*/ void init(Configuration conf) {
     if (conf == null) {
       throw new ServiceStateException("Cannot initialize service "
                                       + getName() + ": null configuration");
     }
-    if (enterState(STATE.INITED) != STATE.INITED) {
-      setConfig(conf);
-      try {
-        serviceInit(config);
-        if (isInState(STATE.INITED)) {
-          //if the service ended up here during init,
-          //notify the listeners
-          notifyListeners();
+    if (isInState(STATE.INITED)) {
+      return;
+    }
+    synchronized (stateChangeLock) {
+      if (enterState(STATE.INITED) != STATE.INITED) {
+        setConfig(conf);
+        try {
+          serviceInit(config);
+          if (isInState(STATE.INITED)) {
+            //if the service ended up here during init,
+            //notify the listeners
+            notifyListeners();
+          }
+        } catch (Exception e) {
+          noteFailure(e);
+          ServiceOperations.stopQuietly(LOG, this);
+          throw ServiceStateException.convert(e);
         }
-      } catch (Exception e) {
-        noteFailure(e);
-        ServiceOperations.stopQuietly(LOG, this);
-        throw ServiceStateException.convert(e);
       }
     }
   }
@@ -169,23 +176,28 @@ public abstract class AbstractService implements Service {
    * this action
    */
   @Override
-  public synchronized void start() {
+  public /*synchronized*/ void start() {
+    if (isInState(STATE.STARTED)) {
+      return;
+    }
     //enter the started state
-    if (stateModel.enterState(STATE.STARTED) != STATE.STARTED) {
-      try {
-        startTime = System.currentTimeMillis();
-        serviceStart();
-        if (isInState(STATE.STARTED)) {
-          //if the service started (and isn't now in a later state), notify
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Service " + getName() + " is started");
+    synchronized (stateChangeLock) {
+      if (stateModel.enterState(STATE.STARTED) != STATE.STARTED) {
+        try {
+          startTime = System.currentTimeMillis();
+          serviceStart();
+          if (isInState(STATE.STARTED)) {
+            //if the service started (and isn't now in a later state), notify
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Service " + getName() + " is started");
+            }
+            notifyListeners();
           }
-          notifyListeners();
+        } catch (Exception e) {
+          noteFailure(e);
+          ServiceOperations.stopQuietly(LOG, this);
+          throw ServiceStateException.convert(e);
         }
-      } catch (Exception e) {
-        noteFailure(e);
-        ServiceOperations.stopQuietly(LOG, this);
-        throw ServiceStateException.convert(e);
       }
     }
   }
@@ -194,30 +206,32 @@ public abstract class AbstractService implements Service {
    * {@inheritDoc}
    */
   @Override
-  public synchronized void stop() {
-    //this operation is only invoked if the service is not already stopped;
-    // it is not an error
-    //to go STOPPED->STOPPED -it is just a no-op
-    if (enterState(STATE.STOPPED) != STATE.STOPPED) {
-      try {
-        serviceStop();
-      } catch (Exception e) {
-        //stop-time exceptions are logged if they are the first one,
-        noteFailure(e);
-        throw ServiceStateException.convert(e);
-      } finally {
-        //report that the service has terminated
-        terminationNotification.set(true);
-        synchronized (terminationNotification) {
-          terminationNotification.notifyAll();
+  public /*synchronized*/ void stop() {
+    if (isInState(STATE.STOPPED)) {
+      return;
+    }
+    synchronized (stateChangeLock) {
+      if (enterState(STATE.STOPPED) != STATE.STOPPED) {
+        try {
+          serviceStop();
+        } catch (Exception e) {
+          //stop-time exceptions are logged if they are the first one,
+          noteFailure(e);
+          throw ServiceStateException.convert(e);
+        } finally {
+          //report that the service has terminated
+          terminationNotification.set(true);
+          synchronized (terminationNotification) {
+            terminationNotification.notifyAll();
+          }
+          //notify anything listening for events
+          notifyListeners();
         }
-        //notify anything listening for events
-        notifyListeners();
-      }
-    } else {
-      //already stopped: note it
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Ignoring re-entrant call to stop()");
+      } else {
+        //already stopped: note it
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Ignoring re-entrant call to stop()");
+        }
       }
     }
   }
