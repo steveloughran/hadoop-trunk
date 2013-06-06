@@ -249,6 +249,14 @@ public class SwiftProtocolConstants {
   public static final String HTTP_ROUTE_DEFAULT_PROXY =
     "http.route.default-proxy";
   /**
+   * Topology to return when a block location is requested
+   */
+  public static final String TOPOLOGY_PATH = "/swift/unknown";
+  /**
+   * Block location to return when a block location is requested
+   */
+  public static final String BLOCK_LOCATION = "/default-rack/swift";
+  /**
    * Default number of attempts to retry a connect request: {@value}
    */
   static final int DEFAULT_RETRY_COUNT = 3;
