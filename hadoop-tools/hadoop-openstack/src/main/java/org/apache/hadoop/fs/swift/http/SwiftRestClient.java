@@ -88,11 +88,8 @@ import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.*;
  * <b>Logging:</b>
  *
  * Logging at DEBUG level displays detail about the actions of this
- * client, including HTTP requests and responses.
- * Logging at TRACE level displays the authentication payload -
- * and so will reveal the secrets used to authenticate against
- * the service. It should only be done to track down authentication problems,
- * -and the logs should not be made public.
+ * client, including HTTP requests and responses -excluding authentication
+ * details.
  */
 public final class SwiftRestClient {
   private static final Log LOG = LogFactory.getLog(SwiftRestClient.class);
@@ -1068,11 +1065,6 @@ public final class SwiftRestClient {
    * This method is re-entrant -if more than one thread attempts to authenticate
    * neither will block -but the field values with have those of the last caller.
    * <p/>
-   * <b>Important:</b> if executed at TRACE level then this method will log the
-   * JSON payload of the authentication. While this can be invaluable for debugging
-   * authentication problems, it can include login information -including
-   * the password. Only turn this level of logging on when dealing with
-   * authentication problems.
    *
    * @return authenticated access token
    */
@@ -1234,12 +1226,6 @@ public final class SwiftRestClient {
             authenticationRequest));
     if (LOG.isDebugEnabled()) {
       LOG.debug("Authenticating with " + authenticationRequest);
-    }
-    //WARNING: some back-ends to commons-logging
-    //upgrade trace to debug, which can leak secrets.
-    //
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("JSON message: " + "\n" + data);
     }
     return toJsonEntity(data);
   }
