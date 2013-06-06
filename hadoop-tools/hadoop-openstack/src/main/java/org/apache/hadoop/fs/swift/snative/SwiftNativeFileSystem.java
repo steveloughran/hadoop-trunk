@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.swift.exceptions.SwiftNotDirectoryException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftOperationFailedException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftPathExistsException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftUnsupportedFeatureException;
+import org.apache.hadoop.fs.swift.http.SwiftProtocolConstants;
 import org.apache.hadoop.fs.swift.util.DurationStats;
 import org.apache.hadoop.fs.swift.util.SwiftObjectPath;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
@@ -272,12 +273,12 @@ public class SwiftNativeFileSystem extends FileSystem {
       //no locations were returned for the object
       //fall back to the superclass
 
-      String[] name = { "/default-rack/swift" };
+      String[] name = {SwiftProtocolConstants.BLOCK_LOCATION};
       String[] host = { "localhost" };
-      String[] topology={"/swift/unknown"};
+      String[] topology={SwiftProtocolConstants.TOPOLOGY_PATH};
       return new BlockLocation[] {
         new BlockLocation(name, host, topology,0, file.getLen()) 
-        };
+      };
     }
 
     final String[] names = new String[locations.size()];
