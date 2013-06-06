@@ -143,7 +143,7 @@ public abstract class AbstractService implements Service {
    * the state change not permitted, or something else went wrong
    */
   @Override
-  public /*synchronized*/ void init(Configuration conf) {
+  public void init(Configuration conf) {
     if (conf == null) {
       throw new ServiceStateException("Cannot initialize service "
                                       + getName() + ": null configuration");
@@ -176,7 +176,7 @@ public abstract class AbstractService implements Service {
    * this action
    */
   @Override
-  public /*synchronized*/ void start() {
+  public void start() {
     if (isInState(STATE.STARTED)) {
       return;
     }
@@ -206,7 +206,7 @@ public abstract class AbstractService implements Service {
    * {@inheritDoc}
    */
   @Override
-  public /*synchronized*/ void stop() {
+  public void stop() {
     if (isInState(STATE.STOPPED)) {
       return;
     }
