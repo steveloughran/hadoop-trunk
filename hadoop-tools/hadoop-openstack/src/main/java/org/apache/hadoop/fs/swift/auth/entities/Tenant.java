@@ -20,7 +20,9 @@ package org.apache.hadoop.fs.swift.auth.entities;
 
 /**
  * Tenant is abstraction in Openstack which describes all account
- * information and user privileges in system
+ * information and user privileges in system.
+ * THIS FILE IS MAPPED BY JACKSON TO AND FROM JSON.
+ * DO NOT RENAME OR MODIFY FIELDS AND THEIR ACCESSORS.
  */
 public class Tenant {
 
