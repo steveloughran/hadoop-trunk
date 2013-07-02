@@ -18,8 +18,13 @@
 
 package org.apache.hadoop.fs.swift.snative;
 
-
 import java.util.Date;
+
+/**
+ * Java mapping of Swift JSON file status.
+ * THIS FILE IS MAPPED BY JACKSON TO AND FROM JSON.
+ * DO NOT RENAME OR MODIFY FIELDS AND THEIR ACCESSORS.
+ */
 
 class SwiftObjectFileStatus {
   private long bytes;

@@ -21,7 +21,9 @@ package org.apache.hadoop.fs.swift.auth.entities;
 import java.net.URI;
 
 /**
- * Openstack Swift endpoint description
+ * Openstack Swift endpoint description.
+ * THIS FILE IS MAPPED BY JACKSON TO AND FROM JSON.
+ * DO NOT RENAME OR MODIFY FIELDS AND THEIR ACCESSORS.
  */
 public class Endpoint {
 
