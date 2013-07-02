@@ -191,7 +191,10 @@ public class SwiftProtocolConstants {
 
 
   public static final String HEADER_USER_AGENT="User-Agent";
-  
+
+  /**
+   * The user agent sent in requests: {@value}
+   */
   public static final String SWIFT_USER_AGENT= "Apache Hadoop Swift Client "
                                                + VersionInfo.getBuildVersion();
 

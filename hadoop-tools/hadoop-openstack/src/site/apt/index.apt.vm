@@ -654,10 +654,10 @@ Hadoop OpenStack Support: Swift Object Store
 
   This builds a set of Hadoop JARs consistent with the <<<hadoop-openstack>>>
   module that is about to be tested.
-   
+
   In the <<<hadoop-tools/hadoop-openstack>>> directory run
 
-+--   
++--
    mvn test -Dtest=TestSwiftRestClient
 +--
 

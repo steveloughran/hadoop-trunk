@@ -411,7 +411,7 @@ public class SwiftNativeFileSystemStore {
   }
 
   /**
-   * The inner directory creation option. This only creates 
+   * The inner directory creation option. This only creates
    * the dir at the given path, not any parent dirs.
    * @param swiftObjectPath swift object path at which a 0-byte blob should be 
    * put

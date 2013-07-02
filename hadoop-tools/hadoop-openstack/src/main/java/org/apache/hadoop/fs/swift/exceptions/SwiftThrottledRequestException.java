@@ -24,7 +24,7 @@ import java.net.URI;
 
 /**
  * Exception raised if a Swift endpoint returned a HTTP response indicating
- * the caller is being throttled. 
+ * the caller is being throttled.
  */
 public class SwiftThrottledRequestException extends
                                             SwiftInvalidResponseException {
