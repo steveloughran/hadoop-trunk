@@ -67,7 +67,7 @@ public final class SwiftUtils {
    *         directory.
    */
   public static boolean isDirectory(FileStatus fileStatus) {
-    return fileStatus.isDir() || isFilePretendingToBeDirectory(fileStatus);
+    return fileStatus.isDirectory() || isFilePretendingToBeDirectory(fileStatus);
   }
 
   /**

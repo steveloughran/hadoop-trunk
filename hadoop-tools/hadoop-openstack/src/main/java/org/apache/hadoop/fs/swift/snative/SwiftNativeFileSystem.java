@@ -82,8 +82,7 @@ public class SwiftNativeFileSystem extends FileSystem {
   /**
    * This constructor used for testing purposes
    */
-  public SwiftNativeFileSystem(SwiftNativeFileSystemStore store)
-          throws IOException {
+  public SwiftNativeFileSystem(SwiftNativeFileSystemStore store) {
     this.store = store;
   }
 
@@ -440,8 +439,9 @@ public class SwiftNativeFileSystem extends FileSystem {
   /**
    * This optional operation is not supported
    */
-  public FSDataOutputStream append(Path f, int bufferSize, Progressable progress) throws
-          IOException {
+  @Override
+  public FSDataOutputStream append(Path f, int bufferSize, Progressable progress)
+      throws IOException {
     LOG.debug("SwiftFileSystem.append");
     throw new SwiftUnsupportedFeatureException("Not supported: append()");
   }
@@ -471,7 +471,7 @@ public class SwiftNativeFileSystem extends FileSystem {
 
       //What is clear at this point is that if the entry exists, there's
       //no need to bother creating any parent entries
-      if (fileStatus.isDir()) {
+      if (fileStatus.isDirectory()) {
         //here someone is trying to create a file over a directory
 
 /*    we can't throw an exception here as there is no easy way to distinguish
@@ -613,6 +613,7 @@ public class SwiftNativeFileSystem extends FileSystem {
    * This method is abstract in Hadoop 1.x; in 2.x+ it is non-abstract
    * and deprecated
    */
+  @Override
   public boolean delete(Path f) throws IOException {
     return delete(f, true);
   }
