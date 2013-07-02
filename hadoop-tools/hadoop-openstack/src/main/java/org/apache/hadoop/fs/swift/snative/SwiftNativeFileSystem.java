@@ -276,7 +276,7 @@ public class SwiftNativeFileSystem extends FileSystem {
       String[] host = { "localhost" };
       String[] topology={SwiftProtocolConstants.TOPOLOGY_PATH};
       return new BlockLocation[] {
-        new BlockLocation(name, host, topology,0, file.getLen()) 
+        new BlockLocation(name, host, topology,0, file.getLen())
       };
     }
 
@@ -476,7 +476,7 @@ public class SwiftNativeFileSystem extends FileSystem {
 
 /*    we can't throw an exception here as there is no easy way to distinguish
      a file from the dir
-        
+
         throw new SwiftPathExistsException("Cannot create a file over a directory:"
                                            + file);
  */
@@ -540,7 +540,7 @@ public class SwiftNativeFileSystem extends FileSystem {
    * Low-level operation to also set the block size for this operation
    * @param path       the file name to open
    * @param bufferSize the size of the buffer to be used.
-   * @param readBlockSize how big should the read blockk/buffer size be? 
+   * @param readBlockSize how big should the read blockk/buffer size be?
    * @return the input stream
    * @throws FileNotFoundException if the file is not found
    * @throws IOException any IO problem
