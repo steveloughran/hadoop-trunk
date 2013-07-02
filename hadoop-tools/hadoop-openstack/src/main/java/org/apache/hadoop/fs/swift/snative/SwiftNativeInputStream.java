@@ -47,17 +47,17 @@ class SwiftNativeInputStream extends FSInputStream {
   /**
    *  range requested off the server: {@value}
    */
-  private long bufferSize;
+  private final long bufferSize;
 
   /**
    * File nativeStore instance
    */
-  private SwiftNativeFileSystemStore nativeStore;
+  private final SwiftNativeFileSystemStore nativeStore;
 
   /**
    * Hadoop statistics. Used to get info about number of reads, writes, etc.
    */
-  private FileSystem.Statistics statistics;
+  private final FileSystem.Statistics statistics;
 
   /**
    * Data input stream
@@ -90,9 +90,7 @@ class SwiftNativeInputStream extends FSInputStream {
   private long rangeOffset = 0;
 
   public SwiftNativeInputStream(SwiftNativeFileSystemStore storeNative,
-                                FileSystem.Statistics statistics,
-                                Path path,
-                                long bufferSize)
+      FileSystem.Statistics statistics, Path path, long bufferSize)
           throws IOException {
     this.nativeStore = storeNative;
     this.statistics = statistics;

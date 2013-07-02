@@ -1346,7 +1346,7 @@ public final class SwiftRestClient {
   /**
    * Performs the HTTP request, validates the response code and returns
    * the received data. HTTP Status codes are converted into exceptions.
-   * @param reason: why is this operation taking place. Used for statistics
+   * @param reason why is this operation taking place. Used for statistics
    * @param uri URI to source
    * @param processor HttpMethodProcessor
    * @param <M> method
