@@ -19,7 +19,7 @@
 package org.apache.hadoop.fs.swift.exceptions;
 
 /**
- * Thrown to indicate that connection is lost of request is incorrect
+ * Thrown to indicate that connection is lost or failed to be made
  */
 public class SwiftConnectionException extends SwiftException {
   public SwiftConnectionException() {
