@@ -20,7 +20,9 @@ package org.apache.hadoop.fs.swift.auth;
 
 /**
  * Class for Keystone authentication.
- * Used when @see ApiKeyCredentials not applicable
+ * Used when {@link ApiKeyCredentials} is not applicable
+ * THIS FILE IS MAPPED BY JACKSON TO AND FROM JSON.
+ * DO NOT RENAME OR MODIFY FIELDS AND THEIR ACCESSORS.
  */
 public class KeystoneApiKeyCredentials {
 

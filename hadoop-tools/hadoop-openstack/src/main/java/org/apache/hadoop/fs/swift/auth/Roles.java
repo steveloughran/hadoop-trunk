@@ -19,7 +19,9 @@
 package org.apache.hadoop.fs.swift.auth;
 
 /**
- * Describes user roles in Openstack system
+ * Describes user roles in Openstack system.
+ * THIS FILE IS MAPPED BY JACKSON TO AND FROM JSON.
+ * DO NOT RENAME OR MODIFY FIELDS AND THEIR ACCESSORS.
  */
 public class Roles {
   /**

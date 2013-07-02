@@ -21,6 +21,8 @@ package org.apache.hadoop.fs.swift.auth;
 /**
  * Class that represents authentication request to Openstack Keystone.
  * Contains basic authentication information.
+ * THIS FILE IS MAPPED BY JACKSON TO AND FROM JSON.
+ * DO NOT RENAME OR MODIFY FIELDS AND THEIR ACCESSORS.
  */
 public class PasswordAuthenticationRequest extends AuthenticationRequest {
   /**

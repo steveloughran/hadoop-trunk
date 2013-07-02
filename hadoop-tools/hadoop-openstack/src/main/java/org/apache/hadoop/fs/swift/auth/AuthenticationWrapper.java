@@ -21,6 +21,8 @@ package org.apache.hadoop.fs.swift.auth;
 /**
  * This class is used for correct hierarchy mapping of
  * Keystone authentication model and java code
+ * THIS FILE IS MAPPED BY JACKSON TO AND FROM JSON.
+ * DO NOT RENAME OR MODIFY FIELDS AND THEIR ACCESSORS.
  */
 public class AuthenticationWrapper {
 

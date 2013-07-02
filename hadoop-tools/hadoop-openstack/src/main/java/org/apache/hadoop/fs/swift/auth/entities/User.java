@@ -26,7 +26,9 @@ import java.util.List;
 /**
  * Describes user entity in Keystone
  * In different Swift installations User is represented differently.
- * To avoid any JSON deserialization failures this entity is ignored
+ * To avoid any JSON deserialization failures this entity is ignored.
+ * THIS FILE IS MAPPED BY JACKSON TO AND FROM JSON.
+ * DO NOT RENAME OR MODIFY FIELDS AND THEIR ACCESSORS.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class User {

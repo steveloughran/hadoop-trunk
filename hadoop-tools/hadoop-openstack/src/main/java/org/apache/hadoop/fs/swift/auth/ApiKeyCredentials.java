@@ -20,7 +20,9 @@ package org.apache.hadoop.fs.swift.auth;
 
 
 /**
- * Describes credentials to log in Swift using Keystone authentication
+ * Describes credentials to log in Swift using Keystone authentication.
+ * THIS FILE IS MAPPED BY JACKSON TO AND FROM JSON.
+ * DO NOT RENAME OR MODIFY FIELDS AND THEIR ACCESSORS.
  */
 public class ApiKeyCredentials {
   /**
