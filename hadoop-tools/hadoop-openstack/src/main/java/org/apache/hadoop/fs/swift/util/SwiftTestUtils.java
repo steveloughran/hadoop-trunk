@@ -89,7 +89,6 @@ public class SwiftTestUtils extends org.junit.Assert {
     }
   }
 
-
   /**
    *
    * Write a file and read it in, validating the result. Optional flags control
@@ -165,7 +164,6 @@ public class SwiftTestUtils extends org.junit.Assert {
     assertFileHasLength(fs, path, len);
   }
 
-
   /**
    * Read the file and convert to a byte dataaset
    * @param fs filesystem
@@ -235,7 +233,6 @@ public class SwiftTestUtils extends org.junit.Assert {
       fail(message);
     }
   }
-
 
   /**
    * Convert a byte to a character for printing. If the
@@ -524,7 +521,7 @@ public class SwiftTestUtils extends org.junit.Assert {
    * Assert that a FileSystem.listStatus on a dir finds the subdir/child entry
    * @param fs filesystem
    * @param dir directory to scan
-   * @param subdir full path to look for 
+   * @param subdir full path to look for
    * @throws IOException IO probles
    */
   public static void assertListStatusFinds(FileSystem fs,

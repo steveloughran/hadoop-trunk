@@ -89,18 +89,12 @@ public class SwiftFileStatus extends FileStatus {
   }
 
   /**
-   * This predicate isn't in branch-1; but it needs to be in sync with
-   * the {@link #isDir()}} predicate in trunk.
-   * By implementing it <i>and not marking as an override</i> this
-   * subclass builds and runs in both Hadoop versions
-   *
+   * Directory test
    * @return true if the file is considered to be a directory
    */
-  @Override
   public boolean isDirectory() {
     return isDir();
   }
-
 
   @Override
   public String toString() {
