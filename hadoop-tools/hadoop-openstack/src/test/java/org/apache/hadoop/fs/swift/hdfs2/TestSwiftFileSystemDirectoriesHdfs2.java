@@ -18,13 +18,8 @@
 
 package org.apache.hadoop.fs.swift.hdfs2;
 
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.swift.SwiftFileSystemBaseTest;
 import org.apache.hadoop.fs.swift.TestSwiftFileSystemDirectories;
 import org.apache.hadoop.fs.swift.snative.SwiftFileStatus;
-import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
-import org.junit.Test;
 
 /**
  * Add some HDFS-2 only assertions to {@link TestSwiftFileSystemDirectories}

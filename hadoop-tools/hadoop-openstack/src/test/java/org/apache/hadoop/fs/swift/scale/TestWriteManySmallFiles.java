@@ -39,7 +39,7 @@ public class TestWriteManySmallFiles extends SwiftScaleTestBase {
     rm1.finished();
     fs.mkdirs(dir);
     Duration ls1 = new Duration();
-    FileStatus[] status1 = (FileStatus[]) fs.listStatus(dir);
+    fs.listStatus(dir);
     ls1.finished();
     long count = getOperationCount();
     SwiftTestUtils.noteAction("Beginning Write of "+ count + " files ");

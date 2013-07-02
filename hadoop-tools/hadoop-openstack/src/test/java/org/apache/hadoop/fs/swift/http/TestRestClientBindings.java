@@ -29,8 +29,19 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Properties;
 
+import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.DOT_AUTH_URL;
+import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.DOT_PASSWORD;
+import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.DOT_USERNAME;
+import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.SWIFT_AUTH_PROPERTY;
+import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.SWIFT_CONTAINER_PROPERTY;
+import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.SWIFT_HTTPS_PORT_PROPERTY;
+import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.SWIFT_HTTP_PORT_PROPERTY;
+import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.SWIFT_PASSWORD_PROPERTY;
+import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.SWIFT_REGION_PROPERTY;
+import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.SWIFT_SERVICE_PROPERTY;
+import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.SWIFT_TENANT_PROPERTY;
+import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.SWIFT_USERNAME_PROPERTY;
 import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.assertPropertyEquals;
-import static org.apache.hadoop.fs.swift.http.SwiftProtocolConstants.*;
 
 public class TestRestClientBindings extends Assert
   implements SwiftTestConstants {
@@ -84,7 +95,6 @@ public class TestRestClientBindings extends Assert
     assertPropertyEquals(props, SWIFT_HTTP_PORT_PROPERTY, null);
     assertPropertyEquals(props, SWIFT_HTTPS_PORT_PROPERTY, null);
   }
-
 
   public void expectBindingFailure(URI fsURI, Configuration config) {
     try {
@@ -184,6 +194,5 @@ public class TestRestClientBindings extends Assert
   public void testLeadingDot() throws Throwable {
     expectExtractServiceFail(".leading");
   }
-
 
 }

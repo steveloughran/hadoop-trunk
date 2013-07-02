@@ -22,7 +22,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.snative.SwiftFileStatus;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
-import org.junit.Assume;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
@@ -124,7 +123,6 @@ public class TestSwiftFileSystemDirectories extends SwiftFileSystemBaseTest {
 
   }
 
-
   /**
    * Asserts that a zero byte file has a status of file and not
    * directory or symlink
@@ -138,11 +136,6 @@ public class TestSwiftFileSystemDirectories extends SwiftFileSystemBaseTest {
     assertIsFile(src);
     FileStatus status = fs.getFileStatus(src);
     assertFalse(status.isDir());
-  }
-  
-  @Test(timeout = SWIFT_TEST_TIMEOUT)
-  public void testOverwriteDirectories() throws Exception {
-    Assume.assumeTrue(false);
   }
 
 }

@@ -33,7 +33,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Locale;
-import java.util.Properties;
 
 public class TestSwiftFileSystemExtendedContract extends SwiftFileSystemBaseTest {
 

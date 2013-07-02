@@ -63,7 +63,6 @@ public class TestV2LsOperations extends SwiftFileSystemBaseTest {
     }
   }
 
-
   /**
    * To get this project to compile under Hadoop 1, this code needs to be
    * commented out
