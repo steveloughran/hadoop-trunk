@@ -29,8 +29,6 @@ import org.apache.hadoop.io.IOUtils;
 import org.junit.After;
 import org.junit.Test;
 
-import java.io.EOFException;
-
 /**
  * Seek tests verify that
  * <ol>
@@ -57,10 +55,14 @@ public class TestReadPastBuffer extends SwiftFileSystemBaseTest {
   private FSDataInputStream instream;
 
 
+  /**
+   * Get a configuration whch a small blocksize reported to callers
+   * @return a configuration for this test 
+   */
   @Override
   public Configuration getConf() {
     Configuration conf = super.getConf();
-    /**
+    /*
      * set to 4KB
      */
     conf.setInt(SwiftProtocolConstants.SWIFT_BLOCKSIZE, SWIFT_READ_BLOCKSIZE);
@@ -89,6 +91,10 @@ public class TestReadPastBuffer extends SwiftFileSystemBaseTest {
     instream = null;
   }
 
+  /**
+   * Create a config with a 1KB request size
+   * @return a config
+   */
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
@@ -96,6 +102,10 @@ public class TestReadPastBuffer extends SwiftFileSystemBaseTest {
     return conf;
   }
 
+  /**
+   * Seek past the buffer then read
+   * @throws Throwable problems
+   */
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testSeekAndReadPastEndOfFile() throws Throwable {
     instream = fs.open(readFile);
@@ -108,6 +118,10 @@ public class TestReadPastBuffer extends SwiftFileSystemBaseTest {
     assertMinusOne("read past end of file", instream.read());
   }
 
+  /**
+   * Seek past the buffer and attempt a read(buffer)
+   * @throws Throwable failures
+   */
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testSeekBulkReadPastEndOfFile() throws Throwable {
     instream = fs.open(readFile);
@@ -133,14 +147,13 @@ public class TestReadPastBuffer extends SwiftFileSystemBaseTest {
 
 
   /**
-   * Read past the buffer size and verify that it refreshed
+   * Read past the buffer size byte by byte and verify that it refreshed
    * @throws Throwable
    */
   @Test
   public void testReadPastBufferSize() throws Throwable {
     instream = fs.open(readFile);
 
-    int read = 0;
     while (instream.read() != -1);
     //here we have gone past the end of a file and its buffer. Now try again
     assertMinusOne("reading after the (large) file was read: "+ instream,

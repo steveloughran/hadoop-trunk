@@ -23,8 +23,6 @@ import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.junit.Test;
 
 import java.io.IOException;
-
-import static org.junit.Assert.assertTrue;
 /**
  * Test deletion operations
  */

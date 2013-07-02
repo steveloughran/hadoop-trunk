@@ -27,9 +27,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.exceptions.SwiftOperationFailedException;
 import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
 import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystemStore;
-
-import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.*;
-
 import org.apache.hadoop.fs.swift.util.DurationStats;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.junit.After;
@@ -45,6 +42,14 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.assertPathExists;
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.cleanupInTeardown;
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.getServiceURI;
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.noteAction;
+
+/**
+ * This is the base class for most of the Swift tests
+ */
 public class SwiftFileSystemBaseTest extends Assert implements
                                                     SwiftTestConstants {
 
@@ -98,7 +103,6 @@ public class SwiftFileSystemBaseTest extends Assert implements
       }
     }
   }
-
 
   /**
    * Get the configuration used to set up the FS
@@ -158,6 +162,10 @@ public class SwiftFileSystemBaseTest extends Assert implements
     return new Path(pathString).makeQualified(fs);
   }
 
+  /**
+   * Get the filesystem
+   * @return the current FS
+   */
   public SwiftNativeFileSystem getFs() {
     return fs;
   }
@@ -185,6 +193,11 @@ public class SwiftFileSystemBaseTest extends Assert implements
     out.close();
   }
 
+  /**
+   * Create and then close a file
+   * @param path path to create
+   * @throws IOException on a failure
+   */
   protected void createEmptyFile(Path path) throws IOException {
     FSDataOutputStream out = fs.create(path);
     out.close();
@@ -199,6 +212,15 @@ public class SwiftFileSystemBaseTest extends Assert implements
     return fs.getStore();
   }
 
+  /**
+   * Rename a path
+   * @param src source
+   * @param dst dest
+   * @param renameMustSucceed flag to say "this rename must exist"
+   * @param srcExists add assert that the source exists afterwards
+   * @param dstExists add assert the dest exists afterwards
+   * @throws IOException IO trouble
+   */
   protected void rename(Path src, Path dst, boolean renameMustSucceed,
                         boolean srcExists, boolean dstExists) throws IOException {
     if (renameMustSucceed) {
@@ -208,6 +230,14 @@ public class SwiftFileSystemBaseTest extends Assert implements
     }
   }
 
+  /**
+   * Get a string describing the outcome of a rename, by listing the dest
+   * path and its parent along with some covering text
+   * @param src source patj
+   * @param dst dest path
+   * @return a string for logs and exceptions
+   * @throws IOException IO problems
+   */
   private String getRenameOutcome(Path src, Path dst) throws IOException {
     String lsDst = ls(dst);
     Path parent = dst.getParent();
@@ -238,12 +268,14 @@ public class SwiftFileSystemBaseTest extends Assert implements
   }
 
   /**
-   * Rename, expecting an exception to be thrown
+   * Rename to success
    *
    * @param src source
    * @param dst dest
-   * @throws SwiftOperationFailedException
-   * @throws IOException
+   * @param srcExists add assert that the source exists afterwards
+   * @param dstExists add assert the dest exists afterwards
+   * @throws SwiftOperationFailedException operation failure
+   * @throws IOException IO problems
    */
   protected void renameToSuccess(Path src, Path dst,
                                  boolean srcExists, boolean dstExists)
@@ -256,14 +288,32 @@ public class SwiftFileSystemBaseTest extends Assert implements
             dstExists, fs.exists(dst));
   }
 
+  /**
+   * List a path in the test FS
+   * @param path path to list
+   * @return the contents of the path/dir
+   * @throws IOException IO problems
+   */
   protected String ls(Path path) throws IOException {
     return SwiftTestUtils.ls(fs, path);
   }
 
+  /**
+   * assert that a path exists
+   * @param message message to use in an assertion
+   * @param path path to probe
+   * @throws IOException IO problems
+   */
   public void assertExists(String message, Path path) throws IOException {
     assertPathExists(fs, message, path);
   }
 
+  /**
+   * assert that a path does not
+   * @param message message to use in an assertion
+   * @param path path to probe
+   * @throws IOException IO problems
+   */
   public void assertPathDoesNotExist(String message, Path path) throws
           IOException {
     SwiftTestUtils.assertPathDoesNotExist(fs, message, path);
@@ -290,8 +340,14 @@ public class SwiftFileSystemBaseTest extends Assert implements
     assertTrue("Failed to mkdir" + path, fs.mkdirs(path));
   }
 
-  protected void assertDeleted(Path file, boolean recursive) throws IOException {
-    SwiftTestUtils.assertDeleted(fs, file, recursive);
+  /**
+   * Assert that a delete succeeded
+   * @param path path to delete
+   * @param recursive recursive flag
+   * @throws IOException IO problems
+   */
+  protected void assertDeleted(Path path, boolean recursive) throws IOException {
+    SwiftTestUtils.assertDeleted(fs, path, recursive);
   }
 
   /**
@@ -305,10 +361,21 @@ public class SwiftFileSystemBaseTest extends Assert implements
                actual != expected);
   }
 
+  /**
+   * Get the number of partitions written from the Swift Native FS APIs
+   * @param out output stream
+   * @return the number of partitioned files written by the stream
+   */
   protected int getPartitionsWritten(FSDataOutputStream out) {
     return SwiftNativeFileSystem.getPartitionsWritten(out);
   }
 
+  /**
+   * Assert that the no. of partitions written matches expectations
+   * @param action operation (for use in the assertions)
+   * @param out output stream
+   * @param expected expected no. of partitions
+   */
   protected void assertPartitionsWritten(String action, FSDataOutputStream out,
                                          long expected) {
     OutputStream nativeStream = out.getWrappedStream();

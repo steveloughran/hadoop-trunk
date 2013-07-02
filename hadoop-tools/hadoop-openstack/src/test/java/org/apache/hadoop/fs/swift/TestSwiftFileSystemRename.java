@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.fs.swift;
 
-import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.*;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
@@ -27,8 +26,13 @@ import org.junit.Test;
 
 import java.io.IOException;
 
-public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.compareByteArrays;
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.dataset;
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.readBytesToString;
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.readDataset;
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.writeDataset;
 
+public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
 
   /**
    * Rename a file into a directory
@@ -54,7 +58,6 @@ public class TestSwiftFileSystemRename extends SwiftFileSystemBaseTest {
     assertTrue("Destination changed",
             fs.exists(path("/test/new/newdir/file")));
   }
-
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testRenameFile() throws Exception {

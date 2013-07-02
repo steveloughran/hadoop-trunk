@@ -20,6 +20,9 @@ package org.apache.hadoop.fs.swift;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 
+/**
+ * A path filter that accepts everything
+ */
 public class AcceptAllFilter implements PathFilter {
   @Override
   public boolean accept(Path file) {
