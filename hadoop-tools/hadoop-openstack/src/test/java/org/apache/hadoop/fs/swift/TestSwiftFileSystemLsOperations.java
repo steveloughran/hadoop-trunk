@@ -20,12 +20,14 @@ package org.apache.hadoop.fs.swift;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
-import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.*;
-
-import org.apache.hadoop.fs.PathFilter;
 import org.junit.Test;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.assertListStatusFinds;
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.cleanup;
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.dumpStats;
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.touch;
 
 /**
  * Test the FileSystem#listStatus() operations
@@ -157,6 +159,5 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
                       + " not found in directory " + dir + ":" + builder,
                       found);
   }
-
 
 }

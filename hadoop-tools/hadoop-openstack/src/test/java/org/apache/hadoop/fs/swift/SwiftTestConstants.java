@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.fs.swift;
 
+/**
+ * Hard coded constants for the test timeouts
+ */
 public interface SwiftTestConstants {
   /**
    * Timeout for swift tests: {@value}
    */
-
   int SWIFT_TEST_TIMEOUT = 5 * 60 * 1000;
 
   /**

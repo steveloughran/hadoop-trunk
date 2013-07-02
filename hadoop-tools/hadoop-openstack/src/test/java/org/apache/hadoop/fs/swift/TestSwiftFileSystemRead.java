@@ -28,7 +28,6 @@ import java.io.IOException;
 
 import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.readBytesToString;
 import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.writeTextFile;
-import static org.junit.Assert.fail;
 
 /**
  * Test filesystem read operations

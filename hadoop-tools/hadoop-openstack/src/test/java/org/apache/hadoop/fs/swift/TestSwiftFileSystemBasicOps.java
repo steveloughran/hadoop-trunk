@@ -26,12 +26,15 @@ import org.apache.hadoop.fs.swift.exceptions.SwiftBadRequestException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftNotDirectoryException;
 import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
-import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.*;
-
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.assertFileHasLength;
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.assertIsDirectory;
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.readBytesToString;
+import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.writeTextFile;
 
 
 /**
@@ -51,7 +54,6 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
     FileStatus[] statuses = fs.listStatus(path);
   }
 
-
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testMkDir() throws Throwable {
     Path path = new Path("/test/MkDir");
@@ -60,13 +62,11 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
     fs.delete(path, true);
   }
 
-
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testDeleteNonexistentFile() throws Throwable {
     Path path = new Path("/test/DeleteNonexistentFile");
     assertFalse("delete returned true", fs.delete(path, false));
   }
-
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testPutFile() throws Throwable {

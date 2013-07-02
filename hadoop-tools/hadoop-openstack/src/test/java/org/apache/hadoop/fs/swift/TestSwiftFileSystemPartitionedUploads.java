@@ -28,7 +28,6 @@ import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
 import org.apache.hadoop.fs.swift.util.SwiftUtils;
 import org.apache.hadoop.io.IOUtils;
-import org.junit.Assume;
 import org.junit.Test;
 import org.junit.internal.AssumptionViolatedException;
 
@@ -38,7 +37,6 @@ import java.net.URISyntaxException;
 
 import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.assertPathExists;
 import static org.apache.hadoop.fs.swift.util.SwiftTestUtils.readDataset;
-
 
 /**
  * Test partitioned uploads.
@@ -127,13 +125,9 @@ public class TestSwiftFileSystemPartitionedUploads extends
       //compare data
       SwiftTestUtils.compareByteArrays(src, dest, len);
       FileStatus status;
-      try {
-        status = validatePathLen(path, len);
-      } catch (AssertionError e) {
-        //downgrade to a skip
-        throw new AssumptionViolatedException(e, null);
-      }
 
+      final Path qualifiedPath = path.makeQualified(fs);
+      status = fs.getFileStatus(qualifiedPath);
       //now see what block location info comes back.
       //This will vary depending on the Swift version, so the results
       //aren't checked -merely that the test actually worked
@@ -141,6 +135,16 @@ public class TestSwiftFileSystemPartitionedUploads extends
       assertNotNull("Null getFileBlockLocations()", locations);
       assertTrue("empty array returned for getFileBlockLocations()",
                  locations.length > 0);
+
+      //last bit of test -which seems to play up on partitions, which we download
+      //to a skip
+      try {
+        validatePathLen(path, len);
+      } catch (AssertionError e) {
+        //downgrade to a skip
+        throw new AssumptionViolatedException(e, null);
+      }
+
     } finally {
       IOUtils.closeStream(out);
     }
