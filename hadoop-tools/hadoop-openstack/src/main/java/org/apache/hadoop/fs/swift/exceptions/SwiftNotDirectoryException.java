@@ -25,10 +25,7 @@ import org.apache.hadoop.fs.Path;
  * the target path is not a directory
  */
 public class SwiftNotDirectoryException extends SwiftException {
-
-
   private final Path path;
-
 
   public SwiftNotDirectoryException(Path path) {
     this(path, "");

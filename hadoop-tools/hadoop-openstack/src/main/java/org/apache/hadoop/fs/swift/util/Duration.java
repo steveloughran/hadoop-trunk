@@ -41,13 +41,9 @@ public class Duration {
   }
 
   public static String humanTime(long time) {
-    long seconds = (long) (time / 1000);
-    long minutes = (long) (seconds / 60);
-
-    return String.format("%d:%02d:%03d",
-                         minutes,
-                         seconds % 60,
-                         time % 1000);
+    long seconds = (time / 1000);
+    long minutes = (seconds / 60);
+    return String.format("%d:%02d:%03d", minutes, seconds % 60, time % 1000);
   }
 
   @Override

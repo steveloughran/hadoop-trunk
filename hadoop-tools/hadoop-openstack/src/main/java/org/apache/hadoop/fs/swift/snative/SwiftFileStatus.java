@@ -74,7 +74,7 @@ public class SwiftFileStatus extends FileStatus {
    */
   @Override
   public boolean isDir() {
-    return super.isDir() || getLen() == 0;
+    return super.isDirectory() || getLen() == 0;
   }
 
   /**
@@ -83,6 +83,7 @@ public class SwiftFileStatus extends FileStatus {
    * subclass builds and runs in both Hadoop versions.
    * @return the opposite value to {@link #isDir()}
    */
+  @Override
   public boolean isFile() {
     return !isDir();
   }
@@ -95,6 +96,7 @@ public class SwiftFileStatus extends FileStatus {
    *
    * @return true if the file is considered to be a directory
    */
+  @Override
   public boolean isDirectory() {
     return isDir();
   }
