@@ -155,10 +155,10 @@ public class SwiftNativeFileSystem extends FileSystem {
    */
   @Override
   public void setWorkingDirectory(Path dir) {
+    workingDir = makeAbsolute(dir);
     if (LOG.isDebugEnabled()) {
       LOG.debug("SwiftFileSystem.setWorkingDirectory to " + dir);
     }
-    workingDir = dir;
   }
 
   /**
