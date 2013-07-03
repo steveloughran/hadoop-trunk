@@ -163,7 +163,8 @@ public final class RestClientBindings {
   }
 
   /**
-   * Extract a boolean value from the configuration and copy it to the 
+   * Extract a boolean value from the configuration and copy it to the
+   * properties instance.
    * @param conf     source configuration
    * @param confKey  key in the configuration file
    * @param props    destination property set
