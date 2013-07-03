@@ -51,7 +51,6 @@ public class SwiftFileStatus extends FileStatus {
   }
 
   //HDFS2+ only
-/*
 
   public SwiftFileStatus(long length,
                          boolean isdir,
@@ -64,7 +63,6 @@ public class SwiftFileStatus extends FileStatus {
     super(length, isdir, block_replication, blocksize, modification_time,
           access_time, permission, owner, group, symlink, path);
   }
-*/
 
   /**
    * Declare that the path represents a directory, which in the
