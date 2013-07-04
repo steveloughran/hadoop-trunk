@@ -81,6 +81,7 @@ public class ExceptionDiags {
     return FOR_MORE_DETAILS_SEE + HADOOP_WIKI + entry;
   }
 
+  @SuppressWarnings("unchecked")
   private static <T extends IOException> T wrapWithMessage(
     T exception, String msg) {
     Class<? extends Throwable> clazz = exception.getClass();

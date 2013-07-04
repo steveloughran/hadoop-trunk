@@ -324,7 +324,7 @@ class SwiftNativeInputStream extends FSInputStream {
                        pos, targetPos, offset, rangeOffset);
       try {
         LOG.debug("chomping ");
-        int chomped = chompBytes(offset);
+        chompBytes(offset);
       } catch (IOException e) {
         //this is assumed to be recoverable with a seek -or more likely to fail
         LOG.debug("while chomping ",e);
