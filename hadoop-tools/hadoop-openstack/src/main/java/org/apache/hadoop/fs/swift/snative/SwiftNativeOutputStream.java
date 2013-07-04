@@ -67,6 +67,7 @@ class SwiftNativeOutputStream extends OutputStream {
    * @param partSizeKB the partition size
    * @throws IOException
    */
+  @SuppressWarnings("IOResourceOpenedButNotSafelyClosed")
   public SwiftNativeOutputStream(Configuration conf,
                                  SwiftNativeFileSystemStore nativeStore,
                                  String key,
@@ -165,6 +166,7 @@ class SwiftNativeOutputStream extends OutputStream {
     }
 }
 
+  @SuppressWarnings("IOResourceOpenedButNotSafelyClosed")
   private long uploadFileAttempt(Path keypath, int attempt) throws IOException {
     long uploadLen = backupFile.length();
     SwiftUtils.debug(LOG, "Closing write of file %s;" +
@@ -275,6 +277,7 @@ class SwiftNativeOutputStream extends OutputStream {
    * @param closingUpload is this the final upload of an upload
    * @throws IOException on IO problems
    */
+  @SuppressWarnings("IOResourceOpenedButNotSafelyClosed")
   private void partUpload(boolean closingUpload) throws IOException {
     if (backupStream != null) {
       backupStream.close();
@@ -315,6 +318,7 @@ class SwiftNativeOutputStream extends OutputStream {
     }
   }
 
+  @SuppressWarnings("IOResourceOpenedButNotSafelyClosed")
   private long uploadFilePartAttempt(int attempt) throws IOException {
     long uploadLen = backupFile.length();
     SwiftUtils.debug(LOG, "Uploading part %d of file %s;" +
