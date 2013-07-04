@@ -147,7 +147,7 @@ public class HttpInputStreamWithRelease extends InputStream {
    * Assume that the connection is not released: throws an exception if it is
    * @throws SwiftConnectionClosedException
    */
-  private void assumeNotReleased() throws SwiftConnectionClosedException {
+  private synchronized void assumeNotReleased() throws SwiftConnectionClosedException {
     if (released || inStream == null) {
       throw new SwiftConnectionClosedException(reasonClosed);
     }
