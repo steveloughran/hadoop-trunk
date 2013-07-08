@@ -22,6 +22,7 @@ import static org.apache.hadoop.fs.s3native.NativeS3FileSystem.PATH_DELIMITER;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -398,6 +399,8 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
   private void handleServiceException(String key, ServiceException e) throws IOException {
     if ("NoSuchKey".equals(e.getErrorCode())) {
       throw new FileNotFoundException("Key '" + key + "' does not exist in S3");
+    } else if ("InvalidRange".equals(e.getS3ErrorCode())){
+      throw new EOFException("Attempted to seek/read past the end of the file");
     } else {
       handleServiceException(e);
     }
