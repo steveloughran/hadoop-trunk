@@ -71,10 +71,9 @@ public class ExceptionDiags {
                  + " failed on exception: "
                  + exception;
     if (xref != null) {
-      xref = xref + ";" + see(xref);
+       msg = msg + ";" + see(xref);
     }
     return wrapWithMessage(exception, msg);
-
   }
 
   private static String see(final String entry) {
