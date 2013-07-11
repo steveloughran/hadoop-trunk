@@ -18,12 +18,28 @@
 
 package org.apache.hadoop.fs.swift.auth.entities;
 
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+
 /**
  * Access token representation of Openstack Keystone authentication.
  * Class holds token id, tenant and expiration time.
  * THIS FILE IS MAPPED BY JACKSON TO AND FROM JSON.
  * DO NOT RENAME OR MODIFY FIELDS AND THEIR ACCESSORS.
+ * 
+ * Example:
+ * <pre>
+ * "token" : {
+ *   "RAX-AUTH:authenticatedBy" : [ "APIKEY" ],
+ *   "expires" : "2013-07-12T05:19:24.685-05:00",
+ *   "id" : "8bbea4215113abdab9d4c8fb0d37",
+ *   "tenant" : { "id" : "01011970",
+ *   "name" : "77777"
+ *   }
+ *  }
+ * </pre>
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
+
 public class AccessToken {
   /**
    * token expiration time
@@ -38,6 +54,7 @@ public class AccessToken {
    */
   private Tenant tenant;
 
+  
   /**
    * @return token expiration time
    */
