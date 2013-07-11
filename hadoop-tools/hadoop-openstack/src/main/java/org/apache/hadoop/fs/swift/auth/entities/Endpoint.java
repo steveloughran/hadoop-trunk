@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.fs.swift.auth.entities;
 
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+
 import java.net.URI;
 
 /**
@@ -25,6 +27,8 @@ import java.net.URI;
  * THIS FILE IS MAPPED BY JACKSON TO AND FROM JSON.
  * DO NOT RENAME OR MODIFY FIELDS AND THEIR ACCESSORS.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
+
 public class Endpoint {
 
   /**
