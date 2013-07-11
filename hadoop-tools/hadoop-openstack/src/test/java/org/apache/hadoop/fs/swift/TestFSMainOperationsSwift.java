@@ -21,7 +21,6 @@ package org.apache.hadoop.fs.swift;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSMainOperationsBaseTest;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.http.SwiftProtocolConstants;
 import org.apache.hadoop.fs.swift.util.SwiftTestUtils;
@@ -45,7 +44,13 @@ public class TestFSMainOperationsSwift extends FSMainOperationsBaseTest {
     super.setUp();
   }
   
-  static Path wd = null;
+  private Path wd = null;
+
+  @Override
+  protected FileSystem createFileSystem() throws Exception {
+    return fSys;
+  }
+
   @Override
   protected Path getDefaultWorkingDirectory() throws IOException {
     if (wd == null)
@@ -56,8 +61,7 @@ public class TestFSMainOperationsSwift extends FSMainOperationsBaseTest {
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   @Override
   public void testWDAbsolute() throws IOException {
-    Path absoluteDir = FileSystemTestHelper.getTestRootPath(fSys,
-        "test/existingDir");
+    Path absoluteDir = getTestRootPath(fSys, "test/existingDir");
     fSys.mkdirs(absoluteDir);
     fSys.setWorkingDirectory(absoluteDir);
     Assert.assertEquals(absoluteDir, fSys.getWorkingDirectory());
