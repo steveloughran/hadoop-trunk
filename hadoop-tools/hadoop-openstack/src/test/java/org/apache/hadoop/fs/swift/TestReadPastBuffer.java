@@ -56,8 +56,8 @@ public class TestReadPastBuffer extends SwiftFileSystemBaseTest {
 
 
   /**
-   * Get a configuration whch a small blocksize reported to callers
-   * @return a configuration for this test 
+   * Get a configuration which a small blocksize reported to callers
+   * @return a configuration for this test
    */
   @Override
   public Configuration getConf() {
