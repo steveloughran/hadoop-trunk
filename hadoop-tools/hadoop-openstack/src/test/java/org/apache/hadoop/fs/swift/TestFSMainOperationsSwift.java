@@ -53,8 +53,9 @@ public class TestFSMainOperationsSwift extends FSMainOperationsBaseTest {
 
   @Override
   protected Path getDefaultWorkingDirectory() throws IOException {
-    if (wd == null)
+    if (wd == null) { 
       wd = fSys.getWorkingDirectory();
+    }
     return wd;
   }
 

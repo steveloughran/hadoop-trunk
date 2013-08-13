@@ -141,7 +141,7 @@ class SwiftNativeInputStream extends FSInputStream {
       result = httpStream.read();
     } catch (IOException e) {
       String msg = "IOException while reading " + path
-                   + ": ' +e, attempting to reopen.";
+                   + ": " +e + ", attempting to reopen.";
       LOG.debug(msg, e);
       if (reopenBuffer()) {
         result = httpStream.read();
