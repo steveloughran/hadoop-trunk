@@ -18,12 +18,20 @@
 package org.apache.hadoop.util;
 
 import junit.framework.Assert;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.junit.Test;
+
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 
 /**
  * Test the find class logic
  */
 public class TestFindClass extends Assert {
+  private static final Log LOG = LogFactory.getLog(TestFindClass.class);
+
+  public static final String LOG4J_PROPERTIES = "log4j.properties";
 
   /**
    * Run the tool runner instance
@@ -106,6 +114,26 @@ public class TestFindClass extends Assert {
     run(FindClass.E_CREATE_FAILED, FindClass.A_CREATE, "org.apache.hadoop.util.TestFindClass$PrivateCtor");
   }
 
+  @Test
+  public void testLoadFindsLog4J() throws Throwable {
+    run(FindClass.SUCCESS, FindClass.A_RESOURCE, LOG4J_PROPERTIES);
+  }
+
+  @SuppressWarnings("UseOfSystemOutOrSystemErr")
+  @Test
+  public void testPrintLog4J() throws Throwable {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    PrintStream out = new PrintStream(baos);
+    FindClass.setOutputStreams(out, System.err);
+    run(FindClass.SUCCESS, FindClass.A_PRINTRESOURCE, LOG4J_PROPERTIES);
+    //here the content should be done
+    out.flush();
+    String body = baos.toString("UTF8");
+    LOG.info(LOG4J_PROPERTIES + " =\n" + body);
+    assertTrue(body.contains("Apache"));
+  }
+  
+  
   /**
    * trigger a divide by zero fault in the static init
    */
