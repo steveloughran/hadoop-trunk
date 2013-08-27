@@ -83,10 +83,13 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
     FileStatus[] paths;
     paths = fs.listStatus(path("/test/hadoop"));
     String stats = dumpStats("/test/hadoop", paths);
-    assertEquals(stats, 3, paths.length);
-    assertEquals(stats, path("/test/hadoop/a"), paths[0].getPath());
-    assertEquals(stats, path("/test/hadoop/b"), paths[1].getPath());
-    assertEquals(stats, path("/test/hadoop/c"), paths[2].getPath());
+    assertEquals("Paths.length wrong in " + stats, 3, paths.length);
+    assertEquals("Path element[0] wrong: " + stats, path("/test/hadoop/a"),
+                 paths[0].getPath());
+    assertEquals("Path element[1] wrong: " + stats, path("/test/hadoop/b"),
+                 paths[1].getPath());
+    assertEquals("Path element[2] wrong: " + stats, path("/test/hadoop/c"),
+                 paths[2].getPath());
   }
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
@@ -120,7 +123,9 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
     cleanup("testListEmptyRoot", fs, "/test");
     cleanup("testListEmptyRoot", fs, "/user");
     FileStatus[] fileStatuses = fs.listStatus(path("/"));
-    assertEquals(0, fileStatuses.length);
+    assertEquals("Non-empty root" + dumpStats("/", fileStatuses),
+                 0,
+                 fileStatuses.length);
   }
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
@@ -128,9 +133,10 @@ public class TestSwiftFileSystemLsOperations extends SwiftFileSystemBaseTest {
     Path test = path("/test");
     touch(fs, test);
     FileStatus[] fileStatuses = fs.listStatus(path("/"));
-    assertEquals(1, fileStatuses.length);
+    String stats = dumpStats("/", fileStatuses);
+    assertEquals("Wrong #of root children" + stats, 1, fileStatuses.length);
     FileStatus status = fileStatuses[0];
-    assertEquals(test, status.getPath());
+    assertEquals("Wrong path value" + stats,test, status.getPath());
   }
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)

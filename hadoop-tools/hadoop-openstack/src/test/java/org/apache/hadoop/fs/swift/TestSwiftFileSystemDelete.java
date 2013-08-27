@@ -30,10 +30,22 @@ public class TestSwiftFileSystemDelete extends SwiftFileSystemBaseTest {
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
   public void testDeleteEmptyFile() throws IOException {
-    final Path file = new Path("/test/testDeleteFile");
+    final Path file = new Path("/test/testDeleteEmptyFile");
     createEmptyFile(file);
     SwiftTestUtils.noteAction("about to delete");
     assertDeleted(file, true);
+  }
+
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
+  public void testDeleteEmptyFileTwice() throws IOException {
+    final Path file = new Path("/test/testDeleteEmptyFileTwice");
+    createEmptyFile(file);
+    assertDeleted(file, true);
+    SwiftTestUtils.noteAction("multiple creates, and deletes");
+    assertFalse("Delete returned true", fs.delete(file, false));
+    createEmptyFile(file);
+    assertDeleted(file, true);
+    assertFalse("Delete returned true", fs.delete(file, false));
   }
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
@@ -41,6 +53,17 @@ public class TestSwiftFileSystemDelete extends SwiftFileSystemBaseTest {
     final Path file = new Path("/test/testDeleteNonEmptyFile");
     createFile(file);
     assertDeleted(file, true);
+  }
+  
+  @Test(timeout = SWIFT_TEST_TIMEOUT)
+  public void testDeleteNonEmptyFileTwice() throws IOException {
+    final Path file = new Path("/test/testDeleteNonEmptyFileTwice");
+    createFile(file);
+    assertDeleted(file, true);
+    assertFalse("Delete returned true", fs.delete(file, false));
+    createFile(file);
+    assertDeleted(file, true);
+    assertFalse("Delete returned true", fs.delete(file, false));
   }
 
   @Test(timeout = SWIFT_TEST_TIMEOUT)
