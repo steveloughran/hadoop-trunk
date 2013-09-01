@@ -22,7 +22,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.util.ReflectionUtils;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -114,7 +115,7 @@ public abstract class AbstractDNSToSwitchMapping
     StringBuilder builder = new StringBuilder();
     builder.append("Mapping: ").append(toString()).append("\n");
     if (rack != null) {
-      builder.append("Map:\n");
+      builder.append("Known mappings:\n");
       Set<String> switches = new HashSet<String>();
       for (Map.Entry<String, String> entry : rack.entrySet()) {
         builder.append("  ")
@@ -125,7 +126,12 @@ public abstract class AbstractDNSToSwitchMapping
         switches.add(entry.getValue());
       }
       builder.append("Nodes: ").append(rack.size()).append("\n");
-      builder.append("Switches: ").append(switches.size()).append("\n");
+      int switchCount = switches.size();
+      builder.append("Switches: ").append(switchCount).append("\n");
+      if ( switchCount > 1 && switches.contains(NetworkTopology.DEFAULT_RACK)) {
+        builder.append("WARNING: some hosts have been mapped to the default rack\n"
+                     + " - the topology may be misconfigured or incomplete\n");
+      }
     } else {
       builder.append("No topology information");
     }
@@ -134,7 +140,8 @@ public abstract class AbstractDNSToSwitchMapping
 
   protected boolean isSingleSwitchByScriptPolicy() {
     return conf != null
-        && conf.get(CommonConfigurationKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY) == null;
+        && conf.get(
+      CommonConfigurationKeysPublic.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY) == null;
   }
 
   /**
@@ -152,4 +159,39 @@ public abstract class AbstractDNSToSwitchMapping
         && ((AbstractDNSToSwitchMapping) mapping).isSingleSwitch();
   }
 
+  /**
+   * Create a mapping from the configuration that is guaranteed to be caching.
+   * That means either it is wrapped in a caching mapper, or that it it
+   * does not need to be.
+   * @param conf configuration
+   * @return an AbstractDNSToSwitchMapping which caches hostname to rack mappings
+   * @throws RuntimeException on any problems loading the class.
+   */
+  public static AbstractDNSToSwitchMapping createCachingDNSToSwitchMapping(Configuration conf) {
+    DNSToSwitchMapping rawMapping = ReflectionUtils.newInstance(
+        conf.getClass(
+          CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            ScriptBasedMapping.class,
+            DNSToSwitchMapping.class), conf);
+    AbstractDNSToSwitchMapping mapping;
+    mapping = (rawMapping instanceof CachedDNSToSwitchMapping) ?
+         (CachedDNSToSwitchMapping)rawMapping
+        : new CachedDNSToSwitchMapping(rawMapping);
+    return mapping;
+  }
+
+  /**
+   * Dump the topology of a supplied mapping -where possible
+   * @param mapping the mapping to dump
+   * @return a string containing topology information or a message
+   * stating that it could not be extracted.
+   */
+  public static String dumpTopology(DNSToSwitchMapping mapping) {
+    if (mapping instanceof AbstractDNSToSwitchMapping) {
+      return ((AbstractDNSToSwitchMapping)mapping).dumpTopology();
+    } else {
+      return "Unpublished topology for " + mapping.getClass()
+          + "instance details "+ mapping;
+    }
+  }
 }

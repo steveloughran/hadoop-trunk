@@ -20,6 +20,7 @@ package org.apache.hadoop.net;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -33,7 +34,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
 
 /**
  * <p>
@@ -81,18 +81,100 @@ public class TableMapping extends CachedDNSToSwitchMapping {
     super.reloadCachedMappings();
     getRawMapping().reloadCachedMappings();
   }
-  
-  private static final class RawTableMapping extends Configured
+
+
+  private static final class RawTableMapping extends AbstractDNSToSwitchMapping
       implements DNSToSwitchMapping {
-    
+    private String filename;
+    private boolean initialized;
+    private String loadFailureText;
+    private Exception loadException;
+
+    private synchronized void init() {
+      if (!initialized) {
+        initialized = true;
+        load();
+      }
+    }
+
+    /**
+     * String method provides information about the chosen table file
+     * and the current mapping
+     * @return some details about the mapping.
+     */
+    @Override
+    public String toString() {
+      init();
+      StringBuilder builder = new StringBuilder();
+      builder.append("TableMapping with table \"")
+             .append(filename)
+             .append("\"\n");
+      if (filename != null && !filename.isEmpty()) {
+        File file = new File(filename);
+        builder.append("Path: ").append(file.getAbsolutePath()).append("\n");
+      }
+      builder.append("Table size: ").append(map.size()).append("\n");
+      return builder.toString();
+    }
+
+    /**
+     * If the topology can load -dump it. If it failed to load, print the exception
+     * @return the topology information or a stack trace.
+     */
+    @Override
+    public synchronized String dumpTopology() {
+      init();
+      if (loadFailureText != null) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("Table failed to load: ")
+               .append(loadFailureText).append('\n');
+        if (loadException != null) {
+          builder.append(loadException.toString()).append('\n');
+          //use full package name as a class with the same name from commons-lang
+          // is imported
+          builder.append(org.apache.hadoop.util.StringUtils
+                                               .stringifyException(
+                                                 loadException));
+        }
+        return builder.toString();
+      } else {
+        return super.dumpTopology();
+      }
+    }
+
+    /**
+     * Note a load problem, and cache the message and
+     * exception for use in later topology dumps
+     * @param message error message
+     * @param e optional exception
+     */
+    private synchronized void noteLoadFailed(String message, Exception e) {
+      loadFailureText = message;
+      LOG.warn(message, e);
+      if (e != null) {
+        loadException = e;
+      }
+    }
+
+    /**
+     * Get the (host x switch) map.
+     * @return a copy of the table map
+     */
+    @Override
+    public Map<String, String> getSwitchMap() {
+      init();
+      Map<String, String > switchMap = new HashMap<String, String>(map);
+      return switchMap;
+    }
     private Map<String, String> map;
   
     private Map<String, String> load() {
       Map<String, String> loadMap = new HashMap<String, String>();
   
-      String filename = getConf().get(NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY, null);
+      filename = getConf().get(NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY, null);
       if (StringUtils.isBlank(filename)) {
-        LOG.warn(NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY + " not configured. ");
+        noteLoadFailed(NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY + " not configured.",
+                       null);
         return null;
       }
   
@@ -113,14 +195,14 @@ public class TableMapping extends CachedDNSToSwitchMapping {
           line = reader.readLine();
         }
       } catch (Exception e) {
-        LOG.warn(filename + " cannot be read.", e);
+        noteLoadFailed(filename + " cannot be read.", e);
         return null;
       } finally {
         if (reader != null) {
           try {
             reader.close();
           } catch (IOException e) {
-            LOG.warn(filename + " cannot be read.", e);
+            noteLoadFailed(filename + " cannot be read.", e);
             return null;
           }
         }
@@ -130,6 +212,7 @@ public class TableMapping extends CachedDNSToSwitchMapping {
   
     @Override
     public synchronized List<String> resolve(List<String> names) {
+      init();
       if (map == null) {
         map = load();
         if (map == null) {
