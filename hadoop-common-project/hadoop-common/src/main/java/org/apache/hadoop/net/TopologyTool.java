@@ -65,6 +65,8 @@ public class TopologyTool extends Configured implements Tool {
   public static final int E_USAGE = -2;
   public static final int E_FAIL = -1;
   public static final String RESOLVE = "r";
+  public static final String ACTION_TEST = "test";
+  public static final String ACTION_TESTFILE = "testfile";
   private boolean nslookup;
   private AbstractDNSToSwitchMapping topology;
 
@@ -161,9 +163,9 @@ public class TopologyTool extends Configured implements Tool {
             (singleSwitch ? " " : "not"));
 
     boolean successful;
-    if ("test".equals(operation)) {
+    if (ACTION_TEST.equals(operation)) {
       successful = resolveHostnameTopologies(argsList) == 0;
-    } else if ("testfile".equals(operation)) {
+    } else if (ACTION_TESTFILE.equals(operation)) {
       if (args.length != 2) {
         usage();
         successful = false;
@@ -225,13 +227,15 @@ public class TopologyTool extends Configured implements Tool {
    * @param hosts the hostnames
    * @return #of failed resolutions
    */
-  private int resolveHostnameTopologies(List<String> hosts) {
+  private List<TopoResolutionPair> resolveHostnameTopologies(List<String> hosts) {
     int failures = 0;
+    List<TopoResolutionPair> results =
+      new ArrayList<TopoResolutionPair>(hosts.size());
     for (String hostname : hosts) {
-      boolean resolved = resolveOneHost(hostname);
-      if (!resolved) {
-        failures++;
-      } else if (nslookup) {
+      TopoResolutionPair resultPair = new TopoResolutionPair();
+      results.add(resultPair);
+      resultPair.hostResult = resolveOneHost(hostname);
+      if (nslookup) {
         InetAddress ipaddr = nslookup(hostname);
         if (ipaddr != null) {
           String hostaddr = ipaddr.getHostAddress();
@@ -239,20 +243,19 @@ public class TopologyTool extends Configured implements Tool {
           if (ipaddr.isLoopbackAddress()) {
             println("Warning: this is a loopback address");
           }
-          resolved = resolveOneHost(hostaddr);
-          if (!resolved) {
-            println("Failed to resolve: %s", hostname);
-            failures++;
-          }
+          TopoResult netResult = resolveOneHost(hostaddr);
+          resultPair.netResult = netResult;
         } else {
+          resultPair.netResult = UNKNOWN_HOST;
           println("IP address lookup failed for %s", hostname);
           failures++;
         }
       }
+      
     }
     //now dump the topology
     printTopology(topology);
-    return failures;
+    return results;
   }
 
   /**
@@ -260,33 +263,34 @@ public class TopologyTool extends Configured implements Tool {
    * @param hostname hostname
    * @return true if the topo resolution worked
    */
-  private boolean resolveOneHost(String hostname) {
-    boolean isResolved = false;
+  private TopoResult resolveOneHost(String hostname) {
+    TopoResult result = new TopoResult(hostname);
     List<String> hostnameList = new ArrayList<String>(1);
     hostnameList.add(hostname);
     try {
-      println("Resolving " + hostname);
       long starttime = System.nanoTime();
       List<String> resolved = topology.resolve(hostnameList);
       long endtime = System.nanoTime();
+      result.resolvetimeMillis = (endtime - starttime) / 1.0e6;
       String resolvedTo = "hostname " + hostname + "resolved to ";
       if (resolved == null) {
         LOG.warn(resolvedTo + "a null list");
       } else if (resolved.size() != 1) {
         LOG.warn(resolvedTo + "a list of size " + resolved.size());
       } else {
-        isResolved = true;
+        result.resolved = true;
+        result.rack = resolved.get(0);
         StringBuilder builder = new StringBuilder();
         builder.append(resolvedTo)
                .append('"').append(resolved.get(0)).append("\" ");
-        double duration = (endtime - starttime) / 1e6;
+        double duration = result.resolvetimeMillis;
         builder.append(" in ").append(duration).append(" milliseconds");
         println(builder.toString());
       }
     } catch (Exception e) {
       LOG.error("Failed to resolve host " + hostname + ": " + e, e);
     }
-    return isResolved;
+    return result;
   }
 
   /**
@@ -321,4 +325,54 @@ public class TopologyTool extends Configured implements Tool {
       ExitUtil.terminate(E_FAIL, e);
     }
   }
+ 
+  
+  public static class TopoResult {
+    public String name;
+    public String rack ="";
+    public double resolvetimeMillis;
+    public boolean resolved;
+
+    public TopoResult(String name) {
+      this.name = name;
+    }
+
+    /**
+     * flag to indicate whether or not the node is on the rack.
+     * @return true if the rack is the default one
+     */
+    public boolean isDefaultRack() {
+      return NetworkTopology.DEFAULT_RACK.equals(rack);
+    }
+
+    @Override
+    public String toString() {
+      if (resolved) {
+        return String.format("%s on %srack \"%s\" (resolution time =%0.3fms)",
+                             name,
+                             (isDefaultRack()?"default ":""),
+                             rack, resolvetimeMillis);
+      } else {
+        return String.format("%s on unknown rack",
+                             name);
+      }
+    }
+  }
+
+  public static TopoResult UNKNOWN_HOST;
+  static {
+    UNKNOWN_HOST = new TopoResult("Unknown Host");
+    UNKNOWN_HOST.rack =null;
+  }
+
+  /**
+   * Pair of hosts
+   */
+  public static class TopoResolutionPair {
+    TopoResult hostResult;
+    TopoResult netResult;
+  }
+  
+  
+ 
 }
