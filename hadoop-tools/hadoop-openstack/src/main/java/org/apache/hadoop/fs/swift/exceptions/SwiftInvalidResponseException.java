@@ -56,6 +56,9 @@ public class SwiftInvalidResponseException extends SwiftConnectionException {
     String bodyAsString;
     try {
       bodyAsString = method.getResponseBodyAsString();
+      if (bodyAsString == null) {
+        bodyAsString = "";
+      }
     } catch (IOException e) {
       bodyAsString = "";
     }
@@ -94,7 +97,7 @@ public class SwiftInvalidResponseException extends SwiftConnectionException {
    */
   @Override
   public String toString() {
-    StringBuilder msg = new StringBuilder(128 + body.length());
+    StringBuilder msg = new StringBuilder();
     msg.append(exceptionTitle());
     msg.append(": ");
     msg.append(getMessage());
@@ -104,7 +107,7 @@ public class SwiftInvalidResponseException extends SwiftConnectionException {
     msg.append(uri);
     msg.append(" => ");
     msg.append(statusCode);
-    if (!body.isEmpty()) {
+    if (body != null && !body.isEmpty()) {
       msg.append(" : ");
       msg.append(body);
     }
