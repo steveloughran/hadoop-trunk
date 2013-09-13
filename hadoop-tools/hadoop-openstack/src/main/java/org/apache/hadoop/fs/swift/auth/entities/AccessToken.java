@@ -25,7 +25,7 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
  * Class holds token id, tenant and expiration time.
  * THIS FILE IS MAPPED BY JACKSON TO AND FROM JSON.
  * DO NOT RENAME OR MODIFY FIELDS AND THEIR ACCESSORS.
- * 
+ *
  * Example:
  * <pre>
  * "token" : {
@@ -54,7 +54,6 @@ public class AccessToken {
    */
   private Tenant tenant;
 
-  
   /**
    * @return token expiration time
    */
