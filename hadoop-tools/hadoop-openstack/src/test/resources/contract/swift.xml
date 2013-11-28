@@ -18,7 +18,7 @@
 
 <configuration>
   <!--
-  S3N is a blobstore, with very different behavior than a 
+  Openstack Swift is a blobstore, with very different behavior than a 
   classic filesystem.
   -->
 

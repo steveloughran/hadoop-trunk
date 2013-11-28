@@ -34,6 +34,7 @@ import java.net.URISyntaxException;
 public class SwiftContract extends AbstractFSContract {
 
   public static final String CONTRACT_XML = "contract/swift.xml";
+  
   /**
    *
    */
@@ -66,7 +67,7 @@ public class SwiftContract extends AbstractFSContract {
         throw new IOException("Invalid URI " + fsName
                               + " for config option " + TEST_FS_NAME);
       } catch (IllegalArgumentException e) {
-        throw new IOException("Invalid S3N URI " + fsName
+        throw new IOException("Invalid Swift URI " + fsName
                               + " for config option " + TEST_FS_NAME, e);
       }
     }

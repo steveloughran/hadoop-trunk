@@ -56,7 +56,7 @@ public class LocalFSContract extends AbstractFSContract {
       getConf().setBoolean(getConfKey(ContractOptions.IS_CASE_SENSITIVE), false);
       getConf().setBoolean(getConfKey(ContractOptions.SUPPORTS_UNIX_PERMISSIONS), false);
     } else if (ContractTestUtils.isOSX()) {
-      //OSX is not case sensitive
+      //OSX HFS+ is not case sensitive
       getConf().setBoolean(getConfKey(ContractOptions.IS_CASE_SENSITIVE),
                            false);
     }
