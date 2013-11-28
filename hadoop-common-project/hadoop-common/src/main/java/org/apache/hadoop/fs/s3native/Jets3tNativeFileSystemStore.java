@@ -399,8 +399,6 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
   private void handleServiceException(String key, ServiceException e) throws IOException {
     if ("NoSuchKey".equals(e.getErrorCode())) {
       throw new FileNotFoundException("Key '" + key + "' does not exist in S3");
-    } else if ("InvalidRange".equals(e.getS3ErrorCode())){
-      throw new EOFException("Attempted to seek/read past the end of the file");
     } else {
       handleServiceException(e);
     }
@@ -410,12 +408,15 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
     if (e.getCause() instanceof IOException) {
       throw (IOException) e.getCause();
     }
-    else {
-      if(LOG.isDebugEnabled()) {
-        LOG.debug("S3 Error code: " + e.getS3ErrorCode() + "; S3 Error message: " + e.getS3ErrorMessage());
-      }
-      throw new S3Exception(e);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("S3 Error code: " + e.getS3ErrorCode() + "; S3 Error message: "
+        + e.getS3ErrorMessage());
     }
+    if ("InvalidRange".equals(e.getS3ErrorCode())) {
+      throw new EOFException(
+        "Attempted to seek or read past the end of the file");
+    }
+    throw new S3Exception(e);
   }
 
   private void handleServiceException(ServiceException e) throws IOException {
