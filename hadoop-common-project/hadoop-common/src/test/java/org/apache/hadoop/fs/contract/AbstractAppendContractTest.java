@@ -66,6 +66,20 @@ public abstract class AbstractAppendContractTest extends AbstractFSContractTestB
                                                  dataset.length);
     ContractTestUtils.compareByteArrays(dataset, bytes, dataset.length);
   }
+  
+  @Test
+  public void testAppendNonexistentFile() throws Throwable {
+    byte[] dataset = dataset(256, 'a', 'z');
+    FSDataOutputStream outputStream = getFileSystem().append(target);
+    try {
+      outputStream.write(dataset);
+    } finally {
+      outputStream.close();
+    }
+    byte[] bytes = ContractTestUtils.readDataset(getFileSystem(), target,
+                                                 dataset.length);
+    ContractTestUtils.compareByteArrays(dataset, bytes, dataset.length);
+  }
 
   @Test
   public void testAppendToExistingFile() throws Throwable {
