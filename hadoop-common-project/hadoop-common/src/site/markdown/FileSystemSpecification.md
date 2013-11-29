@@ -376,16 +376,23 @@ over any Computer-Science strict-notation
 
 ### Mathematics Symbols in this document
 
+This document does use a subset of [the notation in the Z syntax](http://staff.washington.edu/jon/z/glossary.html),
+but in an ascii form and the use of Python list notation for manipulating lists and sets
+
 * `iff` : `iff`: If and only if
 * `⇒` : `implies`
-* `∩` : `intersection`: Set Intersection 
-* `∪` : `+`: Set Union
+* `→` : `-->` total function
+* `↛` : `->` partial function
+
+
+* `∩` : `^`: Set Intersection 
+* `∪` : `|`: Set Union
 * `\` : `-`: Set Difference
 
 * `∃` : `exists` Exists predicate
 * `∀` : `forall`: For all predicate
 * `=` : `==` Equals operator
-* `≠` : `not-equal-to` operator. In Java `z ≠ y` is written as `not  ( z == y )` provided that `z` and `y` are from simple types that can be compared
+* `≠` : `!=` operator. In Java `z ≠ y` is written as `not  ( z == y )` provided that `z` and `y` are from simple types that can be compared
 * `≡` : `equivalent-to` equivalence operator. This is stricter than equals.
 * `∅` : `{}` Empty Set. `∅ ≡ {}`
 * `≈` : `approximately-equal-to` operator
@@ -396,52 +403,68 @@ over any Computer-Science strict-notation
 * `` : `` :  
 * `∈` : `in` : element of
 * `∉` : `not-in` : not an element of
-* `` : `` :  
+* `:=` : `` :  
+
+* `` : `#` :  Python-style comments
 
 * `happens-before` : `happens-before` : Lamport's ordering relationship as defined in  
 [Time, Clocks and the Ordering of Events in a Distributed System](http://research.microsoft.com/en-us/um/people/lamport/pubs/time-clocks.pdf)
 
-#### Sets and Lists
+#### Sets ,  Lists ,  Maps and Strings
 
-The python notation is used as the basis for this syntax as it is both plain ASCII and well known
+The [python data structures](http://docs.python.org/2/tutorial/datastructures.html)
+are used as the basis for this syntax as it is both plain ASCII and well known
 
-Lists
+##### Lists
 
 * A list *L* is an ordered sequence of elements `[l1, l2, ... ln]`
 * The size of a list `len(L)` is the number of elements in a list
 * Items can be addressed by a 0-based index  `l1==L[0]`
 * Python slicing operators can address subsets of a list `L[0:3]==[l1,l2]`, `L[:-1]==ln`
 * Lists can be concatenated `L' = [ h ] + L`
-* The membership predicate returns true iff an element is a member of a List: `l2 in L`
+* The membership predicate `in` returns true iff an element is a member of a List: `l2 in L`
 * List comprehensions can create new lists: `L' = [ x for x in l where x < 5]`
 * for a list *L*, `len(L)` returns the number of elements.
 
-Sets
+
+##### Sets
 
 Sets are an extension of the List notation, adding the restrictions that there can
 be no duplicate entries in the set, and there is no defined order.
 
 * A set is an unordered collection of items surrounded by `{` and `}` braces. 
-* The empty set `{}` has no elements
+* When declaring one, the python constructor `set([list])` is used
+* The empty set `set([])` has no elements
 * All the usual set concepts apply
+* The membership predicate is `in`
 * Set comprehension uses the Python list comprehension
 `S' = {s for s in S where len(s)==2}`
 * for a set *S*, `len(S)` returns the number of elements.
 
-Strings
+
+
+##### Maps 
+
+Maps are written as Python dictionaries; {"key":value, "key2",value2}
+
+* `keys(Map)` represents the set of keys in a map
+* `k in Map` holds iff `k in keys(Map)`
+
+
+##### Strings
 
 Strings are lists of characters represented in double quotes. e.g. `"abc"`
 
-    "abc" == ['a','b','c]
+    "abc" == ['a','b','c']
 
-#### Immutability
+#### State Immutability
 
-All declarations are immutable: new variables must be defined for new values.
+All system state declarations are immutable.
 
-The suffix "'" is used as the convention to indicate a new version of an existing variable:
+The suffix "'" is used as the convention to indicate the state of the system after a operation:
 
     L' = L + ['d','e']
-    L'' = [' '] + L'
+
 
 #### Function Specifications
 
@@ -454,10 +477,13 @@ satisfied else some failure condition is raised.
 For Hadoop we need to be able to specify what failure condition results if a specification is not
 met -usually what exception is to be raised.
 
-The notation `else raise <exception-name>` is used to indicate that an exception is to be raised
-if a precondition is not met.  Example:
+The notation `raise <exception-name>` is used to indicate that an exception is to be raised.
 
-    exists(FS, Path) else raise IOException
+It can be used in the if-then-else sequence to define an action if a precondition is not met.
+
+Example:
+
+    if not exists(FS, Path) then raise IOException
 
 We also need to distinguish predicates that MUST be satisfied, along with those that SHOULD be met.
 For this reason a function specification MAY include a section in the preconditions marked 'Should:'
@@ -467,129 +493,148 @@ which specifies a stricter outcome, it SHOULD BE preferred. Here is an example o
 
 Should:
 
-    exists(FS, Path) else raise FileNotFoundException
+    if not exists(FS, Path) then raise FileNotFoundException
+
+Functions can be divided into partial functions and total functions.
+
+Total functions have a valid output for every input, for example `def double(i :Int)-->Int: i * 2` is valid for all integers
+
+Partial functions are not valid for all inputs, for example, `def inverss:(i: Int)->Float: 1/i` is not valid for the input 0.
+
+Total functions are notated with the term `-->`; partial functions -which form the majority of functions in this
+specification, with `->`.
 
 
-### A Set-based model of a file system
+
+### A model of a Filesystem
 
 
-#### Path Elements
 
+#### Paths and Path Elements
+
+A Path is a list of Path elements which represents a path to a file, directory of symbolic link
 
 Path elements are non-empty strings. The exact set of valid strings MAY 
 be specific to a particular filesystem implementation.
 
-Path Elements MUST NOT be in `"", ".",  "..", "/"`
+Path Elements MUST NOT be in `set(["", ".",  "..", "/"])`
 
-Path Elements MUST NOT contain the strings `"/"` or `":"`.
+Path Elements MUST NOT contain the characters `set(['/', ':')`.
 
 Filesystems MAY have other strings that are not permitted in a path element.
 
 When validating path elements, the exception `InvalidPathException` SHOULD
 be raised when a path is invalid [HDFS]
 
+Predicate: `valid-path-element:List<String>`
 
-A *Filesystem*, *FS* contains a finite set of *Path* elements that
-refer to filesystem entities that MUST include
-Files and Directories and MAY include symbolic links. Filesystems MAY
-reference other entities (devices, named pipes, etc.)
+A path element `pe` is invalid if any character in it is in the set of forbidden characters,
+or the element as a whole is invalid
+
+    forall e in pe: not (e in set(['/', ':'))
+    not pe in set(["", ".",  "..", "/"])
 
 
-A Path can be represented as a list of *Path_Elements*. The set
-of all possible paths is *Paths*
-  and
-    forall P in Paths : P == []
-                      else P == [ H | T] where H in Path_Elements and T in Paths.
+Predicate: `valid-path:List<PathElement>`
+
+A Path `p` is valid if all path elements in it are valid
+
+    def valid-path(pe): forall pe in Path: valid-path-element(pe)
+
+
+The set of all possible paths is *Paths*; this is the infinite set of all lists of valid path elements.
   
-The path represented by empty list, `[]` is the *root path*, and is 
-notated by the string "/"
+The path represented by empty list, `[]` is the *root path*, and is denoted by the string `"/"`
 
-The function `parent(Path):Path` can be defined recursively
+The partial function `parent(path:Path)->Path` provides the parent path can be defined using
+list slicing
 
-    parent([])      := nil
-    parent([T])     := []
-    parent([H | T]) := [H | parent(T)]
-  
-  
+    def parent(pe) : pe[0:-1] 
+
+Preconditions:
+
+    path != []
+
+
+#### `Filename:Path->PathElement`
 
 The last Path Element in a Path is called the filename:
   
-    filename([])    := undefined
-    filename([H])   := H
-    filename([H|T]) := filename(T)
+    def filename(p) : p[:-1]
+   
+Preconditions:
+
+    p != []
+
+#### `childElements:(Path p, Path q)->Path`
 
 
-The childElements of a path D that is a descendent of path P 
-is the list of path elements in D that follow the path P
+The partial function `childElements:(Path p, Path q)->Path` 
+is the list of path elements in `p` that follow the path `q`
 
-    childElements([],C) := C
-    childElements(P,[]) :  error
-    childElements([H|T],[H|T2]) := childelements(T, T2)
-    # the outcome is not defined if the path D is not equal to or
-    # a descendent of path P
-    childElements([H2|T],[H|T2]) where H2 not = H :  error
+    def childelements(p, q): p[len(q):] 
+
+preconditions
+
+    
+    # The path 'q' must be at the head of the path 'p' 
+    q == p[:len(q)]
   
-A path MAY refer to a directory
+
+
+### Defining the Filesystem
+
+
+A filesystem `FS` contains a set of directories, a dictionary of paths and a set of symbolic links
+
+    (directories:set<Path>, files:[Path->List[byte]], symlinks:set<Path>) 
+
+
+    def filenames(FS): keys(files(FS)) 
+    
+The entire set of a paths finite subset of all possible Paths, and functions to resolve a path to data, a directory predicate or a symbolic link
+
+    def paths(FS) : directories(FS) | filenames(FS) | symlinks(FS)) 
+
+A path is deemed to exist if it is in this aggregate set
+
+    def exists(FS, p): p in paths(FS)
+
+*Root* The root path, "/" is a directory represented  by the path [], which must always exist in a filesystem
   
-    exists P in Paths where isDir(P)
-
-A path MAY refer to a file
+    def isRoot(p) : p == [].
     
-    exists P in Paths where isFile(P)
+    forall FS in FileSystems : [] in directories(FS)
 
-A path MAY refer to a symbolic link
-    
-    exists P in Paths where isSymlink(P)
 
-A filesystem contains a finite subset of all possible Paths
 
-    paths(FS) := the proper subset of the set of all Paths
-                  which exist in the filesystem FS
+#### Directory references
   
-    paths(FS) := all P in Paths where exists(FS, P)
-
-The root path, "/" is a directory, and must always exist in a filesystem
+A path MAY refer to a directory in a filesystem
   
-    isRoot(P) := P == [].
-    
-    forall FS in FileSystems : exists(FS,[]) and isDirectory(FS, []).
-    forall FS in FileSystems : exists P in paths(FS) where isRoot(P)
+    isDir(FS, p): p in directories(FS) 
 
 
-Exclusivity: A path cannot refer to more than one of a file, a directory or a symbolic link
-
-    forall P in paths(FS) : isFile(FS, P) => not isDir(FS, P)
-    forall P in paths(FS) : isFile(FS, P) => not isSymlink(FS, P)
-    
-    forall P in paths(FS) : isDir(FS, P) => not isFile(FS, P)
-    forall P in paths(FS) : isDir(FS, P) => not isSymlink(FS, P)
-    
-    forall P in paths(FS) : isSymlink(FS, P) => not isFile(FS, P)
-    forall P in paths(FS) : isSymlink(FS, P) => not isDir(FS, P)
-
-If a filesystem can contain other reference types, again, these MUST be mutually
-exclusive.
-
-Directories can be paths that have children, that is, there exist other paths
-in the filesystem whose path begins with a directory. This can be expressed
+Directories may have children, that is, there may exist other paths
+in the filesystem whose path begins with a directory. Only directories
+may have children. This can be expressed
 by saying that every path's parent must be a directory.
 
 It can then be declared that a path has no parent in which case it is the root directory,
 or it MUST have a parent that is a directory
    
-    forall P in paths(FS) : parent(P) == nil else isDir(FS, parent(P))
+    forall p in paths(FS) : isRoot(p) or isDir(FS, parent(p))
   
 Because the parent directories of all directories must themselves satisfy
-this criterion, it is implicit that only leaf nodes may be files 
+this criterion, it is implicit that only leaf nodes may be files or symbolic links
 
 Furthermore, because every filesystem contains the root path, every filesystem
 must contain at least one directory.
   
-    exists P in paths(FS) where isDir(FS, P)
-
 A directory may have children
   
-    children(FS, P) := all C in paths(FS) where parent(C) == P
+    def children(FS, p) :  {q for q in paths(FS) where parent(q) == p}
+
 
 There are no duplicate names in the child paths, because all paths are
 taken from the set of lists of path elements: there can be no duplicate entries
@@ -598,27 +643,38 @@ in a set, hence no children with duplicate names.
 A path *D* is a descendant of a path *P* if it is the direct child of the
 path *P* or an ancestor is a direct child of path *P*
   
-    isDescendant(P, D) := parent(D) == P where isDescendant(P, parent(D)) 
+    def isDescendant(P, D) : parent(D) == P where isDescendant(P, parent(D)) 
   
 The descendants of a directory P are all paths in the filesystem whose
 path begins with the path P -that is their parent is P or an ancestor is P
 
-    descendants(FS, D) := all P in paths(FS) where isDescendant(D,P) 
+    def descendants(FS, D): {p for p in paths(FS) where isDescendant(D, p)} 
 
-Directories MUST not contain any data
-  
-    forall P in paths(FS): isDir(FS, P) => length(FS, P) == 0
-    forall P in paths(FS): isDir(FS, P) => data(FS, P) == []
 
-Symbolic links MUST not contain any data
-  
-    forall P in paths(FS): isSymlink(FS, P) => length(FS, P) == 0
-    forall P in paths(FS): isSymlink(FS, P) => data(FS, P) == []
-  
-Files MAY contain data
+#### File references
 
-    forall P in paths(FS): isFile(FS, P) => length(FS, P) >= 0
-    forall P in paths(FS): isFile(FS, P) => (D = data(FS, P) and length(D)>=0) 
+A path MAY refer to a file; that it it has data in the filesystem; its path is a key in the data dictionary
+
+    def isFile(FS, p):  p in data(FS)
+
+#### Symbolic references
+
+A path MAY refer to a symbolic link
+
+    def isSymlink(FS, p): p in symlinks(FS)
+
+
+
+#### Exclusivity
+A path cannot refer to more than one of a file, a directory or a symbolic link
+
+
+    directories(FS) ^ keys(data(FS)) == {}
+    directories(FS) ^ symlinks(FS) == {}
+    keys(data(FS))(FS) ^ symlinks(FS) == {}
+    
+
+This implies that only files may have data.
 
 Not covered: hard links in a filesystem. If a filesystem supports multiple
 references in *paths(FS)* to point to the same data, the outcome of operations
@@ -628,7 +684,8 @@ This model of a filesystem is sufficient to describe all the filesystem
 queries and manipulations -excluding metadata and permission operations.
 The Hadoop `FileSystem` and `FileContext` interfaces can be specified
 in terms of operations that query or change the state of a filesystem.
-  
+
+
 
 <not --  ============================================================= -->
 <not --  CLASS: FileSystem -->
