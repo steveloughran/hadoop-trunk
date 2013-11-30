@@ -1,0 +1,178 @@
+<!---
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  
+   http://www.apache.org/licenses/LICENSE-2.0
+  
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
+  
+
+# Notation
+
+A mathematically pure notation such as [The Z Notation](www.open-std.org/jtc1/sc22/open/n3187.pdf‎)
+would be the strictest way to define the filesystem behavior, and could even
+be used to prove some axioms.
+
+However, it has a number of practical flaws
+1. Such notations are not as widely used as they should be -so the broader software
+development community is not going to have practical experience of it.
+1. It's very hard to work with without dropping into tools such as LaTeX *and* add-on libraries.
+1. Even those people who claim to understand such formal notations don't really.
+
+Given the goals of this specification are to document Filesystem behavior in order for it
+to be understood by developers, and to derive tests from the specification, broad
+comprehensibility, ease of maintenance and the ease of deriving tests must take priority
+over any Computer-Science strict-notation
+
+### Mathematics Symbols in this document
+
+This document does use a subset of [the notation in the Z syntax](http://staff.washington.edu/jon/z/glossary.html),
+but in an ascii form and the use of Python list notation for manipulating lists and sets
+
+* `iff` : `iff`: If and only if
+* `⇒` : `implies`
+* `→` : `--&gt;` total function
+* `↛` : `-&gt;` partial function
+
+
+* `∩` : `^`: Set Intersection 
+* `∪` : `|`: Set Union
+* `\` : `-`: Set Difference
+
+* `∃` : `exists` Exists predicate
+* `∀` : `forall`: For all predicate
+* `=` : `==` Equals operator
+* `≠` : `!=` operator. In Java `z ≠ y` is written as `not  ( z == y )` provided that `z` and `y` are from simple types that can be compared
+* `≡` : `equivalent-to` equivalence operator. This is stricter than equals.
+* `∅` : `{}` Empty Set. `∅ ≡ {}`
+* `≈` : `approximately-equal-to` operator
+* `¬` : `not` Not operator. In Java, `not `
+* `∄` : `does-not-exist`: Does not exist predicate. Equivalent to `not exists`
+* `∧` : `and` : local and operator. In Java , `and`  
+* `∨` : `or` : local and operator. In Java, `else`  
+* `` : `` :  
+* `∈` : `in` : element of
+* `∉` : `not-in` : not an element of
+* `:=` : `` :  
+
+* `` : `#` :  Python-style comments
+
+* `happens-before` : `happens-before` : Lamport's ordering relationship as defined in  
+[Time, Clocks and the Ordering of Events in a Distributed System](http://research.microsoft.com/en-us/um/people/lamport/pubs/time-clocks.pdf)
+
+#### Sets ,  Lists ,  Maps and Strings
+
+The [python data structures](http://docs.python.org/2/tutorial/datastructures.html)
+are used as the basis for this syntax as it is both plain ASCII and well known
+
+##### Lists
+
+* A list *L* is an ordered sequence of elements `[e1, e2, ... en]`
+* The size of a list `len(L)` is the number of elements in a list
+* Items can be addressed by a 0-based index  `e1==L[0]`
+* Python slicing operators can address subsets of a list `L[0:3]==[e1,e2]`, `L[:-1]==en`
+* Lists can be concatenated `L' = [ h ] + L`
+* The membership predicate `in` returns true iff an element is a member of a List: `e2 in L`
+* List comprehensions can create new lists: `L' = [ x for x in l where x < 5]`
+* for a list `L`, `len(L)` returns the number of elements.
+
+
+##### Sets
+
+Sets are an extension of the List notation, adding the restrictions that there can
+be no duplicate entries in the set, and there is no defined order.
+
+* A set is an unordered collection of items surrounded by `{` and `}` braces. 
+* When declaring one, the python constructor `{}` is used. This is different from Python, which uses the function `set([list])`. Here the assumption
+is that the difference between a set and a dictionary can be determined from the contents 
+* The empty set `{}` has no elements
+* All the usual set concepts apply
+* The membership predicate is `in`
+* Set comprehension uses the Python list comprehension
+`S' = {s for s in S where len(s)==2}`
+* for a set *S*, `len(S)` returns the number of elements.
+
+
+
+##### Maps 
+
+Maps resemble Python dictionaries; {"key":value, "key2",value2}
+
+* `keys(Map)` represents the set of keys in a map
+* `k in Map` holds iff `k in keys(Map)`
+* The empty map is written `{:}`
+
+
+##### Strings
+
+Strings are lists of characters represented in double quotes. e.g. `"abc"`
+
+    "abc" == ['a','b','c']
+
+#### State Immutability
+
+All system state declarations are immutable.
+
+The suffix "'" is used as the convention to indicate the state of the system after a operation:
+
+    L' = L + ['d','e']
+
+
+#### Function Specifications
+
+A function is defined as a set of preconditions and a set of postconditions,
+where the postconditions define the new state of the system and the return value from the function.
+
+
+### Exceptions
+
+In classic Z-style specification languages, the preconditions define the predicates that MUST be
+satisfied else some failure condition is raised. 
+
+For Hadoop we need to be able to specify what failure condition results if a specification is not
+met -usually what exception is to be raised.
+
+The notation `raise <exception-name>` is used to indicate that an exception is to be raised.
+
+It can be used in the if-then-else sequence to define an action if a precondition is not met.
+
+Example:
+
+    if not exists(FS, Path) : raise IOException
+    
+If implementations may raise any one of a set of exceptions, this is denoted by
+providing a set of exceptions:
+
+    if not exists(FS, Path) : raise { IOException, FileNotFoundException}
+
+In such cases, listed exceptions that are subclasses of other exceptions are
+to be preferred, on the basis that they aid diagnosis of problems.
+
+We also need to distinguish predicates that MUST be satisfied, along with those that SHOULD be met.
+For this reason a function specification MAY include a section in the preconditions marked 'Should:'
+All predicates declared in this section SHOULD be met, and if there is an entry in that section
+which specifies a stricter outcome, it SHOULD BE preferred. Here is an example of a should-precondition
+
+
+Should:
+
+    if not exists(FS, Path) : raise FileNotFoundException
+
+Functions can be divided into partial functions and total functions.
+
+Total functions have a valid output for every input, for example `def double(i :Int)--&gt;Int: i * 2` is valid for all integers
+
+Partial functions are not valid for all inputs, for example, `def inverse:(i: Int)-&gt;Float: 1/i` is not valid for the input 0.
+
+Total functions are notated with the term `--&gt;` partial functions -which form the majority of functions in this
+specification, with `-&gt;`.
+
+
+
+ 
