@@ -182,6 +182,9 @@ A path MAY refer to a file; that it it has data in the filesystem; its path is a
 
     def isFile(FS, p) =  p in FS.Files
 
+
+
+
 #### Symbolic references
 
 A path MAY refer to a symbolic link

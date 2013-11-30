@@ -18,36 +18,50 @@
 <!--  ============================================================= -->
 
 # class org.apache.hadoop.fs.FileSystem
+
+The abstract `FileSystem` class is the original class to access Hadoop filesystems;
+non-abstract subclasses exist for all Hadoop-supported filesystems. 
   
 All operations that take a Path to this interface MUST support relative paths.
 In such a case, they must be resolved relative to the working directory
-defined by `setWorkingDirectory()`.
+defined by `setWorkingDirectory()`. 
+
+For all clients, therefore, we also add the notion of a state component PWD: 
+this represents the present working directory of the client. Changes to this
+state are not reflected in the filesystem itself -they are unique to the instance
+of the client.
+
+**Implementation Note**: the static `FileSystem get(URI uri, Configuration conf) ` method may return
+a pre-existing instance of a filesystem client class - a class that may also be in use in other
+threads. Current implementations of FileSystem *do not make any attempt to synchronize access
+to the working directory field*. 
 
 
 ### boolean exists(Path p)
 
 
-    exists(FS, p)
+    def exists(FS, p): p in paths(FS)
   
 
 ### boolean isDirectory(Path p) 
 
-    exists(FS, p) and isDir(FS, p)
+    def isDirectory(FS, p): p in directories(FS)
   
 
 ### boolean isFile(Path p) 
 
 
-    exists(FS, p) and isFile(FS, p)
-  
+    def isFile(FS, p): p in files(FS)
 
 ###  isSymlink(Path p) boolean
 
 
-    exists(FS, p) and isSymlink(FS, p)
+    def isSymlink(FS, p): p in symlinks(FS)
   
 
 ### FileStatus getFileStatus(Path p)
+
+Get the status of a path
 
 #### Preconditions
 
@@ -57,37 +71,46 @@ defined by `setWorkingDirectory()`.
 #### Postconditions
 
 
-    FS' = FS
-    result = FileStatus(length(p), isDirectory(p), [metadata], p)) 
+
+    result = FileStatus where:
+        if isFile(FS, p) :
+            result.length = len(FS.Files[p])
+            result.isdir = False
+        elif isDir(FS, p) :
+            result.length = 0
+            result.isdir = True
+        elif isSymlink(FS, p) :
+            result.length = 0
+            result.isdir = false
+            result.symlink = FS.Symlinks[p]
   
- <!--  ============================================================= -->
- <!--  METHOD: mkdirs() -->
- <!--  ============================================================= -->
  
 ### `boolean mkdirs(Path p, FsPermission permission )`
+
+Create a directory and all its parents
 
 #### Preconditions
  
  
-     if isFile(p) :
-         raise {IOException, ParentNotDirectoryException, FileAlreadyExistsException}
+     if exists(FS, p) and not isDir(FS, p) :
+         raise [ParentNotDirectoryException, FileAlreadyExistsException, IOException]
      
  
 #### Postconditions
  
-
    
-     FS' where FS'.Directories' = FS.Directories + [pe foreach pe in p]  
-     result = true
- 
- The condition exclusivity requirement of a filesystem's directories,
- files and symbolic links myst hold, 
- 
- The probe for the existence and type of a path and directory creation MUST be
- atomic. The combined operation, including `mkdirs(parent(F))` MAY be atomic.
- 
- The return value is always true - even if
- a new directory is not created. (this is defined in HDFS)
+    FS' where FS'.Directories' = FS.Directories + p + ancestors(FS, p)  
+    result = True
+
+  
+The condition exclusivity requirement of a filesystem's directories,
+files and symbolic links must hold; in `FS'` all 
+
+The probe for the existence and type of a path and directory creation MUST be
+atomic. The combined operation, including `mkdirs(parent(F))` MAY be atomic.
+
+The return value is always true - even if
+a new directory is not created. (this is defined in HDFS)
 
 
 
@@ -96,10 +119,10 @@ defined by `setWorkingDirectory()`.
 <!--  METHOD: create() -->
 <!--  ============================================================= -->
 
-### FSDataOutputStream create(Path f, ...)
+### FSDataOutputStream create(Path p, ...)
 
 
-    FSDataOutputStream create(Path P,
+    FSDataOutputStream create(Path p,
           FsPermission permission,
           boolean overwrite,
           int bufferSize,
@@ -110,65 +133,68 @@ defined by `setWorkingDirectory()`.
 
 #### Preconditions
 
-    #file must not exist for a no-overwrite create
-    not overwrite and isFile(FS, P)  => raise FileAlreadyExistsException
-    #it must not be a directory either; exception is the same
-    not overwrite and isDir(FS, P)  => raise FileAlreadyExistsException
-      
-    #overwriting a directory must fail.    
-    not isDir(FS,P) else raise FileAlreadyExistsException, FileNotFoundException
+    # file must not exist for a no-overwrite create
+    if not overwrite and isFile(FS, p)  : raise FileAlreadyExistsException
     
-    
-    # MUST raise FileAlreadyExistsException, FileNotFoundException
-    not  exists(FS, P) else (overwrite and isFile(FS, P))
-    isDir(FS, parent(P)) else mkdirs(parent(P))
-
-
-#### Postconditions
+    #writing to or overwriting a directory must fail.    
+    if isDir(FS, p) : raise {FileAlreadyExistsException, FileNotFoundException, IOException}
   
 
-    FS' where isFile(FS', P)) 
-  
-
-Return: `FSDataOutputStream`, where `FSDataOutputStream.write(byte)`,
-will, after any flushing, sycing and committing, add `byte`
-to the tail of the list returned by `data(FS, P)`.
-
-* Filesystems may reject the request for other
+Filesystems may reject the request for other
 reasons -such as the FS being read-only  (HDFS), 
 the block size being below the minimum permitted (HDFS),
 the replication count being out of range (HDFS),
 quotas on namespace or filesystem being exceeded, reserved
 names, ...etc. All rejections SHOULD be `IOException` or a subclass thereof
-and MAY be a `RuntimeException` or subclass. (HDFS: `InvalidPathException`)
+and MAY be a `RuntimeException` or subclass. (HDFS may raise: `InvalidPathException`)
+
+#### Postconditions
+  
+
+
+    FS' where :
+       FS'.Files[p] == []
+       ancestors(p) is-subset-of FS'.Directories 
+       
+    result= FSDataOutputStream
+  
+The updated (valid) filesystem must contains all the parent directories of the path, as created by `mkdirs(parent(p))`.
+
+The result is `FSDataOutputStream`, which through its operations may generate new filesystem states with updated values of
+`FS.Files[p]`
+
 
 * S3N, Swift and other blobstores do not currently change the FS state
 until the output stream `close()` operation is completed.
-This MAY be a bug, as it allows >1 client to create a file with overwrite=false
+This MAY be a bug, as it allows >1 client to create a file with overwrite=false, and potentially confuse file/directory logic
 
 * Local FS raises a `FileNotFoundException` when trying to create a file over
 a directory, hence it is is listed as a possible exception to raise
 in this situation.
 
+* Not covered: symlinks. The resolved path of the symlink is used as the final path argument to the `create()` operation
+
 <!--  ============================================================= -->
 <!--  METHOD: append() -->
 <!--  ============================================================= -->
 
-### FSDataOutputStream append(Path P, int bufferSize, Progressable progress)
+### FSDataOutputStream append(Path p, int bufferSize, Progressable progress)
 
 Implementations MAY throw `UnsupportedOperationException`
   
 #### Preconditions
 
-    exists(FS, P) else raise FileNotFoundException
-    isFile(FS, P)) else raise FileNotFoundException or IOException
+    if not exists(FS, p) : raise FileNotFoundException
+    
+    if not isFile(FS, p)) : raise [FileNotFoundException, IOException]
 
 #### Postconditions
   
+    FS
+    result = FSDataOutputStream
 
-Return: `FSDataOutputStream`, where `FSDataOutputStream.write(byte)`,
-will, after any flushing, syncing and committing, add `byte`
-to the tail of the list returned by `data(FS, P)`.
+Return: `FSDataOutputStream`, which can update the entry FS.Files[p] by appending data to the existing list
+
   
 
 <!--  ============================================================= -->
@@ -177,24 +203,29 @@ to the tail of the list returned by `data(FS, P)`.
 
 ### FSDataInputStream open(Path f, int bufferSize)
 
-  Implementations MAY throw `UnsupportedOperationException`
+Implementations MAY throw `UnsupportedOperationException`
   
 #### Preconditions
 
-    not exists(FS, P) else raise FileNotFoundException
-    not isFile(FS, P)) else raise FileNotFoundException or IOException
+    if not isFile(FS, p)) : raise [FileNotFoundException, IOException]
 
 
 #### Postconditions
   
+    result = FSDataInputStream
   
-#### HDFS implementation details
+The result provides access to the byte array defined by `FS.Files[p]`; whether that 
+access is to the contents at the time the `open()` operation was invoked, 
+or whether and how it may pick up changes to that data in later states of FS is
+an implementation detail.
+  
+#### HDFS implementation notes
 
 1. MAY throw `UnresolvedPathException` when attempting to traverse
 symbolic links
 
 1. throws `IOException("Cannot open filename " + src)` if the path
-exists in the metadata, but copies of its blocks can be located;
+exists in the metadata, but no copies of any its blocks can be located;
 -`FileNotFoundException` would seem more accurate and useful.
   
 
@@ -206,40 +237,61 @@ exists in the metadata, but copies of its blocks can be located;
 
 #### Preconditions
 
-    # a directory with children and recursive == false cannot be deleted
-    # raise IOException
-    isDir(FS, P) => (recursive else childen(FS, P) == {} )
+A directory with children and recursive == false cannot be deleted
+ 
+    if isDir(FS, p) and not recursive and (childen(FS, p) != {}) : raise IOException
 
 
 #### Postconditions
 
-    #return false if file does not exist; FS state does not change
-    not exists(FS, P) => (FS, false)
+return false if file does not exist; FS state does not change
     
-    # a path referring to a file is removed, return value: true
-    isFile(FS, P) => (FS' where (not exists(FS', P)), true)
-  
+    if not exists(FS, p):
+        FS' = FS
+        result = False
     
-    # deleting an empty root returns true or false
-    isDir(FS, P) and isRoot(P) and childen(FS, P) == {} 
-      => (FS, true)) 
+
+a path referring to a file is removed, return value: true
+
+    if isFile(FS, p) :
+        FS' = (FS.Directories, FS.Files - p, FS.Symlinks)
+        result = True
   
-    # deleting an empty directory that is not root will remove the path from the FS
-    isDir(FS, P) and not isRoot(P) and childen(FS, P) == {} 
-      => ((FS' where (not exists(FS', P) and not exists(descendents(FS', P))) , true) 
+
+deleting an empty root does not change the filesystem state
+and may return true or false
+  
+    if isDir(FS, p) and isRoot(p) and childen(FS, p) == {} :
+        FS ' = FS
+        result = (undetermined)
+  
+Deleting an empty directory that is not root will remove the path from the FS and
+return true
+
+    if isDir(FS, p) and not isRoot(p) and childen(FS, p) == {} :
+        FS' = (FS.Directories - p, FS.Files, FS.Symlinks)
+        result = True 
   
   
-    # deleting a root path with children & recursive==true|false
-    # removes the path and all descendents
-    
-    isDir(FS, P) and isRoot(P) and recursive  
-      => (FS' where  not exists(descendents(FS', P)), true 
-      
-    # deleting a non-root path with children & recursive==true | false
-    # removes the path and all descendents
-    
-    isDir(FS, P) and not isRoot(P) and recursive => 
-     ( FS' where (not exists(FS', P) not exists(descendents(FS', P))): not parent(F,P))
+Deleting a root path with children and recursive==true removes all descendants
+
+    if isDir(FS, p) and isRoot(p) and recursive :
+        FS' where forall d in descendants(FS, p):
+            not isDir(FS', d)
+            and not isFile(FS', d)
+            and not isSymlink(FS', d)
+        result = True 
+
+Deleting a non-root path with children & recursive==true  removes the path and all descendants
+
+    if isDir(FS, p) and not isRoot(p) and recursive :
+        FS' where:
+            not isDir(FS', p)
+            and forall d in descendants(FS, p):
+                not isDir(FS', d)
+                not isFile(FS', d)
+                not isSymlink(FS', d)
+        result = True 
 
 
 * Deleting a file is an atomic action.
@@ -256,68 +308,92 @@ exists in the metadata, but copies of its blocks can be located;
 <!--  ============================================================= -->
 
 
-### `FileSystem.rename(Path S, Path D)`
+### `FileSystem.rename(Path s, Path d)`
 
 Rename includes the calculation of the destination path. 
 If the destination exists and is a directory, the final destination
 of the rename becomes the destination + the filename of the source path.
   
-    D' := if (isDir(D) and Dnot =S) then (D :: filename(S)) else D.
+    dest = if (isDir(FS, s) and d != s) : 
+            d + [filename(s)]
+        else :
+            d
   
 #### Preconditions
 
 
-    #src cannot be root (special case of previous condition)
-    not isRoot(S)
+source must exist
+
+    if not exists(FS, s) : raise FileNotFoundException
+
   
-    # src must exist
-    # raise: FileNotFoundException
-    exists(FS, S)
-    
-    
-    #dest cannot be a descendent of src
-    not isDescendent(S, D')
+dest cannot be a descendant of src
+
+    if isDescendant(FS, s, dest) : raise IOException
+
+This implicitly covers the special case of `isRoot(FS, s)`  
+
   
-    #dest must be root, or have a parent that exists
-    isRoot(FS, D') else exists(FS, parent(D'))
-    
-    #parent must not be a file 
-    not isFile(FS, parent(D'))
-    
-    # a destination can be a file iff source == dest
-    # raise FileAlreadyExistsException
-    not isFile(FS, D') else S == D'
+`dest` must be root, or have a parent that exists
+
+    if not isRoot(FS, dest) and not exists(FS, parent(dest)) : raise IOException
   
+parent must not be a file 
+
+    if isFile(FS, parent(dest)) : raise IOException
+
+A destination can be a file iff source == dest
+
+    if isFile(FS, dest) and not s == dest : raise IOException
   
+
 
 #### Postconditions
 
 
 
-    #rename file to self is a no-op, returns true
-    isFile(FS, S) and S==D' => (FS, true) 
-    
-    #renaming a dir to self is no op; return value is not specified
-    # (posix => false, hdfs=> true)
-    isDir(FS, S) and S==D' => (FS, ?)
+
+renaming a dir to self is no op; return value is not specified
+In posix the result is false;  hdfs returns true
+
+    if isDir(FS, s) and s == dest :
+        FS' = FS
+        result = (undefined)
+
+
+ rename file to self is a no-op, returns true
+
+     if isFile(FS, s) and s == dest :
+         FS' = FS
+         result = True 
+
   
-    #renaming a file under dir adds file to dest dir, removes
-    #old entry
-    isFile(FS, S) and Snot =D' =>
-      FS' where (not exists(FS', S) and isFile(FS', D') and data(FS', D') == data(FS, S))
+Renaming a file under a dir adds file as a child of the dest dir, removes
+ old entry
+ 
+    if isFile(FS, s) and s != dest: 
+        FS' where:
+            FS'.Files = FS.Files - s + { dest: FS.Files[src]}
+
+A more declarative form of the postcondition would be:
   
-    # for a directory the entire tree under S exists under D, while 
-    # S and its descendents do not exist
-    isDir(FS, D) and Snot =D' =>
-      FS' where (
-      (not exists(FS', S) 
-        and isDir(FS', D')
-        and forall C in descendents(FS, S) : not exists(FS', C)) 
-        and forall C in descendents(FS, S) where isDir(C):
-          exists C' in paths(FS) where isDir(C') 
-          and childElements(D', C') == childElements(S, C)  
-          and data(FS', C') == data(FS, C))
-        )
+      not exists(FS', s) and data(FS', dest) == data(FS, s)
+
+  
+For a directory the entire tree under s will exists under dest, while 
+s and its descendants do not exist.
+
+    if isDir(FS, s) isDir(FS, dest) and s != dest :
+        FS' where:
+            not s in FS'.Directories
+            and dest in FS'.Directories
+            and forall c in descendants(FS, s) :
+                not exists(FS', c)) 
+            and forall c in descendants(FS, s) where isDir(FS, c):
+                isDir(FS', dest + childElements(s, c)
+            and forall c in descendants(FS, s) where not isDir(FS, c):
+                    data(FS', dest + childElements(s, c)) == data(FS, c)
+        result = True
 
 
 #### Notes
@@ -348,17 +424,17 @@ meets the filter's conditions.
 
 
     #path must exist
-    exists(FS, P) else raise FileNotFoundException
+    exists(FS, p) else raise FileNotFoundException
   
 
 #### Postconditions
   
 
-    isFile(FS, P) and Filter(P) => [FileStatus(FS, P)]
+    isFile(FS, p) and Filter(P) => [FileStatus(FS, p)]
     
-    isFile(FS, P) and not Filter(P) => []
+    isFile(FS, p) and not Filter(P) => []
     
-    isDir(FS, P) => [all C in children(FS, P) where Filter(C) == true] 
+    isDir(FS, p) => [all C in children(FS, p) where Filter(C) == True] 
   
 
 
@@ -390,7 +466,7 @@ attributes of any files, and the existence of the path supplied.
     FS
     
     if (F == null => null
-    F not =null and F.getLen() <= S ==>  []
+    F !=null and F.getLen() <= S ==>  []
   
 
 
@@ -420,7 +496,7 @@ directory. As `FileStatus.getLen()` for a directory is 0, it is
 implictly returning []
 
 
-  *REVIEW*: Action if `isDirectory(FS, P)` ? 
+  *REVIEW*: Action if `isDirectory(FS, p)` ? 
   
 <!--  ============================================================= -->
 <!--  METHOD: getFileBlockLocations() -->
@@ -432,8 +508,8 @@ implictly returning []
 
 
 
-    P not = null else raise NullPointerException
-    exists(FS, P) else raise FileNotFoundException
+    P != null else raise NullPointerException
+    exists(FS, p) else raise FileNotFoundException
   
 
 #### Postconditions
@@ -479,7 +555,7 @@ Implementations MAY throw `UnsupportedOperationException`
 #### Preconditions
 
 
-    Srcsnot =[] else raise IllegalArgumentException
+    Srcs!=[] else raise IllegalArgumentException
     exists(FS, T)
     
     # all sources MUST be in the same directory

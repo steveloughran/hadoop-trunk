@@ -48,17 +48,19 @@ but in an ascii form and the use of Python list notation for manipulating lists 
 * `∃` : `exists` Exists predicate
 * `∀` : `forall`: For all predicate
 * `=` : `==` Equals operator
-* `≠` : `!=` operator. In Java `z ≠ y` is written as `not  ( z == y )` provided that `z` and `y` are from simple types that can be compared
+* `≠` : `!=` operator. In Java `z ≠ y` is written as `!( z.equals(y))` for all non-simple datatypes
 * `≡` : `equivalent-to` equivalence operator. This is stricter than equals.
 * `∅` : `{}` Empty Set. `∅ ≡ {}`
 * `≈` : `approximately-equal-to` operator
-* `¬` : `not` Not operator. In Java, `not `
+* `¬` : `not` Not operator. In Java, `!`
 * `∄` : `does-not-exist`: Does not exist predicate. Equivalent to `not exists`
 * `∧` : `and` : local and operator. In Java , `and`  
 * `∨` : `or` : local and operator. In Java, `else`  
-* `` : `` :  
 * `∈` : `in` : element of
 * `∉` : `not-in` : not an element of
+* `⊆` : `subset-or-equal-to` the subset or equality condition
+* `⊂` : `subset-of` the proper subset condition
+
 * `:=` : `` :  
 
 * `` : `#` :  Python-style comments
@@ -145,14 +147,15 @@ It can be used in the if-then-else sequence to define an action if a preconditio
 Example:
 
     if not exists(FS, Path) : raise IOException
-    
+
 If implementations may raise any one of a set of exceptions, this is denoted by
 providing a set of exceptions:
 
-    if not exists(FS, Path) : raise { IOException, FileNotFoundException}
+    if not exists(FS, Path) : raise [FileNotFoundException, IOException]
 
-In such cases, listed exceptions that are subclasses of other exceptions are
-to be preferred, on the basis that they aid diagnosis of problems.
+In such preconditions, if a list of exceptions is to be provided, the earlier elements
+of the list are preferred to the later entries, on the basis that they aid diagnosis of problems.
+If a set of exceptions is stated
 
 We also need to distinguish predicates that MUST be satisfied, along with those that SHOULD be met.
 For this reason a function specification MAY include a section in the preconditions marked 'Should:'
