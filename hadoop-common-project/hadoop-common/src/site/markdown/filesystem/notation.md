@@ -77,9 +77,11 @@ are used as the basis for this syntax as it is both plain ASCII and well known
 
 * A list *L* is an ordered sequence of elements `[e1, e2, ... en]`
 * The size of a list `len(L)` is the number of elements in a list
-* Items can be addressed by a 0-based index  `e1==L[0]`
+* Items can be addressed by a 0-based index  `e1 == L[0]`
 * Python slicing operators can address subsets of a list `L[0:3]==[e1,e2]`, `L[:-1]==en`
-* Lists can be concatenated `L' = [ h ] + L`
+* Lists can be concatenated `L' = L + [ e3 ]`
+* Lists can have entries removed `L' = L - [ e2, e1 ]`. This is different from Python's
+`del` operation, which operates on the list in place 
 * The membership predicate `in` returns true iff an element is a member of a List: `e2 in L`
 * List comprehensions can create new lists: `L' = [ x for x in l where x < 5]`
 * for a list `L`, `len(L)` returns the number of elements.
@@ -99,6 +101,7 @@ is that the difference between a set and a dictionary can be determined from the
 * Set comprehension uses the Python list comprehension
 `S' = {s for s in S where len(s)==2}`
 * for a set *S*, `len(S)` returns the number of elements.
+* The `-` operator returns a new set excluding all items listed in the righthand set of the operator
 
 
 
@@ -109,6 +112,7 @@ Maps resemble Python dictionaries; {"key":value, "key2",value2}
 * `keys(Map)` represents the set of keys in a map
 * `k in Map` holds iff `k in keys(Map)`
 * The empty map is written `{:}`
+* The `-` operator returns a new map which excludes the entry with the key specified
 
 
 ##### Strings
