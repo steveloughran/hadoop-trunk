@@ -263,7 +263,7 @@ a new directory is not created. (this is defined in HDFS)
 <!--  METHOD: create() -->
 <!--  ============================================================= -->
 
-### FSDataOutputStream create(Path p, ...)
+### FSDataOutputStream create(Path, ...)
 
 
     FSDataOutputStream create(Path p,
@@ -277,10 +277,12 @@ a new directory is not created. (this is defined in HDFS)
 
 #### Preconditions
 
-    # file must not exist for a no-overwrite create
+File must not exist for a no-overwrite create
+  
     if not overwrite and isFile(FS, p)  : raise FileAlreadyExistsException
-    
-    #writing to or overwriting a directory must fail.    
+  
+Writing to or overwriting a directory must fail.    
+
     if isDir(FS, p) : raise {FileAlreadyExistsException, FileNotFoundException, IOException}
   
 
@@ -297,10 +299,10 @@ and MAY be a `RuntimeException` or subclass. (HDFS may raise: `InvalidPathExcept
 
 
     FS' where :
-       FS'.Files[p] == []
-       ancestors(p) is-subset-of FS'.Directories 
+       FS'.Files'[p] == []
+       ancestors(p) is-subset-of FS'.Directories' 
        
-    result= FSDataOutputStream
+    result = FSDataOutputStream
   
 The updated (valid) filesystem must contains all the parent directories of the path, as created by `mkdirs(parent(p))`.
 
@@ -330,7 +332,7 @@ Implementations MAY throw `UnsupportedOperationException`
 
     if not exists(FS, p) : raise FileNotFoundException
     
-    if not isFile(FS, p)) : raise [FileNotFoundException, IOException]
+    if not isFile(FS, p) : raise [FileNotFoundException, IOException]
 
 #### Postconditions
   
@@ -398,7 +400,7 @@ return false if file does not exist; FS state does not change
 a path referring to a file is removed, return value: true
 
     if isFile(FS, p) :
-        FS' = (FS.Directories, FS.Files - p, FS.Symlinks)
+        FS' = (FS.Directories, FS.Files - [p], FS.Symlinks)
         result = True
   
 
@@ -520,8 +522,8 @@ In posix the result is false;  hdfs returns true
  
  Rename file a over an existing file where `s != dest` results in
 
-             FS' = FS
-             result = False
+     FS' = FS
+     result = False
 
 
  This situation arises iff attempts to rename a file onto a different file are not considered
@@ -545,7 +547,7 @@ For a directory the entire tree under `s` will then exist under `dest`, while th
     if isDir(FS, s) isDir(FS, dest) and s != dest :
         FS' where:
             not exists(FS', s)
-            and dest in FS'.Directories
+            and dest in FS'.Directories]
             and forall c in descendants(FS, s) :
                 not exists(FS', c)) 
             and forall c in descendants(FS, s) where isDir(FS, c):
