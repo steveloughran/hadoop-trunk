@@ -37,12 +37,12 @@ but in an ascii form and the use of Python list notation for manipulating lists 
 
 * `iff` : `iff`: If and only if
 * `⇒` : `implies`
-* `→` : `--&gt;` total function
-* `↛` : `-&gt;` partial function
+* `→` : `-->` total function
+* `↛` : `->` partial function
 
 
 * `∩` : `^`: Set Intersection 
-* `∪` : `|`: Set Union
+* `∪` : `+`: Set Union
 * `\` : `-`: Set Difference
 
 * `∃` : `exists` Exists predicate
@@ -54,14 +54,15 @@ but in an ascii form and the use of Python list notation for manipulating lists 
 * `≈` : `approximately-equal-to` operator
 * `¬` : `not` Not operator. In Java, `!`
 * `∄` : `does-not-exist`: Does not exist predicate. Equivalent to `not exists`
-* `∧` : `and` : local and operator. In Java , `and`  
-* `∨` : `or` : local and operator. In Java, `else`  
+* `∧` : `and` : local and operator. In Java , `&&`  
+* `∨` : `or` : local and operator. In Java, `||`  
 * `∈` : `in` : element of
-* `∉` : `not-in` : not an element of
+* `∉` : `not in` : not an element of
 * `⊆` : `subset-or-equal-to` the subset or equality condition
 * `⊂` : `subset-of` the proper subset condition
+* `| p |` : `len(p)` the size of a variable
 
-* `:=` : `` :  
+* `:=` : `=` :  
 
 * `` : `#` :  Python-style comments
 
@@ -78,7 +79,7 @@ are used as the basis for this syntax as it is both plain ASCII and well known
 * A list *L* is an ordered sequence of elements `[e1, e2, ... en]`
 * The size of a list `len(L)` is the number of elements in a list
 * Items can be addressed by a 0-based index  `e1 == L[0]`
-* Python slicing operators can address subsets of a list `L[0:3]==[e1,e2]`, `L[:-1]==en`
+* Python slicing operators can address subsets of a list `L[0:3] == [e1,e2]`, `L[:-1] == en`
 * Lists can be concatenated `L' = L + [ e3 ]`
 * Lists can have entries removed `L' = L - [ e2, e1 ]`. This is different from Python's
 `del` operation, which operates on the list in place 
@@ -100,7 +101,7 @@ is that the difference between a set and a dictionary can be determined from the
 * The membership predicate is `in`
 * Set comprehension uses the Python list comprehension
 `S' = {s for s in S where len(s)==2}`
-* for a set *S*, `len(S)` returns the number of elements.
+* for a set *s*, `len(s)` returns the number of elements.
 * The `-` operator returns a new set excluding all items listed in the righthand set of the operator
 
 
@@ -113,7 +114,7 @@ Maps resemble Python dictionaries; {"key":value, "key2",value2}
 * `k in Map` holds iff `k in keys(Map)`
 * The empty map is written `{:}`
 * The `-` operator returns a new map which excludes the entry with the key specified
-
+* `len(Map)` returns the number of entries in the map
 
 ##### Strings
 
@@ -138,7 +139,7 @@ where the postconditions define the new state of the system and the return value
 
 ### Exceptions
 
-In classic Z-style specification languages, the preconditions define the predicates that MUST be
+In classic Z specification languages, the preconditions define the predicates that MUST be
 satisfied else some failure condition is raised. 
 
 For Hadoop we need to be able to specify what failure condition results if a specification is not
@@ -173,12 +174,12 @@ Should:
 
 Functions can be divided into partial functions and total functions.
 
-Total functions have a valid output for every input, for example `def double(i :Int)--&gt;Int: i * 2` is valid for all integers
+Total functions have a valid output for every input, for example `def double(i :Int)-->Int: i * 2` is valid for all integers
 
-Partial functions are not valid for all inputs, for example, `def inverse:(i: Int)-&gt;Float: 1/i` is not valid for the input 0.
+Partial functions are not valid for all inputs, for example, `def inverse:(i: Int)->Float: 1/i` is not valid for the input 0.
 
-Total functions are notated with the term `--&gt;` partial functions -which form the majority of functions in this
-specification, with `-&gt;`.
+Total functions are notated with the term `-->` partial functions -which form the majority of functions in this
+specification, with `->`.
 
 
 

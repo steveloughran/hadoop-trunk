@@ -12,7 +12,7 @@
   limitations under the License. See accompanying LICENSE file.
 -->
   
-# A model of a Filesystem
+# A Model of a Hadoop Filesystem
 
 
 
@@ -139,7 +139,6 @@ A path MAY refer to a directory in a filesystem
   
     isDir(FS, p): p in FS.Directories 
 
-
 Directories may have children, that is, there may exist other paths
 in the filesystem whose path begins with a directory. Only directories
 may have children. This can be expressed
@@ -159,7 +158,6 @@ must contain at least one directory.
 A directory may have children
   
     def children(FS, p) :  {q for q in paths(FS) where parent(q) == p}
-
 
 There are no duplicate names in the child paths, because all paths are
 taken from the set of lists of path elements: there can be no duplicate entries
