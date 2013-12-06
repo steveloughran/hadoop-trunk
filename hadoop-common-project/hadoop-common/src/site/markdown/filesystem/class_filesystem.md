@@ -91,6 +91,30 @@ Get the status of a path
             stat.isdir = false
             stat.symlink = FS.Symlinks[p]
 
+### Path getHomeDirectory()
+
+The function `getHomeDirectory` returns the home directory for the Filesystem and the current user account.
+For some filesystems, the path is `["/","users", System.getProperty("user-name")]`. However,
+for HDFS, the username is derived from the credentials used to authenticate the client with HDFS -this
+may differ from the local user account name.
+
+Accordingly, it is the responsibility of the filesystem to determine the home directory
+of the caller
+
+
+#### Preconditions
+
+
+#### Postconditions
+
+    result = p:path where:
+        valid-path(FS, p)
+
+There is no requirement that the path exists at the time the method was called,
+or, if it exists, that it points to a directory. However, code tends to assume
+that `not isfile(FS, getHomeDirectory())` holds to the extent that follow-on
+code may fail.
+
 
 <!--  ============================================================= -->
 <!--  METHOD: listStatus() -->

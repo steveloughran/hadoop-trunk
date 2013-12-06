@@ -43,7 +43,7 @@ or the element as a whole is invalid
 
 Predicate: `valid-path:List<PathElement>`
 
-A Path `p` is valid if all path elements in it are valid
+A Path `p` is *valid* if all path elements in it are valid
 
     def valid-path(pe): forall pe in Path: valid-path-element(pe)
 
@@ -105,7 +105,7 @@ such as `rename`.
 
 A filesystem `FS` contains a set of directories, a dictionary of paths and a dictionary of symbolic links
 
-    (Directories:set<Path>, Files:[Path:List[byte]], Symlinks:[Path:Path]]) 
+    (Directories:set[Path], Files:[Path:List[byte]], Symlinks:set[Path]) 
 
 
 Accessor functions return the specific element of a filesystem
@@ -115,21 +115,21 @@ Accessor functions return the specific element of a filesystem
     def symlinks(FS) = FS.Directories
 
 
-    def filenames(FS): keys(FS.Files) 
+    def filenames(FS) = keys(FS.Files) 
     
 The entire set of a paths finite subset of all possible Paths, and functions to resolve a path to data, a directory predicate or a symbolic link
 
-    def paths(FS) : FS.Directories | filenames(FS) | FS.Symlinks) 
+    def paths(FS) = FS.Directories + filenames(FS) + FS.Symlinks) 
 
 A path is deemed to exist if it is in this aggregate set
 
-    def exists(FS, p): p in paths(FS)
+    def exists(FS, p) = p in paths(FS)
 
-*Root* The root path, "/" is a directory represented  by the path [], which must always exist in a filesystem
+*Root* The root path, "/" is a directory represented  by the path ["/"], which must always exist in a filesystem
   
-    def isRoot(p) : p == [].
+    def isRoot(p) = p == ["/"].
     
-    forall FS in FileSystems : [] in FS.Directories
+    forall FS in FileSystems : ["/"] in FS.Directories
 
 
 
@@ -157,7 +157,7 @@ must contain at least one directory.
   
 A directory may have children
   
-    def children(FS, p) :  {q for q in paths(FS) where parent(q) == p}
+    def children(FS, p) = {q for q in paths(FS) where parent(q) == p}
 
 There are no duplicate names in the child paths, because all paths are
 taken from the set of lists of path elements: there can be no duplicate entries
@@ -166,12 +166,12 @@ in a set, hence no children with duplicate names.
 A path *D* is a descendant of a path *P* if it is the direct child of the
 path *P* or an ancestor is a direct child of path *P*
   
-    def isDescendant(P, D) : parent(D) == P where isDescendant(P, parent(D)) 
+    def isDescendant(P, D) = parent(D) == P where isDescendant(P, parent(D)) 
   
 The descendants of a directory P are all paths in the filesystem whose
 path begins with the path P -that is their parent is P or an ancestor is P
 
-    def descendants(FS, D): {p for p in paths(FS) where isDescendant(D, p)} 
+    def descendants(FS, D) = {p for p in paths(FS) where isDescendant(D, p)} 
 
 
 #### File references
@@ -194,6 +194,16 @@ A path MAY refer to a symbolic link
     
     def length(FS, p) = if isFile(p) : return length(data(FS, p)) else return 0
 
+### User home
+
+The home directory of a user is an implicit part of a filesystem, and is derived from the userid of the 
+process working with the filesystem
+
+    def getHomeDirectory(FS) : Path
+
+The function `getHomeDirectory` returns the home directory for the Filesystem and the current user account.
+For some filesystems, the path is `["/","users", System.getProperty("user-name")]`. However,
+for HDFS, 
 
 #### Exclusivity
 
