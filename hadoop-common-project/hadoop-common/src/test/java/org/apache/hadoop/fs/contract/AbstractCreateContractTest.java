@@ -56,8 +56,9 @@ public abstract class AbstractCreateContractTest extends
     try {
       writeDataset(getFileSystem(), path, data2, data2.length, 1024, false);
       fail("writing without overwrite unexpectedly succeeded");
-    } catch (FileAlreadyExistsException e) {
+    } catch (FileAlreadyExistsException expected) {
       //expected
+      handleExpectedException(expected);
     }
   }
 
@@ -92,6 +93,7 @@ public abstract class AbstractCreateContractTest extends
       fail("write of file over empty dir succeeded");
     } catch (FileAlreadyExistsException expected) {
       //expected
+      handleExpectedException(expected);
     } catch (FileNotFoundException e) {
       handleRelaxedException("overwriting a dir with a file ",
                              "FileAlreadyExistsException",
@@ -120,6 +122,7 @@ public abstract class AbstractCreateContractTest extends
       fail("write of file over dir succeeded");
     } catch (FileAlreadyExistsException expected) {
       //expected
+      handleExpectedException(expected);
     } catch (FileNotFoundException e) {
       handleRelaxedException("overwriting a dir with a file ",
                              "FileAlreadyExistsException",

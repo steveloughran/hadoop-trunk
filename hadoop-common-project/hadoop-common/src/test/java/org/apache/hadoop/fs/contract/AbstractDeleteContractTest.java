@@ -69,8 +69,9 @@ public abstract class AbstractDeleteContractTest extends
       boolean deleted = getFileSystem().delete(path, false);
       fail("non recursive delete should have raised an exception," +
            " but completed with exit code " + deleted);
-    } catch (IOException e) {
+    } catch (IOException expected) {
       //expected
+      handleExpectedException(expected);
     }
     ContractTestUtils.assertIsDirectory(getFileSystem(), path);
   }
