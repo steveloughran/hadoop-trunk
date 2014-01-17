@@ -41,7 +41,7 @@ public class HDFSContract extends AbstractFSContract {
   public static final String CONTRACT_HDFS_XML = "contract/hdfs.xml";
   public static final int BLOCK_SIZE = AbstractFSContractTestBase.TEST_FILE_LEN;
   private static MiniDFSCluster cluster;
-  
+
   public HDFSContract(Configuration conf) {
     super(conf);
     //insert the base features
@@ -53,14 +53,14 @@ public class HDFSContract extends AbstractFSContract {
     conf.addResource(CONTRACT_HDFS_XML);
     //hack in a 256 byte block size
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
-    
+
     cluster =
       new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     cluster.waitClusterUp();
   }
 
   public static void destroyCluster() throws IOException {
-    if (cluster!=null) {
+    if (cluster != null) {
       cluster.shutdown();
     }
   }
