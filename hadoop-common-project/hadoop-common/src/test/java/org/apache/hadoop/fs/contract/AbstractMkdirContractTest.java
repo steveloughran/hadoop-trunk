@@ -101,7 +101,7 @@ public abstract class AbstractMkdirContractTest extends AbstractFSContractTestBa
       //parent is a directory  
       handleExpectedException(e);
     } catch (FileAlreadyExistsException e) {
-      handleRelaxedException("mkdirs", "ParentNotDirectoryException", e);
+      handleExpectedException(e);
     } catch (IOException e) {
       handleRelaxedException("mkdirs", "ParentNotDirectoryException", e);
     }
