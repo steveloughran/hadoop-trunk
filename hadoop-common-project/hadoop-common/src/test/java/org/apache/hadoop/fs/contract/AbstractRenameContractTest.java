@@ -38,6 +38,12 @@ public abstract class AbstractRenameContractTest extends
     return getFileSystem().rename(src, dst);
   }
 
+  /**
+   * Expect a rename exception to raise an exception
+   * @param src source path
+   * @param dst destination path
+   * @throws IOException any exception raised during the rename operation
+   */
   public void expectRenameToFault(Path src, Path dst) throws IOException {
     boolean renamed = rename(src, dst);
     //expected an exception
@@ -48,6 +54,27 @@ public abstract class AbstractRenameContractTest extends
     fail("expected rename(" + src + ", " + dst + " ) to fail," +
          " got a result of " + renamed
          + " and a dest dir of " + destDirLS);
+  }
+
+  /**
+   * Expect a rename exception to raise an exception or fail
+   * by returning false.
+   * @param src source path
+   * @param dst destination path
+   * @throws IOException any exception raised during the rename operation
+   */
+  public void expectRenameToFaultOrFail(Path src, Path dst) throws IOException {
+    boolean renamed = rename(src, dst);
+    if (renamed) {
+      //expected an exception
+      String destDirLS = ContractTestUtils.ls(getFileSystem(), dst.getParent());
+      getLog().error(
+        "src dir " + ContractTestUtils.ls(getFileSystem(), src.getParent()));
+      getLog().error("dest dir " + destDirLS);
+      fail("expected rename(" + src + ", " + dst + " ) to fail," +
+           " got a result of " + renamed
+           + " and a dest dir of " + destDirLS);
+    }
   }
 
   @Test
@@ -87,7 +114,7 @@ public abstract class AbstractRenameContractTest extends
     writeDataset(getFileSystem(), path2, data2, data2.length, 1024, false);
     assertIsFile(path2);
     try {
-      expectRenameToFault(path, path2);
+      expectRenameToFaultOrFail(path, path2);
     } catch (FileAlreadyExistsException e) {
       handleExpectedException(e);
     }
