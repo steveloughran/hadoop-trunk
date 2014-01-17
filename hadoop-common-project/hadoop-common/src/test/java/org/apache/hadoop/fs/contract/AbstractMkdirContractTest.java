@@ -71,7 +71,8 @@ public abstract class AbstractMkdirContractTest extends AbstractFSContractTestBa
       //parent is a directory  
       handleExpectedException(e);
     } catch (FileAlreadyExistsException e) {
-      handleRelaxedException("mkdirs", "ParentNotDirectoryException", e);
+      //also allowed as an exception (HDFS)
+      handleExpectedException(e);;
     } catch (IOException e) {
       //here the FS says "no create"  
       handleRelaxedException("mkdirs", "FileAlreadyExistsException", e);
