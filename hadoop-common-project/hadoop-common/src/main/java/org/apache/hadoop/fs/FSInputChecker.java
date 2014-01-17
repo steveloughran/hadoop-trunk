@@ -395,7 +395,7 @@ abstract public class FSInputChecker extends FSInputStream {
 
   @Override
   public synchronized void seek(long pos) throws IOException {
-    if( pos<0 ) {
+    if( pos < 0 ) {
       throw new EOFException("Cannot seek to a negative position");
     }
     // optimize: check if the pos is in the buffer

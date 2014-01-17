@@ -340,7 +340,7 @@ public class NativeS3FileSystem extends FileSystem {
       Progressable progress) throws IOException {
 
     if (exists(f) && !overwrite) {
-      throw new FileAlreadyExistsException("File already exists:" + f);
+      throw new FileAlreadyExistsException("File already exists: " + f);
     }
     
     if(LOG.isDebugEnabled()) {
