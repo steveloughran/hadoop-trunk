@@ -96,7 +96,11 @@ public abstract class AbstractRootDirectoryContractTest extends AbstractFSContra
     boolean deleted = getFileSystem().delete(root, true);
     ContractTestUtils.assertIsDirectory(getFileSystem(), root);
     LOG.info("rm -rf / result is " + deleted);
-    assertPathDoesNotExist("expected file to be deleted", file);
+    if (deleted) {
+      assertPathDoesNotExist("expected file to be deleted", file);
+    } else {
+      assertPathExists("expected file to be preserved", file);;
+    }
   }
 
   @Test

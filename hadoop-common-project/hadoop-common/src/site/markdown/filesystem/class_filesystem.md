@@ -239,8 +239,6 @@ of elements as the cluster topology MUST be provided, hence the
 
     result = integer  >= 0 
 
-
-
 Although there is no defined minimum value for this result, as it
 is used to partition work during job submission, a block size
 that is too small will result in either too many jobs being submitted
@@ -319,8 +317,6 @@ names, ...etc. All rejections SHOULD be `IOException` or a subclass thereof
 and MAY be a `RuntimeException` or subclass. (HDFS may raise: `InvalidPathException`)
 
 #### Postconditions
-  
-
 
     FS' where :
        FS'.Files'[p] == []
@@ -443,16 +439,30 @@ return true
         result = True 
   
   
-Deleting a root path with children and recursive==true removes all descendants
+Deleting a root path with children and `recursive==true`
+ can do one of two things
+
+In contrast, the Unix/Posix model assumes that if the user has
+the correct permissions to delete everything, 
+they are free to do so -resulting in an empty filesystem
 
     if isDir(FS, p) and isRoot(p) and recursive :
-        FS' where forall d in descendants(FS, p):
-            not isDir(FS', d)
-            and not isFile(FS', d)
-            and not isSymlink(FS', d)
+        FS' = ({["/"]}, {}, {}, {})
         result = True 
+        
+In contrast HDFS considers the accidental or intentional deletion
+of a multi-petabyte filesystem is always a mistake; the
+filesystem be taken offline and reformatted if and empty
+filesystem is desired.
 
-Deleting a non-root path with children & recursive==true  removes the path and all descendants
+    if isDir(FS, p) and isRoot(p) and recursive :
+        FS ' = FS
+        result = False
+ 
+
+
+Deleting a non-root path with children `recursive==true` 
+removes the path and all descendants
 
     if isDir(FS, p) and not isRoot(p) and recursive :
         FS' where:
@@ -461,7 +471,7 @@ Deleting a non-root path with children & recursive==true  removes the path and a
                 not isDir(FS', d)
                 not isFile(FS', d)
                 not isSymlink(FS', d)
-        result = True 
+        result = True
 
 
 * Deleting a file is an atomic action.
