@@ -164,14 +164,14 @@ public class TopologyTool extends Configured implements Tool {
 
     boolean successful;
     if (ACTION_TEST.equals(operation)) {
-      successful = resolveHostnameTopologies(argsList) == 0;
+      successful = resolveHostnameTopologies(argsList).isEmpty();
     } else if (ACTION_TESTFILE.equals(operation)) {
       if (args.length != 2) {
         usage();
         successful = false;
       } else {
         String filename = args[1];
-        successful = resolveHostFile(filename) == 0;
+        successful = resolveHostFile(filename).size() == 0;
       }
     } else {
       usage();
@@ -194,11 +194,12 @@ public class TopologyTool extends Configured implements Tool {
   /**
    * Load a file and hand its hostnames off for mapping
    *
+   *
    * @param filename the file to load
    * @return #of failed resolutions
    * @throws IOException on any IO problem
    */
-  private int resolveHostFile(String filename) throws IOException {
+  private List<TopoResolutionPair> resolveHostFile(String filename) throws IOException {
     BufferedReader reader = null;
     List<String> hostnames = new ArrayList<String>();
     try {
@@ -229,12 +230,14 @@ public class TopologyTool extends Configured implements Tool {
    */
   private List<TopoResolutionPair> resolveHostnameTopologies(List<String> hosts) {
     int failures = 0;
-    List<TopoResolutionPair> results =
+    List<TopoResolutionPair> resolved =
       new ArrayList<TopoResolutionPair>(hosts.size());
+    List<TopoResolutionPair> unresolved = new ArrayList<TopoResolutionPair>();
     for (String hostname : hosts) {
       TopoResolutionPair resultPair = new TopoResolutionPair();
-      results.add(resultPair);
-      resultPair.hostResult = resolveOneHost(hostname);
+      resolved.add(resultPair);
+      TopoResult resolvedHost = resolveOneHost(hostname);
+      resultPair.hostResult = resolvedHost;
       if (nslookup) {
         InetAddress ipaddr = nslookup(hostname);
         if (ipaddr != null) {
@@ -255,24 +258,25 @@ public class TopologyTool extends Configured implements Tool {
     }
     //now dump the topology
     printTopology(topology);
-    return results;
+    return resolved;
   }
 
   /**
    * Resolve one host, print out resolution and time to resolve
    * @param hostname hostname
-   * @return true if the topo resolution worked
+   * @return the result, null if the topo resolution failed
    */
   private TopoResult resolveOneHost(String hostname) {
-    TopoResult result = new TopoResult(hostname);
+    
     List<String> hostnameList = new ArrayList<String>(1);
     hostnameList.add(hostname);
     try {
+      TopoResult result = new TopoResult(hostname);
       long starttime = System.nanoTime();
       List<String> resolved = topology.resolve(hostnameList);
       long endtime = System.nanoTime();
-      result.resolvetimeMillis = (endtime - starttime) / 1.0e6;
-      String resolvedTo = "hostname " + hostname + "resolved to ";
+      result.resolveTimeMillis = (endtime - starttime) / 1.0e6;
+      String resolvedTo = "hostname " + hostname + " resolved to ";
       if (resolved == null) {
         LOG.warn(resolvedTo + "a null list");
       } else if (resolved.size() != 1) {
@@ -283,14 +287,16 @@ public class TopologyTool extends Configured implements Tool {
         StringBuilder builder = new StringBuilder();
         builder.append(resolvedTo)
                .append('"').append(resolved.get(0)).append("\" ");
-        double duration = result.resolvetimeMillis;
+        double duration = result.resolveTimeMillis;
         builder.append(" in ").append(duration).append(" milliseconds");
         println(builder.toString());
+        return result;
       }
     } catch (Exception e) {
       LOG.error("Failed to resolve host " + hostname + ": " + e, e);
     }
-    return result;
+    // only get here on a failure
+    return null;
   }
 
   /**
@@ -330,7 +336,7 @@ public class TopologyTool extends Configured implements Tool {
   public static class TopoResult {
     public String name;
     public String rack ="";
-    public double resolvetimeMillis;
+    public double resolveTimeMillis;
     public boolean resolved;
 
     public TopoResult(String name) {
@@ -351,7 +357,7 @@ public class TopologyTool extends Configured implements Tool {
         return String.format("%s on %srack \"%s\" (resolution time =%0.3fms)",
                              name,
                              (isDefaultRack()?"default ":""),
-                             rack, resolvetimeMillis);
+                             rack, resolveTimeMillis);
       } else {
         return String.format("%s on unknown rack",
                              name);
@@ -372,7 +378,16 @@ public class TopologyTool extends Configured implements Tool {
     TopoResult hostResult;
     TopoResult netResult;
   }
-  
-  
- 
+
+  public static class TopoResolutionOutcome {
+    public final List<TopoResolutionPair> resolved =
+      new ArrayList<TopoResolutionPair>();
+    public final List<TopoResolutionPair> unresolved =
+      new ArrayList<TopoResolutionPair>();
+    public final List<TopoResolutionPair> nslookupfailures =
+      new ArrayList<TopoResolutionPair>();
+
+    public TopoResolutionOutcome() {
+    }
+  }
 }

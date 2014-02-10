@@ -191,7 +191,7 @@ public abstract class AbstractDNSToSwitchMapping
       return ((AbstractDNSToSwitchMapping)mapping).dumpTopology();
     } else {
       return "Unpublished topology for " + mapping.getClass()
-          + "instance details "+ mapping;
+          + " instance details "+ mapping;
     }
   }
 }
