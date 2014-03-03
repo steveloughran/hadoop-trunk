@@ -79,6 +79,13 @@ public interface ContractOptions {
   String SUPPORTS_SEEK_PAST_EOF = "supports-seek-past-eof";
 
   /**
+   * Is seeking past the EOF supported? Some filesystems only raise an
+   * exception later, when trying to read.
+   * @{value}
+   */
+  String SUPPORTS_SEEK_ON_CLOSED_FILE = "supports-seek-past-eof";
+
+  /**
    * Flag to indicate that this FS expects to throw the strictest
    * exceptions it can, not generic IOEs, which, if returned,
    * must be rejected.

@@ -107,6 +107,7 @@ public abstract class AbstractSeekContractTest extends AbstractFSContractTestBas
   @Test
   public void testSeekReadClosedFile() throws Throwable {
     instream = getFileSystem().open(smallSeekFile);
+    getLog().info("Stream is of type " + instream.getClass().getCanonicalName());
     instream.close();
     try {
       instream.seek(0);
@@ -115,15 +116,21 @@ public abstract class AbstractSeekContractTest extends AbstractFSContractTestBas
       //expected a closed file
     }
     try {
-      instream.read();
-      fail("read succeeded on a closed stream");
+      int data = instream.available();
+      fail("read() succeeded on a closed stream, got " + data);
+    } catch (IOException e) {
+      //expected a closed file
+    }
+    try {
+      int data = instream.read();
+      fail("read() succeeded on a closed stream, got " + data);
     } catch (IOException e) {
       //expected a closed file
     }
     try {
       byte[] buffer = new byte[1];
       int result = instream.read(buffer, 0, 1);
-      fail("read succeeded on a closed stream");
+      fail("read(buffer, 0, 1) succeeded on a closed stream, got " + buffer[0]);
     } catch (IOException e) {
       //expected a closed file
     }
