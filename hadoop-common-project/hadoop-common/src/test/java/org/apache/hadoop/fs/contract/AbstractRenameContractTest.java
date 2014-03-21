@@ -150,7 +150,7 @@ public abstract class AbstractRenameContractTest extends
     Path renamedSrc = new Path(destDir, "source");
     assertIsFile(path2);
     assertIsDirectory(renamedSrc);
-    ContractTestUtils.verifyFileContents(getFileSystem(), path2, data);
+    ContractTestUtils.verifyFileContents(getFileSystem(), path2, data2);
     assertTrue("rename returned false though the contents were copied", rename);
   }
 

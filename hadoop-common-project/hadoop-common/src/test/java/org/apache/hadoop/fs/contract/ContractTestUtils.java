@@ -182,7 +182,7 @@ public class ContractTestUtils extends Assert {
     FileStatus stat = fs.getFileStatus(path);
     String statText = stat.toString();
     assertTrue("not a file " + statText, stat.isFile());
-    assertEquals("wrong length " + statText, stat.getLen(), original.length);
+    assertEquals("wrong length " + statText, original.length, stat.getLen());
     byte[] bytes = readDataset(fs, path, original.length);
     compareByteArrays(original,bytes,original.length);
   }
