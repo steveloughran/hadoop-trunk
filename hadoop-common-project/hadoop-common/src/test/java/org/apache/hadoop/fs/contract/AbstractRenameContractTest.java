@@ -19,12 +19,14 @@
 package org.apache.hadoop.fs.contract;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
+import static org.apache.hadoop.fs.contract.ContractTestUtils.assertIsDirectory;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.writeDataset;
 
@@ -47,13 +49,10 @@ public abstract class AbstractRenameContractTest extends
   public void expectRenameToFault(Path src, Path dst) throws IOException {
     boolean renamed = rename(src, dst);
     //expected an exception
-    String destDirLS = ContractTestUtils.ls(getFileSystem(), dst.getParent());
-    getLog().error(
-      "src dir " + ContractTestUtils.ls(getFileSystem(), src.getParent()));
-    getLog().error("dest dir " + destDirLS);
+    String destDirLS = generateAndLogErrorListing(src, dst);
     fail("expected rename(" + src + ", " + dst + " ) to fail," +
          " got a result of " + renamed
-         + " and a dest dir of " + destDirLS);
+         + " and a destination of " + destDirLS);
   }
 
   /**
@@ -67,14 +66,25 @@ public abstract class AbstractRenameContractTest extends
     boolean renamed = rename(src, dst);
     if (renamed) {
       //expected an exception
-      String destDirLS = ContractTestUtils.ls(getFileSystem(), dst.getParent());
-      getLog().error(
-        "src dir " + ContractTestUtils.ls(getFileSystem(), src.getParent()));
+      String destDirLS = generateAndLogErrorListing(src, dst);
       getLog().error("dest dir " + destDirLS);
       fail("expected rename(" + src + ", " + dst + " ) to fail," +
-           " got a result of " + renamed
-           + " and a dest dir of " + destDirLS);
+           " but got success and destination of " + destDirLS);
     }
+  }
+
+  protected String generateAndLogErrorListing(Path src, Path dst) throws
+                                                                  IOException {
+    FileSystem fs = getFileSystem();
+    getLog().error(
+      "src dir " + ContractTestUtils.ls(fs, src.getParent()));
+    String destDirLS = ContractTestUtils.ls(fs, dst.getParent());
+    if (fs.isDirectory(dst)) {
+      //include the dir into the listing
+      destDirLS = destDirLS + "\n" +
+                  ContractTestUtils.ls(fs, dst);
+    }
+    return destDirLS;
   }
 
   @Test
@@ -90,10 +100,10 @@ public abstract class AbstractRenameContractTest extends
   }
 
   @Test
-  public void testRenameNoFileSameDir() throws Throwable {
+  public void testRenameNonexistentFile() throws Throwable {
     describe("rename a file into a new file in the same directory");
-    Path path = path("testRenameNoFileSameDir");
-    Path path2 = path("testRenameNoFileSameDir2");
+    Path path = path("testRenameNonexistentFileSrc");
+    Path path2 = path("testRenameNonexistentFileDest");
     mkdirs(path.getParent());
     try {
       expectRenameToFault(path, path2);
@@ -119,6 +129,29 @@ public abstract class AbstractRenameContractTest extends
       handleExpectedException(e);
     }
     ContractTestUtils.verifyFileContents(getFileSystem(), path2, data2);
+  }
+  
+  @Test
+  public void testRenameDirIntoExistingDir() throws Throwable {
+    describe("Verify renaming a dir into an existing dir puts it underneath" +
+             "and leaves existing files alone");
+    Path srcDir = path("source");
+    Path path = new Path(srcDir, "source-256.txt");
+    byte[] data = dataset(256, 'a', 'z');
+    writeDataset(getFileSystem(), path, data, data.length, 1024, false);
+    Path destDir = path("dest");
+
+    Path path2 = new Path(destDir, "dest-512.txt");
+    byte[] data2 = dataset(512, 'A', 'Z');
+    writeDataset(getFileSystem(), path2, data2, data2.length, 1024, false);
+    assertIsFile(path2);
+
+    boolean rename = rename(srcDir, destDir);
+    Path renamedSrc = new Path(destDir, "source");
+    assertIsFile(path2);
+    assertIsDirectory(renamedSrc);
+    ContractTestUtils.verifyFileContents(getFileSystem(), path2, data);
+    assertTrue("rename returned false though the contents were copied", rename);
   }
 
 }
