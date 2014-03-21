@@ -20,7 +20,6 @@ package org.apache.hadoop.fs.contract.localfs;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.apache.hadoop.fs.contract.ContractOptions;
@@ -33,24 +32,43 @@ import java.io.IOException;
  * The contract of the Local filesystem.
  * This changes its feature set from platform for platform -the default
  * set is updated during initialization.
+ * 
+ * This contract contains some override points, to permit
+ * the raw local filesystem and other filesystems to subclass it.
  */
 public class LocalFSContract extends AbstractFSContract {
 
   public static final String CONTRACT_XML = "contract/localfs.xml";
-  private LocalFileSystem fs;
+  public static final String SYSPROP_TEST_BUILD_DATA = "test.build.data";
+  public static final String DEFAULT_TEST_BUILD_DATA_DIR = "test/build/data";
+  private FileSystem fs;
 
   public LocalFSContract(Configuration conf) {
     super(conf);
     //insert the base features
-    addConfResource(CONTRACT_XML);
+    addConfResource(getContractXml());
+  }
+
+  /**
+   * Return the contract file for this filesystem
+   * @return the XML
+   */
+  protected String getContractXml() {
+    return CONTRACT_XML;
   }
 
   @Override
   public void init() throws IOException {
     super.init();
-    fs = FileSystem.getLocal(getConf());
-    //see if this FS is windows and tweak some of
-    //the contract parameters
+    fs = getLocalFS();
+    adjustContractToLocalEnvironment();
+  }
+
+  /**
+   *  tweak some of the contract parameters based on the local system
+   *  state
+   */
+  protected void adjustContractToLocalEnvironment() {
     if (Shell.WINDOWS) {
       //NTFS doesn't do case sensitivity, and its permissions are ACL-based
       getConf().setBoolean(getConfKey(ContractOptions.IS_CASE_SENSITIVE), false);
@@ -60,6 +78,15 @@ public class LocalFSContract extends AbstractFSContract {
       getConf().setBoolean(getConfKey(ContractOptions.IS_CASE_SENSITIVE),
                            false);
     }
+  }
+
+  /**
+   * Get the local filesystem. This may be overridden
+   * @return the filesystem
+   * @throws IOException
+   */
+  protected FileSystem getLocalFS() throws IOException {
+    return FileSystem.getLocal(getConf());
   }
 
   @Override
@@ -75,7 +102,15 @@ public class LocalFSContract extends AbstractFSContract {
   @Override
   public Path getTestPath() {
     Path path = fs.makeQualified(new Path(
-      System.getProperty("test.build.data", "test/build/data")));
+      getTestDataDir()));
     return path;
+  }
+
+  /**
+   * Get the test data directory
+   * @return the directory for test data
+   */
+  protected String getTestDataDir() {
+    return System.getProperty(SYSPROP_TEST_BUILD_DATA, DEFAULT_TEST_BUILD_DATA_DIR);
   }
 }

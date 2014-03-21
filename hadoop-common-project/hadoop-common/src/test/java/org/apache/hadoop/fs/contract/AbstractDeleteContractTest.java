@@ -44,18 +44,22 @@ public abstract class AbstractDeleteContractTest extends
   }
 
   @Test
-  public void testDeleteNonexistentFileRecursive() throws Throwable {
-    Path path = path("testDeleteEmptyDirRecursive");
+  public void testDeleteNonexistentPathRecursive() throws Throwable {
+    Path path = path("testDeleteNonexistentPathRecursive");
     ContractTestUtils.assertPathDoesNotExist(getFileSystem(), "leftover", path);
-    assertFalse(getFileSystem().delete(path, true));
+    assertFalse("Returned true attempting to delete"
+                + " a nonexistent path " + path,
+                getFileSystem().delete(path, false));
   }
 
 
   @Test
-  public void testDeleteNonexistentFileNonRecursive() throws Throwable {
-    Path path = path("testDeleteEmptyDirRecursive");
+  public void testDeleteNonexistentPathNonRecursive() throws Throwable {
+    Path path = path("testDeleteNonexistentPathNonRecursive");
     ContractTestUtils.assertPathDoesNotExist(getFileSystem(), "leftover", path);
-    assertFalse(getFileSystem().delete(path, false));
+    assertFalse("Returned true attempting to recursively delete" 
+                + " a nonexistent path " + path,
+                getFileSystem().delete(path, false));
   }
 
   @Test

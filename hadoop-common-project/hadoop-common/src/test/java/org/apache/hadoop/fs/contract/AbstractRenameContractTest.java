@@ -105,12 +105,12 @@ public abstract class AbstractRenameContractTest extends
 
   @Test
   public void testRenameFileOverExistingFile() throws Throwable {
-    describe("Verify renaming onto an existing file fails");
-    Path path = path("testRenameFileOverExistingFile");
-    Path path2 = path("testRenameFileOverExistingFile2");
+    describe("Verify renaming a file onto an existing file fails");
+    Path path = path("source-256.txt");
     byte[] data = dataset(256, 'a', 'z');
     writeDataset(getFileSystem(), path, data, data.length, 1024, false);
-    byte[] data2 = dataset(10 * 1024, 'A', 'Z');
+    Path path2 = path("dest-512.txt");
+    byte[] data2 = dataset(512, 'A', 'Z');
     writeDataset(getFileSystem(), path2, data2, data2.length, 1024, false);
     assertIsFile(path2);
     try {
