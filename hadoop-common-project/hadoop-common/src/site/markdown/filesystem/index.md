@@ -12,8 +12,8 @@
   limitations under the License. See accompanying LICENSE file.
 -->
   
-# Formal specification of a Hadoop filesystem
- 
+# The Hadoop Filesystem API Definition
+
 This is an attempt to model the contents a filesystem as a set of paths that 
 are either directories, symbolic links or files; only files may contain data.
 

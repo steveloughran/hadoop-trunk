@@ -31,10 +31,8 @@ this represents the present working directory of the client. Changes to this
 state are not reflected in the filesystem itself -they are unique to the instance
 of the client.
 
-**Implementation Note**: the static `FileSystem get(URI uri, Configuration conf) ` method may return
-a pre-existing instance of a filesystem client class - a class that may also be in use in other
-threads. Current implementations of FileSystem *do not make any attempt to synchronize access
-to the working directory field*. 
+**Implementation Note**: the static `FileSystem get(URI uri, Configuration conf) ` method MAY return
+a pre-existing instance of a filesystem client class - a class that may also be in use in other threads. The implementations of `FileSystem` which ship with Apache Hadoop *do not make any attempt to synchronize access to the working directory field*. 
 
 ### Invariants
 
@@ -107,12 +105,11 @@ of the caller
 
 #### Postconditions
 
-    result = p:path where:
-        valid-path(FS, p)
+    result = p where valid-path(FS, p)
 
 There is no requirement that the path exists at the time the method was called,
 or, if it exists, that it points to a directory. However, code tends to assume
-that `not isfile(FS, getHomeDirectory())` holds to the extent that follow-on
+that `not isFile(FS, getHomeDirectory())` holds to the extent that follow-on
 code may fail.
 
 
@@ -127,11 +124,9 @@ meets the filter's conditions.
 
 #### Preconditions
 
-
-path must exist
+Path must exist
 
     if not exists(FS, p) : raise FileNotFoundException
-
 
 #### Postconditions
 
@@ -143,23 +138,65 @@ path must exist
         result = []
 
     elif isDir(FS, p):
-       result [c forall c in children(FS, p) where f(c) == True] 
+       result [getFileStatus(c) forall c in children(FS, p) where f(c) == True] 
 
+### Atomicity and Consistency
 
-* After a file is created, all `listStatus()>` operations on the file and parent
-  directory MUST find the file.
-
-* After a file is deleted, all `listStatus()` operations on the file and parent
-  directory MUST NOT find the file.
-
-* By the time the `listStatus()` operation returns to the caller, there
+By the time the `listStatus()` operation returns to the caller, there
 is no guarantee that the information contained in the response is current.
 The details MAY be out of date -including the contents of any directory, the
 attributes of any files, and the existence of the path supplied. 
 
-* Atomicity and Consistency: the state of a directory may change during the evaluation
+The state of a directory MAY change during the evaluation
 process. This may be reflected in a listing that is split between the pre-
 and post- updated filesystem states.
+
+
+* After an entry at path `P` is created, and before any other
+ changes are made to the filesystem, `listStatus(P)` MUST
+find the file and return its status.
+
+* After an entry at path `P` is deleted, `listStatus(P)`  MUST
+raise a `FileNotFoundException`.
+
+* After an entry is path `P` is created, and before any other
+ changes are made to the filesystem, the result of `listStatus(parent(P))` SHOULD
+include the value of `getFileStatus(P)`.
+
+* After an entry is path `P` is created,  nd before any other
+ changes are made to the filesystem, the result of `listStatus(parent(P))` SHOULD
+NOT include the value of `getFileStatus(P)`.
+
+
+This is not a theoretical possibility, it is observable in HDFS when a
+directory contains many thousands of files.
+
+Consider a directory "d" with the contents
+
+	a
+	part-0000001
+	part-0000002
+	...
+	part-9999999
+	
+	
+If the number of files is such that HDFS returns a partial listing in each
+response, then, if a listing `listStatus("d")` takes place concurrently with the operation
+`rename("d/a","d/z"))`, the result may be one of 
+
+	[a, part-0000001, ... , part-9999999]
+	[part-0000001, ... , part-9999999, z]
+
+	[a, part-0000001, ... , part-9999999, z]
+	[part-0000001, ... , part-9999999]
+
+While this situation is likely to be a rare occurrence, it MAY happen. In HDFS
+these inconsistent views are only likely when listing a directory with many children.
+
+Other filesystems may have stronger consistency guarantees, or return inconsistent
+data more readily.
+
+
 
 <!--  ============================================================= -->
 <!--  METHOD: getFileBlockLocations() -->
@@ -176,7 +213,7 @@ or length; this extends `IllegalArgumentException`.
 #### Postconditions
 
 If the filesystem is location aware, it must return the list
-of block locations where the data in the range (S, S+L ) can be found.
+of block locations where the data in the range `[s:s+l]` can be found.
 
 
     if f == null :
@@ -206,8 +243,8 @@ If the filesystem is not location aware, it SHOULD return
 
 
 *A bug in Hadoop 1.0.3 means that a topology path of the same number
-of elements as the cluster topology MUST be provided, hence the 
-`"/default/localhost"` path
+of elements as the cluster topology MUST be provided, hence Filesystems SHOULD
+return that `"/default/localhost"` path
 
 
 <!--  ============================================================= -->
@@ -247,7 +284,7 @@ for efficient work, or the `JobSubmissionClient` running out of memory.
 
 Any FileSystem that does not actually break files into block SHOULD
 return a number for this that results in efficient processing. 
-(it MAY make this user-configurable)
+(it MAY make this user-configurable -the S3 and Swift filesystem clients do this)
 
 
 
@@ -272,7 +309,7 @@ Create a directory and all its parents
 
   
 The condition exclusivity requirement of a filesystem's directories,
-files and symbolic links must hold; in `FS'` all 
+files and symbolic links must hold.
 
 The probe for the existence and type of a path and directory creation MUST be
 atomic. The combined operation, including `mkdirs(parent(F))` MAY be atomic.
@@ -330,7 +367,7 @@ The result is `FSDataOutputStream`, which through its operations may generate ne
 `FS.Files[p]`
 
 
-* S3N, Swift and other blobstores do not currently change the FS state
+* S3N, Swift and other Object Stores do not currently change the FS state
 until the output stream `close()` operation is completed.
 This MAY be a bug, as it allows >1 client to create a file with overwrite=false, and potentially confuse file/directory logic
 
@@ -362,7 +399,6 @@ Implementations MAY throw `UnsupportedOperationException`
 Return: `FSDataOutputStream`, which can update the entry FS.Files[p] by appending data to the existing list
 
   
-
 <!--  ============================================================= -->
 <!--  METHOD: open() -->
 <!--  ============================================================= -->
@@ -405,44 +441,60 @@ exists in the metadata, but no copies of any its blocks can be located;
 
 A directory with children and recursive == false cannot be deleted
  
-    if isDir(FS, p) and not recursive and (childen(FS, p) != {}) : raise IOException
+    if isDir(FS, p) and not recursive and (children(FS, p) != {}) : raise IOException
 
 
 #### Postconditions
 
-return false if file does not exist; FS state does not change
+
+##### Nonexistent path
+
+If the file does not exist the FS state does not change
     
     if not exists(FS, p):
         FS' = FS
         result = False
+
+The result SHOULD be `False, indicating that no file was deleted.
+
+
+##### Simple File
     
 
-a path referring to a file is removed, return value: true
+A path referring to a file is removed, return value: `True`
 
     if isFile(FS, p) :
         FS' = (FS.Directories, FS.Files - [p], FS.Symlinks)
         result = True
   
 
-deleting an empty root does not change the filesystem state
+##### Empty root directory
+
+Deleting an empty root does not change the filesystem state
 and may return true or false
   
-    if isDir(FS, p) and isRoot(p) and childen(FS, p) == {} :
+    if isDir(FS, p) and isRoot(p) and children(FS, p) == {} :
         FS ' = FS
         result = (undetermined)
-  
+
+There's no consistent return code from an attempt to delete the root directory
+
+##### Empty (non-root) directory
+
 Deleting an empty directory that is not root will remove the path from the FS and
 return true
 
-    if isDir(FS, p) and not isRoot(p) and childen(FS, p) == {} :
+    if isDir(FS, p) and not isRoot(p) and children(FS, p) == {} :
         FS' = (FS.Directories - [p], FS.Files, FS.Symlinks)
         result = True 
   
-  
-Deleting a root path with children and `recursive==true`
+
+##### Recursive delete of root directory
+
+Deleting a root path with children and `recursive==True`
  can do one of two things
 
-In contrast, the Unix/Posix model assumes that if the user has
+The Unix/Posix model assumes that if the user has
 the correct permissions to delete everything, 
 they are free to do so -resulting in an empty filesystem
 
@@ -450,16 +502,15 @@ they are free to do so -resulting in an empty filesystem
         FS' = ({["/"]}, {}, {}, {})
         result = True 
         
-In contrast HDFS considers the accidental or intentional deletion
-of a multi-petabyte filesystem is always a mistake; the
-filesystem be taken offline and reformatted if and empty
+In contrast, HDFS never permits the deletion of the root of a filesystem; the
+filesystem be taken offline and reformatted if an empty
 filesystem is desired.
 
     if isDir(FS, p) and isRoot(p) and recursive :
         FS ' = FS
-        result = False
- 
+        result = False 
 
+##### Recursive delete of non-root directory
 
 Deleting a non-root path with children `recursive==true` 
 removes the path and all descendants
@@ -474,13 +525,16 @@ removes the path and all descendants
         result = True
 
 
-* Deleting a file is an atomic action.
 
-* Deleting an empty directory is atomic.
+#### Atomicity
 
-* A recursive delete of a directory tree SHOULD be atomic. (or MUST?)
+* Deleting a file MUST be an atomic action.
 
-* There's no consistent return code from an attempt to delete of the root directory
+* Deleting an empty directory MUST be an atomic action.
+
+* A recursive delete of a directory tree MUST be atomic.
+
+
 
 
 <!--  ============================================================= -->
@@ -489,6 +543,11 @@ removes the path and all descendants
 
 
 ### `FileSystem.rename(Path s, Path d)`
+
+In terms of its specification, `rename()` is one of the most complex operations within a filesystem .
+
+In terms of its implementation, it is the one with the most ambiguity regarding when to return false
+versus raise an exception.
 
 Rename includes the calculation of the destination path. 
 If the destination exists and is a directory, the final destination
@@ -506,6 +565,7 @@ source `s` must exist
 
     if not exists(FS, s) : raise FileNotFoundException
 
+** HDFS does not fail here -it returns false from the operation**
   
 `dest` cannot be a descendant of `s`
 
@@ -527,44 +587,49 @@ This implicitly covers all the ancestors of the parent.
 
 ** Should **
 
-A destination can only be a file iff `s == dest`
+A destination can only be a file if `s == dest`
 
     if isFile(FS, dest) and not s == dest : raise IOException
   
  ** HDFS Behavior*: This check does not take place, instead the rename is [considered a failure](#hdfs-rename)
+ 
+ ** Local Filesystem : the rename succeeds
 
 #### Postconditions
 
 
-Renaming a directory to itsself is no op; return value is not specified
+##### Renaming a directory to self
 
-In posix the result is false;  hdfs returns true
+Renaming a directory to itself is no-op; return value is not specified
+
+In Posix the result is `False;  in HDFS the result is `True`
 
     if isDir(FS, s) and s == dest :
         FS' = FS
         result = (undefined)
 
 
- rename file to self is a no-op, returns true
+##### Renaming a file to self
+
+ rename file to self is a no-op; the result is `True`
 
      if isFile(FS, s) and s == dest :
          FS' = FS
          result = True 
 
 
- <a name="hdfs-rename"></a>** HDFS Behavior**: SHOULD NOT
+##### <a name="hdfs-rename">Renaming a file to self: HDFS</a>
  
- Rename file a over an existing file where `s != dest` results in
+In HDFS, a rename where the destination is a file such that `s != dest` results in
 
      FS' = FS
      result = False
 
+That is: HDFS does not raise an `IOException`, merely rejects the request and returns false.
 
- This situation arises iff attempts to rename a file onto a different file are not considered
- a failure of the preconditions -and so raise an error.
+##### Renaming a file onto a directory
 
-Renaming a file under a directory adds the file as a child of the dest dir, retaining the filename
-of the source; the old entry is no longer present
+Renaming a file where the destination is a directory moves the file as a child of the destination directory, retaining the filename element of the source path.
  
     if isFile(FS, s) and s != dest: 
         FS' where:
@@ -574,6 +639,7 @@ A more declarative form of the postcondition would be:
   
       not exists(FS', s) and data(FS', dest) == data(FS, s)
 
+##### Renaming a directory onto a directory
   
 For a directory the entire tree under `s` will then exist under `dest`, while the path
 `s` and its descendants do not exist.
@@ -593,15 +659,18 @@ For a directory the entire tree under `s` will then exist under `dest`, while th
 
 #### Notes
 
-* rename() MUST be atomic
+* The core operation of `rename()` -moving one entry in the filesystem to another MUST be atomic -some applications rely on this as a way to co-ordinate access to data.
+
+* Some FileSystem implementations perform checks on the destination filesystem before and after the rename -the `ChecksumFileSystem` used to provide checksummed access to local data is an example of this. The entire sequence MAY NOT be atomic.
+
 
 * The behavior of `rename()` on an open file is unspecified: whether it is allowed, what happens to later attempts to read from or write to the open stream
 
-* The return code of renaming a directory to itself is unspecified. 
+* The return code of renaming a directory onto itself is unspecified. 
 
 #### HDFS specifics
 
-Renaming a source file that does not exist returns
+Renaming a source file that does not exist is not an exception -it simply returns `False`
 
     FS' = FS
     result = false
