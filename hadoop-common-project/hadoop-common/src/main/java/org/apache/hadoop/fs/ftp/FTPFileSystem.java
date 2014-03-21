@@ -127,9 +127,9 @@ public class FTPFileSystem extends FileSystem {
     client.connect(host, port);
     int reply = client.getReplyCode();
     if (!FTPReply.isPositiveCompletion(reply)) {
-      throw NetUtils.wrapException(host, port, NetUtils.UNKNOWN_HOST, 0,
-                                   new ConnectException(
-                                     "Server response " + reply));
+      throw NetUtils.wrapException(host, port,
+                   NetUtils.UNKNOWN_HOST, 0,
+                   new ConnectException("Server response " + reply));
     } else if (client.login(user, password)) {
       client.setFileTransferMode(FTP.BLOCK_TRANSFER_MODE);
       client.setFileType(FTP.BINARY_FILE_TYPE);
