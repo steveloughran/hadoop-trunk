@@ -349,6 +349,10 @@ public class RawLocalFileSystem extends FileSystem {
   @Override
   public boolean delete(Path p, boolean recursive) throws IOException {
     File f = pathToFile(p);
+    if (!f.exists()) {
+      //no path, return false "nothing to delete"
+      return false;
+    }
     if (f.isFile()) {
       return f.delete();
     } else if (!recursive && f.isDirectory() && 
