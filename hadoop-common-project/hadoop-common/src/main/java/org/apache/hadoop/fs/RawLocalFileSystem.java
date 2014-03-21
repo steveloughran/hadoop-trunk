@@ -99,26 +99,13 @@ public class RawLocalFileSystem extends FileSystem {
   class LocalFSFileInputStream extends FSInputStream implements HasFileDescriptor {
     private FileInputStream fis;
     private long position;
-    private boolean closed;
 
     public LocalFSFileInputStream(Path f) throws IOException {
       fis = new FileInputStream(pathToFile(f));
     }
-
-    /**
-     * Verify that a stream is open
-     * @throws IOException if the stream is closed
-     */
-    private void verifyOpen() throws IOException {
-      if (closed) {
-        throw new IOException(FSExceptionMessages.STREAM_IS_CLOSED);
-      }
-    }
     
     @Override
     public void seek(long pos) throws IOException {
-      LOG.info("Seek of "+ pos+ " closed="+closed);
-      verifyOpen();
       if (pos < 0) {
         throw new EOFException(
           FSExceptionMessages.CANNOT_SEEK_TO_A_NEGATIVE_POSITION);
@@ -143,12 +130,7 @@ public class RawLocalFileSystem extends FileSystem {
     @Override
     public int available() throws IOException { return fis.available(); }
     @Override
-    public void close() throws IOException {
-      LOG.info("Closing input stream");
-      closed = true;
-      fis.close();
-    }
-    
+    public void close() throws IOException { fis.close(); }
     @Override
     public boolean markSupported() { return false; }
     
