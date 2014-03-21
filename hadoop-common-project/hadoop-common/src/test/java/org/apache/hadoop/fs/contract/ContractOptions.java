@@ -83,7 +83,7 @@ public interface ContractOptions {
    * exception later, when trying to read.
    * @{value}
    */
-  String SUPPORTS_SEEK_ON_CLOSED_FILE = "supports-seek-past-eof";
+  String SUPPORTS_SEEK_ON_CLOSED_FILE = "supports-seek-on-closed-file";
 
   /**
    * Flag to indicate that this FS expects to throw the strictest

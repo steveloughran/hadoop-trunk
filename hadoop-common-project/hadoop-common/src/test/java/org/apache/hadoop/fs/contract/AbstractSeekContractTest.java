@@ -106,8 +106,12 @@ public abstract class AbstractSeekContractTest extends AbstractFSContractTestBas
 
   @Test
   public void testSeekReadClosedFile() throws Throwable {
+    if (isSupported(SUPPORTS_SEEK_ON_CLOSED_FILE)) {
+      skip("Filesystem supports seek on closed files");
+    }
     instream = getFileSystem().open(smallSeekFile);
-    getLog().info("Stream is of type " + instream.getClass().getCanonicalName());
+    getLog().info(
+      "Stream is of type " + instream.getClass().getCanonicalName());
     instream.close();
     try {
       instream.seek(0);
