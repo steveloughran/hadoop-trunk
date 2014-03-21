@@ -101,7 +101,7 @@ equal 0.
 throw an exception, the outcomes of `S.getPos()` and `S.read()`
 operations are undefined.
 
-1. After `S.close()`, `S.seek(P)` MUST fail with an `IOException`
+1. After `S.close()`, `S.seek(P)` SHOULD fail with an `IOException`. (HDFS does, LocalFS does not)
 
 1. For all values of *P1*, *P2* in *Long*,  `S.seek(P1)` followed
 by `S.seek(P2)` is the equivalent of `S.seek(P2)`.
@@ -112,7 +112,7 @@ declare that this elision can ignore that possibility?*
 It SHOULD be an `EOFException`. It MAY be an `IOException`, an `IllegalArgumentException `
 or other `RuntimeException`.
 
-1. `S.seek(0)` must succeed even if the file length is 0
+1. `S.seek(0)` MUST succeed even if the file length is 0
 
 1.  For all values of *P* in *Long* if `S.seek(P)` does not raise
 an Exception, it is considered a successful seek.

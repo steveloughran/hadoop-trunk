@@ -102,6 +102,8 @@ Posix filesystem
 
 ### Path Names
 
+Similarly, path names have a set of rules some of which are considered fundamental ("they all begin with '/"), others implementatin specific.
+
   * A path is comprised of path components separated by '/'.
   
   * Paths are compared based on unicode code-points. 
@@ -157,9 +159,7 @@ to an undefined availability problem"*
 
 * Rename of a file MUST be atomic.
 
-* Rename of a directory SHOULD be atomic. Blobstore filesystems MAY offer
-non-atomic directory renaming.
-
+* Rename of a directory MUST be atomic.
 * Delete of a file MUST be atomic.
 
 * Delete of an empty directory MUST be atomic.
@@ -176,44 +176,34 @@ versions of HDFS]
 
 * If `append()` is implemented, each individual `append()` operation SHOULD be atomic.
 
-* `FileSystem.listStatus()` does not appear to contain any claims of atomicity,
-  though some uses in the MapReduce codebase (such as `FileOutputCommitter`) do
-  assume that the listed directories do not get deleted between listing their
-  status and recursive actions on the listed entries.
+* `FileSystem.listStatus()` does contain any claims of atomicity -caching algorithms mean that HDFS listings can be inconsistent.
 
 ### Consistency
 
 The consistency model of a Hadoop filesystem is *one-copy-update-semantics*;
-that generally that of a traditional Posix filesystem. 
+effectively that of a traditional Posix filesystem. 
 
-* Create: once the `close()` operation on an output stream writing a newly
-created file has completed, in-cluster operations querying the file metadata
-and contents MUST immediately see the file and its data.
+Every machine in the cluster expects to see the same view of data as others.
 
-*  Update: Once  the `close()`  operation on  an output  stream writing  a newly
-created file  has completed,  in-cluster operations  querying the  file metadata
-and contents MUST immediately see the new data.
+Furthermore the consistency semantics out of cluster MUST be the same as that in-cluster:
 
-*  Delete:   once  a  `delete()`   operation  is   on  a  file   has  completed,
-`listStatus()`, `open()`,`rename()` and `append()` operations MUST fail.
+That said, there are some corner-cases in HDFS to be aware of, specifically
+on when changes becomes visible to applications that have an open/cached copy
+of a file or directory's data.
 
-* When file is deleted then overwritten, `listStatus()`, `open()`,`rename()`
-and `append()` operations MUST succeed: the file is visible.
+* there's no guarantee that changes to a file (e.g. appends, deletes) will be visible
+to clients that already have the file open
+* changes to a directory may not be visible to a client that is part-way
+through enumerating the contents of a directory.
 
-* Rename:  after a rename  has completed, operations  against the new  path MUST
-succeed; operations against the old path MUST fail.
 
-* The consistency semantics out of cluster  MUST be the same as that in-cluster:
-All clients  calling `read()` on  a closed file MUST  see the same  metadata and
-data  until  it  is  changed  from  a  `create()`,  `append()`,  `rename()`  and
-`append()` operation.
 
 ### Concurrency
 
 * The data added to a file during a write or append MAY be visible while the
   write operation is in progress.
 
-* If a client opens a file for a read()` operation while another `read()`
+* If a client opens a file for a `read()` operation while another `read()`
   operation is in progress, the second operation MUST succeed. Both clients
   MUST have a consistent view of the same data.
 
@@ -280,176 +270,11 @@ does not hold on blob stores]
 1. Directory list operations are fast for directories with few entries, but may
 incur a cost that is O(no. of entries). Hadoop 2.x adds iterative listing to
 handle the challenge of listing directories with millions of entries without
-buffering.
+buffering -at the cost of consistency.
 
 1. A `close()` of an `OutputStream` is fast, irrespective of whether or not
-the file operation has succeeded or not.
+the file operation has succeeded or not. Again, object stores break these assumptions.
 
-## Operation-specific requirements
-
-This section attempts to define the expected behaviors of specific operations
-of the FileSystem implementations
-
-### `read()` operations
-
-* An attempt to open a nonexistent path for reading MUST raise a `FileNotFoundException`.
-* read() operations at the end of the file MUST return -1
-
-* `readFully()` calls that attempt to read past the end of a file SHOULD raise
-  an `EOFException`. Implementations MAY raise a different class of
-  `IOException` or subclass thereof.
-
-#### `Seekable.seek(position)`
-
-* A `seek(position)` followed by a read operation MUST position the cursor
-such that the next read will return the data starting at `byte[position]`
-
-* If the position is past the end of the file, the stream MUST throw
-an `IOException`, which SHOULD be an `EOFException`.
-
-* If the file is closed, then an `IOException` MUST be raised.
-
-* After a `seek()` operation, the result of `getPos()` is the location that was
-just seek()'d to.
-
-#### `Seekable.seekToNewSource(position)`
-
-* This SHOULD return false if the filesystem does not implement multiple-data
-  sources for files.
-
-* Irrespective of whether or a `seekToNewSource()` operation succeeds or fails,
-the stream's `getPos()` value MUST be the value which it was before the seek
-operation was invoked. Specifically, it is not a `seek()` operation, it is a
-request to bind to a new location of data in expectation of a read or seek
-operation fetching the new data.
-
-### `rename(src,dest)`
-
-* The parent directories of a the destination file/directory MUST exist for
-the rename to succeed.
-
-* `rename(self, self)` MUST return true if `isFile(self)` but MUST be a no-op:
-the file and its attributes are not updated.
-
-* `rename(self, self)` MUST be a no-op `isDirectory(self)`. The return value
-  MAY be true. The return value MAY be false. HDFS returns true. *This is a
-  departure from the behavior of Posix, which requires the operation to fail
-  with a non-zero status code.*
-
-* `rename(path, path2)` MUST fail if `!exists(path)`
-
-* `rename(path, path2)` MUST fail if `is-subdirectory-of(path, path2)` is true.
-
-* `rename(path, path2)` MUST fail if `!exists(path2)` and `isFile(path2)`.
-
-* `rename("/",anything)` MUST always fail. This implicitly covered
-by the child directory rename rule.
-
-_Notes_
-
-* The behavior of `rename()` on an open file is unspecified.
-
-* The return code of renaming a directory to itself is unspecified. 
-
-### `delete(Path path, boolean recursive)`
-
-
-* Deleting an empty directory MUST delete the directory and return `true`,
-irrespective of the value of the recursive flag.
-
-* Deleting a directory with child elements MUST succeed iff `recursive==true`.
-
-* Deleting the root path, `/`, MUST, iff `recursive==true`, delete all entries
-in the filesystem, excluding the `/` entry itself. That is, `exists("/")`
-must still be true
-
-* If the filesystem is empty, deleting the root path, `/`, MUST succeed and
-  MUST have no effect.
- 
-* Deleting a non-empty root directory, `/`, MUST return false if `recursive==false`.
-
-* Deleting a file is an atomic action.
-
-* Deleting an empty directory is atomic.
-
-* A recursive delete of a directory tree MAY be atomic.
-
-* After a delete operation completes successfully, attempts by clients to open
-  the file, query its attributes, or locate it by enumerating the parent
-  directory will fail. (i.e changes are immediately visible and consistent
-  across all clients)
-
-_Notes_
-
-Posix permits deletion of files that are open. This does not hold in Windows; a
-fact that has broken some tests. It's not clear whether real-world Hadoop
-applications depend upon this property.
-
-### `FileSystem.listStatus()` 
-
-
-* `FileSystem.listStatus("/", filter)` MUST return the filtered child
-directory entries
-
-* `FileSystem.listStatus(existing-directory, filter)` succeeds and returns
-0 or more children in the directory. Entries that match the filter are excluded.
-
-* `FileSystem.listStatus(existing-file, filter)` succeeds and returns the
-status of the file as the single element of the array, an element where
-`FileStatus.isDirectory()` returns false.
-_Exception_: if the file matches any filter, an empty array MUST be returned.
-
-* `FileSystem.listStatus(non-existing-file, filter)` MUST throw a
- `FileNotFoundException`
-
-* After a file is created, all `listStatus()` operations on the file and parent
-  directory MUST find the file.
-
-* After a file is deleted, all `listStatus()` operations on the file and parent
-  directory MUST NOT find the file.
-
-* By the time the `listStatus()` operation returns to the caller, there
-is no guarantee that the information contained in the response is current.
-The details MAY be out of date -including the contents of any directory, the
-attributes of any files, and the existence of the path supplied. 
-
-* Security: if a caller has the rights to call `listStatus()` a directory or
-file, it has the rights to `listStatus()` all parent directories. 
-
-### `getFileBlockLocations(Path path, int start, int len)`
-
-The following conditions must be met in order:
- 
- 1. The operation MUST return null if `(path==null)`
- 
- 1. MUST throw an `InvalidArgumentException` if `(src<0 || len<0)`
- 
- 1. MUST throw an `IOException` instance if `path.isDirectory()` is true
- 
- 1. If the filesystem is not location-aware it SHOULD return
-`"localhost","localhost:????"` as the response.
-
-### `create(Path file, FsPermission permission, boolean overwrite, int bufferSize, short replication, long blockSize, Progressable progress)`
-
-
-* `create()` MUST create parent directories according to the `mkdirs()` rules
-if the path's parent directories are missing.
-
-* `create()` MUST fail if the Path `file` resolves to an existing file or
-directory AND `overwrite==false`
-
-### `OutputStream.flush()` for output streams writing to a `FileSystem`
-
-
-* Client-side `flush()` SHOULD forward the data to the DFS.
-
-* The DFS MAY flush that data to disk.
-
-### `OutputStream.close()` for output streams writing to a `FileSystem`
-
-
-Durability: Once a `close()` operation has successfully completed, the data
-MUST be persisted according to the durability guarantees of the filesystem.
 
 ### Block Size data
 

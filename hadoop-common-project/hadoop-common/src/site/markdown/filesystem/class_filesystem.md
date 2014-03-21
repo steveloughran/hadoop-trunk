@@ -251,7 +251,7 @@ return that `"/default/localhost"` path
 <!--  METHOD: getFileBlockLocations() -->
 <!--  ============================================================= -->
 
-###  getFileBlockLocations(Path P, int S, int L)
+###  `getFileBlockLocations(Path P, int S, int L)`
 
 #### Preconditions
 
@@ -265,9 +265,10 @@ return that `"/default/localhost"` path
     result = getFileBlockLocations(getStatus(P), S, L)
 
 
-###  getDefaultBlockSize(Path P), getDefaultBlockSize()
+###  `getDefaultBlockSize()`
 
 #### Preconditions
+
 
 
 
@@ -286,6 +287,38 @@ Any FileSystem that does not actually break files into block SHOULD
 return a number for this that results in efficient processing. 
 (it MAY make this user-configurable -the S3 and Swift filesystem clients do this)
 
+###  `getDefaultBlockSize(Path P)`
+
+#### Preconditions
+
+
+#### Postconditions
+
+
+    result = integer  >= 0 
+
+The outcome of this operation is usually identical to `getDefaultBlockSize()`,
+with no checks for the existence of the given path. 
+
+Filesystems that support mount points may have different default values for
+different paths, in which case the specific default value for the destination path
+SHOULD be returned.
+
+
+###  `getBlockSize(Path P)`
+
+#### Preconditions
+
+    if not exists(FS, p) :  raise FileNotFoundException
+
+
+#### Postconditions
+
+
+    result == getFileStatus(P).getBlockSize()
+
+The outcome of this operation MUST be identical to that  contained in
+the `FileStatus` returned from `getFileStatus(P)`.
 
 
 ## State Changing Operations  
@@ -396,7 +429,8 @@ Implementations MAY throw `UnsupportedOperationException`
     FS
     result = FSDataOutputStream
 
-Return: `FSDataOutputStream`, which can update the entry FS.Files[p] by appending data to the existing list
+Return: `FSDataOutputStream`, which can update the entry `FS.Files[p]`
+by appending data to the existing list
 
   
 <!--  ============================================================= -->
@@ -591,9 +625,9 @@ A destination can only be a file if `s == dest`
 
     if isFile(FS, dest) and not s == dest : raise IOException
   
- ** HDFS Behavior*: This check does not take place, instead the rename is [considered a failure](#hdfs-rename)
+* HDFS Behavior: This check does not take place, instead the rename is [considered a failure](#hdfs-rename)
  
- ** Local Filesystem : the rename succeeds
+* Local Filesystem : the rename succeeds
 
 #### Postconditions
 
@@ -602,7 +636,7 @@ A destination can only be a file if `s == dest`
 
 Renaming a directory to itself is no-op; return value is not specified
 
-In Posix the result is `False;  in HDFS the result is `True`
+In Posix the result is `False`;  in HDFS the result is `True`
 
     if isDir(FS, s) and s == dest :
         FS' = FS
@@ -659,12 +693,15 @@ For a directory the entire tree under `s` will then exist under `dest`, while th
 
 #### Notes
 
-* The core operation of `rename()` -moving one entry in the filesystem to another MUST be atomic -some applications rely on this as a way to co-ordinate access to data.
+* The core operation of `rename()` -moving one entry in the filesystem to
+another MUST be atomic -some applications rely on this as a way to co-ordinate access to data.
 
-* Some FileSystem implementations perform checks on the destination filesystem before and after the rename -the `ChecksumFileSystem` used to provide checksummed access to local data is an example of this. The entire sequence MAY NOT be atomic.
+* Some FileSystem implementations perform checks on the destination
+filesystem before and after the rename -the `ChecksumFileSystem` used to provide checksummed access to local data is an example of this. The entire sequence MAY NOT be atomic.
 
 
-* The behavior of `rename()` on an open file is unspecified: whether it is allowed, what happens to later attempts to read from or write to the open stream
+* The behavior of `rename()` on an open file is unspecified: whether it is
+allowed, what happens to later attempts to read from or write to the open stream
 
 * The return code of renaming a directory onto itself is unspecified. 
 
