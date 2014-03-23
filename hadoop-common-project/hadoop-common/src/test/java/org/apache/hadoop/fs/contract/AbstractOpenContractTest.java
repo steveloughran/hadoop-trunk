@@ -122,7 +122,10 @@ public abstract class AbstractOpenContractTest extends AbstractFSContractTestBas
       assertEquals("second read of instream 1", 1, instream1.read());
       instream1.close();
       assertEquals("second read of instream 2", 1, instream2.read());
+      //close instream1 again
+      instream1.close();
     } finally {
+      IOUtils.closeStream(instream1);
       IOUtils.closeStream(instream2);
     }
 
