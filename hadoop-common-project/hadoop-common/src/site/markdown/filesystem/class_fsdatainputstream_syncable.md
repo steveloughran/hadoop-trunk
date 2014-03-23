@@ -19,7 +19,7 @@
   
 # `class FSDataOutputStream extends DataOutputStream implements Syncable`
   
-  The specification of `DataOutputStream` is defined b   `java.io.DataOutputStream` 
+  The specification of `DataOutputStream` is defined by `java.io.DataOutputStream` 
   
       public interface Syncable {
         
@@ -45,7 +45,28 @@
   `FSDataOutputStream.hsync()` delegates to `OutputStream.flush()` unless
   the stream it is wrapping implements `Syncable`, in -which case it is called
   
-      
+
+        
+# Interface `Syncable`
+
     
   <!--  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
   
+# Interface `CanSetDropBehind`
+
+This is interface offers the ability of client applications to set hints on
+the filesystem caching strategy, specifically policy regarding whether not
+to continue to cache recently read data. 
+
+## void `setDropBehind(Boolean dropCache)` 
+
+Implementations must do one of
+
+    if implemented:
+      CacheStrategy' = CacheStrategy and drop-behind-flag = dropCache
+    else:
+      raise UnsupportedOperationException
+
+Subclasses of `FSDataOutputStream` which relay (and poteentially filter)
+operations to an inner stream SHOULD forward `setDropBehind()` calls to
+to any inner stream that implements the interface.
