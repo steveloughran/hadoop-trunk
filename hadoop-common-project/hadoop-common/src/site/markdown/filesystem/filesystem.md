@@ -17,7 +17,7 @@
 <!--  CLASS: FileSystem -->
 <!--  ============================================================= -->
 
-# class org.apache.hadoop.fs.FileSystem
+# class `org.apache.hadoop.fs.FileSystem`
 
 The abstract `FileSystem` class is the original class to access Hadoop filesystems;
 non-abstract subclasses exist for all Hadoop-supported filesystems. 
@@ -91,13 +91,16 @@ Get the status of a path
 
 ### Path getHomeDirectory()
 
-The function `getHomeDirectory` returns the home directory for the Filesystem and the current user account.
-For some filesystems, the path is `["/","users", System.getProperty("user-name")]`. However,
-for HDFS, the username is derived from the credentials used to authenticate the client with HDFS -this
+The function `getHomeDirectory` returns the home directory for the Filesystem 
+and the current user account.
+
+For some filesystems, the path is `["/","users", System.getProperty("user-name")]`.
+
+However, for HDFS, the username is derived from the credentials used to authenticate the client with HDFS -this
 may differ from the local user account name.
 
-Accordingly, it is the responsibility of the filesystem to determine the home directory
-of the caller
+*It is the responsibility of the filesystem to determine actual the home directory
+of the caller*
 
 
 #### Preconditions
@@ -355,7 +358,7 @@ a new directory is not created. (this is defined in HDFS)
 <!--  METHOD: create() -->
 <!--  ============================================================= -->
 
-### FSDataOutputStream create(Path, ...)
+### `FSDataOutputStream create(Path, ...)`
 
 
     FSDataOutputStream create(Path p,
@@ -414,7 +417,7 @@ in this situation.
 <!--  METHOD: append() -->
 <!--  ============================================================= -->
 
-### FSDataOutputStream append(Path p, int bufferSize, Progressable progress)
+### `FSDataOutputStream append(Path p, int bufferSize, Progressable progress)`
 
 Implementations MAY throw `UnsupportedOperationException`
   
@@ -437,7 +440,7 @@ by appending data to the existing list
 <!--  METHOD: open() -->
 <!--  ============================================================= -->
 
-### FSDataInputStream open(Path f, int bufferSize)
+### `FSDataInputStream open(Path f, int bufferSize)`
 
 Implementations MAY throw `UnsupportedOperationException`
   
@@ -445,15 +448,26 @@ Implementations MAY throw `UnsupportedOperationException`
 
     if not isFile(FS, p)) : raise [FileNotFoundException, IOException]
 
+This is a critical precondition. Implementations of some FileSystems (e.g.
+Object stores) could shortcut one round trip by postponing their HTTP GET
+operation until the first `read()` on the returned `FSDataInputStream`.
+However, much client code does depend on the existence check being performed
+at the time of the `open()` operation -implementations MUST check for the 
+presence of the file at the time of creation. (This does not imply that
+the file and its data is still at the time of the following read()` or
+any successors)
 
 #### Postconditions
   
-    result = FSDataInputStream
+    result = FSDataInputStream(0, FS.Files[p])
   
 The result provides access to the byte array defined by `FS.Files[p]`; whether that 
 access is to the contents at the time the `open()` operation was invoked, 
 or whether and how it may pick up changes to that data in later states of FS is
 an implementation detail.
+
+The result MUST be the same for local and remote callers of the operation.
+  
   
 #### HDFS implementation notes
 
@@ -463,6 +477,8 @@ symbolic links
 1. throws `IOException("Cannot open filename " + src)` if the path
 exists in the metadata, but no copies of any its blocks can be located;
 -`FileNotFoundException` would seem more accurate and useful.
+
+
   
 
 <!--  ============================================================= -->

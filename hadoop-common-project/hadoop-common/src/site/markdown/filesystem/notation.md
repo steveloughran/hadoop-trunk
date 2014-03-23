@@ -172,15 +172,20 @@ Should:
 
     if not exists(FS, Path) : raise FileNotFoundException
 
-Functions can be divided into partial functions and total functions.
 
-Total functions have a valid output for every input, for example `def double(i :Int)-->Int: i * 2` is valid for all integers
+### Conditions
 
-Partial functions are not valid for all inputs, for example, `def inverse:(i: Int)->Float: 1/i` is not valid for the input 0.
-
-Total functions are notated with the term `-->` partial functions -which form the majority of functions in this
-specification, with `->`.
+Other conditions used in precondition and postcondition declarations are
 
 
-
+#### `supported(instance, method)`
  
+
+This condition declares that a subclass implements the named method
+ -some subclasses of the verious FileSystem classes do not, and instead
+ raise `UnsupportedOperation`
+
+As an example, one precondition of `FSDataInputStream.seek` 
+is that the implementation must support `Seekable.seek` :
+
+    supported(FDIS, Seekable.seek) else raise UnsupportedOperation

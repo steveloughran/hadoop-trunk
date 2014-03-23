@@ -54,11 +54,12 @@ MUST return -1.
 
 1. `S.read(Buffer, Offset, Len)`
 
-    where Offset &lt; 0 else  Offset >  Buffer.length
-    else (Len > (Buffer.length - Offset)) 
-    else Len &lt; 0 MUST throw
-      InvalidArgumentException or another RuntimeException
-    including -but not limited to- `ArrayIndexOutOfBoundsException
+
+      where Offset &lt; 0 else  Offset >  Buffer.length
+      else (Len > (Buffer.length - Offset)) 
+      else Len &lt; 0 MUST throw
+        InvalidArgumentException or another RuntimeException
+      including -but not limited to- `ArrayIndexOutOfBoundsException
 
 1. `S.read(null, int Offset, int Len )` MUST throw `NullPointerException`.
 

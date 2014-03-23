@@ -33,6 +33,6 @@ reference data, or updates it.
 1. [Introduction](introduction.html)
 1. [Notation](notation.html)
 1. [Model](model.html)
-1. [FileSystem class](class_filesystem.html)
+1. [FileSystem class](filesystem.html)
+1. [InputStream class](fsdatainputstream.md.html)
 1. [FSDataOutputStream class](fsdataoutputstream_syncable.html)
-1. [InputStream class](inputstream_seekable_positionedreadable.html)
