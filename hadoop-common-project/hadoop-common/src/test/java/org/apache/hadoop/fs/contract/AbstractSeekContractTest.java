@@ -104,18 +104,25 @@ public abstract class AbstractSeekContractTest extends AbstractFSContractTestBas
     assertMinusOne("block read zero byte file", result);
   }
 
+  /**
+   * Seek and read on a closed file.
+   * Some filesystems let callers seek on a closed file -these must
+   * still fail on the subsequent reads.
+   * @throws Throwable
+   */
   @Test
   public void testSeekReadClosedFile() throws Throwable {
-    if (isSupported(SUPPORTS_SEEK_ON_CLOSED_FILE)) {
-      skip("Filesystem supports seek on closed files");
-    }
+    boolean supportsSeekOnClosedFiles = isSupported(SUPPORTS_SEEK_ON_CLOSED_FILE);
+
     instream = getFileSystem().open(smallSeekFile);
     getLog().debug(
       "Stream is of type " + instream.getClass().getCanonicalName());
     instream.close();
     try {
       instream.seek(0);
-      fail("seek succeeded on a closed stream");
+      if (!supportsSeekOnClosedFiles) {
+        fail("seek succeeded on a closed stream");
+      }
     } catch (IOException e) {
       //expected a closed file
     }
@@ -134,10 +141,14 @@ public abstract class AbstractSeekContractTest extends AbstractFSContractTestBas
     try {
       byte[] buffer = new byte[1];
       int result = instream.read(buffer, 0, 1);
-      fail("read(buffer, 0, 1) succeeded on a closed stream, got " + buffer[0]);
+      fail("read(buffer, 0, 1) succeeded on a closed stream, got " + result);
     } catch (IOException e) {
       //expected a closed file
     }
+    //what position does a closed file have?
+    long offset = instream.getPos();
+    //and close again
+    instream.close();
   }
 
   @Test
@@ -203,7 +214,7 @@ public abstract class AbstractSeekContractTest extends AbstractFSContractTestBas
     boolean canSeekPastEOF =
       isSupported(ContractOptions.SUPPORTS_SEEK_PAST_EOF);
     try {
-      instream.seek(TEST_FILE_LEN+1);
+      instream.seek(TEST_FILE_LEN + 1);
       //if this doesn't trigger, then read() is expected to fail
       assertMinusOne("read after seeking past EOF", instream.read());
     } catch (EOFException e) {
@@ -258,7 +269,8 @@ public abstract class AbstractSeekContractTest extends AbstractFSContractTestBas
 
   @Test
   public void testPositionedBulkReadDoesntChangePosition() throws Throwable {
-    describe("verify that a positioned read does not change the getPos() value");
+    describe(
+      "verify that a positioned read does not change the getPos() value");
     Path testSeekFile = path("bigseekfile.txt");
     byte[] block = dataset(65536, 0, 255);
     createFile(getFileSystem(), testSeekFile, false, block);

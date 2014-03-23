@@ -52,6 +52,9 @@ implements Seekable, PositionedReadable, HasFileDescriptor {
 
   @Override
   public long getPos() throws IOException {
+    if (in == null) {
+      throw new IOException("Stream is closed");
+    }
     return ((FSInputStream)in).getPos()-(count-pos);
   }
 
