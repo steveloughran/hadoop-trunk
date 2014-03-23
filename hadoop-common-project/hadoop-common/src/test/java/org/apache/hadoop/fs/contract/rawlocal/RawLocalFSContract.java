@@ -25,8 +25,8 @@ import org.apache.hadoop.fs.contract.localfs.LocalFSContract;
 import java.io.File;
 import java.io.IOException;
 
-public class RawlocalFSContract extends LocalFSContract {
-  public RawlocalFSContract(Configuration conf) {
+public class RawLocalFSContract extends LocalFSContract {
+  public RawLocalFSContract(Configuration conf) {
     super(conf);
   }
 
