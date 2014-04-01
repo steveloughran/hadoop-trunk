@@ -53,6 +53,10 @@ public abstract class AbstractFSContractTestBase extends Assert
    * The test filesystem extracted from it
    */
   private FileSystem fileSystem;
+
+  /**
+   * The path for tests
+   */
   private Path testPath;
 
   /**

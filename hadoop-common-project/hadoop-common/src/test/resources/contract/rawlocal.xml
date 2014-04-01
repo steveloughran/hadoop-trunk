@@ -24,67 +24,72 @@
   -->
 
   <property>
-    <name>fs.file.contract.test.root-tests-enabled</name>
+    <name>fs.contract.test.root-tests-enabled</name>
     <value>false</value>
   </property>
 
   <property>
-    <name>fs.file.contract.test.random-seek-count</name>
+    <name>fs.contract.test.random-seek-count</name>
     <value>1000</value>
   </property>
 
   <property>
-    <name>fs.file.contract.is-case-sensitive</name>
+    <name>fs.contract.is-case-sensitive</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.file.contract.supports-append</name>
+    <name>fs.contract.supports-append</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.file.contract.supports-atomic-directory-delete</name>
+    <name>fs.contract.supports-atomic-directory-delete</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.file.contract.supports-atomic-rename</name>
+    <name>fs.contract.supports-atomic-rename</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.file.contract.supports-block-locality</name>
+    <name>fs.contract.supports-block-locality</name>
     <value>false</value>
   </property>
 
   <property>
-    <name>fs.file.contract.supports-concat</name>
+    <name>fs.contract.supports-concat</name>
     <value>false</value>
   </property>
 
   <property>
-    <name>fs.file.contract.supports-seek</name>
+    <name>supports-overwrite-on-rename</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.file.contract.supports-seek-on-closed-file</name>
+    <name>fs.contract.supports-seek</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.file.contract.supports-seek-past-eof</name>
+    <name>fs.contract.supports-seek-on-closed-file</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.file.contract.supports-strict-exceptions</name>
+    <name>fs.contract.supports-seek-past-eof</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>fs.contract.supports-strict-exceptions</name>
     <value>false</value>
   </property>
   
   <property>
-    <name>fs.file.contract.supports-unix-permissions</name>
+    <name>fs.contract.supports-unix-permissions</name>
     <value>true</value>
   </property>
 

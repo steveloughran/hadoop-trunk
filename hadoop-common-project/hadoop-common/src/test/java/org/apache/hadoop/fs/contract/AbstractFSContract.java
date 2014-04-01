@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.fs.contract;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -40,10 +42,28 @@ import java.net.URL;
  * and limit filesize and other numeric variables for scale tests
  */
 public abstract class AbstractFSContract extends Configured {
+  private static final Log LOG = LogFactory.getLog(AbstractFSContract.class);
+  public static final String FS_CONTRACT_KEY = "fs.contract.";
+
+  
   private boolean enabled = true;
 
+  /**
+   * name of the (optional) resource containing auth keys : {@value}
+   * If found, it it will be loaded
+   */
+  String RESOURCE_AUTH_FILE = "contract/auth-keys.xml";
+
+
+  /**
+   * Constructor: loads the authentication keys if found
+   * @param conf configuration to work with
+   */
   protected AbstractFSContract(Configuration conf) {
     super(conf);
+    if (maybeAddConfResource(RESOURCE_AUTH_FILE)) {
+      LOG.debug("Loaded authentication keys from " + RESOURCE_AUTH_FILE);
+    }
   }
 
   /**
@@ -53,13 +73,31 @@ public abstract class AbstractFSContract extends Configured {
   public void init() throws IOException {
 
   }
-  
+
+  /**
+   * Add a configuration resource to this instance's configuration
+   * @param resource resource reference
+   * @throws AssertionError if the resource was not found.
+   */
   protected void addConfResource(String resource) {
-    URL url = this.getClass().getClassLoader().getResource(resource);
-    Assert.assertNotNull("Resource not found " + resource, url);
-    getConf().addResource(resource);
+    boolean found = maybeAddConfResource(resource); 
+    Assert.assertTrue("Resource not found " + resource, found);
   }
-    
+
+  /**
+   * Add a configuration resource to this instance's configuration,
+   * return true if the resource was found
+   * @param resource resource reference
+   */
+  protected boolean maybeAddConfResource(String resource) {
+    URL url = this.getClass().getClassLoader().getResource(resource);
+    boolean found = url != null;
+    if (found) {
+      getConf().addResource(resource);
+    }
+    return found;
+  }
+
 
   /**
    * Get the FS from a URI. The default implementation just retrieves
@@ -100,6 +138,14 @@ public abstract class AbstractFSContract extends Configured {
     return enabled;
   }
 
+  /**
+   * Boolean to indicate whether or not the contract test are enabled
+   * for this test run.
+   * @param enabled flag which must be true if the tests can be run.
+   */
+  public void setEnabled(boolean enabled) {
+    this.enabled = enabled;
+  }
   
   /**
    * Query for a feature being supported. This may include a probe for the feature
@@ -135,15 +181,7 @@ public abstract class AbstractFSContract extends Configured {
    * @return the configuration key base with the feature appended
    */
   public String getConfKey(String feature) {
-    return getKeyBase() + feature;
-  }
-
-  /**
-   * Get the base key for all contract properties for this filesystem
-   * @return the string to use when constructing contract-specific keys
-   */
-  public final String getKeyBase() {
-    return "fs." + getScheme() + ".contract.";
+    return FS_CONTRACT_KEY + feature;
   }
 
   /**
@@ -165,7 +203,4 @@ public abstract class AbstractFSContract extends Configured {
     return "FSContract for " + getScheme();
   }
 
-  public void setEnabled(boolean enabled) {
-    this.enabled = enabled;
-  }
 }

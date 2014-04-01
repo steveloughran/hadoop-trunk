@@ -19,27 +19,15 @@
 package org.apache.hadoop.fs.contract.s3n;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.contract.AbstractFSContract;
-
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
+import org.apache.hadoop.fs.contract.AbstractBondedFSContract;
 
 /**
  * The contract of S3N: only enabled if the test bucket is provided
  */
-public class NativeS3Contract extends AbstractFSContract {
+public class NativeS3Contract extends AbstractBondedFSContract {
 
   public static final String CONTRACT_XML = "contract/s3n.xml";
-  /**
-   *
-   */
-  public static final String TEST_FS_S3N_NAME = "test.fs.s3n.name";
-  private String fsName;
-  private URI fsURI;
-  private FileSystem s3nFS;
+
 
   public NativeS3Contract(Configuration conf) {
     super(conf);
@@ -48,46 +36,9 @@ public class NativeS3Contract extends AbstractFSContract {
   }
 
   @Override
-  public void init() throws IOException {
-    super.init();
-    //this test is only enabled if the test FS is present
-    fsName = getConf().get(TEST_FS_S3N_NAME);
-    boolean enabled = fsName != null
-                      && !fsName.isEmpty()
-                      && !fsName.equals("s3n:///");
-    setEnabled(enabled);
-    if (enabled) {
-      try {
-        fsURI = new URI(fsName);
-        s3nFS = FileSystem.get(fsURI, getConf());
-      } catch (URISyntaxException e) {
-        throw new IOException("Invalid URI " + fsName
-                              + " for config option " + TEST_FS_S3N_NAME);
-      } catch (IllegalArgumentException e) {
-        throw new IOException("Invalid S3N URI " + fsName
-                              + " for config option " + TEST_FS_S3N_NAME, e);
-      }
-    }
-  }
-
-  @Override
-  public FileSystem getTestFileSystem() throws IOException {
-    return s3nFS;
-  }
-
-  @Override
   public String getScheme() {
     return "s3n";
   }
 
-  @Override
-  public Path getTestPath() {
-    Path path = new Path("/test");
-    return path;
-  }
 
-  @Override
-  public String toString() {
-    return "S3N Contract against " + fsName;
-  }
 }

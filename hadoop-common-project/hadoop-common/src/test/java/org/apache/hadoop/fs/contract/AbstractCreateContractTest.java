@@ -23,11 +23,13 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
+import org.junit.internal.AssumptionViolatedException;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.writeDataset;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.writeTextFile;
 
@@ -111,7 +113,16 @@ public abstract class AbstractCreateContractTest extends
     describe("verify trying to create a file over a non-empty dir fails");
     Path path = path("testOverwriteNonEmptyDirectory");
     mkdirs(path);
-    assertIsDirectory(path);
+    try {
+      assertIsDirectory(path);
+    } catch (AssertionError failure) {
+      if (isSupported(IS_BLOBSTORE)) {
+        // file/directory hack surfaces here
+        throw new AssumptionViolatedException(failure.toString()).initCause(failure);
+      } 
+      // else: rethrow
+      throw failure;
+    }
     Path child = new Path(path, "child");
     writeTextFile(getFileSystem(), child, "child file", true);
     byte[] data = dataset(256, 'a', 'z');
@@ -147,8 +158,16 @@ public abstract class AbstractCreateContractTest extends
                                    4096,
                                    (short) 1,
                                    1024);
-      assertPathExists("expected path to be visible before anything written",
-                       path);
+      if (!getFileSystem().exists(path)) {
+
+        if (isSupported(IS_BLOBSTORE)) {
+          // object store: downgrade to a skip so that the failure is visible
+          // in test results
+          skip("Filesystem is an object store and newly created files are not immediately visible");
+        }
+        assertPathExists("expected path to be visible before anything written",
+                         path);
+      }
     } finally {
       IOUtils.closeStream(out);
     }

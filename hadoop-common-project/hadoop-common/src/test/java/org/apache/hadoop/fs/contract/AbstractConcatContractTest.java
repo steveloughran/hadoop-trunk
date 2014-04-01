@@ -43,7 +43,7 @@ public abstract class AbstractConcatContractTest extends AbstractFSContractTestB
   @Override
   public void setup() throws Exception {
     super.setup();
-    skipIfUnsupported(SUPPORTS_CONTAT);
+    skipIfUnsupported(SUPPORTS_CONCAT);
 
     //delete the test directory
     testPath = path("test");

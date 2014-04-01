@@ -18,8 +18,7 @@
 
 <configuration>
   <!--
-  S3N is a blobstore, with very different behavior than a 
-  classic filesystem.
+  FTP -these options are for testing against a remote unix filesystem.
   -->
 
   <property>

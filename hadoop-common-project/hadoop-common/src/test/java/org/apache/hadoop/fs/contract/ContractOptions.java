@@ -63,8 +63,15 @@ public interface ContractOptions {
    * Does the FS support multiple block locations?
    * @{value}
    */
-  String SUPPORTS_CONTAT = "supports-concat";
+  String SUPPORTS_CONCAT = "supports-concat";
 
+  /**
+   * will a rename overwrite rather than fail if the
+   * destination exists?
+   * @{value}
+   */
+  String SUPPORTS_OVERWRITE_ON_RENAME = "supports-overwrite-on-rename";
+  
   /**
    * Is seeking supported at all?
    * @{value}

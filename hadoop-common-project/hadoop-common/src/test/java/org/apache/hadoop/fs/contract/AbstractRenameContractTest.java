@@ -26,7 +26,6 @@ import org.junit.Test;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
-import static org.apache.hadoop.fs.contract.ContractTestUtils.assertIsDirectory;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.writeDataset;
 
@@ -55,24 +54,6 @@ public abstract class AbstractRenameContractTest extends
          + " and a destination of " + destDirLS);
   }
 
-  /**
-   * Expect a rename exception to raise an exception or fail
-   * by returning false.
-   * @param src source path
-   * @param dst destination path
-   * @throws IOException any exception raised during the rename operation
-   */
-  public void expectRenameToFaultOrFail(Path src, Path dst) throws IOException {
-    boolean renamed = rename(src, dst);
-    if (renamed) {
-      //expected an exception
-      String destDirLS = generateAndLogErrorListing(src, dst);
-      getLog().error("dest dir " + destDirLS);
-      fail("expected rename(" + src + ", " + dst + " ) to fail," +
-           " but got success and destination of " + destDirLS);
-    }
-  }
-
   protected String generateAndLogErrorListing(Path src, Path dst) throws
                                                                   IOException {
     FileSystem fs = getFileSystem();
@@ -81,8 +62,7 @@ public abstract class AbstractRenameContractTest extends
     String destDirLS = ContractTestUtils.ls(fs, dst.getParent());
     if (fs.isDirectory(dst)) {
       //include the dir into the listing
-      destDirLS = destDirLS + "\n" +
-                  ContractTestUtils.ls(fs, dst);
+      destDirLS = destDirLS + "\n" + ContractTestUtils.ls(fs, dst);
     }
     return destDirLS;
   }
@@ -113,28 +93,52 @@ public abstract class AbstractRenameContractTest extends
     }
   }
 
+  /**
+   * Rename test -handles filesystems that will overwrite the destination
+   * as well as those that do not (i.e. HDFS). 
+   * @throws Throwable
+   */
   @Test
   public void testRenameFileOverExistingFile() throws Throwable {
     describe("Verify renaming a file onto an existing file fails");
-    Path path = path("source-256.txt");
-    byte[] data = dataset(256, 'a', 'z');
-    writeDataset(getFileSystem(), path, data, data.length, 1024, false);
+    Path path1 = path("source-256.txt");
+    byte[] data1 = dataset(256, 'a', 'z');
+    writeDataset(getFileSystem(), path1, data1, data1.length, 1024, false);
     Path path2 = path("dest-512.txt");
     byte[] data2 = dataset(512, 'A', 'Z');
     writeDataset(getFileSystem(), path2, data2, data2.length, 1024, false);
     assertIsFile(path2);
-    try {
-      expectRenameToFaultOrFail(path, path2);
-    } catch (FileAlreadyExistsException e) {
-      handleExpectedException(e);
+    boolean expectOverwrite = !isSupported(SUPPORTS_OVERWRITE_ON_RENAME);
+    if (expectOverwrite) {
+      // the filesystem supports rename(file, file2) by overwriting file2
+      
+      boolean renamed = rename(path1, path2);
+      assertTrue("Rename returned false", renamed);
+      //now verify that the data has been overwritten
+      ContractTestUtils.verifyFileContents(getFileSystem(), path2, data1);
+    } else {
+      try {
+        // rename is rejected by returning 'false' or throwing an exception
+        boolean renamed = rename(path1, path2);
+        if (renamed) {
+          //expected an exception
+          String destDirLS = generateAndLogErrorListing(path1, path2);
+          getLog().error("dest dir " + destDirLS);
+          fail("expected rename(" + path1 + ", " + path2 + " ) to fail," +
+               " but got success and destination of " + destDirLS);
+        }
+      } catch (FileAlreadyExistsException e) {
+        handleExpectedException(e);
+      }
+      //verify that the destination file is as before
+      ContractTestUtils.verifyFileContents(getFileSystem(), path2, data2);
     }
-    ContractTestUtils.verifyFileContents(getFileSystem(), path2, data2);
   }
   
   @Test
   public void testRenameDirIntoExistingDir() throws Throwable {
-    describe("Verify renaming a dir into an existing dir puts it underneath" +
-             "and leaves existing files alone");
+    describe("Verify renaming a dir into an existing dir puts it underneath"
+             +" and leaves existing files alone");
     Path srcDir = path("source");
     Path path = new Path(srcDir, "source-256.txt");
     byte[] data = dataset(256, 'a', 'z');

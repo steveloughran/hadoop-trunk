@@ -19,30 +19,15 @@
 package org.apache.hadoop.fs.swift.contract;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.contract.AbstractFSContract;
+import org.apache.hadoop.fs.contract.AbstractBondedFSContract;
 import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
-
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 
 /**
  * The contract of S3N: only enabled if the test bucket is provided
  */
-public class SwiftContract extends AbstractFSContract {
+public class SwiftContract extends AbstractBondedFSContract {
 
   public static final String CONTRACT_XML = "contract/swift.xml";
-  
-  /**
-   *
-   */
-  public static final String TEST_FS_NAME = "test.fs.name";
-
-  private String fsName;
-  private URI fsURI;
-  private FileSystem fs;
 
   public SwiftContract(Configuration conf) {
     super(conf);
@@ -50,47 +35,10 @@ public class SwiftContract extends AbstractFSContract {
     addConfResource(CONTRACT_XML);
   }
 
-  @Override
-  public void init() throws IOException {
-    super.init();
-    //this test is only enabled if the test FS is present
-    fsName = getOption(TEST_FS_NAME, null);
-    boolean enabled = fsName != null
-                      && !fsName.isEmpty()
-                      && !fsName.equals("swift:///");
-    setEnabled(enabled);
-    if (enabled) {
-      try {
-        fsURI = new URI(fsName);
-        fs = FileSystem.get(fsURI, getConf());
-      } catch (URISyntaxException e) {
-        throw new IOException("Invalid URI " + fsName
-                              + " for config option " + TEST_FS_NAME);
-      } catch (IllegalArgumentException e) {
-        throw new IOException("Invalid Swift URI " + fsName
-                              + " for config option " + TEST_FS_NAME, e);
-      }
-    }
-  }
-
-  @Override
-  public FileSystem getTestFileSystem() throws IOException {
-    return fs;
-  }
 
   @Override
   public String getScheme() {
     return SwiftNativeFileSystem.SWIFT;
   }
 
-  @Override
-  public Path getTestPath() {
-    Path path = new Path("/test");
-    return path;
-  }
-
-  @Override
-  public String toString() {
-    return "Swift Contract against " + fsName;
-  }
 }

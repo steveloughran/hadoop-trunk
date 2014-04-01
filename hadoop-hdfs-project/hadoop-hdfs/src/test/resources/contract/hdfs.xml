@@ -22,7 +22,7 @@
   -->
 
   <property>
-    <name>fs.hdfs.contract.test.root-tests-enabled</name>
+    <name>fs.contract.test.root-tests-enabled</name>
     <value>true</value>
   </property>
 
@@ -32,52 +32,52 @@
   </property>
 
   <property>
-    <name>fs.hdfs.contract.is-case-sensitive</name>
+    <name>fs.contract.is-case-sensitive</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.hdfs.contract.supports-append</name>
+    <name>fs.contract.supports-append</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.hdfs.contract.supports-atomic-directory-delete</name>
+    <name>fs.contract.supports-atomic-directory-delete</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.hdfs.contract.supports-atomic-rename</name>
+    <name>fs.contract.supports-atomic-rename</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.hdfs.contract.supports-block-locality</name>
+    <name>fs.contract.supports-block-locality</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.hdfs.contract.supports-concat</name>
+    <name>fs.contract.supports-concat</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.hdfs.contract.supports-seek</name>
+    <name>fs.contract.supports-seek</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.hdfs.contract.supports-seek-past-eof</name>
+    <name>fs.contract.supports-seek-past-eof</name>
     <value>false</value>
   </property>
 
   <property>
-    <name>fs.hdfs.contract.supports-strict-exceptions</name>
+    <name>fs.contract.supports-strict-exceptions</name>
     <value>true</value>
   </property>
 
   <property>
-    <name>fs.hdfs.contract.supports-unix-permissions</name>
+    <name>fs.contract.supports-unix-permissions</name>
     <value>true</value>
   </property>
 
