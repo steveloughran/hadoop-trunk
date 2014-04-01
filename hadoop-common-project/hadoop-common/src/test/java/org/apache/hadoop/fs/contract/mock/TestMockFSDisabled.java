@@ -21,13 +21,12 @@ package org.apache.hadoop.fs.contract.mock;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.apache.hadoop.fs.contract.AbstractFSContractTestBase;
-import org.apache.hadoop.fs.contract.ContractOptions;
 import org.junit.Test;
 
 /**
  * Test dir operations on a the local FS.
  */
-public class TestMockFSSDisabled extends AbstractFSContractTestBase {
+public class TestMockFSDisabled extends AbstractFSContractTestBase {
 
   @Override
   protected AbstractFSContract createContract(Configuration conf) {
@@ -36,7 +35,7 @@ public class TestMockFSSDisabled extends AbstractFSContractTestBase {
 
   @Test
   public void testExpectSkipDisabledContract() throws Throwable {
-    assertFalse("isEnabled()=true",getContract().isEnabled());
+    assertFalse("isEnabled()=true", getContract().isEnabled());
     fail("Expected test to be skipped");
   }
   
