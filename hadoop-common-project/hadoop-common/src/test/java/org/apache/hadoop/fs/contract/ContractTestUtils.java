@@ -573,8 +573,8 @@ public class ContractTestUtils extends Assert {
                                Path path) throws IOException {
     if (!fileSystem.exists(path)) {
       //failure, report it
+      ls(fileSystem, path.getParent());
       fail(message + ": not found " + path + " in " + path.getParent());
-           ls(fileSystem, path.getParent());
     }
   }
 
