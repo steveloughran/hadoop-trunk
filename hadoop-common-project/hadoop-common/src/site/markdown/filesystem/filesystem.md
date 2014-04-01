@@ -43,29 +43,29 @@ all operations on a valid filesystem MUST result in a new filesystem that is als
 ### Predicates and other state access operations
 
 
-### boolean exists(Path p)
+### `boolean exists(Path p)`
 
 
     def exists(FS, p) = p in paths(FS)
   
 
-### boolean isDirectory(Path p) 
+### `boolean isDirectory(Path p)` 
 
     def isDirectory(FS, p)= p in directories(FS)
   
 
-### boolean isFile(Path p) 
+### `boolean isFile(Path p)` 
 
 
     def isFile(FS, p) = p in files(FS)
 
-###  isSymlink(Path p) boolean
+###  `boolean isSymlink(Path p)`
 
 
     def isSymlink(FS, p) = p in symlinks(FS)
   
 
-### FileStatus getFileStatus(Path p)
+### `FileStatus getFileStatus(Path p)`
 
 Get the status of a path
 
@@ -120,7 +120,7 @@ code may fail.
 <!--  METHOD: listStatus() -->
 <!--  ============================================================= -->
 
-### FileSystem.listStatus(Path, PathFilter ) 
+### `FileSystem.listStatus(Path, PathFilter )` 
 
 A `PathFilter` `f` is a predicate function that returns true iff the path `p`
 meets the filter's conditions.
@@ -142,6 +142,15 @@ Path must exist
 
     elif isDir(FS, p):
        result [getFileStatus(c) forall c in children(FS, p) where f(c) == True] 
+
+
+**Implicit invariant**: the contents of a `FileStatus` of a child retrieved
+via `listStatus()` are equal to those from a call of `getFileStatus()`
+to the same path:
+
+    forall fs in listStatus(Path) :
+      fs == getFileStatus(fs.path)
+
 
 ### Atomicity and Consistency
 

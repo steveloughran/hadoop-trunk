@@ -32,6 +32,8 @@ with extensions that add key assumptions to the system
 1. Callers may use `Seekable.seek()` to positions within this array, with future
 reads starting at this offset.
 1. The cost of a forward or backwards seek is low.
+1. There is no requirement for the stream implementation to be thread safe.
+ callers MUST assume that instances are not thread-safe.
 
 
 Files are opened via `FileSystem.open(p)`, which, if successful, returns:
@@ -49,6 +51,13 @@ with access functions
     pos(FDIS) 
     data(FDIS)
     isOpen(FDIS)
+
+**Implicit invariant**: the size of the data stream equals the size of the
+file as returned by `FileSystem.getFileStatus(Path p)`
+
+    forall p in dom(FS.Files[p]) :
+    len(data(FDIS)) == FS.getFileStatus(p).length
+
 
 ### `Closeable.close()`
 
@@ -74,7 +83,6 @@ unexpectedly.
      
     FSDIS' = (undefined), (undefined), false)
        
-   
 
 ### `Seekable.getPos()`
 
@@ -112,8 +120,6 @@ Return the data at the current position.
         result = -1
         
 
-
-
 ### `InputStream.read(buffer[], offset, length)`
 
 Read `length` bytes of data into the destination buffer, starting at offset
@@ -148,8 +154,6 @@ Exceptions raised on precondition failure are
           FDIS' = (pos+l, data, true)
           result = l
     
-
-
 ### `Seekable.seek(s)`
 
 
@@ -164,13 +168,12 @@ If the operation is supported, the file SHOULD be open:
     isOpen(FDIS)
 
 Some filesystems do not perform this check, relying the `read()` contract
-to reject reads on a closed stream. (RawLocalFileSystem)
+to reject reads on a closed stream. (e.g. `RawLocalFileSystem`)
 
-Seek to offset 0 must always succeed, or the seek position must be less
-than the length of the data:
+A `seek(0)` MUST always succeed, as  the seek position must be 
+positive and less than the length of the Stream's:
 
-
-    (s==0) or (s < len(data))) else raise [EOFException, IOException]
+    s> 0 and ((s==0) or ((s < len(data)))) else raise [EOFException, IOException]
 
 Some FileSystems do not raise an exception if this condition is not met. They
 instead return -1 on any `read()` operation where, at the time of the read,
@@ -179,7 +182,6 @@ instead return -1 on any `read()` operation where, at the time of the read,
 #### Postconditions
     
     FDIS' = (s, data, true)
-    
 
 ### `Seekable.seekToNewSource(offset)`
 
@@ -229,6 +231,92 @@ Outside of test methods, the primary use of this method is in the {{FSInputCheck
 class, which can react to a checksum error in a read by attempting to source
 the data elsewhere. It a new source can be found it attempts to reread and
 recheck that portion of the file.
+
+## interface `PositionedReadable`
+
+The `PositionedReadable` operations provide the ability to
+read data into a buffer from a specific position in
+the data stream.
+
+Although the interface declares that it must be thread safe,
+some of the implementations do not follow this guarantee.
+
+#### Implementation preconditions
+
+Not all `FSDataInputStream` support these operations -those that do
+not implement `Seekable.seek()` do not implement the `PositionedReadable`
+interface. 
+
+    supported(FDIS, Seekable.seek) else raise [UnsupportedOperation, IOException]
+
+This could be considered "obvious" -if a stream is not seekable, a client
+cannot seek to a location to read it. It is also a side effect of the
+base class implementation, which uses `Seekable.seek()`.
+
+
+**Implicit invariant**: for all `PositionedReadable` operations, the value
+of `pos` is unchanged at the end of the operation
+ 
+    pos(FSDIS') == pos(FSDIS)
+
+
+There are no guarantees that this holds *during* the operation.
+
+
+#### Failure states
+
+For any operations that fail, the contents of the destination
+`buffer` are undefined. Implementations may overwrite part
+or all of the buffer before reporting a failure.
+
+
+
+### `int PositionedReadable.read(position, buffer, offset, length)`
+  
+#### Preconditions
+
+  (All stated above)
+  
+    position > 0 else raise [IllegalArgumentException, RuntimeException]
+    len(buffer) + offset < len(data) else raise [IndexOutOfBoundException, RuntimeException]
+    length >= 0
+    offset >= 0
+  
+#### Postconditions  
+
+The amount of data read is the less of the length or the amount
+of data available from the specified positiom
+ 
+    let available = min(length, len(data)-position)
+    buffer'[offset..(offset+available-1)] = data[position..position+available -1]
+    result = available
+  
+
+### `void PositionedReadable.readFully(position, buffer, offset, length)`
+  
+#### Preconditions
+
+  (All stated above)
+
+    position > 0 else raise [IllegalArgumentException, RuntimeException]
+    length >= 0
+    offset >= 0 
+    (position + length) <= len(data) else raise [EOFException, IOException]
+    len(buffer) + offset < len(data)
+  
+#### Postconditions  
+
+The amount of data read is the less of the length or the amount
+of data available from the specified positiom
+ 
+    let available = min(length, len(data)-position)
+    buffer'[offset..(offset+length-1)] = data[position..(position + length -1)]
+    
+### `PositionedReadable.readFully(position, buffer)`
+
+The semantics of this are exactly equivalent to
+
+    readFully(position, buffer, 0, len(buffer))
 
   
 ## Consistency 
