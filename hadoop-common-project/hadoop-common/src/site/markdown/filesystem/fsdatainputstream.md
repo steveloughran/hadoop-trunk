@@ -173,7 +173,7 @@ to reject reads on a closed stream. (e.g. `RawLocalFileSystem`)
 A `seek(0)` MUST always succeed, as  the seek position must be 
 positive and less than the length of the Stream's:
 
-    s> 0 and ((s==0) or ((s < len(data)))) else raise [EOFException, IOException]
+    s > 0 and ((s==0) or ((s < len(data)))) else raise [EOFException, IOException]
 
 Some FileSystems do not raise an exception if this condition is not met. They
 instead return -1 on any `read()` operation where, at the time of the read,
@@ -182,6 +182,13 @@ instead return -1 on any `read()` operation where, at the time of the read,
 #### Postconditions
     
     FDIS' = (s, data, true)
+
+There is an implicit invariant: a seek to the current position is a no-op
+
+    seek(getPos()) 
+
+Implementations may recognise this operation and bypass all other precondition
+checks, leaving the input stream unchanged.
 
 ### `Seekable.seekToNewSource(offset)`
 

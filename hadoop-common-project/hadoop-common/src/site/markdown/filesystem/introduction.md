@@ -12,10 +12,7 @@
   limitations under the License. See accompanying LICENSE file.
 -->
   
-# title
-
-
-## Introduction
+# Introduction
 
 This document defines the required behaviors of a Hadoop-compatible filesystem
 for implementors and maintainers of the Hadoop filesystem, and for users of
@@ -24,13 +21,15 @@ the Hadoop FileSystem APIs
 Most of the Hadoop operations are tested against HDFS in the Hadoop test
 suites, initially through `MiniDFSCluster`, before release by vendor-specific
 'production' tests, and implicitly by the Hadoop stack above it.
-HDFS's actions have
-been modeled closely on the POSIX Filesystem behavior -using the actions and
-return codes of Unix filesystem actions as a reference.
 
-What is not so rigorously tested is how well other filesystems accessible from
-Hadoop behave. the bundled S3 filesystem makes Amazon's S3 blobstore accessible
-through the FileSystem API. The Swift filesystem driver provides similar
+HDFS's actions have been modeled  on the POSIX Filesystem behavior -using the actions and
+return codes of Unix filesystem actions as a reference. Even so, there
+are places where HDFS diverges from the expected behaviour of a POSIX
+filesystem.
+
+What is not rigorously tested is how well other filesystems accessible from
+Hadoop behave. the bundled S3 filesystem makes Amazon's S3 Object Store ("blobstore")
+accessible through the FileSystem API. The Swift filesystem driver provides similar
 functionality for the OpenStack Swift blobstore. The Azure object storage
 filesystem in branch-1-win talks to Microsoft's Azure equivalent. All of these
 bind to blobstores, which do have different behaviors, especially regarding
@@ -38,19 +37,24 @@ consistency guarantees, and atomicity of operations.
 
 The "Local" filesystem provides access to the underlying filesystem of the
 platform -its behavior is defined by the operating system -and again, can
-behave differently from HDFS.
+behave differently from HDFS. Case-sensitivity, action when attempting to
+rename a file atop another file, and whether it is possible to `seek()` past
+the end of the file are all examples of possible differences.
 
-Finally, there are filesystems implemented by third parties, that assert
+There are also filesystems implemented by third parties, that assert
 compatibility with Apache Hadoop. There is no formal compatibility suite, and
 hence no way for anyone to declare compatibility except in the form of their
 own compatibility tests.
 
-This document does not attempt to formally define compatibility; passing the
-associated test suites does not guarantee correct behavior in MapReduce jobs,
-or HBase operations.
+These documents does not attempt to provide a normative definition of compatibility;
+passing the associated test suites does not guarantee correct behavior of applications.
 
 What the test suites do define is the expected set of actions -failing these
 tests will highlight potential issues.
+
+By making aspect of the contract tests configurable, it becomes possible to
+declare which parts of the standard contract a filesystem diverges from.
+This is information which can be conveyed to users of the filesystem.
   
 ### Naming
 
@@ -74,11 +78,11 @@ present.
 
 * Files contain data -possibly 0 bytes worth.
 
-* You cannot put files or directories under a file
+* You cannot put files or directories under a file.
 
-* Directories contain 0 or more files
+* Directories contain zero or more files.
 
-* A directory entry has no data itself
+* A directory entry has no data itself.
 
 * You can write arbitrary binary data to a file -and when that file's contents
  are read in, from anywhere in or out the cluster -that data is returned.
@@ -166,31 +170,24 @@ Some filesystems do not meet all these requirements. As a result, some programs 
 
 ### Atomicity
 
-* Rename of a file MUST be atomic.
 
-* Rename of a directory SHOULD be atomic. Blobstore filesystems MAY offer
-non-atomic directory renaming.
+There are some operations that MUST be atomic. This is because they are
+often used to impement locking/exclusive access between processes in a cluster
 
-* Delete of a file MUST be atomic.
-
-* Delete of an empty directory MUST be atomic.
+1. Creating a file. If the `overwrite` parameter is false, the check and creation
+MUST be atomic.
+1. Deleting a file.
+1. Renaming a file.
+1. Rename a directory
+1. creating a single directory with `mkdir()`
 
 * Recursive directory deletion MAY be atomic. Although HDFS offers atomic
 recursive directory deletion, none of the other FileSystems that Hadoop supports
 offers such a guarantee -including the local filesystems.
 
-* `mkdir()` SHOULD be atomic.
+Most other operations come with no requirements or guarantees of atomicity.
 
-* `mkdirs()` MAY be atomic. [It is *currently* atomic on HDFS, but this is not
-the case for most other filesystems -and cannot be guaranteed for future
-versions of HDFS]
 
-* If `append()` is implemented, each individual `append()` call SHOULD be atomic.
-
-* `FileSystem.listStatus()` does not contain any guarantees of atomicity.
-  Some uses in the MapReduce codebase (such as `FileOutputCommitter`) do
-  assume that the listed directories do not get deleted between listing their
-  status and recursive actions on the listed entries.
 
 ### Consistency
 
@@ -223,27 +220,9 @@ same metadata and data irrespective of their location in or out of the cluster.
 
 ### Concurrency
 
-* The data added to a file during a write or append MAY be visible while the
-write operation is in progress.
-
-* If a client opens a file for a `read()` operation while another `read()`
-operation is in progress, the second operation MUST succeed. 
-Provided no writes/appends take place during this period both clients
-MUST have a consistent view of the same data.
-
-* If a file is deleted while a `read()` operation is in progress, the
-`delete()` operation SHOULD complete successfully. Implementations MAY cause
-`delete()` to fail with an IOException instead.
-
-* If a file is deleted while a `read()` operation is in progress, the `read()`
-operation MAY complete successfully. Implementations MAY cause `read()`
-operations to fail with an IOException instead.
-
-* Multiple writers MAY open a file for writing. If this occurs, the outcome
-is undefined
-
-* Undefined: action of `delete()` while a write or append operation is in
-progress
+There are no guarantees of isolated access to data: if one client is interacting
+with a remote file and another client changes that file, the changes may or may
+not be visible.
 
 ### Operations and failures
 
@@ -325,7 +304,7 @@ does not hold on blob stores]
 1. Directory list operations are fast for directories with few entries, but may
 incur a cost that is `O(entries)`. Hadoop 2 added iterative listing to
 handle the challenge of listing directories with millions of entries without
-buffering.
+buffering -at the cost of consistency.
 
 1. A `close()` of an `OutputStream` is fast, irrespective of whether or not
 the file operation has succeeded or not.
@@ -333,6 +312,5 @@ the file operation has succeeded or not.
 1. The time to delete a directory is independent of the size of the number of 
 child entries
 
-Different filesystems not only have different behavior, under excess load or failure
-conditions a filesystem may behave very differently. 
+
 

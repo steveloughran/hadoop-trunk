@@ -26,13 +26,8 @@ and APIs so that multiple filesystems can implement the APIs and present a consi
 model of their data to applications. It does not attempt to specify any of the
 concurrency  
 
-The operations that a filesystem supports either examines the paths and
-reference data, or updates it.
-
-
 1. [Introduction](introduction.html)
 1. [Notation](notation.html)
 1. [Model](model.html)
 1. [FileSystem class](filesystem.html)
-1. [InputStream class](fsdatainputstream.md.html)
-1. [FSDataOutputStream class](fsdataoutputstream_syncable.html)
+1. [FSDataInputStream class](fsdatainputstream.md.html)

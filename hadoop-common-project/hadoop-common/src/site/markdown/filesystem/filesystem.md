@@ -89,7 +89,7 @@ Get the status of a path
             stat.isdir = false
             stat.symlink = FS.Symlinks[p]
 
-### Path getHomeDirectory()
+### `Path getHomeDirectory()`
 
 The function `getHomeDirectory` returns the home directory for the Filesystem 
 and the current user account.
@@ -215,6 +215,7 @@ data more readily.
 <!--  ============================================================= -->
 
 ### ` List[BlockLocation] getFileBlockLocations(FileStatus f, int s, int l)`
+
 #### Preconditions
 
     if s <= 0 or l <= 0 : raise {HadoopIllegalArgumentException, InvalidArgumentException}
@@ -381,7 +382,7 @@ a new directory is not created. (this is defined in HDFS)
 
 #### Preconditions
 
-File must not exist for a no-overwrite create
+The file must not exist for a no-overwrite create
   
     if not overwrite and isFile(FS, p)  : raise FileAlreadyExistsException
   
@@ -620,7 +621,7 @@ of the rename becomes the destination + the filename of the source path.
 #### Preconditions
 
 
-source `s` must exist
+Source `s` must exist
 
     if not exists(FS, s) : raise FileNotFoundException
 
@@ -742,7 +743,7 @@ Renaming a source file that does not exist is not an exception -it simply return
 <!--  METHOD: concat() -->
 <!--  ============================================================= -->
 
-### concat(Path p, Path sources[])
+### `concat(Path p, Path sources[])`
 
 Joins multiple blocks together to create a single file. This
 is a very under-implemented (and under-used) operation.

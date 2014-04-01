@@ -113,8 +113,6 @@ Accessor functions return the specific element of a filesystem
     def FS.Directories  = FS.Directories
     def file(FS) = FS.Files
     def symlinks(FS) = FS.Directories
-
-
     def filenames(FS) = keys(FS.Files) 
     
 The entire set of a paths finite subset of all possible Paths, and functions to resolve a path to data, a directory predicate or a symbolic link
