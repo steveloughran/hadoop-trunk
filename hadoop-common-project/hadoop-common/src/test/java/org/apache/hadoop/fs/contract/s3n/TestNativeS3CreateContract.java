@@ -30,8 +30,4 @@ public class TestNativeS3CreateContract extends AbstractCreateContractTest {
     return new NativeS3Contract(conf);
   }
 
-  @Override
-  public void testOverwriteEmptyDirectory() throws Throwable {
-    ContractTestUtils.skip("blobstores can't distinguish empty directories from files");
-  }
 }
