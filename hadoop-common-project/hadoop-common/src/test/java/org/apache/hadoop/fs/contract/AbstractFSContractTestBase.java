@@ -26,8 +26,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.After;
 import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.Before;
+import org.junit.internal.AssumptionViolatedException;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
 
@@ -116,7 +116,8 @@ public abstract class AbstractFSContractTestBase extends Assert
    * Include at the start of tests to skip them if the FS is not enabled.
    */
   protected void assumeEnabled() {
-    Assume.assumeTrue(contract.isEnabled());
+    if (!contract.isEnabled())
+      throw new AssumptionViolatedException("test cases disabled for " + contract);
   }
 
   /**
