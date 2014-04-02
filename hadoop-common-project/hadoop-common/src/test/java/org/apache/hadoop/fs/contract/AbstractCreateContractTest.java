@@ -62,6 +62,10 @@ public abstract class AbstractCreateContractTest extends
     } catch (FileAlreadyExistsException expected) {
       //expected
       handleExpectedException(expected);
+    } catch (IOException relaxed) {
+      handleRelaxedException("Creating a file over a file with overwrite==false",
+                             "FileAlreadyExistsException",
+                             relaxed);
     }
   }
 
