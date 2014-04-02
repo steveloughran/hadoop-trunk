@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.fs.contract;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -36,6 +38,9 @@ import java.net.URISyntaxException;
  * tests are not enabled
  */
 public abstract class AbstractBondedFSContract extends AbstractFSContract {
+
+  private static final Log LOG =
+    LogFactory.getLog(AbstractFSContractTestBase.class);
 
   /**
    * Pattern for the option for test filesystems from schema
@@ -70,6 +75,9 @@ public abstract class AbstractBondedFSContract extends AbstractFSContract {
       } catch (IllegalArgumentException e) {
         throw new IOException("Invalid URI " + fsName, e);
       }
+    } else {
+      LOG.info("skipping tests as FS name is not defined in "
+              + getFilesystemConfKey());
     }
   }
 
@@ -81,6 +89,13 @@ public abstract class AbstractBondedFSContract extends AbstractFSContract {
    */
   public String loadFilesystemName(String schema) {
     return getOption(String.format(FSNAME_OPTION, schema), "");
+  }
+
+  /**
+   * Get the conf key for a filesystem
+   */
+  protected String getFilesystemConfKey() {
+    return getConfKey(String.format(FSNAME_OPTION, getScheme()));
   }
 
   @Override

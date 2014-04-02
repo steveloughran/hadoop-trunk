@@ -63,6 +63,8 @@ public abstract class AbstractFSContract extends Configured {
     super(conf);
     if (maybeAddConfResource(RESOURCE_AUTH_FILE)) {
       LOG.debug("Loaded authentication keys from " + RESOURCE_AUTH_FILE);
+    } else {
+      LOG.debug("Not loaded: " + RESOURCE_AUTH_FILE);
     }
   }
 
