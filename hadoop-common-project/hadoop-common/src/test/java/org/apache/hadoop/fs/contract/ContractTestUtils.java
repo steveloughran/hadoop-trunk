@@ -526,7 +526,6 @@ public class ContractTestUtils extends Assert {
     return pathname + fileStatsToString(stats, "\n");
   }
 
-  /**
    /**
    * Assert that a file exists and whose {@link FileStatus} entry
    * declares that this is a file and not a symlink or directory.
@@ -538,6 +537,16 @@ public class ContractTestUtils extends Assert {
                                                                  IOException {
     assertPathExists(fileSystem, "Expected file", filename);
     FileStatus status = fileSystem.getFileStatus(filename);
+    assertIsFile(filename, status);
+  }
+
+  /**
+   * Assert that a file exists and whose {@link FileStatus} entry
+   * declares that this is a file and not a symlink or directory.
+   * @param filename name of the file
+   * @param status file status
+   */
+  public static void assertIsFile(Path filename, FileStatus status) {
     String fileInfo = filename + "  " + status;
     assertFalse("File claims to be a directory " + fileInfo,
                 status.isDirectory());

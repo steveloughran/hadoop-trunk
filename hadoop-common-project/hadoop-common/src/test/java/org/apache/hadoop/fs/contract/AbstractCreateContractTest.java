@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.contract;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
@@ -127,8 +128,17 @@ public abstract class AbstractCreateContractTest extends
     writeTextFile(getFileSystem(), child, "child file", true);
     byte[] data = dataset(256, 'a', 'z');
     try {
-      writeDataset(getFileSystem(), path, data, data.length, 1024, true);
+      writeDataset(getFileSystem(), path, data, data.length, 1024,
+                   true);
       assertIsFile(child);
+      FileStatus status = getFileSystem().getFileStatus(path);
+
+      boolean isDir = status.isDirectory();
+      if (!isDir && isSupported(IS_BLOBSTORE)) {
+        // object store: downgrade to a skip so that the failure is visible
+        // in test results
+        skip("Object store allows a file to overwrite a directory");
+      }
       assertIsDirectory(path);
       fail("write of file over dir succeeded");
     } catch (FileAlreadyExistsException expected) {
