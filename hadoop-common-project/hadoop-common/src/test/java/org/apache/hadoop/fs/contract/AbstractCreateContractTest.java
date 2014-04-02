@@ -130,7 +130,6 @@ public abstract class AbstractCreateContractTest extends
     try {
       writeDataset(getFileSystem(), path, data, data.length, 1024,
                    true);
-      assertIsFile(child);
       FileStatus status = getFileSystem().getFileStatus(path);
 
       boolean isDir = status.isDirectory();
@@ -139,7 +138,6 @@ public abstract class AbstractCreateContractTest extends
         // in test results
         skip("Object store allows a file to overwrite a directory");
       }
-      assertIsDirectory(path);
       fail("write of file over dir succeeded");
     } catch (FileAlreadyExistsException expected) {
       //expected
