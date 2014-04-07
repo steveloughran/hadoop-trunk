@@ -51,7 +51,7 @@ public abstract class AbstractRenameContractTest extends
     String destDirLS = generateAndLogErrorListing(src, dst);
     fail("expected rename(" + src + ", " + dst + " ) to fail," +
          " got a result of " + renamed
-         + " and a destination of " + destDirLS);
+         + " and a destination directory of " + destDirLS);
   }
 
   protected String generateAndLogErrorListing(Path src, Path dst) throws
@@ -87,7 +87,6 @@ public abstract class AbstractRenameContractTest extends
     mkdirs(path.getParent());
     try {
       expectRenameToFault(path, path2);
-      fail("rename a missing file unexpectedly succeeded");
     } catch (FileNotFoundException e) {
       handleExpectedException(e);
     }

@@ -146,7 +146,13 @@ public abstract class AbstractSeekContractTest extends AbstractFSContractTestBas
       //expected a closed file
     }
     //what position does a closed file have?
-    long offset = instream.getPos();
+    try {
+      long offset = instream.getPos();
+    } catch (IOException e) {
+      // its valid to raise error here; but the test is applied to make
+      // sure there's no other exception like an NPE.
+
+    }
     //and close again
     instream.close();
   }
