@@ -33,7 +33,6 @@ public abstract class AbstractAppendContractTest extends AbstractFSContractTestB
   public static final Log LOG = LogFactory.getLog(AbstractAppendContractTest.class);
 
   private Path testPath;
-  private Path srcFile;
   private Path target;
 
   @Override
@@ -121,10 +120,11 @@ public abstract class AbstractAppendContractTest extends AbstractFSContractTestB
     outputStream.close();
     String listing = ls(testPath);
     
-
     //expected: the stream goes to the file that was being renamed, not
     //the original path
-    assertPathDoesNotExist("Original filename still found after append:\n" +
+    assertPathExists("renamed destination file does not exist", renamed);
+
+    assertPathDoesNotExist("Source file found after rename during append:\n" +
                            listing, target);
     byte[] bytes = ContractTestUtils.readDataset(getFileSystem(), renamed,
                                                  dataset.length);
