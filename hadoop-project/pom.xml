@@ -65,10 +65,15 @@
     <!-- define the protobuf JAR version                               -->
     <protobuf.version>2.5.0</protobuf.version>
     <protoc.path>${env.HADOOP_PROTOC_PATH}</protoc.path>
-    
-    <!-- define the Java language version                               -->
+
+    <!-- define the Java language version used by the compiler -->
     <javac.version>1.7</javac.version>
-    
+    <!-- The java version enforced by the maven enforcer -->
+    <!-- more complex patterns can be used here, such a
+       [${javac.version})
+    for an open-ended enforcement
+    -->
+    <enforced.java.version>${javac.version}</enforced.java.version>
   </properties>
 
   <dependencyManagement>
