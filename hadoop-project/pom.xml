@@ -65,6 +65,10 @@
     <!-- define the protobuf JAR version                               -->
     <protobuf.version>2.5.0</protobuf.version>
     <protoc.path>${env.HADOOP_PROTOC_PATH}</protoc.path>
+    
+    <!-- define the Java language version                               -->
+    <javac.version>1.7</javac.version>
+    
   </properties>
 
   <dependencyManagement>
@@ -775,8 +779,8 @@
           <artifactId>maven-compiler-plugin</artifactId>
           <version>2.5.1</version>
           <configuration>
-            <source>1.6</source>
-            <target>1.6</target>
+            <source>${javac.version}</source>
+            <target>${javac.version}</target>
           </configuration>
         </plugin>
         <plugin>
@@ -1033,8 +1037,8 @@
             <artifactId>maven-compiler-plugin</artifactId>
             <configuration>
               <fork>true</fork>
-              <source>1.6</source>
-              <target>1.6</target>
+              <source>${javac.version}</source>
+              <target>${javac.version}</target>
               <compilerArguments>
                 <Xlint/>
                 <Xmaxwarns>9999</Xmaxwarns>
