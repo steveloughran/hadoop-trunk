@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.fs.contract;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -28,20 +26,23 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.internal.AssumptionViolatedException;
-
-import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
+
+import static org.apache.hadoop.fs.contract.ContractTestUtils.cleanup;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
 
 /**
  * This is the base class for all the contract tests
  */
 public abstract class AbstractFSContractTestBase extends Assert
   implements ContractOptions {
-  
-  private static final Log LOG = 
-    LogFactory.getLog(AbstractFSContractTestBase.class);
+
+  private static final Logger LOG = 
+    LoggerFactory.getLogger(AbstractFSContractTestBase.class);
 
   public static final int TEST_FILE_LEN = 1024;
   /**
@@ -87,7 +88,7 @@ public abstract class AbstractFSContractTestBase extends Assert
    * Get the log of the base class
    * @return a logger
    */
-  public static Log getLog() {
+  public static Logger getLog() {
     return LOG;
   }
 
@@ -241,7 +242,7 @@ public abstract class AbstractFSContractTestBase extends Assert
    * @param e exception raised.
    */
   protected void handleExpectedException(Exception e) {
-    getLog().debug("expected " + e, e);
+    getLog().debug("expected :{}" ,e, e);
   }
 
   /**
@@ -317,5 +318,22 @@ public abstract class AbstractFSContractTestBase extends Assert
    */
   protected void assertMinusOne(String text, int result) {
     assertEquals(text + " wrong read result " + result, -1, result);
+  }
+
+  boolean rename(Path src, Path dst) throws IOException {
+    return getFileSystem().rename(src, dst);
+  }
+
+  protected String generateAndLogErrorListing(Path src, Path dst) throws
+                                                                  IOException {
+    FileSystem fs = getFileSystem();
+    getLog().error(
+      "src dir " + ContractTestUtils.ls(fs, src.getParent()));
+    String destDirLS = ContractTestUtils.ls(fs, dst.getParent());
+    if (fs.isDirectory(dst)) {
+      //include the dir into the listing
+      destDirLS = destDirLS + "\n" + ContractTestUtils.ls(fs, dst);
+    }
+    return destDirLS;
   }
 }

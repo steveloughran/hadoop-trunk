@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.fs.contract;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.Assert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
@@ -42,9 +42,10 @@ import java.net.URL;
  * and limit filesize and other numeric variables for scale tests
  */
 public abstract class AbstractFSContract extends Configured {
-  private static final Log LOG = LogFactory.getLog(AbstractFSContract.class);
-  public static final String FS_CONTRACT_KEY = "fs.contract.";
+  private static final Logger LOG =
+      LoggerFactory.getLogger(AbstractFSContract.class);
 
+  public static final String FS_CONTRACT_KEY = "fs.contract.";
   
   private boolean enabled = true;
 
@@ -62,9 +63,9 @@ public abstract class AbstractFSContract extends Configured {
   protected AbstractFSContract(Configuration conf) {
     super(conf);
     if (maybeAddConfResource(RESOURCE_AUTH_FILE)) {
-      LOG.debug("Loaded authentication keys from " + RESOURCE_AUTH_FILE);
+      LOG.debug("Loaded authentication keys from {}", RESOURCE_AUTH_FILE);
     } else {
-      LOG.debug("Not loaded: " + RESOURCE_AUTH_FILE);
+      LOG.debug("Not loaded: {}", RESOURCE_AUTH_FILE);
     }
   }
 

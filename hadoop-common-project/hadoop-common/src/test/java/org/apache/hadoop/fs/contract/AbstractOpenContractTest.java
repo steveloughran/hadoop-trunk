@@ -128,7 +128,6 @@ public abstract class AbstractOpenContractTest extends AbstractFSContractTestBas
       IOUtils.closeStream(instream1);
       IOUtils.closeStream(instream2);
     }
-
   }
 
 

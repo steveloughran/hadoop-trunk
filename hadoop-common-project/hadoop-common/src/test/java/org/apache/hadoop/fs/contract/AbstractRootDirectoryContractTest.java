@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.fs.contract;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
@@ -35,8 +35,8 @@ import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
  * you don't care about the data.
  */
 public abstract class AbstractRootDirectoryContractTest extends AbstractFSContractTestBase {
-  protected static final Log LOG =
-    LogFactory.getLog(AbstractSeekContractTest.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(AbstractRootDirectoryContractTest.class);
 
   @Override
   public void setup() throws Exception {
@@ -62,7 +62,7 @@ public abstract class AbstractRootDirectoryContractTest extends AbstractFSContra
     Path root = new Path("/");
     ContractTestUtils.assertIsDirectory(getFileSystem(), root);
     boolean deleted = getFileSystem().delete(root, true);
-    LOG.info("rm / of empty dir result is " + deleted);
+    LOG.info("rm / of empty dir result is {}", deleted);
     ContractTestUtils.assertIsDirectory(getFileSystem(), root);
   }
 
@@ -95,7 +95,7 @@ public abstract class AbstractRootDirectoryContractTest extends AbstractFSContra
     ContractTestUtils.touch(getFileSystem(), file);
     boolean deleted = getFileSystem().delete(root, true);
     ContractTestUtils.assertIsDirectory(getFileSystem(), root);
-    LOG.info("rm -rf / result is " + deleted);
+    LOG.info("rm -rf / result is {}", deleted);
     if (deleted) {
       assertPathDoesNotExist("expected file to be deleted", file);
     } else {

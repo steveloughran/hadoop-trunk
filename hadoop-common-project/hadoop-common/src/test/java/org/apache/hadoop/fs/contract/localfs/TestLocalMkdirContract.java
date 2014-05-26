@@ -19,8 +19,8 @@
 package org.apache.hadoop.fs.contract.localfs;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.contract.AbstractMkdirContractTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
+import org.apache.hadoop.fs.contract.AbstractMkdirContractTest;
 
 /**
  * Test dir operations on a the local FS.

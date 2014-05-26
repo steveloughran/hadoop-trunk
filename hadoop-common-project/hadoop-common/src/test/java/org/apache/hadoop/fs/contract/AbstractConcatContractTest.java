@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.fs.contract;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertFileHasLength;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.cleanup;
@@ -33,7 +33,8 @@ import static org.apache.hadoop.fs.contract.ContractTestUtils.touch;
  * Test concat -if supported
  */
 public abstract class AbstractConcatContractTest extends AbstractFSContractTestBase {
-  public static final Log LOG = LogFactory.getLog(AbstractConcatContractTest.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(AbstractConcatContractTest.class);
 
   private Path testPath;
   private Path srcFile;

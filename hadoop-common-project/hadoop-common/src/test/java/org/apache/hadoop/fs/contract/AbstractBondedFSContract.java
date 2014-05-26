@@ -40,7 +40,7 @@ import java.net.URISyntaxException;
 public abstract class AbstractBondedFSContract extends AbstractFSContract {
 
   private static final Log LOG =
-    LogFactory.getLog(AbstractFSContractTestBase.class);
+      LogFactory.getLog(AbstractBondedFSContract.class);
 
   /**
    * Pattern for the option for test filesystems from schema
@@ -80,7 +80,6 @@ public abstract class AbstractBondedFSContract extends AbstractFSContract {
               + getFilesystemConfKey());
     }
   }
-
 
   /**
    * Load the name of a test filesystem.

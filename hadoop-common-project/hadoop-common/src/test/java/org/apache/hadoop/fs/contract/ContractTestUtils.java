@@ -18,16 +18,15 @@
 
 package org.apache.hadoop.fs.contract;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.util.StringUtils;
 import org.junit.Assert;
 import org.junit.internal.AssumptionViolatedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.FileNotFoundException;
@@ -40,8 +39,8 @@ import java.util.Properties;
  */
 public class ContractTestUtils extends Assert {
 
-  private static final Log LOG =
-    LogFactory.getLog(ContractTestUtils.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContractTestUtils.class);
 
   public static final String IO_FILE_BUFFER_SIZE = "io.file.buffer.size";
 
@@ -352,7 +351,7 @@ public class ContractTestUtils extends Assert {
    * @throws AssumptionViolatedException always
    */
   public static void skip(String message) {
-    LOG.debug("Skipping: " + message);
+    LOG.debug("Skipping: {}", message);
     throw new AssumptionViolatedException(message);
   }
 

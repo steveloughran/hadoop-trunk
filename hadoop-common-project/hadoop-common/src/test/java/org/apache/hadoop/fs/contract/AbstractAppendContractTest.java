@@ -18,19 +18,23 @@
 
 package org.apache.hadoop.fs.contract;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.cleanup;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.createFile;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.touch;
 
 /**
  * Test concat -if supported
  */
 public abstract class AbstractAppendContractTest extends AbstractFSContractTestBase {
-  public static final Log LOG = LogFactory.getLog(AbstractAppendContractTest.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(AbstractAppendContractTest.class);
 
   private Path testPath;
   private Path target;
@@ -90,10 +94,7 @@ public abstract class AbstractAppendContractTest extends AbstractFSContractTestB
     byte[] bytes = ContractTestUtils.readDataset(getFileSystem(), target,
                                                  original.length + appended.length);
     ContractTestUtils.validateFileContent(bytes, 
-                                          new byte[] [] {
-                                            original, appended
-                                          }
-                                          );
+            new byte[] [] { original, appended });
   }
 
   @Test
