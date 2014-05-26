@@ -81,4 +81,9 @@
     <value>true</value>
   </property>
 
+  <property>
+    <name>fs.contract.rename-returns-false-on-failure</name>
+    <value>true</value>
+  </property>
+
 </configuration>

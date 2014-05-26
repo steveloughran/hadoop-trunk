@@ -39,6 +39,13 @@ public interface ContractOptions {
   String IS_BLOBSTORE = "is-blobstore";
 
   /**
+   * Flag to indicate that the FS does not follow the rename contract -and
+   * instead only returns false on a failure.
+   * @{value}
+   */
+  String RENAME_RETURNS_FALSE_ON_FAILURE = "rename-returns-false-on-failure";
+
+  /**
    * @{value}
    */
   String SUPPORTS_APPEND = "supports-append";

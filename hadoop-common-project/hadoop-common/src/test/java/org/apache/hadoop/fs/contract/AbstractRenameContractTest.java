@@ -19,7 +19,6 @@
 package org.apache.hadoop.fs.contract;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.Test;
 
@@ -34,38 +33,6 @@ import static org.apache.hadoop.fs.contract.ContractTestUtils.writeDataset;
  */
 public abstract class AbstractRenameContractTest extends
                                                  AbstractFSContractTestBase {
-
-  boolean rename(Path src, Path dst) throws IOException {
-    return getFileSystem().rename(src, dst);
-  }
-
-  /**
-   * Expect a rename exception to raise an exception
-   * @param src source path
-   * @param dst destination path
-   * @throws IOException any exception raised during the rename operation
-   */
-  public void expectRenameToFault(Path src, Path dst) throws IOException {
-    boolean renamed = rename(src, dst);
-    //expected an exception
-    String destDirLS = generateAndLogErrorListing(src, dst);
-    fail("expected rename(" + src + ", " + dst + " ) to fail," +
-         " got a result of " + renamed
-         + " and a destination directory of " + destDirLS);
-  }
-
-  protected String generateAndLogErrorListing(Path src, Path dst) throws
-                                                                  IOException {
-    FileSystem fs = getFileSystem();
-    getLog().error(
-      "src dir " + ContractTestUtils.ls(fs, src.getParent()));
-    String destDirLS = ContractTestUtils.ls(fs, dst.getParent());
-    if (fs.isDirectory(dst)) {
-      //include the dir into the listing
-      destDirLS = destDirLS + "\n" + ContractTestUtils.ls(fs, dst);
-    }
-    return destDirLS;
-  }
 
   @Test
   public void testRenameNewFileSameDir() throws Throwable {
@@ -82,14 +49,33 @@ public abstract class AbstractRenameContractTest extends
   @Test
   public void testRenameNonexistentFile() throws Throwable {
     describe("rename a file into a new file in the same directory");
-    Path path = path("testRenameNonexistentFileSrc");
-    Path path2 = path("testRenameNonexistentFileDest");
-    mkdirs(path.getParent());
+    Path missing = path("testRenameNonexistentFileSrc");
+    Path target = path("testRenameNonexistentFileDest");
+    boolean renameReturnsFalseOnFailure =
+        isSupported(ContractOptions.RENAME_RETURNS_FALSE_ON_FAILURE);
+    mkdirs(missing.getParent());
     try {
-      expectRenameToFault(path, path2);
+      boolean renamed = rename(missing, target);
+      //expected an exception
+      if (!renameReturnsFalseOnFailure) {
+        String destDirLS = generateAndLogErrorListing(missing, target);
+        fail("expected rename(" + missing + ", " + target + " ) to fail," +
+             " got a result of " + renamed
+             + " and a destination directory of " + destDirLS);
+      } else {
+        // at least one FS only returns false here, if that is the case
+        // warn but continue
+        getLog().warn("Rename returned {} renaming a nonexistent file", renamed);
+        assertFalse("Renaming a missing file returned true", renamed);
+      }
     } catch (FileNotFoundException e) {
       handleExpectedException(e);
+    } catch (IOException e) {
+      handleRelaxedException("rename nonexistent file",
+          "FileNotFoundException",
+          e);
     }
+    assertPathDoesNotExist("rename nonexistent file created a destination file", target);
   }
 
   /**
@@ -122,7 +108,7 @@ public abstract class AbstractRenameContractTest extends
         if (renamed) {
           //expected an exception
           String destDirLS = generateAndLogErrorListing(path1, path2);
-          getLog().error("dest dir " + destDirLS);
+          getLog().error("dest dir {}", destDirLS);
           fail("expected rename(" + path1 + ", " + path2 + " ) to fail," +
                " but got success and destination of " + destDirLS);
         }
