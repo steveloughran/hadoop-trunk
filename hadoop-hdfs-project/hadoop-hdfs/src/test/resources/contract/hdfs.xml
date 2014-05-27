@@ -86,4 +86,9 @@
     <value>true</value>
   </property>
 
+  <property>
+    <name>fs.contract.rename-overwrites-dest</name>
+    <value>true</value>
+  </property>
+
 </configuration>

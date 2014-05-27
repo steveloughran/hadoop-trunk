@@ -93,7 +93,7 @@ public abstract class AbstractRenameContractTest extends
     byte[] data2 = dataset(512, 'A', 'Z');
     writeDataset(getFileSystem(), path2, data2, data2.length, 1024, false);
     assertIsFile(path2);
-    boolean expectOverwrite = !isSupported(SUPPORTS_OVERWRITE_ON_RENAME);
+    boolean expectOverwrite = !isSupported(RENAME_OVERWRITES_DEST);
     if (expectOverwrite) {
       // the filesystem supports rename(file, file2) by overwriting file2
       

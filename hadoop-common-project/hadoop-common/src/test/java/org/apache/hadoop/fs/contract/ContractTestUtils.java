@@ -342,7 +342,7 @@ public class ContractTestUtils extends Assert {
    * @throws AssumptionViolatedException always
    */
   public static void unsupported(String message) {
-    throw new AssumptionViolatedException(message);
+    skip(message);
   }
 
   /**
@@ -351,7 +351,7 @@ public class ContractTestUtils extends Assert {
    * @throws AssumptionViolatedException always
    */
   public static void skip(String message) {
-    LOG.debug("Skipping: {}", message);
+    LOG.info("Skipping: {}", message);
     throw new AssumptionViolatedException(message);
   }
 

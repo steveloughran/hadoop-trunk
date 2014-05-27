@@ -38,6 +38,14 @@ public interface ContractOptions {
    */
   String IS_BLOBSTORE = "is-blobstore";
 
+
+  /**
+   * Flag to indicate that the FS does not follow the rename contract -and
+   * instead only returns false on a failure.
+   * @{value}
+   */
+  String RENAME_OVERWRITES_DEST = "rename-overwrites-dest";
+
   /**
    * Flag to indicate that the FS does not follow the rename contract -and
    * instead only returns false on a failure.
@@ -72,13 +80,6 @@ public interface ContractOptions {
    */
   String SUPPORTS_CONCAT = "supports-concat";
 
-  /**
-   * will a rename overwrite rather than fail if the
-   * destination exists?
-   * @{value}
-   */
-  String SUPPORTS_OVERWRITE_ON_RENAME = "supports-overwrite-on-rename";
-  
   /**
    * Is seeking supported at all?
    * @{value}
