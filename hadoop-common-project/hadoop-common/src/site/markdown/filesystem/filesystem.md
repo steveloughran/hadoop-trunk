@@ -644,23 +644,43 @@ The parent path of a destination must not be a file
 This implicitly covers all the ancestors of the parent.
 
 
+**Destination as file:**
 
-** Should **
+* Should 
 
-A destination can only be a file if `s == dest`
+  A destination can only be a file if `src == dest`
 
-    if isFile(FS, dest) and not s == dest : raise IOException
-  
-* HDFS Behavior: This check does not take place, instead the rename is [considered a failure](#hdfs-rename)
+    if isFile(FS, dest) and not src == dest : raise IOException
+
+* Local Filesystem : the rename succeeds; the destination file is replaced by the source file.
  
-* Local Filesystem : the rename succeeds
+* HDFS : The rename fails, no exception is raised. Instead the the method call simply returns false.
+
+**missing source file:**
+
+* Should 
+
+  If the source file `s` does not exist, `FileNotFoundException` should be raised.
+
+    if not exists(FS, s) : raise FileNotFoundException
+ 
+* HDFS : The operation fails without raising an exception. `rename()` merely returns false.
+
+The behavior of HDFS here should not be considered a feature to replicate; `FileContext` explicitly changed the behavior to raise an exception -and the retrofitting of that action
+to the `DFSFileSystem` implementation is an ongoing matter for debate.
+
+
+
+ 
+
+
 
 #### Postconditions
 
 
-##### Renaming a directory to self
+##### Renaming a directory onto itself
 
-Renaming a directory to itself is no-op; return value is not specified
+Renaming a directory onto itself is no-op; return value is not specified
 
 In Posix the result is `False`;  in HDFS the result is `True`
 

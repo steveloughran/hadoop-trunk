@@ -51,7 +51,15 @@ public interface ContractOptions {
    * instead only returns false on a failure.
    * @{value}
    */
-  String RENAME_RETURNS_FALSE_ON_FAILURE = "rename-returns-false-on-failure";
+  String RENAME_RETURNS_FALSE_IF_DEST_EXISTS =
+      "rename-returns-false-if-dest-exists";
+  /**
+   * Flag to indicate that the FS does not follow the rename contract -and
+   * instead only returns false on a failure.
+   * @{value}
+   */
+  String RENAME_RETURNS_FALSE_IF_SOURCE_MISSING =
+      "rename-returns-false-if-source-missing";
 
   /**
    * @{value}

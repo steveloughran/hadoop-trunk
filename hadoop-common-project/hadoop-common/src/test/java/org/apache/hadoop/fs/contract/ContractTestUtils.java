@@ -356,6 +356,17 @@ public class ContractTestUtils extends Assert {
   }
 
   /**
+   * Fail with an exception that was receivedT
+   * @param text
+   * @param t
+   */
+  public static void fail(String text, Throwable t) {
+    AssertionError e = new AssertionError(text);
+    e.initCause(t);
+    throw e;
+  }
+
+  /**
    * Make an assertion about the length of a file
    * @param fs filesystem
    * @param path path of the file

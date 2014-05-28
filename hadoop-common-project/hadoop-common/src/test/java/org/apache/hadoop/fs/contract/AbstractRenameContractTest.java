@@ -52,7 +52,7 @@ public abstract class AbstractRenameContractTest extends
     Path missing = path("testRenameNonexistentFileSrc");
     Path target = path("testRenameNonexistentFileDest");
     boolean renameReturnsFalseOnFailure =
-        isSupported(ContractOptions.RENAME_RETURNS_FALSE_ON_FAILURE);
+        isSupported(ContractOptions.RENAME_RETURNS_FALSE_IF_SOURCE_MISSING);
     mkdirs(missing.getParent());
     try {
       boolean renamed = rename(missing, target);
@@ -69,6 +69,10 @@ public abstract class AbstractRenameContractTest extends
         assertFalse("Renaming a missing file returned true", renamed);
       }
     } catch (FileNotFoundException e) {
+      if (renameReturnsFalseOnFailure) {
+        ContractTestUtils.fail(
+            "Renaming a missing file unexpectedly threw an exception", e);
+      }
       handleExpectedException(e);
     } catch (IOException e) {
       handleRelaxedException("rename nonexistent file",
@@ -85,39 +89,43 @@ public abstract class AbstractRenameContractTest extends
    */
   @Test
   public void testRenameFileOverExistingFile() throws Throwable {
-    describe("Verify renaming a file onto an existing file fails");
-    Path path1 = path("source-256.txt");
-    byte[] data1 = dataset(256, 'a', 'z');
-    writeDataset(getFileSystem(), path1, data1, data1.length, 1024, false);
-    Path path2 = path("dest-512.txt");
-    byte[] data2 = dataset(512, 'A', 'Z');
-    writeDataset(getFileSystem(), path2, data2, data2.length, 1024, false);
-    assertIsFile(path2);
-    boolean expectOverwrite = !isSupported(RENAME_OVERWRITES_DEST);
-    if (expectOverwrite) {
+    describe("Verify renaming a file onto an existing file matches expectations");
+    Path srcFile = path("source-256.txt");
+    byte[] srcData = dataset(256, 'a', 'z');
+    writeDataset(getFileSystem(), srcFile, srcData, srcData.length, 1024, false);
+    Path destFile = path("dest-512.txt");
+    byte[] destData = dataset(512, 'A', 'Z');
+    writeDataset(getFileSystem(), destFile, destData, destData.length, 1024, false);
+    assertIsFile(destFile);
+    boolean renameOverwritesDest = isSupported(RENAME_OVERWRITES_DEST);
+    boolean renameReturnsFalseOnRenameDestExists =
+        !isSupported(RENAME_RETURNS_FALSE_IF_DEST_EXISTS);
+    boolean destUnchanged = true;
+    try {
+      boolean renamed = rename(srcFile, destFile);
+
+      if (renameOverwritesDest) {
       // the filesystem supports rename(file, file2) by overwriting file2
       
-      boolean renamed = rename(path1, path2);
       assertTrue("Rename returned false", renamed);
-      //now verify that the data has been overwritten
-      ContractTestUtils.verifyFileContents(getFileSystem(), path2, data1);
-    } else {
-      try {
+        destUnchanged = false;
+      } else {
         // rename is rejected by returning 'false' or throwing an exception
-        boolean renamed = rename(path1, path2);
-        if (renamed) {
+        if (renamed && !renameReturnsFalseOnRenameDestExists) {
           //expected an exception
-          String destDirLS = generateAndLogErrorListing(path1, path2);
+          String destDirLS = generateAndLogErrorListing(srcFile, destFile);
           getLog().error("dest dir {}", destDirLS);
-          fail("expected rename(" + path1 + ", " + path2 + " ) to fail," +
+          fail("expected rename(" + srcFile + ", " + destFile + " ) to fail," +
                " but got success and destination of " + destDirLS);
         }
-      } catch (FileAlreadyExistsException e) {
-        handleExpectedException(e);
       }
-      //verify that the destination file is as before
-      ContractTestUtils.verifyFileContents(getFileSystem(), path2, data2);
+    } catch (FileAlreadyExistsException e) {
+      handleExpectedException(e);
     }
+    // verify that the destination file is as expected based on the expected
+    // outcome
+    ContractTestUtils.verifyFileContents(getFileSystem(), destFile,
+        destUnchanged? destData: srcData);
   }
   
   @Test

@@ -17,10 +17,24 @@
   -->
 
 <configuration>
+
+<!--
+case sensitivity and permission options are determined at run time from OS type
+-->
+
+  <property>
+    <name>fs.contract.is-case-sensitive</name>
+    <value>true</value>
+  </property>
+
+
+  <property>
+    <name>fs.contract.supports-unix-permissions</name>
+    <value>true</value>
+  </property>
+
   <!--
-  Here are most of the local FS contract options.
-  some of them may be overridden at run time based on the OS,
-  others potentially generated.
+  The remaining options are static
   -->
 
   <property>
@@ -34,7 +48,7 @@
   </property>
 
   <property>
-    <name>fs.contract.is-case-sensitive</name>
+    <name>fs.contract.rename-overwrites-dest</name>
     <value>true</value>
   </property>
 
@@ -67,11 +81,6 @@
   </property>
 
   <property>
-    <name>supports-overwrite-on-rename</name>
-    <value>true</value>
-  </property>
-  
-  <property>
     <name>fs.contract.supports-seek</name>
     <value>true</value>
   </property>
@@ -92,9 +101,4 @@
     <value>false</value>
   </property>
   
-  <property>
-    <name>fs.contract.supports-unix-permissions</name>
-    <value>true</value>
-  </property>
-
 </configuration>

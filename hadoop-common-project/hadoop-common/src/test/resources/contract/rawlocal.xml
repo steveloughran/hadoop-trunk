@@ -64,7 +64,7 @@
   </property>
 
   <property>
-    <name>supports-overwrite-on-rename</name>
+    <name>fs.contract.rename-overwrites-dest</name>
     <value>true</value>
   </property>
 
