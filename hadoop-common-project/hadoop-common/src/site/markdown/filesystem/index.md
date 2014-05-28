@@ -14,7 +14,9 @@
   
 # The Hadoop FileSystem API Definition
 
-Here is specification of the Hadoop FileSystem APis, a specication that models the contents a filesystem as a set of paths that are either directories, symbolic links or files; only files may contain data.
+Here is specification of the Hadoop FileSystem APis, a specification that models
+the contents a filesystem as a set of paths that are either directories,
+symbolic links or files; only files may contain data.
 
 There is surprisingly little prior art in this: multiple specifications of
 the Unix filesystems as a tree of inodes, but nothing public which defines the

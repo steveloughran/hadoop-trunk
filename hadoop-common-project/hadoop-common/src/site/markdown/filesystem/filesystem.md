@@ -94,7 +94,7 @@ Get the status of a path
 The function `getHomeDirectory` returns the home directory for the Filesystem 
 and the current user account.
 
-For some filesystems, the path is `["/","users", System.getProperty("user-name")]`.
+For some filesystems, the path is `["/", "users", System.getProperty("user-name")]`.
 
 However, for HDFS, the username is derived from the credentials used to authenticate the client with HDFS -this
 may differ from the local user account name.
@@ -166,19 +166,18 @@ and post- updated filesystem states.
 
 * After an entry at path `P` is created, and before any other
  changes are made to the filesystem, `listStatus(P)` MUST
-find the file and return its status.
+ find the file and return its status.
 
 * After an entry at path `P` is deleted, `listStatus(P)`  MUST
-raise a `FileNotFoundException`.
+ raise a `FileNotFoundException`.
 
 * After an entry is path `P` is created, and before any other
  changes are made to the filesystem, the result of `listStatus(parent(P))` SHOULD
-include the value of `getFileStatus(P)`.
+ include the value of `getFileStatus(P)`.
 
 * After an entry is path `P` is created,  nd before any other
  changes are made to the filesystem, the result of `listStatus(parent(P))` SHOULD
-NOT include the value of `getFileStatus(P)`.
-
+ NOT include the value of `getFileStatus(P)`.
 
 This is not a theoretical possibility, it is observable in HDFS when a
 directory contains many thousands of files.
@@ -207,8 +206,6 @@ these inconsistent views are only likely when listing a directory with many chil
 
 Other filesystems may have stronger consistency guarantees, or return inconsistent
 data more readily.
-
-
 
 <!--  ============================================================= -->
 <!--  METHOD: getFileBlockLocations() -->
@@ -242,7 +239,8 @@ where
       def blocks(FS, p, s, s +  l)  = a list of the blocks containing  data(FS, path)[s:s+l]
 
 
-Note that that as `length(FS, f) ` is defined as 0 if `isDir(FS, f)`, the result of `getFileBlockLocations()` on a directory is []
+Note that that as `length(FS, f) ` is defined as 0 if `isDir(FS, f)`, the result
+of `getFileBlockLocations()` on a directory is []
 
 
 If the filesystem is not location aware, it SHOULD return
@@ -282,11 +280,7 @@ return that `"/default/localhost"` path
 
 #### Preconditions
 
-
-
-
 #### Postconditions
-
 
     result = integer  >= 0 
 
@@ -360,9 +354,17 @@ files and symbolic links must hold.
 The probe for the existence and type of a path and directory creation MUST be
 atomic. The combined operation, including `mkdirs(parent(F))` MAY be atomic.
 
-The return value is always true - even if
-a new directory is not created. (this is defined in HDFS)
+The return value is always true - even if a new directory is not created.
+ (this is defined in HDFS)
+ 
+#### Implementation Notes: Local Filesystem
 
+The local filesystem does not raise an exception if `mkdirs(p)` is invoked
+on a path that exists and is a file. Instead the operation returns false.
+
+    if isFile(FS, p): 
+       FS' = FS
+       result = False
 
 <!--  ============================================================= -->
 <!--  METHOD: create() -->
@@ -412,14 +414,15 @@ The updated (valid) filesystem must contains all the parent directories of the p
 The result is `FSDataOutputStream`, which through its operations may generate new filesystem states with updated values of
 `FS.Files[p]`
 
+#### Implementation Notes
 
-* S3N, Swift and other Object Stores do not currently change the FS state
+* S3N, Swift and potentially other Object Stores do not currently change the FS state
 until the output stream `close()` operation is completed.
 This MAY be a bug, as it allows >1 client to create a file with overwrite=false, and potentially confuse file/directory logic
 
-* Local FS raises a `FileNotFoundException` when trying to create a file over
-a directory, hence it is is listed as a possible exception to raise
-in this situation.
+* The Local Filesystem raises a `FileNotFoundException` when trying to create a file over
+a directory, hence it is is listed as an exception that MAY be raised when
+this precondition fails.
 
 * Not covered: symlinks. The resolved path of the symlink is used as the final path argument to the `create()` operation
 
@@ -464,7 +467,7 @@ operation until the first `read()` on the returned `FSDataInputStream`.
 However, much client code does depend on the existence check being performed
 at the time of the `open()` operation -implementations MUST check for the 
 presence of the file at the time of creation. (This does not imply that
-the file and its data is still at the time of the following read()` or
+the file and its data is still at the time of the following `read()` or
 any successors)
 
 #### Postconditions
@@ -481,15 +484,13 @@ The result MUST be the same for local and remote callers of the operation.
   
 #### HDFS implementation notes
 
-1. MAY throw `UnresolvedPathException` when attempting to traverse
+1. HDFS MAY throw `UnresolvedPathException` when attempting to traverse
 symbolic links
 
-1. throws `IOException("Cannot open filename " + src)` if the path
+1. HDFS throws `IOException("Cannot open filename " + src)` if the path
 exists in the metadata, but no copies of any its blocks can be located;
 -`FileNotFoundException` would seem more accurate and useful.
 
-
-  
 
 <!--  ============================================================= -->
 <!--  METHOD: delete() -->
@@ -595,14 +596,12 @@ removes the path and all descendants
 * A recursive delete of a directory tree MUST be atomic.
 
 
-
-
 <!--  ============================================================= -->
 <!--  METHOD: rename() -->
 <!--  ============================================================= -->
 
 
-### `FileSystem.rename(Path s, Path d)`
+### `FileSystem.rename(Path src, Path d)`
 
 In terms of its specification, `rename()` is one of the most complex operations within a filesystem .
 
@@ -613,29 +612,31 @@ Rename includes the calculation of the destination path.
 If the destination exists and is a directory, the final destination
 of the rename becomes the destination + the filename of the source path.
   
-    let dest = if (isDir(FS, s) and d != s) : 
-            d + [filename(s)]
+    let dest = if (isDir(FS, src) and d != src) : 
+            d + [filename(src)]
         else :
             d
   
 #### Preconditions
 
+All checks on the destination path MUST take place after the final path
+has been calculated.
 
-Source `s` must exist
+Source `src` must exist
 
-    if not exists(FS, s) : raise FileNotFoundException
+    exists(FS, src) else raise FileNotFoundException
 
 ** HDFS does not fail here -it returns false from the operation**
   
-`dest` cannot be a descendant of `s`
+`dest` cannot be a descendant of `src`
 
-    if isDescendant(FS, s, dest) : raise IOException
+    if isDescendant(FS, src, dest) : raise IOException
 
-This implicitly covers the special case of `isRoot(FS, s)`  
+This implicitly covers the special case of `isRoot(FS, src)`  
   
 `dest` must be root, or have a parent that exists
 
-    if not isRoot(FS, dest) and not exists(FS, parent(dest)) : raise IOException
+    isRoot(FS, dest) or exists(FS, parent(dest)) else raise IOException
   
 The parent path of a destination must not be a file 
 
@@ -643,48 +644,21 @@ The parent path of a destination must not be a file
 
 This implicitly covers all the ancestors of the parent.
 
+There must not be an existing file at the end of the destination path
 
-**Destination as file:**
-
-* Should 
-
-  A destination can only be a file if `src == dest`
-
-    if isFile(FS, dest) and not src == dest : raise IOException
-
-* Local Filesystem : the rename succeeds; the destination file is replaced by the source file.
- 
-* HDFS : The rename fails, no exception is raised. Instead the the method call simply returns false.
-
-**missing source file:**
-
-* Should 
-
-  If the source file `s` does not exist, `FileNotFoundException` should be raised.
-
-    if not exists(FS, s) : raise FileNotFoundException
- 
-* HDFS : The operation fails without raising an exception. `rename()` merely returns false.
-
-The behavior of HDFS here should not be considered a feature to replicate; `FileContext` explicitly changed the behavior to raise an exception -and the retrofitting of that action
-to the `DFSFileSystem` implementation is an ongoing matter for debate.
-
-
-
- 
-
-
+    if isFile(FS, dest) : raise IOException
+	
 
 #### Postconditions
 
 
-##### Renaming a directory onto itself
+##### renaming a directory onto itself
 
 Renaming a directory onto itself is no-op; return value is not specified
 
 In Posix the result is `False`;  in HDFS the result is `True`
 
-    if isDir(FS, s) and s == dest :
+    if isDir(FS, src) and src == dest :
         FS' = FS
         result = (undefined)
 
@@ -693,70 +667,83 @@ In Posix the result is `False`;  in HDFS the result is `True`
 
  rename file to self is a no-op; the result is `True`
 
-     if isFile(FS, s) and s == dest :
+     if isFile(FS, src) and src == dest :
          FS' = FS
          result = True 
 
 
-##### <a name="hdfs-rename">Renaming a file to self: HDFS</a>
- 
-In HDFS, a rename where the destination is a file such that `s != dest` results in
-
-     FS' = FS
-     result = False
-
-That is: HDFS does not raise an `IOException`, merely rejects the request and returns false.
-
-##### Renaming a file onto a directory
+##### Renaming a file onto a nonexistant path
 
 Renaming a file where the destination is a directory moves the file as a child of the destination directory, retaining the filename element of the source path.
  
-    if isFile(FS, s) and s != dest: 
+    if isFile(FS, src) and src != dest: 
         FS' where:
-            FS'.Files = FS.Files - s + { dest: FS.Files[src]}
+            not exists(FS', src)
+            and exists(FS', dest)
+            and data(FS', dest) == data (FS, dest)
+        result = True
 
-A more declarative form of the postcondition would be:
   
-      not exists(FS', s) and data(FS', dest) == data(FS, s)
 
 ##### Renaming a directory onto a directory
   
-For a directory the entire tree under `s` will then exist under `dest`, while the path
-`s` and its descendants do not exist.
+If `src` is a directory then all its children will then exist under `dest`, while the path
+`src` and its descendants will no longer not exist. The names of the paths under
+`dest` will match those under `src`, as will the contents:
 
-    if isDir(FS, s) isDir(FS, dest) and s != dest :
+    if isDir(FS, src) isDir(FS, dest) and src != dest :
         FS' where:
-            not exists(FS', s)
+            not exists(FS', src)
             and dest in FS'.Directories]
-            and forall c in descendants(FS, s) :
+            and forall c in descendants(FS, src) :
                 not exists(FS', c)) 
-            and forall c in descendants(FS, s) where isDir(FS, c):
-                isDir(FS', dest + childElements(s, c)
-            and forall c in descendants(FS, s) where not isDir(FS, c):
+            and forall c in descendants(FS, src) where isDir(FS, c):
+                isDir(FS', dest + childElements(src, c)
+            and forall c in descendants(FS, src) where not isDir(FS, c):
                     data(FS', dest + childElements(s, c)) == data(FS, c)
         result = True
 
 
-#### Notes
+#### Concurrency requirements
 
 * The core operation of `rename()` -moving one entry in the filesystem to
 another MUST be atomic -some applications rely on this as a way to co-ordinate access to data.
 
 * Some FileSystem implementations perform checks on the destination
-filesystem before and after the rename -the `ChecksumFileSystem` used to provide checksummed access to local data is an example of this. The entire sequence MAY NOT be atomic.
+filesystem before and after the rename -the `ChecksumFileSystem` used to provide
+checksummed access to local data is an example of this. The entire sequence MAY NOT be atomic.
 
+##### Implementation Notes
 
-* The behavior of `rename()` on an open file is unspecified: whether it is
+** Files open for reading, writing or appending**
+
+The behavior of `rename()` on an open file is unspecified: whether it is
 allowed, what happens to later attempts to read from or write to the open stream
 
+** Renaming a directory onto itself 
 * The return code of renaming a directory onto itself is unspecified. 
 
-#### HDFS specifics
 
-Renaming a source file that does not exist is not an exception -it simply returns `False`
+**Destination exists and is a file:**
+
+Renaming a file atop an existing file is specified as failing, raising an exception. 
+
+* Local Filesystem : the rename succeeds; the destination file is replaced by the source file.
+ 
+* HDFS : The rename fails, no exception is raised. Instead the the method call simply returns false.
+
+**missing source file:**
+
+If the source file `src` does not exist,  `FileNotFoundException` should be raised.
+
+HDFS fails without raising an exception; `rename()` merely returns false.
 
     FS' = FS
     result = false
+
+The behavior of HDFS here should not be considered a feature to replicate;
+ `FileContext` explicitly changed the behavior to raise an exception -and the retrofitting of that action
+to the `DFSFileSystem` implementation is an ongoing matter for debate.
 
 
 <!--  ============================================================= -->
@@ -766,12 +753,11 @@ Renaming a source file that does not exist is not an exception -it simply return
 ### `concat(Path p, Path sources[])`
 
 Joins multiple blocks together to create a single file. This
-is a very under-implemented (and under-used) operation.
+is a little-used operation currently implemented only by HDFS.
   
 Implementations MAY throw `UnsupportedOperationException`
   
 #### Preconditions
-
 
     if not exists(FS, p) : raise FileNotFoundException
 
@@ -789,12 +775,10 @@ No duplicate paths
     
     not (exists p1, p2 in (sources + [p]) where p1 == p2)
     
-
-HFDS: All src files except the final one MUST be a complete block
+HFDS: All source files except the final one MUST be a complete block
 
     for s in (sources[0:length(sources)-1] + [p]):
       (length(FS, s) mod getBlockSize(FS, p)) == 0
-
 
 
 #### Postconditions
@@ -807,9 +791,6 @@ HFDS: All src files except the final one MUST be a complete block
 
 HDFS's restrictions may be an implementation detail of how it implements
 `concat` -by changing the inode references to join them together in 
-a sequence. A no other filesystem in the Hadoop core codebase
+a sequence. As no other filesystem in the Hadoop core codebase
 implements this method, there is no way to distinguish implementation detail.
 from specification.
-  
-
-

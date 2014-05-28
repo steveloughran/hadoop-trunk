@@ -17,8 +17,6 @@
 <!--  ============================================================= -->
   
   
-  
-  
 # Class `FSDataInputStream extends DataInputStream`
   
 The core behavior of `FSDataInputStream` is defined by `java.io.DataInputStream`,
@@ -40,9 +38,7 @@ Files are opened via `FileSystem.open(p)`, which, if successful, returns:
 
     result = FSDataInputStream(0, FS.Files[p])
 
-
 The stream can be modeled as
-
 
     FSDIS = (pos, data[], isOpen)
 
@@ -94,7 +90,6 @@ Return the current position. The outcome when a stream is closed is undefined.
          
 #### Postconditions
     
-        
     result = pos(FSDIS)  
         
 
@@ -111,7 +106,6 @@ Return the data at the current position.
     pos < len(data) else raise [EOFException, IOException]
      
 #### Postconditions
-    
     
     if ( pos < len(data) ):
        FSDIS' = (pos+1, data, true)
@@ -189,6 +183,7 @@ There is an implicit invariant: a seek to the current position is a no-op
 
 Implementations may recognise this operation and bypass all other precondition
 checks, leaving the input stream unchanged.
+
 
 ### `Seekable.seekToNewSource(offset)`
 

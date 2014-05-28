@@ -139,7 +139,7 @@ where the postconditions define the new state of the system and the return value
 
 ### Exceptions
 
-In classic Z specification languages, the preconditions define the predicates that MUST be
+In classic specification languages, the preconditions define the predicates that MUST be
 satisfied else some failure condition is raised. 
 
 For Hadoop we need to be able to specify what failure condition results if a specification is not
