@@ -16,16 +16,21 @@
 
 ## Running the tests
 
-A normal Hadoop test run will test those filesystems that can be tested locally via the local filesystem -such as  `file://` and its underlying `LocalFS`, and those which can be tested via short-lived HDFS miniclusters -specifically `hdfs://`.
+A normal Hadoop test run will test those filesystems that can be tested locally
+via the local filesystem -such as  `file://` and its underlying `LocalFS`, and
+those which can be tested via short-lived HDFS miniclusters -specifically `hdfs://`.
 
-Other filesystems are skipped unless there is a specific configuration to the remote server providing the filesystem.
+Other filesystems are skipped unless there is a specific configuration to the
+remote server providing the filesystem.
 
 
-These filesystem bindings must be defined in an XML configuration file, usually the file `hadoop-common-project/hadoop-common/src/test/resources/contract/auth-keys.xml`. This file is excluded from subversion and git, so should not be unintentionally checked in.
+These filesystem bindings must be defined in an XML configuration file, usually
+the file `hadoop-common-project/hadoop-common/src/test/resources/contract/test-options.xml`.
+This file is excluded should not be checked in.
 
 ### S3:
 
-In `auth-keys.xml`, the filesystem name must be defined in the property `fs.contract.test.fs.s3`. The standard configuration options to define the S3 authentication details muse also be provided.
+In `test-options.xml`, the filesystem name must be defined in the property `fs.contract.test.fs.s3`. The standard configuration options to define the S3 authentication details muse also be provided.
 
 Example:
 
@@ -49,7 +54,7 @@ Example:
 ### S3n://
 
 
-In `auth-keys.xml`, the filesystem name must be defined in the property `fs.contract.test.fs.s3n`. The standard configuration options to define the S3N authentication details muse also be provided.
+In `test-options.xml`, the filesystem name must be defined in the property `fs.contract.test.fs.s3n`. The standard configuration options to define the S3N authentication details muse also be provided.
 
 Example:
 
@@ -73,7 +78,7 @@ Example:
 ### ftp://
 
 
-In `auth-keys.xml`, the filesystem name must be defined in the property `fs.contract.test.fs.ftp`. The specific login options to connect to the FTP Server must then be provided. 
+In `test-options.xml`, the filesystem name must be defined in the property `fs.contract.test.fs.ftp`. The specific login options to connect to the FTP Server must then be provided. 
 
 A path to a test directory must also be provided in the option `fs.contract.test.ftp.testdir`. This is the directory under which operations take place.
 
@@ -105,10 +110,10 @@ Example:
    
 ### openstack swift, swift://
 
-The openstack swift login details must be defined in the file `/hadoop-tools/hadoop-openstack/src/test/resources/contract/auth-keys.xml`. The standard hadoop-common `auth-keys.xml` resource file cannot be used, as that file does not get included in `hadoop-common-test.jar` -so cannot be picked up.
+The openstack swift login details must be defined in the file `/hadoop-tools/hadoop-openstack/src/test/resources/contract/test-options.xml`. The standard hadoop-common `test-options.xml` resource file cannot be used, as that file does not get included in `hadoop-common-test.jar` -so cannot be picked up.
 
 
-In `/hadoop-tools/hadoop-openstack/src/test/resources/contract/auth-keys.xml` the swift bucket name must be defined in the property `fs.contract.test.fs.swift`, along with the login details for the specific swift service provider in which the bucket is posted.
+In `/hadoop-tools/hadoop-openstack/src/test/resources/contract/test-options.xml` the swift bucket name must be defined in the property `fs.contract.test.fs.swift`, along with the login details for the specific swift service provider in which the bucket is posted.
 
     <configuration>
       <property>
@@ -152,7 +157,7 @@ The core part of supporting a new FileSystem for the contract tests is adding a 
 2. Subclass `AbstractFSContract` for your own contract implementation.
 3. For every test suite you plan to support create a non-abstract subclass -with the name starting with `Test` and the name of the filesystem. Example: `TestHDFSRenameContract`.
 4. These non-abstract classes must implement the abstract method `createContract()`.
-4. Identify and ocument any filesystem bindings that must be defined in an `src/test/resources/contract/auth-keys.xml` file of the filesystem class in development. The hadoop-common auth-keys file cannot be used as it will not be found.
+4. Identify and ocument any filesystem bindings that must be defined in an `src/test/resources/contract/test-options.xml` file of the filesystem class in development. The hadoop-common test-options file cannot be used as it will not be found.
 5. Run the tests until they work.
 
 
@@ -210,7 +215,7 @@ While filesystems SHOULD raise the stricter exceptions, there may be reasons why
 Tests against remote filesystems will require the URL to the filesystem to be specified;
 tests againt remote filesystems that require login details require usernames/IDs and passwords.
 
-All these details MUST be required to be placed in the file `src/test/resources/auth-keys.xml`, *and your SCM tools configured to never commit this file to subversion, git or
+All these details MUST be required to be placed in the file `src/test/resources/test-options.xml`, *and your SCM tools configured to never commit this file to subversion, git or
 equivalent. Furthermore, the build MUST be configured to never bundle this file in any `-test` artifacts generated. The Hadoop build does this, excluding `src/test/**/*.xml` from the JAR files.
 
 The `AbstractFSContract` class automatically loads this resource file if present; specific keys for specific test cases can be added. 

@@ -53,7 +53,7 @@ public abstract class AbstractFSContract extends Configured {
    * name of the (optional) resource containing auth keys : {@value}
    * If found, it it will be loaded
    */
-  public static final String RESOURCE_AUTH_FILE = "contract/auth-keys.xml";
+  public static final String RESOURCE_AUTH_FILE = "contract/test-options.xml";
 
 
   /**
