@@ -57,12 +57,6 @@ public abstract class AbstractConcatContractTest extends AbstractFSContractTestB
     touch(getFileSystem(), zeroByteFile);
   }
 
-  @Override
-  public void teardown() throws Exception {
-    cleanup("teardown", getFileSystem(), testPath);
-    super.teardown();
-  }
-
   @Test
   public void testConcatEmptyFiles() throws Throwable {
     touch(getFileSystem(), target);

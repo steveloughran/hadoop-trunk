@@ -49,12 +49,6 @@ public abstract class AbstractAppendContractTest extends AbstractFSContractTestB
     target = new Path(testPath, "target");
   }
 
-  @Override
-  public void teardown() throws Exception {
-    cleanup("teardown", getFileSystem(), testPath);
-    super.teardown();
-  }
-
   @Test
   public void testAppendToEmptyFile() throws Throwable {
     touch(getFileSystem(), target);

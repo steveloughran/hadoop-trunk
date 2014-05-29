@@ -76,7 +76,6 @@ public abstract class AbstractSeekContractTest extends AbstractFSContractTestBas
   public void teardown() throws Exception {
     IOUtils.closeStream(instream);
     instream = null;
-    cleanup("teardown", getFileSystem(), testPath);
     super.teardown();
   }
 

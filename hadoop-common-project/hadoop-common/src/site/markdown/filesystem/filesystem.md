@@ -528,7 +528,7 @@ If the file does not exist the FS state does not change
         FS' = FS
         result = False
 
-The result SHOULD be `False, indicating that no file was deleted.
+The result SHOULD be `False`, indicating that no file was deleted.
 
 
 ##### Simple File

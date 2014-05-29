@@ -143,8 +143,8 @@ public abstract class AbstractFSContractTestBase extends Assert
     fileSystem = contract.getTestFileSystem();
     assertNotNull("null filesystem", fileSystem);
     URI fsURI = fileSystem.getUri();
-    LOG.info("Test filesystem = " + fsURI + " implemented by "
-             + fileSystem.toString());
+    LOG.info("Test filesystem = {} implemented by {}", fsURI,
+             fileSystem);
     //sanity check to make sure that the test FS picked up really matches
     //the scheme chosen. This is to avoid defaulting back to the localFS
     //which would be drastic for root FS tests
@@ -233,8 +233,8 @@ public abstract class AbstractFSContractTestBase extends Assert
     if (getContract().isSupported(SUPPORTS_STRICT_EXCEPTIONS, false)) {
       throw e;
     }
-    LOG.warn("an " + expectedException + " was not the exception class" +
-             " raised on " + action + ": " + e.getClass(), e);
+    LOG.warn("The expected exception {}  was not the exception class" +
+             " raised on {}: {}", action , e.getClass(), expectedException, e);
   }
 
   /**
@@ -296,7 +296,7 @@ public abstract class AbstractFSContractTestBase extends Assert
    * @throws IOException IO problems during file operations
    */
   protected void mkdirs(Path path) throws IOException {
-    assertTrue("Failed to mkdir" + path, fileSystem.mkdirs(path));
+    assertTrue("Failed to mkdir " + path, fileSystem.mkdirs(path));
   }
 
   /**

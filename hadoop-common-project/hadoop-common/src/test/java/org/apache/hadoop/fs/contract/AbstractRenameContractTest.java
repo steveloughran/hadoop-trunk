@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.contract;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.Test;
 
@@ -37,12 +38,14 @@ public abstract class AbstractRenameContractTest extends
   @Test
   public void testRenameNewFileSameDir() throws Throwable {
     describe("rename a file into a new file in the same directory");
-    Path path = path("testRenameNewFile");
-    Path path2 = path("testRenameNewFile2");
+    Path renameSrc = path("testRenameSrc");
+    Path renameTarget = path("testRenameTarget");
     byte[] data = dataset(256, 'a', 'z');
-    writeDataset(getFileSystem(), path, data, data.length, 1024 * 1024, false);
-    boolean rename = rename(path, path2);
-    ContractTestUtils.verifyFileContents(getFileSystem(), path2, data);
+    writeDataset(getFileSystem(), renameSrc, data, data.length, 1024 * 1024, false);
+    boolean rename = rename(renameSrc, renameTarget);
+    ContractTestUtils.assertListStatusFinds(getFileSystem(),
+        renameTarget.getParent(), renameTarget);
+    ContractTestUtils.verifyFileContents(getFileSystem(), renameTarget, data);
     assertTrue("rename returned false though the contents were copied", rename);
   }
 
@@ -132,22 +135,24 @@ public abstract class AbstractRenameContractTest extends
   public void testRenameDirIntoExistingDir() throws Throwable {
     describe("Verify renaming a dir into an existing dir puts it underneath"
              +" and leaves existing files alone");
-    Path srcDir = path("source");
-    Path path = new Path(srcDir, "source-256.txt");
-    byte[] data = dataset(256, 'a', 'z');
-    writeDataset(getFileSystem(), path, data, data.length, 1024, false);
+    FileSystem fs = getFileSystem();
+    String sourceSubdir = "source";
+    Path srcDir = path(sourceSubdir);
+    Path srcFilePath = new Path(srcDir, "source-256.txt");
+    byte[] srcDataset = dataset(256, 'a', 'z');
+    writeDataset(fs, srcFilePath, srcDataset, srcDataset.length, 1024, false);
     Path destDir = path("dest");
 
-    Path path2 = new Path(destDir, "dest-512.txt");
-    byte[] data2 = dataset(512, 'A', 'Z');
-    writeDataset(getFileSystem(), path2, data2, data2.length, 1024, false);
-    assertIsFile(path2);
+    Path destFilePath = new Path(destDir, "dest-512.txt");
+    byte[] destDateset = dataset(512, 'A', 'Z');
+    writeDataset(fs, destFilePath, destDateset, destDateset.length, 1024, false);
+    assertIsFile(destFilePath);
 
     boolean rename = rename(srcDir, destDir);
-    Path renamedSrc = new Path(destDir, "source");
-    assertIsFile(path2);
+    Path renamedSrc = new Path(destDir, sourceSubdir);
+    assertIsFile(destFilePath);
     assertIsDirectory(renamedSrc);
-    ContractTestUtils.verifyFileContents(getFileSystem(), path2, data2);
+    ContractTestUtils.verifyFileContents(fs, destFilePath, destDateset);
     assertTrue("rename returned false though the contents were copied", rename);
   }
 

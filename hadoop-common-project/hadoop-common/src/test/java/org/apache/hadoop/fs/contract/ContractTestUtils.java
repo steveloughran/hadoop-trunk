@@ -101,6 +101,7 @@ public class ContractTestUtils extends Assert {
     compareByteArrays(src, dest, len);
 
     if (delete) {
+      rejectRootOperation(path);
       boolean deleted = fs.delete(path, false);
       assertTrue("Deleted", deleted);
       assertPathDoesNotExist(fs, "Cleanup failed", path);
@@ -204,6 +205,7 @@ public class ContractTestUtils extends Assert {
                                          seekOff + toRead);
     compareByteArrays(expected, out,toRead);
   }
+
   /**
    * Assert that tthe array original[0..len] and received[] are equal.
    * A failure triggers the logging of the bytes near where the first
@@ -271,6 +273,11 @@ public class ContractTestUtils extends Assert {
     }
   }
 
+  /**
+   * Convert a buffer to a string, character by character
+   * @param buffer input bytes
+   * @return a string conversion
+   */
   public static String toChar(byte[] buffer) {
     StringBuilder builder = new StringBuilder(buffer.length);
     for (byte b : buffer) {
@@ -289,11 +296,12 @@ public class ContractTestUtils extends Assert {
     return buffer;
   }
 
-  public static void cleanupInTeardown(FileSystem fileSystem,
-                                       String cleanupPath) {
-    cleanup("TEARDOWN", fileSystem, cleanupPath);
-  }
-
+  /**
+   * Cleanup at the end of a test run
+   * @param action action triggering the operation (for use in logging)
+   * @param fileSystem filesystem to work with. May be null
+   * @param cleanupPath path to delete as a string
+   */
   public static void cleanup(String action,
                              FileSystem fileSystem,
                              String cleanupPath) {
@@ -304,18 +312,69 @@ public class ContractTestUtils extends Assert {
     cleanup(action, fileSystem, path);
   }
 
+  /**
+   * Cleanup at the end of a test run
+   * @param action action triggering the operation (for use in logging)
+   * @param fileSystem filesystem to work with. May be null
+   * @param path path to delete
+   */
   public static void cleanup(String action, FileSystem fileSystem, Path path) {
     noteAction(action);
     try {
-      if (fileSystem != null && fileSystem.exists(path)) {
-        fileSystem.delete(path,
-                          true);
-      }
+      rm(fileSystem, path, true, false);
     } catch (Exception e) {
       LOG.error("Error deleting in "+ action + " - "  + path + ": " + e, e);
     }
   }
 
+  /**
+   * Delete a directory. There's a safety check for operations against the
+   * root directory -these are intercepted and rejected with an IOException
+   * unless the allowRootDelete flag is true
+   * @param fileSystem filesystem to work with. May be null
+   * @param path path to delete
+   * @param recursive flag to enable recursive delete
+   * @param allowRootDelete can the root directory be deleted?
+   * @throws IOException on any problem.
+   */
+  public static boolean rm(FileSystem fileSystem,
+      Path path,
+      boolean recursive,
+      boolean allowRootDelete) throws
+      IOException {
+    if (fileSystem != null) {
+      rejectRootOperation(path, allowRootDelete);
+      if (fileSystem.exists(path)) {
+        return fileSystem.delete(path, true);
+      }
+    }
+    return false;
+
+  }
+
+  /**
+   * Block any operation on the root path. This is a safety check
+   * @param path path in the filesystem
+   * @param allowRootOperation can the root directory be manipulated?
+   * @throws IOException if the operation was rejected
+   */
+  public static void rejectRootOperation(Path path,
+      boolean allowRootOperation) throws IOException {
+    if (path.isRoot() && !allowRootOperation) {
+      throw new IOException("Root directory operation rejected: " + path);
+    }
+  }
+
+  /**
+   * Block any operation on the root path. This is a safety check
+   * @param path path in the filesystem
+   * @throws IOException if the operation was rejected
+   */
+  public static void rejectRootOperation(Path path) throws IOException {
+    rejectRootOperation(path, false);
+  }
+  
+  
   public static void noteAction(String action) {
     if (LOG.isDebugEnabled()) {
       LOG.debug("==============  "+ action +" =============");
@@ -457,7 +516,8 @@ public class ContractTestUtils extends Assert {
 
   /**
    * Delete a file/dir and assert that delete() returned true
-   * <i>and</i> that the path no longer exists
+   * <i>and</i> that the path no longer exists. This variant rejects
+   * all operations on root directories
    * @param fs filesystem
    * @param file path to delete
    * @param recursive flag to enable recursive delete
@@ -466,6 +526,24 @@ public class ContractTestUtils extends Assert {
   public static void assertDeleted(FileSystem fs,
                                    Path file,
                                    boolean recursive) throws IOException {
+    assertDeleted(fs, file, recursive, false);
+  }
+
+  /**
+   * Delete a file/dir and assert that delete() returned true
+   * <i>and</i> that the path no longer exists. This variant rejects
+   * all operations on root directories
+   * @param fs filesystem
+   * @param file path to delete
+   * @param recursive flag to enable recursive delete
+   * @param allowRootOperations can the root dir be deleted?
+   * @throws IOException IO problems
+   */
+  public static void assertDeleted(FileSystem fs,
+      Path file,
+      boolean recursive,
+      boolean allowRootOperations) throws IOException {
+    rejectRootOperation(file, allowRootOperations);
     assertPathExists(fs, "about to be deleted file", file);
     boolean deleted = fs.delete(file, recursive);
     String dir = ls(fs, file.getParent());
