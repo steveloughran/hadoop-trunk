@@ -145,7 +145,9 @@ public class NativeS3FileSystem extends FileSystem {
 
     @Override
     public void close() throws IOException {
-      in.close();
+      if (in != null) {
+        in.close();
+      }
     }
 
     @Override
