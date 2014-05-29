@@ -21,6 +21,7 @@ package org.apache.hadoop.fs.contract.s3n;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractCreateContractTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
 
 public class TestNativeS3CreateContract extends AbstractCreateContractTest {
 
@@ -29,4 +30,9 @@ public class TestNativeS3CreateContract extends AbstractCreateContractTest {
     return new NativeS3Contract(conf);
   }
 
+  @Override
+  public void testOverwriteEmptyDirectory() throws Throwable {
+    ContractTestUtils.skip(
+        "blobstores can't distinguish empty directories from files");
+  }
 }

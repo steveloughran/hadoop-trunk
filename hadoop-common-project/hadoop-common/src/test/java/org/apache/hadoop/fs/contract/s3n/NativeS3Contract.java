@@ -40,5 +40,4 @@ public class NativeS3Contract extends AbstractBondedFSContract {
     return "s3n";
   }
 
-
 }

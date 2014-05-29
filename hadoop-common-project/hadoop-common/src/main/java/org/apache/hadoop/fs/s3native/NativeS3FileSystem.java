@@ -153,10 +153,15 @@ public class NativeS3FileSystem extends FileSystem {
     @Override
     public synchronized void seek(long pos) throws IOException {
       in.close();
-      LOG.info("Opening key '" + key + "' for reading at position '" + pos + "'");
+      String action =
+          "object '{}'" + key + "' for reading at position '" + pos + "'";
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Opening " + action);
+      }
       in = store.retrieve(key, pos);
       this.pos = pos;
     }
+
     @Override
     public synchronized long getPos() throws IOException {
       return pos;
@@ -541,7 +546,7 @@ public class NativeS3FileSystem extends FileSystem {
     try {
       FileStatus fileStatus = getFileStatus(f);
       if (fileStatus.isFile()) {
-        throw new IOException(String.format(
+        throw new FileAlreadyExistsException(String.format(
             "Can't make directory for path '%s' since it is a file.", f));
 
       }
@@ -559,7 +564,7 @@ public class NativeS3FileSystem extends FileSystem {
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {
     FileStatus fs = getFileStatus(f); // will throw if the file doesn't exist
     if (fs.isDirectory()) {
-      throw new IOException("'" + f + "' is a directory");
+      throw new FileNotFoundException("'" + f + "' is a directory");
     }
     LOG.info("Opening '" + f + "' for reading");
     Path absolutePath = makeAbsolute(f);

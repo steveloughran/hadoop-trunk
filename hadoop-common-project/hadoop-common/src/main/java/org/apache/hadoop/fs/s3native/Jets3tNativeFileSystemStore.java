@@ -44,6 +44,7 @@ import org.jets3t.service.S3Service;
 import org.jets3t.service.S3ServiceException;
 import org.jets3t.service.ServiceException;
 import org.jets3t.service.StorageObjectsChunk;
+import org.jets3t.service.impl.rest.HttpException;
 import org.jets3t.service.impl.rest.httpclient.RestS3Service;
 import org.jets3t.service.model.MultipartPart;
 import org.jets3t.service.model.MultipartUpload;
@@ -181,12 +182,14 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
           object.getLastModifiedDate().getTime());
 
     } catch (ServiceException e) {
-      // Following is brittle. Is there a better way?
-      if ("NoSuchKey".equals(e.getErrorCode())) {
-        return null; //return null if key not found
+      try {
+        // process
+        handleServiceException(key, e);
+        return null;
+      } catch (FileNotFoundException fnfe) {
+        // and downgrade missing files
+        return null; 
       }
-      handleServiceException(e);
-      return null; //never returned - keep compiler happy
     } finally {
       if (object != null) {
         object.closeDataInputStream();
@@ -237,7 +240,7 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
       return object.getDataInputStream();
     } catch (ServiceException e) {
       handleServiceException(key, e);
-      return null; //return null if key not found
+      return null;
     }
   }
 
@@ -255,13 +258,14 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
   }
 
   /**
-   *
-   * @return
-   * This method returns null if the list could not be populated
-   * due to S3 giving ServiceException
-   * @throws IOException
+   * list objects 
+   * @param prefix prefix
+   * @param delimiter delimiter
+   * @param maxListingLengthm max no. of entries
+   * @param priorLastKey last key in any previous search
+   * @return a list of matches
+   * @throws IOException on any reported failure
    */
-
   private PartialListing list(String prefix, String delimiter,
       int maxListingLength, String priorLastKey) throws IOException {
     try {
@@ -282,10 +286,10 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
           chunk.getCommonPrefixes());
     } catch (S3ServiceException e) {
       handleS3ServiceException(e);
-      return null; //never returned - keep compiler happy
+      return null; // never returned - keep compiler happy
     } catch (ServiceException e) {
       handleServiceException(e);
-      return null; //return null if list could not be populated
+      return null; // never returned - keep compiler happy
     }
   }
 
@@ -396,6 +400,12 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
     System.out.println(sb);
   }
 
+  /**
+   * Handle any service exception by translating it into an IOException
+   * @param key key sought from file
+   * @param e exception
+   * @throws IOException exception -always
+   */
   private void handleServiceException(String key, ServiceException e) throws IOException {
     if ("NoSuchKey".equals(e.getErrorCode())) {
       throw new FileNotFoundException("Key '" + key + "' does not exist in S3");
@@ -404,9 +414,21 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
     }
   }
 
+  /**
+   * Handle any service exception by translating it into an IOException
+   * @param e exception
+   * @throws IOException exception -always
+   */
   private void handleS3ServiceException(S3ServiceException e) throws IOException {
-    if (e.getCause() instanceof IOException) {
-      throw (IOException) e.getCause();
+    Throwable cause = e.getCause();
+    if (cause instanceof IOException) {
+      throw (IOException) cause;
+    }
+    if (cause instanceof ServiceException) {
+      handleServiceException((ServiceException)cause);
+    }
+    if (cause instanceof S3ServiceException) {
+      handleServiceException((S3ServiceException)cause);
     }
     if (LOG.isDebugEnabled()) {
       LOG.debug("S3 Error code: " + e.getS3ErrorCode() + "; S3 Error message: "
@@ -418,15 +440,65 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
     }
     throw new S3Exception(e);
   }
+  
 
-  private void handleServiceException(ServiceException e) throws IOException {
-    if (e.getCause() instanceof IOException) {
-      throw (IOException) e.getCause();
-    }
-    else {
-      if(LOG.isDebugEnabled()) {
-        LOG.debug("Got ServiceException with Error code: " + e.getErrorCode() + ";and Error message: " + e.getErrorMessage());
+
+  /**
+   * Handle any service exception by translating it into an IOException
+   * @param e exception
+   * @throws IOException exception -always
+   */
+  private void handleServiceException(Exception e) throws IOException {
+    throw processException(e);
+  }
+
+  /**
+   * Handle any service exception by translating it into an IOException
+   * @param e exception
+   * @throws IOException exception -always
+   */
+  private IOException processException(Exception e) throws IOException {
+    IOException result = null;
+    Throwable cause = e.getCause();
+    if (cause instanceof IOException) {
+      // unwrap and rethrow
+      result = (IOException) cause;
+    } else if (cause instanceof HttpException) {
+      // nested HttpException - examine error code and react
+      HttpException httpException = (HttpException) cause;
+      String responseMessage = httpException.getResponseMessage();
+      int responseCode = httpException.getResponseCode();
+      String text = String.format("%03d: %s", responseCode, responseMessage);
+      IOException ioe;
+      switch (responseCode) {
+        case 404:
+          result = new FileNotFoundException(text);
+          break;
+        case 416: // invalid range
+          result = new EOFException(text);
+          break;
+        default:
+          result = new IOException(text);
       }
+      result.initCause(cause);
+    } else if (cause instanceof ServiceException) {
+      result = processException((ServiceException) cause);
     }
+    if (cause instanceof S3ServiceException) {
+      result = processException((S3ServiceException) cause);
+    }
+
+    if (result != null) {
+      throw result;
+    }
+
+    //unknown cause here or no cause, look at the 
+    
+    //any other exception type
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Got ServiceException with Error code: " + e.getErrorCode() +
+                "; and Error text: " + e.toString(), e);
+    }
+    throw new S3Exception(e);
   }
 }
