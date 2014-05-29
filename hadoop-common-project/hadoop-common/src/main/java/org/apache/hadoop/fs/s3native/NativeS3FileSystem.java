@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.s3native;
 
 import java.io.BufferedOutputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -37,8 +38,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -56,6 +55,8 @@ import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.util.Progressable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * <p>
@@ -82,8 +83,8 @@ import org.apache.hadoop.util.Progressable;
 @InterfaceStability.Stable
 public class NativeS3FileSystem extends FileSystem {
   
-  public static final Log LOG = 
-    LogFactory.getLog(NativeS3FileSystem.class);
+  public static final Logger LOG =
+      LoggerFactory.getLogger(NativeS3FileSystem.class);
   
   private static final String FOLDER_SUFFIX = "_$folder$";
   static final String PATH_DELIMITER = Path.SEPARATOR;
@@ -106,11 +107,16 @@ public class NativeS3FileSystem extends FileSystem {
     
     @Override
     public synchronized int read() throws IOException {
+      if (in == null) {
+        throw new EOFException("Cannot read closed stream");
+      }
       int result = -1;
       try {
         result = in.read();
+      } catch (EOFException eof) {
+        throw eof;
       } catch (IOException e) {
-        LOG.info("Received IOException while reading '" + key + "', attempting to reopen.");
+        LOG.info("Received IOException while reading '{}', attempting to reopen.", key);
         seek(pos);
         result = in.read();
       } 
@@ -125,12 +131,16 @@ public class NativeS3FileSystem extends FileSystem {
     @Override
     public synchronized int read(byte[] b, int off, int len)
       throws IOException {
-      
+      if (in == null) {
+        throw new EOFException("Cannot read closed stream");
+      }
       int result = -1;
       try {
         result = in.read(b, off, len);
+      } catch (EOFException eof) {
+        throw eof;
       } catch (IOException e) {
-        LOG.info("Received IOException while reading '" + key + "', attempting to reopen.");
+        LOG.info( "Received IOException while reading '{}', attempting to reopen.", key);
         seek(pos);
         result = in.read(b, off, len);
       }
@@ -144,24 +154,26 @@ public class NativeS3FileSystem extends FileSystem {
     }
 
     @Override
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
       if (in != null) {
-        in.close();
+        try {
+          in.close();
+        } finally {
+          in = null;
+        }
       }
     }
 
     @Override
     public synchronized void seek(long pos) throws IOException {
-      in.close();
-      String action =
-          "object '{}'" + key + "' for reading at position '" + pos + "'";
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Opening " + action);
+      if (pos < 0) {
+        throw new EOFException("Negative seek position not supported");
       }
+      in.close();
+      LOG.debug("Opening key '{}' for reading at position '{}", key,  pos );
       in = store.retrieve(key, pos);
       this.pos = pos;
     }
-
     @Override
     public synchronized long getPos() throws IOException {
       return pos;
@@ -222,7 +234,7 @@ public class NativeS3FileSystem extends FileSystem {
       }
 
       backupStream.close();
-      LOG.info("OutputStream for key '" + key + "' closed. Now beginning upload");
+      LOG.info("OutputStream for key '{}' closed. Now beginning upload", key);
       
       try {
         byte[] md5Hash = digest == null ? null : digest.digest();
@@ -234,7 +246,7 @@ public class NativeS3FileSystem extends FileSystem {
         super.close();
         closed = true;
       } 
-      LOG.info("OutputStream for key '" + key + "' upload complete");
+      LOG.info("OutputStream for key '{}' upload complete", key);
     }
 
     @Override
@@ -375,7 +387,7 @@ public class NativeS3FileSystem extends FileSystem {
     String key = pathToKey(absolutePath);
     if (status.isDirectory()) {
       if (!recurse && listStatus(f).length > 0) {
-        throw new IOException("Can not delete " + f + " at is a not empty directory and recurse option is false");
+        throw new IOException("Can not delete " + f + " as is a not empty directory and recurse option is false");
       }
 
       createParent(f);
