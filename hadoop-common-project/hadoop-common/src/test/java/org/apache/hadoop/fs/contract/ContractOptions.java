@@ -144,6 +144,10 @@ public interface ContractOptions {
    */
   String TEST_RANDOM_SEEK_COUNT = "test.random-seek-count";
 
+  /**
+   * Prefix for all contract keys in the configuration files
+   */
+  String FS_CONTRACT_KEY = "fs.contract.";
   
   /**
    * name of the (optional) resource containing filesystem binding keys : {@value}

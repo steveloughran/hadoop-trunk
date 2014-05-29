@@ -22,8 +22,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.AbstractBondedFSContract;
+import org.junit.Assert;
 
 import java.net.URI;
+
+import static org.junit.Assert.assertNotNull;
 
 /**
  * The contract of FTP; requires the option "test.testdir" to be set
@@ -34,7 +37,7 @@ public class FTPContract extends AbstractBondedFSContract {
   /**
    *
    */
-  public static final String TEST_FS_TESTDIR = "ftp.testdir";
+  public static final String TEST_FS_TESTDIR = "test.ftp.testdir";
   private String fsName;
   private URI fsURI;
   private FileSystem fs;
@@ -52,7 +55,9 @@ public class FTPContract extends AbstractBondedFSContract {
 
   @Override
   public Path getTestPath() {
-    Path path = new Path(getOption(TEST_FS_TESTDIR, "/"));
+    String pathString = getOption(TEST_FS_TESTDIR, null);
+    assertNotNull("Undefined test option " + TEST_FS_TESTDIR, pathString);
+    Path path = new Path(pathString);
     return path;
   }
 }
