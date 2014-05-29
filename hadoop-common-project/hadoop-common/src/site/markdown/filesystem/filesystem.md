@@ -115,6 +115,11 @@ or, if it exists, that it points to a directory. However, code tends to assume
 that `not isFile(FS, getHomeDirectory())` holds to the extent that follow-on
 code may fail.
 
+#### Implementation Notes
+
+* The FTPFileSystem queries this value from the remote filesystem -and may
+fail with a RuntimeException or subclass thereof if there is any connectivity
+problem. The time to execute the operation is not bounded.
 
 <!--  ============================================================= -->
 <!--  METHOD: listStatus() -->
@@ -416,9 +421,16 @@ The result is `FSDataOutputStream`, which through its operations may generate ne
 
 #### Implementation Notes
 
+* Some implementations split the create into a check for the file existing
+-deleting this file or raising an depending on the `overwrite` flag- from the
+ actual creation. This means the operation is NOT atomic: it is possible for
+ clients creating files with `overwrite==true` to fail if the file is created
+ by another client between the two tests.
+
 * S3N, Swift and potentially other Object Stores do not currently change the FS state
 until the output stream `close()` operation is completed.
-This MAY be a bug, as it allows >1 client to create a file with overwrite=false, and potentially confuse file/directory logic
+This MAY be a bug, as it allows >1 client to create a file with `overwrite==false`,
+ and potentially confuse file/directory logic
 
 * The Local Filesystem raises a `FileNotFoundException` when trying to create a file over
 a directory, hence it is is listed as an exception that MAY be raised when
@@ -585,8 +597,6 @@ removes the path and all descendants
                 not isSymlink(FS', d)
         result = True
 
-
-
 #### Atomicity
 
 * Deleting a file MUST be an atomic action.
@@ -595,6 +605,12 @@ removes the path and all descendants
 
 * A recursive delete of a directory tree MUST be atomic.
 
+#### Implementation Notes
+
+* S3N, Swift, FTP and potentially other "non-traditional Filesystems" 
+implement `delete()` as recursive listing and file delete operation.
+This can break the expectations of client applications -and means that
+they cannot be used as drop-in replacements for HDFS.
 
 <!--  ============================================================= -->
 <!--  METHOD: rename() -->
@@ -606,7 +622,7 @@ removes the path and all descendants
 In terms of its specification, `rename()` is one of the most complex operations within a filesystem .
 
 In terms of its implementation, it is the one with the most ambiguity regarding when to return false
-versus raise an exception.
+versus raising an exception.
 
 Rename includes the calculation of the destination path. 
 If the destination exists and is a directory, the final destination
@@ -619,14 +635,13 @@ of the rename becomes the destination + the filename of the source path.
   
 #### Preconditions
 
-All checks on the destination path MUST take place after the final path
+All checks on the destination path MUST take place after the final `dest` path
 has been calculated.
 
 Source `src` must exist
 
     exists(FS, src) else raise FileNotFoundException
 
-** HDFS does not fail here -it returns false from the operation**
   
 `dest` cannot be a descendant of `src`
 
@@ -674,7 +689,8 @@ In Posix the result is `False`;  in HDFS the result is `True`
 
 ##### Renaming a file onto a nonexistant path
 
-Renaming a file where the destination is a directory moves the file as a child of the destination directory, retaining the filename element of the source path.
+Renaming a file where the destination is a directory moves the file as a child
+ of the destination directory, retaining the filename element of the source path.
  
     if isFile(FS, src) and src != dest: 
         FS' where:

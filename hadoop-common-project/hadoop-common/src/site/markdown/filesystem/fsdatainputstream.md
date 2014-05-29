@@ -65,14 +65,18 @@ The operation MUST be idempotent; the following sequence is not an error
     FSDIS.close();
     FSDIS.close();
 
-Implementations SHOULD NOT raise `IOException` exceptions (or any other exception)
+#### Implementation Notes
+
+* Implementations SHOULD be robust against failure -if an inner stream
+is closed, it should be checked for being `null` first.
+
+* Implementations SHOULD NOT raise `IOException` exceptions (or any other exception)
 during this operation -client applications often ignore these, or may fail
 unexpectedly.
 
-#### Preconditions
 
-    isOpen(FDIS) else raise IOException
-    pos < len(data) else raise [EOFException, IOException]
+
+
      
 #### Postconditions
     

@@ -60,6 +60,10 @@ public class FTPFileSystem extends FileSystem {
   public static final int DEFAULT_BUFFER_SIZE = 1024 * 1024;
 
   public static final int DEFAULT_BLOCK_SIZE = 4 * 1024;
+  public static final String FS_FTP_USER_PREFIX = "fs.ftp.user.";
+  public static final String FS_FTP_HOST = "fs.ftp.host";
+  public static final String FS_FTP_HOST_PORT = "fs.ftp.host.port";
+  public static final String FS_FTP_PASSWORD_PREFIX = "fs.ftp.password.";
 
   private URI uri;
 
@@ -79,11 +83,11 @@ public class FTPFileSystem extends FileSystem {
     super.initialize(uri, conf);
     // get host information from uri (overrides info in conf)
     String host = uri.getHost();
-    host = (host == null) ? conf.get("fs.ftp.host", null) : host;
+    host = (host == null) ? conf.get(FS_FTP_HOST, null) : host;
     if (host == null) {
       throw new IOException("Invalid host specified");
     }
-    conf.set("fs.ftp.host", host);
+    conf.set(FS_FTP_HOST, host);
 
     // get port information from uri, (overrides info in conf)
     int port = uri.getPort();
@@ -100,11 +104,11 @@ public class FTPFileSystem extends FileSystem {
       }
     }
     String[] userPasswdInfo = userAndPassword.split(":");
-    conf.set("fs.ftp.user." + host, userPasswdInfo[0]);
+    conf.set(FS_FTP_USER_PREFIX + host, userPasswdInfo[0]);
     if (userPasswdInfo.length > 1) {
-      conf.set("fs.ftp.password." + host, userPasswdInfo[1]);
+      conf.set(FS_FTP_PASSWORD_PREFIX + host, userPasswdInfo[1]);
     } else {
-      conf.set("fs.ftp.password." + host, null);
+      conf.set(FS_FTP_PASSWORD_PREFIX + host, null);
     }
     setConf(conf);
     this.uri = uri;
@@ -119,10 +123,10 @@ public class FTPFileSystem extends FileSystem {
   private FTPClient connect() throws IOException {
     FTPClient client = null;
     Configuration conf = getConf();
-    String host = conf.get("fs.ftp.host");
-    int port = conf.getInt("fs.ftp.host.port", FTP.DEFAULT_PORT);
-    String user = conf.get("fs.ftp.user." + host);
-    String password = conf.get("fs.ftp.password." + host);
+    String host = conf.get(FS_FTP_HOST);
+    int port = conf.getInt(FS_FTP_HOST_PORT, FTP.DEFAULT_PORT);
+    String user = conf.get(FS_FTP_USER_PREFIX + host);
+    String password = conf.get(FS_FTP_PASSWORD_PREFIX + host);
     client = new FTPClient();
     client.connect(host, port);
     int reply = client.getReplyCode();
@@ -228,7 +232,7 @@ public class FTPFileSystem extends FileSystem {
     }
     if (status != null) {
       if (overwrite && !status.isDirectory()) {
-        delete(client, file);
+        delete(client, file, false);
       } else {
         disconnect(client);
         throw new FileAlreadyExistsException("File already exists: " + file);
