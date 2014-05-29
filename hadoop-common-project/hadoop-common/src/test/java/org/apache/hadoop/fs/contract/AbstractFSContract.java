@@ -45,15 +45,7 @@ public abstract class AbstractFSContract extends Configured {
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractFSContract.class);
 
-  public static final String FS_CONTRACT_KEY = "fs.contract.";
-  
   private boolean enabled = true;
-
-  /**
-   * name of the (optional) resource containing auth keys : {@value}
-   * If found, it it will be loaded
-   */
-  public static final String RESOURCE_AUTH_FILE = "contract/test-options.xml";
 
 
   /**
@@ -62,10 +54,10 @@ public abstract class AbstractFSContract extends Configured {
    */
   protected AbstractFSContract(Configuration conf) {
     super(conf);
-    if (maybeAddConfResource(RESOURCE_AUTH_FILE)) {
-      LOG.debug("Loaded authentication keys from {}", RESOURCE_AUTH_FILE);
+    if (maybeAddConfResource(ContractOptions.TEST_OPTIONS_RESOURCE)) {
+      LOG.debug("Loaded authentication keys from {}", ContractOptions.TEST_OPTIONS_RESOURCE);
     } else {
-      LOG.debug("Not loaded: {}", RESOURCE_AUTH_FILE);
+      LOG.debug("Not loaded: {}", ContractOptions.TEST_OPTIONS_RESOURCE);
     }
   }
 
@@ -184,7 +176,7 @@ public abstract class AbstractFSContract extends Configured {
    * @return the configuration key base with the feature appended
    */
   public String getConfKey(String feature) {
-    return FS_CONTRACT_KEY + feature;
+    return ContractOptions.FS_CONTRACT_KEY + feature;
   }
 
   /**
