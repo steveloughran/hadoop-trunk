@@ -298,7 +298,7 @@ class SwiftNativeInputStream extends FSInputStream {
   @Override
   public synchronized void seek(long targetPos) throws IOException {
     if (targetPos < 0) {
-      throw new IOException("Negative Seek offset not supported");
+      throw new EOFException("Negative Seek offset not supported");
     }
     //there's some special handling of near-local data
     //as the seek can be omitted if it is in/adjacent
