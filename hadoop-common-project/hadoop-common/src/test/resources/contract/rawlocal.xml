@@ -64,6 +64,11 @@
   </property>
 
   <property>
+    <name>fs.contract.rename-creates-dest-dirs</name>
+    <value>true</value>
+  </property>
+
+  <property>
     <name>fs.contract.rename-overwrites-dest</name>
     <value>true</value>
   </property>

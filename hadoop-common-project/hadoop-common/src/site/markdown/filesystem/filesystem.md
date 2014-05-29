@@ -719,8 +719,30 @@ If `src` is a directory then all its children will then exist under `dest`, whil
                     data(FS', dest + childElements(s, c)) == data(FS, c)
         result = True
 
+##### Renaming into a path where the parent path does not exists
 
-#### Concurrency requirements
+      not exists(FS, parent(dest)) 
+
+There's no consistent behavior here.
+
+*HDFS* 
+
+Postcondition:
+
+    FS' = FS; result = False
+    
+*Local Filesystem, S3N* 
+
+The outcome is as a normal rename, with the additional (implicit) feature
+that the parent directores of the destination also exist
+   
+   exists(FS', parent(dest)) 
+
+*Other Filesystems (including Swift) *
+
+Other filesystems strictly reject the operation, raising a `FileNotFoundException`
+
+##### Concurrency requirements
 
 * The core operation of `rename()` -moving one entry in the filesystem to
 another MUST be atomic -some applications rely on this as a way to co-ordinate access to data.

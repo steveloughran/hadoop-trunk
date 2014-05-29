@@ -22,6 +22,7 @@ import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException;
@@ -590,7 +591,7 @@ public class SwiftNativeFileSystemStore {
         } else {
           //outcome #1 dest it's a file: fail if differeent
           if (!renamingOnToSelf) {
-            throw new SwiftOperationFailedException(
+            throw new FileAlreadyExistsException(
                     "cannot rename a file over one that already exists");
           } else {
             //is mv self self where self is a file. this becomes a no-op

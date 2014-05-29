@@ -573,17 +573,9 @@ public class SwiftNativeFileSystem extends FileSystem {
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
 
-    try {
       store.rename(makeAbsolute(src), makeAbsolute(dst));
       //success
       return true;
-    } catch (SwiftOperationFailedException e) {
-      //downgrade to a failure
-      return false;
-    } catch (FileNotFoundException e) {
-      //downgrade to a failure
-      return false;
-    }
   }
 
 

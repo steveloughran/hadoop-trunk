@@ -156,4 +156,28 @@ public abstract class AbstractRenameContractTest extends
     assertTrue("rename returned false though the contents were copied", rename);
   }
 
+  @Test
+  public void testRenameFileNonexistentDir() throws Throwable {
+    describe("rename a file into a new file in the same directory");
+    Path renameSrc = path("testRenameSrc");
+    Path renameTarget = path("subdir/testRenameTarget");
+    byte[] data = dataset(256, 'a', 'z');
+    writeDataset(getFileSystem(), renameSrc, data, data.length, 1024 * 1024,
+        false);
+    boolean renameCreatesDestDirs = isSupported(RENAME_CREATES_DEST_DIRS);
+
+    try {
+      boolean rename = rename(renameSrc, renameTarget);
+      if (renameCreatesDestDirs) {
+        assertTrue(rename);
+        ContractTestUtils.verifyFileContents(getFileSystem(), renameTarget, data);
+      } else {
+        assertFalse(rename);
+        ContractTestUtils.verifyFileContents(getFileSystem(), renameSrc, data);
+      }
+    } catch (FileNotFoundException e) {
+       // allowed unless that rename flag is set
+      assertFalse(renameCreatesDestDirs);
+    }
+  }
 }

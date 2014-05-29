@@ -25,6 +25,11 @@ package org.apache.hadoop.fs.contract;
 public interface ContractOptions {
 
   /**
+   * Prefix for all contract keys in the configuration files
+   */
+  String FS_CONTRACT_KEY = "fs.contract.";
+  
+  /**
    * Is a filesystem case sensitive. 
    * Some of the filesystems that say "no" here may mean
    * that it varies from platform to platform -the localfs being the key
@@ -40,6 +45,13 @@ public interface ContractOptions {
 
 
   /**
+   * Flag to indicate that the FS can rename into directories that
+   * don't exist, creating them as needed.
+   * @{value}
+   */
+  String RENAME_CREATES_DEST_DIRS = "rename-creates-dest-dirs";
+
+  /**
    * Flag to indicate that the FS does not follow the rename contract -and
    * instead only returns false on a failure.
    * @{value}
@@ -53,6 +65,7 @@ public interface ContractOptions {
    */
   String RENAME_RETURNS_FALSE_IF_DEST_EXISTS =
       "rename-returns-false-if-dest-exists";
+ 
   /**
    * Flag to indicate that the FS does not follow the rename contract -and
    * instead only returns false on a failure.
@@ -144,10 +157,6 @@ public interface ContractOptions {
    */
   String TEST_RANDOM_SEEK_COUNT = "test.random-seek-count";
 
-  /**
-   * Prefix for all contract keys in the configuration files
-   */
-  String FS_CONTRACT_KEY = "fs.contract.";
   
   /**
    * name of the (optional) resource containing filesystem binding keys : {@value}
