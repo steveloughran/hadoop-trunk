@@ -223,8 +223,7 @@ public class FTPFileSystem extends FileSystem {
     final FTPClient client = connect();
     Path workDir = new Path(client.printWorkingDirectory());
     Path absolute = makeAbsolute(workDir, file);
-
-    FileStatus status = null;
+    FileStatus status;
     try {
       status = getFileStatus(client, file);
     } catch (FileNotFoundException fnfe) {
@@ -548,6 +547,23 @@ public class FTPFileSystem extends FileSystem {
   }
 
   /**
+   * Probe for a path being a parent of another
+   * @param parent parent path
+   * @param child possible child path
+   * @return true if the parent's path matches the start of the child's
+   */
+  private boolean isParentOf(Path parent, Path child) {
+    URI parentURI = parent.toUri();
+    String parentPath = parentURI.getPath();
+    if (!parentPath.endsWith("/")) {
+      parentPath += "/";
+    }
+    URI childURI = child.toUri();
+    String childPath = childURI.getPath();
+    return childPath.startsWith(parentPath);
+  }
+
+  /**
    * Convenience method, so that we don't open a new connection when using this
    * method from within another method. Otherwise every API invocation incurs
    * the overhead of opening/closing a TCP connection.
@@ -566,18 +582,29 @@ public class FTPFileSystem extends FileSystem {
     if (!exists(client, absoluteSrc)) {
       throw new FileNotFoundException("Source path " + src + " does not exist");
     }
+    if (isDirectory(absoluteDst)) {
+      // destination is a directory: rename goes underneath it with the
+      // source name
+      absoluteDst = new Path(absoluteDst, absoluteSrc.getName());
+    }
     if (exists(client, absoluteDst)) {
       throw new FileAlreadyExistsException("Destination path " + dst
-          + " already exists, cannot rename!");
+          + " already exists");
     }
     String parentSrc = absoluteSrc.getParent().toUri().toString();
     String parentDst = absoluteDst.getParent().toUri().toString();
-    String from = src.getName();
-    String to = dst.getName();
-    if (!parentSrc.equals(parentDst)) {
-      throw new IOException("Cannot rename parent(source): " + parentSrc
-          + ", parent(destination):  " + parentDst);
+    if (isParentOf(absoluteSrc, absoluteDst)) {
+      throw new IOException("Cannot rename " + absoluteSrc + " under itself"
+      + " : "+ absoluteDst);
     }
+
+    if (!parentSrc.equals(parentDst)) {
+      throw new IOException("Cannot rename source: " + absoluteSrc
+          + " to " + absoluteDst
+          + " -"+"only same directory renames are supported");
+    }
+    String from = absoluteSrc.getName();
+    String to = absoluteDst.getName();
     client.changeWorkingDirectory(parentSrc);
     boolean renamed = client.rename(from, to);
     return renamed;
