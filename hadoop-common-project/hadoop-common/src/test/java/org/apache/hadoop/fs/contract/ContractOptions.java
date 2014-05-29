@@ -144,4 +144,10 @@ public interface ContractOptions {
    */
   String TEST_RANDOM_SEEK_COUNT = "test.random-seek-count";
 
+  
+  /**
+   * name of the (optional) resource containing filesystem binding keys : {@value}
+   * If found, it it will be loaded
+   */
+  String TEST_OPTIONS_RESOURCE = "contract/contract-test-options.xml";
 }
