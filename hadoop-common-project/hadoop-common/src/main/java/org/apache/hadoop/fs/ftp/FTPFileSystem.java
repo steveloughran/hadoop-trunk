@@ -64,6 +64,8 @@ public class FTPFileSystem extends FileSystem {
   public static final String FS_FTP_HOST = "fs.ftp.host";
   public static final String FS_FTP_HOST_PORT = "fs.ftp.host.port";
   public static final String FS_FTP_PASSWORD_PREFIX = "fs.ftp.password.";
+  public static final String E_SAME_DIRECTORY_ONLY =
+      "only same directory renames are supported";
 
   private URI uri;
 
@@ -601,7 +603,7 @@ public class FTPFileSystem extends FileSystem {
     if (!parentSrc.equals(parentDst)) {
       throw new IOException("Cannot rename source: " + absoluteSrc
           + " to " + absoluteDst
-          + " -"+"only same directory renames are supported");
+          + " -"+ E_SAME_DIRECTORY_ONLY);
     }
     String from = absoluteSrc.getName();
     String to = absoluteDst.getName();
