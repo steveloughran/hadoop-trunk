@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.swift.snative;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -298,7 +299,8 @@ class SwiftNativeInputStream extends FSInputStream {
   @Override
   public synchronized void seek(long targetPos) throws IOException {
     if (targetPos < 0) {
-      throw new EOFException("Negative Seek offset not supported");
+      throw new EOFException(
+          FSExceptionMessages.CANNOT_SEEK_TO_A_NEGATIVE_POSITION);
     }
     //there's some special handling of near-local data
     //as the seek can be omitted if it is in/adjacent

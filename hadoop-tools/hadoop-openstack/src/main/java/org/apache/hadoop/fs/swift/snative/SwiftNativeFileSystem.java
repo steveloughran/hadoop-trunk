@@ -32,7 +32,6 @@ import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException;
-import org.apache.hadoop.fs.swift.exceptions.SwiftNotDirectoryException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftOperationFailedException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftUnsupportedFeatureException;
 import org.apache.hadoop.fs.swift.http.SwiftProtocolConstants;
@@ -574,9 +573,20 @@ public class SwiftNativeFileSystem extends FileSystem {
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
 
+    try {
       store.rename(makeAbsolute(src), makeAbsolute(dst));
       //success
       return true;
+    } catch (SwiftOperationFailedException e) {
+      //downgrade to a failure
+      return false;
+    } catch (FileAlreadyExistsException e) {
+      //downgrade to a failure
+      return false;
+    } catch (FileNotFoundException e) {
+      //downgrade to a failure
+      return false;
+    }
   }
 
 

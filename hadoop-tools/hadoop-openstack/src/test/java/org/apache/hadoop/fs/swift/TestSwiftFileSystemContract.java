@@ -47,6 +47,14 @@ public class TestSwiftFileSystemContract
   private static final Log LOG =
           LogFactory.getLog(TestSwiftFileSystemContract.class);
 
+  /**
+   * Override this if the filesystem is not case sensitive
+   * @return true if the case detection/preservation tests should run
+   */
+  protected boolean filesystemIsCaseSensitive() {
+    return false;
+  }
+
   @Override
   protected void setUp() throws Exception {
     final URI uri = getFilesystemURI();

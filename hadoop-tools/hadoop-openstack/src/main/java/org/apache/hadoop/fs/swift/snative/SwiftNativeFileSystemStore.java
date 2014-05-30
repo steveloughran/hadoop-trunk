@@ -634,7 +634,7 @@ public class SwiftNativeFileSystemStore {
 
       if (destExists && !destIsDir) {
         // #1 destination is a file: fail
-        throw new SwiftOperationFailedException(
+        throw new FileAlreadyExistsException(
                 "the source is a directory, but not the destination");
       }
       Path targetPath;
