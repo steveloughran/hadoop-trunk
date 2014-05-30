@@ -38,15 +38,17 @@ public abstract class AbstractRenameContractTest extends
   @Test
   public void testRenameNewFileSameDir() throws Throwable {
     describe("rename a file into a new file in the same directory");
-    Path renameSrc = path("testRenameSrc");
-    Path renameTarget = path("testRenameTarget");
+    Path renameSrc = path("rename_src");
+    Path renameTarget = path("rename_dest");
     byte[] data = dataset(256, 'a', 'z');
-    writeDataset(getFileSystem(), renameSrc, data, data.length, 1024 * 1024, false);
+    writeDataset(getFileSystem(), renameSrc,
+        data, data.length, 1024 * 1024, false);
     boolean rename = rename(renameSrc, renameTarget);
+    assertTrue("rename("+renameSrc+", "+ renameTarget+") returned false",
+        rename);
     ContractTestUtils.assertListStatusFinds(getFileSystem(),
         renameTarget.getParent(), renameTarget);
     ContractTestUtils.verifyFileContents(getFileSystem(), renameTarget, data);
-    assertTrue("rename returned false though the contents were copied", rename);
   }
 
   @Test
