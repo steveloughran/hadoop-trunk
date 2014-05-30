@@ -661,7 +661,7 @@ This implicitly covers all the ancestors of the parent.
 
 There must not be an existing file at the end of the destination path
 
-    if isFile(FS, dest) : raise IOException
+    if isFile(FS, dest) : raise FileAlreadyExistsException, IOException
 	
 
 #### Postconditions
