@@ -39,5 +39,5 @@ public class FSExceptionMessages {
    * Seeks : {@value}
    */
   public static final String CANNOT_SEEK_PAST_EOF =
-    "Cannot seek after EOF";
+      "Attempted to seek or read past the end of the file";
 }

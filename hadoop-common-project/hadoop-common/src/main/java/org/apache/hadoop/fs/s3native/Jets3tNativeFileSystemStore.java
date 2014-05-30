@@ -36,6 +36,7 @@ import java.util.List;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.s3.S3Credentials;
 import org.apache.hadoop.fs.s3.S3Exception;
 import org.apache.hadoop.io.IOUtils;
@@ -437,7 +438,8 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
           result = new FileNotFoundException(text);
           break;
         case 416: // invalid range
-          result = new EOFException(text);
+          result = new EOFException(FSExceptionMessages.CANNOT_SEEK_PAST_EOF
+                                    +":" + text);
           break;
         default:
           result = new IOException(text);
@@ -449,8 +451,7 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
           "S3ServiceException: {}: {} : {}",
           se.getS3ErrorCode(), se.getS3ErrorMessage(), se, se);
       if ("InvalidRange".equals(se.getS3ErrorCode())) {
-        result = new EOFException(
-            "Attempted to seek or read past the end of the file");
+        result = new EOFException(FSExceptionMessages.CANNOT_SEEK_PAST_EOF);
       } else {
         result = new S3Exception(se);
       }

@@ -45,6 +45,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BufferedFSInputStream;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
@@ -194,7 +195,8 @@ public class NativeS3FileSystem extends FileSystem {
     @Override
     public synchronized void seek(long newpos) throws IOException {
       if (newpos < 0) {
-        throw new EOFException("Negative seek position not supported");
+        throw new EOFException(
+            FSExceptionMessages.CANNOT_SEEK_TO_A_NEGATIVE_POSITION);
       }
       if (pos != newpos) {
         // the seek is attempting to move the current position

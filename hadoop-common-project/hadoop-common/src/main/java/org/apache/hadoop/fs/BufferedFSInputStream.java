@@ -53,7 +53,7 @@ implements Seekable, PositionedReadable, HasFileDescriptor {
   @Override
   public long getPos() throws IOException {
     if (in == null) {
-      throw new IOException("Stream is closed");
+      throw new IOException(FSExceptionMessages.STREAM_IS_CLOSED);
     }
     return ((FSInputStream)in).getPos()-(count-pos);
   }
@@ -71,10 +71,10 @@ implements Seekable, PositionedReadable, HasFileDescriptor {
   @Override
   public void seek(long pos) throws IOException {
     if (in == null) {
-      throw new IOException("Stream is closed");
+      throw new IOException(FSExceptionMessages.STREAM_IS_CLOSED);
     }
     if (pos < 0) {
-      throw new EOFException("Cannot seek to a negative position");
+      throw new EOFException(FSExceptionMessages.CANNOT_SEEK_TO_A_NEGATIVE_POSITION);
     }
     if (this.pos != this.count) {
       // optimize: check if the pos is in the buffer
