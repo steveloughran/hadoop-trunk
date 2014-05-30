@@ -196,7 +196,7 @@ public class NativeS3FileSystem extends FileSystem {
     public synchronized void seek(long newpos) throws IOException {
       if (newpos < 0) {
         throw new EOFException(
-            FSExceptionMessages.CANNOT_SEEK_TO_A_NEGATIVE_POSITION);
+            FSExceptionMessages.NEGATIVE_SEEK);
       }
       if (pos != newpos) {
         // the seek is attempting to move the current position

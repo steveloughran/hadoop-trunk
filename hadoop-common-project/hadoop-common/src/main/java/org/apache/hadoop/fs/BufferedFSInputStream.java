@@ -74,7 +74,7 @@ implements Seekable, PositionedReadable, HasFileDescriptor {
       throw new IOException(FSExceptionMessages.STREAM_IS_CLOSED);
     }
     if (pos < 0) {
-      throw new EOFException(FSExceptionMessages.CANNOT_SEEK_TO_A_NEGATIVE_POSITION);
+      throw new EOFException(FSExceptionMessages.NEGATIVE_SEEK);
     }
     if (this.pos != this.count) {
       // optimize: check if the pos is in the buffer

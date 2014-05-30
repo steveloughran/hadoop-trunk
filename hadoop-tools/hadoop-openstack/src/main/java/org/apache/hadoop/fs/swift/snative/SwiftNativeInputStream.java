@@ -300,7 +300,7 @@ class SwiftNativeInputStream extends FSInputStream {
   public synchronized void seek(long targetPos) throws IOException {
     if (targetPos < 0) {
       throw new EOFException(
-          FSExceptionMessages.CANNOT_SEEK_TO_A_NEGATIVE_POSITION);
+          FSExceptionMessages.NEGATIVE_SEEK);
     }
     //there's some special handling of near-local data
     //as the seek can be omitted if it is in/adjacent
