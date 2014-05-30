@@ -319,8 +319,8 @@ public abstract class AbstractSeekContractTest extends AbstractFSContractTestBas
     FSDataInputStream stm = getFileSystem().open(randomSeekFile);
 
     // Record the sequence of seeks and reads which trigger a failure.
-    int seeks[] = new int[10];
-    int reads[] = new int[10];
+    int[] seeks = new int[10];
+    int[] reads = new int[10];
     try {
       for (int i = 0; i < limit; i++) {
         int seekOff = r.nextInt(buf.length);

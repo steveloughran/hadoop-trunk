@@ -24,6 +24,13 @@ package org.apache.hadoop.fs.contract;
  */
 public interface ContractOptions {
 
+
+  /**
+   * name of the (optional) resource containing filesystem binding keys : {@value}
+   * If found, it it will be loaded
+   */
+  String CONTRACT_OPTIONS_RESOURCE = "contract-test-options.xml";
+  
   /**
    * Prefix for all contract keys in the configuration files
    */
@@ -43,7 +50,6 @@ public interface ContractOptions {
    */
   String IS_BLOBSTORE = "is-blobstore";
 
-
   /**
    * Flag to indicate that the FS can rename into directories that
    * don't exist, creating them as needed.
@@ -59,32 +65,34 @@ public interface ContractOptions {
   String RENAME_OVERWRITES_DEST = "rename-overwrites-dest";
 
   /**
-   * Flag to indicate that the FS does not follow the rename contract -and
-   * instead only returns false on a failure.
+   * Flag to indicate that the FS returns false if the destination exists
    * @{value}
    */
   String RENAME_RETURNS_FALSE_IF_DEST_EXISTS =
       "rename-returns-false-if-dest-exists";
  
   /**
-   * Flag to indicate that the FS does not follow the rename contract -and
-   * instead only returns false on a failure.
+   * Flag to indicate that the FS returns false on a rename
+   * if the source is missing
    * @{value}
    */
   String RENAME_RETURNS_FALSE_IF_SOURCE_MISSING =
       "rename-returns-false-if-source-missing";
 
   /**
+   * Flag to indicate that append is supported
    * @{value}
    */
   String SUPPORTS_APPEND = "supports-append";
 
   /**
+   * Flag to indicate that renames are atomic
    * @{value}
    */
   String SUPPORTS_ATOMIC_RENAME = "supports-atomic-rename";
 
   /**
+   * Flag to indicate that directory deletes are atomic
    * @{value}
    */
   String SUPPORTS_ATOMIC_DIRECTORY_DELETE = "supports-atomic-directory-delete";
@@ -96,7 +104,7 @@ public interface ContractOptions {
   String SUPPORTS_BLOCK_LOCALITY = "supports-block-locality";
 
   /**
-   * Does the FS support multiple block locations?
+   * Does the FS support the concat() operation?
    * @{value}
    */
   String SUPPORTS_CONCAT = "supports-concat";
@@ -108,14 +116,13 @@ public interface ContractOptions {
   String SUPPORTS_SEEK = "supports-seek";
 
   /**
-   * Is seeking past the EOF supported? Some filesystems only raise an
-   * exception later, when trying to read.
+   * Is seeking past the EOF supported?
    * @{value}
    */
   String SUPPORTS_SEEK_PAST_EOF = "supports-seek-past-eof";
 
   /**
-   * Is seeking past the EOF supported? Some filesystems only raise an
+   * Is seeking on a closed file supported? Some filesystems only raise an
    * exception later, when trying to read.
    * @{value}
    */
@@ -130,6 +137,7 @@ public interface ContractOptions {
   String SUPPORTS_STRICT_EXCEPTIONS = "supports-strict-exceptions";
 
   /**
+   * Are unix permissions
    * @{value}
    */
   String SUPPORTS_UNIX_PERMISSIONS = "supports-unix-permissions";
@@ -147,6 +155,8 @@ public interface ContractOptions {
   String MAX_FILESIZE = "max-filesize";
 
   /**
+   * Flag to indicate that tests on the root directories of a filesystem/
+   * object store are permitted
    * @{value}
    */
   String TEST_ROOT_TESTS_ENABLED = "test.root-tests-enabled";
@@ -157,10 +167,4 @@ public interface ContractOptions {
    */
   String TEST_RANDOM_SEEK_COUNT = "test.random-seek-count";
 
-  
-  /**
-   * name of the (optional) resource containing filesystem binding keys : {@value}
-   * If found, it it will be loaded
-   */
-  String TEST_OPTIONS_RESOURCE = "contract/contract-test-options.xml";
 }

@@ -25,7 +25,7 @@ remote server providing the filesystem.
 
 
 These filesystem bindings must be defined in an XML configuration file, usually
-the file `hadoop-common-project/hadoop-common/src/test/resources/contract/contract-test-options.xml`.
+the file `hadoop-common-project/hadoop-common/src/test/resources/contract-test-options.xml`.
 This file is excluded should not be checked in.
 
 ### S3:
@@ -78,9 +78,13 @@ Example:
 ### ftp://
 
 
-In `contract-test-options.xml`, the filesystem name must be defined in the property `fs.contract.test.fs.ftp`. The specific login options to connect to the FTP Server must then be provided. 
+In `contract-test-options.xml`, the filesystem name must be defined in
+the property `fs.contract.test.fs.ftp`. The specific login options to
+connect to the FTP Server must then be provided. 
 
-A path to a test directory must also be provided in the option `fs.contract.test.ftp.testdir`. This is the directory under which operations take place.
+A path to a test directory must also be provided in the option
+`fs.contract.test.ftp.testdir`. This is the directory under which
+operations take place.
 
 Example:
 
@@ -110,10 +114,16 @@ Example:
    
 ### openstack swift, swift://
 
-The openstack swift login details must be defined in the file `/hadoop-tools/hadoop-openstack/src/test/resources/contract/contract-test-options.xml`. The standard hadoop-common `contract-test-options.xml` resource file cannot be used, as that file does not get included in `hadoop-common-test.jar` -so cannot be picked up.
+The openstack swift login details must be defined in the file
+`/hadoop-tools/hadoop-openstack/src/test/resources/contract-test-options.xml`. 
+The standard hadoop-common `contract-test-options.xml` resource file cannot be
+used, as that file does not get included in `hadoop-common-test.jar`.
 
 
-In `/hadoop-tools/hadoop-openstack/src/test/resources/contract/contract-test-options.xml` the swift bucket name must be defined in the property `fs.contract.test.fs.swift`, along with the login details for the specific swift service provider in which the bucket is posted.
+In `/hadoop-tools/hadoop-openstack/src/test/resources/contract-test-options.xml`
+the swift bucket name must be defined in the property `fs.contract.test.fs.swift`,
+along with the login details for the specific swift service provider in which the
+bucket is posted.
 
     <configuration>
       <property>
@@ -145,20 +155,31 @@ In `/hadoop-tools/hadoop-openstack/src/test/resources/contract/contract-test-opt
   
     </configuration>
 
-Often the different public cloud swift infrastructures exhibit different behaviors -authentication and throttling in particular. We recommand that testers create accounts on as many of these providers as possible -and test aainst each of them.
-
+1. Often the different public cloud swift infrastructures exhibit different behaviors
+-authentication and throttling in particular. We recommand that testers create
+accounts on as many of these providers as possible -and test aainst each of them.
+1. They can be slow, especially remotely. Remote links are also the most likely
+to make eventual-consistency behaviors visible, which is a mixed benefit. 
       
 ## Testing a new filesystem
 
-The core part of supporting a new FileSystem for the contract tests is adding a new contract class, then creating a new non-abstract test class for every test suite that you wish to test.
+The core part of supporting a new FileSystem for the contract tests is adding a
+ new contract class, then creating a new non-abstract test class for every test
+  suite that you wish to test.
 
-1. Do not try and add these tests into Hadoop itself -they won't be added to the soruce tree. The tests must live with your own filesystem class.
-1. Create a package in your own test source tree (usually)under `contract`, for the files and tests.
-2. Subclass `AbstractFSContract` for your own contract implementation.
-3. For every test suite you plan to support create a non-abstract subclass -with the name starting with `Test` and the name of the filesystem. Example: `TestHDFSRenameContract`.
-4. These non-abstract classes must implement the abstract method `createContract()`.
-4. Identify and ocument any filesystem bindings that must be defined in an `src/test/resources/contract/contract-test-options.xml` file of the filesystem class in development. The hadoop-common contract-test-options file cannot be used as it will not be found.
-5. Run the tests until they work.
+1. Do not try and add these tests into Hadoop itself -they won't be added to 
+the soutce tree. The tests must live with your own filesystem source.
+1. Create a package in your own test source tree (usually) under `contract`, 
+for the files and tests.
+1. Subclass `AbstractFSContract` for your own contract implementation.
+1. For every test suite you plan to support create a non-abstract subclass
+ -with the name starting with `Test` and the name of the filesystem.
+  Example: `TestHDFSRenameContract`.
+1. These non-abstract classes must implement the abstract method
+ `createContract()`.
+1. Identify and document any filesystem bindings that must be defined in a
+ `src/test/resources/ntract-test-options.xml` file of the specific project.
+1. Run the tests until they work.
 
 
 As an example, here is the implementation of the test of the `create()` tests for the local filesystem.
