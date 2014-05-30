@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException;
@@ -373,7 +374,7 @@ public class SwiftNativeFileSystem extends FileSystem {
    * @param directory path to query
    * @return true iff the directory should be created
    * @throws IOException IO problems
-   * @throws SwiftNotDirectoryException if the path references a file
+   * @throws ParentNotDirectoryException if the path references a file
    */
   private boolean shouldCreate(Path directory) throws IOException {
     FileStatus fileStatus;
@@ -388,9 +389,9 @@ public class SwiftNativeFileSystem extends FileSystem {
 
       if (!SwiftUtils.isDirectory(fileStatus)) {
         //if it's a file, raise an error
-        throw new SwiftNotDirectoryException(directory,
-                String.format(": can't mkdir since it exists and is not a directory: %s",
-                        fileStatus));
+        throw new ParentNotDirectoryException(
+                String.format("%s: can't mkdir since it exists and is not a directory: %s",
+                    directory, fileStatus));
       } else {
         //path exists, and it is a directory
         if (LOG.isDebugEnabled()) {

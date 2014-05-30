@@ -21,11 +21,22 @@ package org.apache.hadoop.fs.swift.contract;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.apache.hadoop.fs.contract.AbstractOpenContractTest;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
 
 public class TestSwiftOpenContract extends AbstractOpenContractTest {
 
   @Override
   protected AbstractFSContract createContract(Configuration conf) {
     return new SwiftContract(conf);
+  }
+
+  @Override
+  public void testOpenReadDir() throws Throwable {
+    ContractTestUtils.skip("Skipping object-store quirk");
+  }
+
+  @Override
+  public void testOpenReadDirWithChild() throws Throwable {
+    ContractTestUtils.skip("Skipping object-store quirk");
   }
 }

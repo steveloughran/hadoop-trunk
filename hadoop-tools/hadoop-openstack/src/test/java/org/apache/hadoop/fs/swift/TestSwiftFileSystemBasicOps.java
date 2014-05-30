@@ -21,6 +21,7 @@ package org.apache.hadoop.fs.swift;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.exceptions.SwiftBadRequestException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftNotDirectoryException;
@@ -245,7 +246,7 @@ public class TestSwiftFileSystemBasicOps extends SwiftFileSystemBaseTest {
       writeTextFile(fs, path, "parent", true);
       try {
         fs.mkdirs(child);
-      } catch (SwiftNotDirectoryException expected) {
+      } catch (ParentNotDirectoryException expected) {
         LOG.debug("Expected Exception", expected);
       }
     } finally {
