@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -99,6 +100,7 @@ public class NativeS3FileSystem extends FileSystem {
     private long pos = 0;
     
     public NativeS3FsInputStream(NativeFileSystemStore store, Statistics statistics, InputStream in, String key) {
+      Preconditions.checkNotNull(in, "Null input stream");
       this.store = store;
       this.statistics = statistics;
       this.in = in;
@@ -107,18 +109,20 @@ public class NativeS3FileSystem extends FileSystem {
     
     @Override
     public synchronized int read() throws IOException {
-      if (in == null) {
-        throw new EOFException("Cannot read closed stream");
-      }
-      int result = -1;
+      int result;
       try {
         result = in.read();
-      } catch (EOFException eof) {
-        throw eof;
       } catch (IOException e) {
-        LOG.info("Received IOException while reading '{}', attempting to reopen.", key);
-        seek(pos);
-        result = in.read();
+        LOG.info("Received IOException while reading '{}', attempting to reopen: {}",
+            key);
+        LOG.debug("{}", e, e);
+        try {
+          seek(pos);
+          result = in.read();
+        } catch (EOFException eof) {
+          LOG.debug("EOF on input stream read: {}", eof, eof);
+          result = -1;
+        }
       } 
       if (result != -1) {
         pos++;
@@ -155,6 +159,15 @@ public class NativeS3FileSystem extends FileSystem {
 
     @Override
     public synchronized void close() throws IOException {
+      closeInnerStream();
+    }
+
+    /**
+     * Close the inner stream if not null. Even if an exception
+     * is raised during the close, the field is set to null
+     * @throws IOException if raised by the close() operation.
+     */
+    private void closeInnerStream() throws IOException {
       if (in != null) {
         try {
           in.close();
@@ -164,16 +177,33 @@ public class NativeS3FileSystem extends FileSystem {
       }
     }
 
+    /**
+     * Update inner stream with a new stream and position
+     * @param newStream new stream -must not be null
+     * @param newpos new position
+     * @throws IOException IO exception on a failure to close the existing
+     * stream.
+     */
+    private synchronized void updateInnerStream(InputStream newStream, long newpos) throws IOException {
+      Preconditions.checkNotNull(newStream, "Null newstream argument");
+      closeInnerStream();
+      in = newStream;
+      this.pos = newpos;
+    }
+
     @Override
-    public synchronized void seek(long pos) throws IOException {
-      if (pos < 0) {
+    public synchronized void seek(long newpos) throws IOException {
+      if (newpos < 0) {
         throw new EOFException("Negative seek position not supported");
       }
-      in.close();
-      LOG.debug("Opening key '{}' for reading at position '{}", key,  pos );
-      in = store.retrieve(key, pos);
-      this.pos = pos;
+      if (pos != newpos) {
+        // the seek is attempting to move the current position
+        LOG.debug("Opening key '{}' for reading at position '{}", key, newpos);
+        InputStream newStream = store.retrieve(key, newpos);
+        updateInnerStream(newStream, newpos);
+      }
     }
+    
     @Override
     public synchronized long getPos() throws IOException {
       return pos;
