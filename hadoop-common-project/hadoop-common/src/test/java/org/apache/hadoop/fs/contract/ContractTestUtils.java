@@ -345,7 +345,7 @@ public class ContractTestUtils extends Assert {
     if (fileSystem != null) {
       rejectRootOperation(path, allowRootDelete);
       if (fileSystem.exists(path)) {
-        return fileSystem.delete(path, true);
+        return fileSystem.delete(path, recursive);
       }
     }
     return false;
@@ -607,7 +607,7 @@ public class ContractTestUtils extends Assert {
     } catch (IOException e) {
       return pathtext + " -failed: " + e;
     }
-    return pathtext + fileStatsToString(stats, "\n");
+    return dumpStats(pathtext, stats);
   }
 
   public static String dumpStats(String pathname, FileStatus[] stats) {
@@ -665,6 +665,7 @@ public class ContractTestUtils extends Assert {
    * @param fileSystem filesystem to examine
    * @param message message to include in the assertion failure message
    * @param path path in the filesystem
+   * @throws FileNotFoundException raised if the path is missing
    * @throws IOException IO problems
    */
   public static void assertPathExists(FileSystem fileSystem, String message,
@@ -672,7 +673,8 @@ public class ContractTestUtils extends Assert {
     if (!fileSystem.exists(path)) {
       //failure, report it
       ls(fileSystem, path.getParent());
-      fail(message + ": not found " + path + " in " + path.getParent());
+      throw new FileNotFoundException(message + ": not found " + path 
+                                      + " in " + path.getParent());
     }
   }
 

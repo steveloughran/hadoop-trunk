@@ -25,7 +25,9 @@ import org.apache.hadoop.fs.Path;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.internal.AssumptionViolatedException;
+import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +46,16 @@ public abstract class AbstractFSContractTestBase extends Assert
   private static final Logger LOG = 
     LoggerFactory.getLogger(AbstractFSContractTestBase.class);
 
+  /**
+   * Length of files to work with: {@value}
+   */
   public static final int TEST_FILE_LEN = 1024;
+
+  /**
+   * standard test timeout: {@value}
+   */
+  public static final int DEFAULT_TEST_TIMEOUT = 180 * 1000;
+
   /**
    * The FS contract used for these tets
    */
@@ -130,6 +141,21 @@ public abstract class AbstractFSContractTestBase extends Assert
   }
 
   /**
+   * Set the timeout for every test
+   */
+  @Rule
+  public Timeout testTimeout = new Timeout(getTestTimeoutMillis());
+
+  /**
+   * Option for tests to override the default timeout value
+   * @return the current test timeout
+   */
+  protected int getTestTimeoutMillis() {
+    return DEFAULT_TEST_TIMEOUT;
+  }
+
+
+  /**
    * Setup: create the contract then init it
    * @throws Exception on any failure
    */
@@ -143,8 +169,8 @@ public abstract class AbstractFSContractTestBase extends Assert
     fileSystem = contract.getTestFileSystem();
     assertNotNull("null filesystem", fileSystem);
     URI fsURI = fileSystem.getUri();
-    LOG.info("Test filesystem = {} implemented by {}", fsURI,
-             fileSystem);
+    LOG.info("Test filesystem = {} implemented by {}",
+        fsURI, fileSystem);
     //sanity check to make sure that the test FS picked up really matches
     //the scheme chosen. This is to avoid defaulting back to the localFS
     //which would be drastic for root FS tests
@@ -181,9 +207,7 @@ public abstract class AbstractFSContractTestBase extends Assert
    */
   protected Path path(String filepath) throws IOException {
     return getFileSystem().makeQualified(
-      new Path(
-        getContract().getTestPath(),
-        filepath));
+      new Path(getContract().getTestPath(), filepath));
   }
   
   /**
