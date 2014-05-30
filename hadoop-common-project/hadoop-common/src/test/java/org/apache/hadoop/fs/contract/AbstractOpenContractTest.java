@@ -60,7 +60,7 @@ public abstract class AbstractOpenContractTest extends AbstractFSContractTestBas
     touch(getFileSystem(), path);
     instream = getFileSystem().open(path);
     assertEquals(0, instream.getPos());
-    //expect initial read to fai;
+    //expect initial read to fail
     int result = instream.read();
     assertMinusOne("initial byte read", result);
   }
@@ -107,7 +107,7 @@ public abstract class AbstractOpenContractTest extends AbstractFSContractTestBas
   @Test
   public void testOpenFileTwice() throws Throwable {
     describe("verify that two opened file streams are independent");
-    Path path = path("seekfile.txt");
+    Path path = path("testopenfiletwice.txt");
     byte[] block = dataset(TEST_FILE_LEN, 0, 255);
     //this file now has a simple rule: offset => value
     createFile(getFileSystem(), path, false, block);
@@ -128,6 +128,27 @@ public abstract class AbstractOpenContractTest extends AbstractFSContractTestBas
       IOUtils.closeStream(instream1);
       IOUtils.closeStream(instream2);
     }
+  }
+
+  @Test
+  public void testSequentialRead() throws Throwable {
+    describe("verify that sequential read() operations return values");
+    Path path = path("testsequentialread.txt");
+    int len = 4;
+    int base = 0x40; // 64
+    byte[] block = dataset(len, base, base + len);
+    //this file now has a simple rule: offset => (value | 0x40)
+    createFile(getFileSystem(), path, false, block);
+    //open first
+    instream = getFileSystem().open(path);
+    assertEquals(base, instream.read());
+    assertEquals(base + 1, instream.read());
+    assertEquals(base + 2, instream.read());
+    assertEquals(base + 3, instream.read());
+    // and now, failures
+    assertEquals(-1, instream.read());
+    assertEquals(-1, instream.read());
+    instream.close();
   }
 
 
