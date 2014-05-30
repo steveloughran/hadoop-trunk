@@ -44,15 +44,15 @@ The stream can be modeled as
 
 with access functions
     
-    pos(FDIS) 
-    data(FDIS)
-    isOpen(FDIS)
+    pos(FSDIS) 
+    data(FSDIS)
+    isOpen(FSDIS)
 
 **Implicit invariant**: the size of the data stream equals the size of the
 file as returned by `FileSystem.getFileStatus(Path p)`
 
     forall p in dom(FS.Files[p]) :
-    len(data(FDIS)) == FS.getFileStatus(p).length
+    len(data(FSDIS)) == FS.getFileStatus(p).length
 
 
 ### `Closeable.close()`
@@ -90,7 +90,7 @@ Return the current position. The outcome when a stream is closed is undefined.
 
 #### Preconditions
 
-    isOpen(FDIS)
+    isOpen(FSDIS)
          
 #### Postconditions
     
@@ -101,18 +101,17 @@ Return the current position. The outcome when a stream is closed is undefined.
 
 Return the data at the current position. 
 
-1. Implementations should fail When a stream is closed
+1. Implementations should fail when a stream is closed
 1. There is no limit on how long `read())` may take to complete.
 
 #### Preconditions
 
-    isOpen(FDIS)
-    pos < len(data) else raise [EOFException, IOException]
+    isOpen(FSDIS)
      
 #### Postconditions
     
     if ( pos < len(data) ):
-       FSDIS' = (pos+1, data, true)
+       FSDIS' = (pos + 1, data, true)
        result = data[pos]
     else
         result = -1
@@ -125,13 +124,13 @@ Read `length` bytes of data into the destination buffer, starting at offset
 
 #### Preconditions
 
-    isOpen(FDIS)
+    isOpen(FSDIS)
     buffer != null else raise NullPointerException
     length >= 0 
     offset < len(buffer)
     length <= len(buffer) - offset
                            
-Exceptions raised on precondition failure are                           
+Exceptions that may be raised on precondition failure are                           
                            
     InvalidArgumentException
     ArrayIndexOutOfBoundsException
@@ -139,7 +138,7 @@ Exceptions raised on precondition failure are
 
 #### Postconditions
     
-    if length==0 :
+    if length == 0 :
       result = 0
      
     elseif pos > len(data):
@@ -149,7 +148,7 @@ Exceptions raised on precondition failure are
       let l = min(length, len(data)-length) : 
           buffer' = buffer where forall i in [0..l-1]:
               buffer'[o+i] = data[pos+i]
-          FDIS' = (pos+l, data, true)
+          FSDIS' = (pos+l, data, true)
           result = l
     
 ### `Seekable.seek(s)`
@@ -159,11 +158,11 @@ Exceptions raised on precondition failure are
 
 Not all subclasses implement the Seek operation:
 
-    supported(FDIS, Seekable.seek) else raise [UnsupportedOperation, IOException]
+    supported(FSDIS, Seekable.seek) else raise [UnsupportedOperation, IOException]
 
 If the operation is supported, the file SHOULD be open:
 
-    isOpen(FDIS)
+    isOpen(FSDIS)
 
 Some filesystems do not perform this check, relying the `read()` contract
 to reject reads on a closed stream. (e.g. `RawLocalFileSystem`)
@@ -179,7 +178,7 @@ instead return -1 on any `read()` operation where, at the time of the read,
 
 #### Postconditions
     
-    FDIS' = (s, data, true)
+    FSDIS' = (s, data, true)
 
 There is an implicit invariant: a seek to the current position is a no-op
 
@@ -202,20 +201,20 @@ data at offset `offset`.
 Not all subclasses implement the operation operation, and instead
 either raise an exception -or return `False`.
 
-    supported(FDIS, Seekable.seekToNewSource) else raise [UnsupportedOperation, IOException]
+    supported(FSDIS, Seekable.seekToNewSource) else raise [UnsupportedOperation, IOException]
 
 Examples: `CompressionInputStream` , `HttpFSFileSystem`
 
 If supported, the file must be open
 
-    isOpen(FDIS)   
+    isOpen(FSDIS)   
 
 #### Postconditions
 
 The majority of subclasses that do not implement this operation simply
 fail. 
 
-    if not supported(FDIS, Seekable.seekToNewSource(s)):
+    if not supported(FSDIS, Seekable.seekToNewSource(s)):
         result = False
     
 Examples: `RawLocalFileSystem` , `HttpFSFileSystem`
@@ -253,7 +252,7 @@ Not all `FSDataInputStream` support these operations -those that do
 not implement `Seekable.seek()` do not implement the `PositionedReadable`
 interface. 
 
-    supported(FDIS, Seekable.seek) else raise [UnsupportedOperation, IOException]
+    supported(FSDIS, Seekable.seek) else raise [UnsupportedOperation, IOException]
 
 This could be considered "obvious" -if a stream is not seekable, a client
 cannot seek to a location to read it. It is also a side effect of the

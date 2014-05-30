@@ -33,4 +33,5 @@ HDFS -as these are the behaviors which client applications will expect
 1. [Model](model.html)
 1. [FileSystem class](filesystem.html)
 1. [FSDataInputStream class](fsdatainputstream.md.html)
-2. [Testing the FileSystem specification](testing.html)
+2. [Testing with the Filesystem specification](testing.html)
+2. [Extending the specification and its tests](extending.html)
