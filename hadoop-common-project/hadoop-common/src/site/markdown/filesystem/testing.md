@@ -25,7 +25,7 @@ remote server providing the filesystem.
 
 
 These filesystem bindings must be defined in an XML configuration file, usually
-the file `hadoop-common-project/hadoop-common/src/test/resources/contract-test-options.xml`.
+the file `hadoop-common-project/hadoop-common/src/test/contract-test-options.xml`.
 This file is excluded should not be checked in.
 
 ### S3:
@@ -115,12 +115,12 @@ Example:
 ### openstack swift, swift://
 
 The openstack swift login details must be defined in the file
-`/hadoop-tools/hadoop-openstack/src/test/resources/contract-test-options.xml`. 
+`/hadoop-tools/hadoop-openstack/src/test/contract-test-options.xml`. 
 The standard hadoop-common `contract-test-options.xml` resource file cannot be
 used, as that file does not get included in `hadoop-common-test.jar`.
 
 
-In `/hadoop-tools/hadoop-openstack/src/test/resources/contract-test-options.xml`
+In `/hadoop-tools/hadoop-openstack/src/test/contract-test-options.xml`
 the swift bucket name must be defined in the property `fs.contract.test.fs.swift`,
 along with the login details for the specific swift service provider in which the
 bucket is posted.
@@ -236,7 +236,7 @@ While filesystems SHOULD raise the stricter exceptions, there may be reasons why
 Tests against remote filesystems will require the URL to the filesystem to be specified;
 tests againt remote filesystems that require login details require usernames/IDs and passwords.
 
-All these details MUST be required to be placed in the file `src/test/resources/contract-test-options.xml`, *and your SCM tools configured to never commit this file to subversion, git or
+All these details MUST be required to be placed in the file `src/test/contract-test-options.xml`, *and your SCM tools configured to never commit this file to subversion, git or
 equivalent. Furthermore, the build MUST be configured to never bundle this file in any `-test` artifacts generated. The Hadoop build does this, excluding `src/test/**/*.xml` from the JAR files.
 
 The `AbstractFSContract` class automatically loads this resource file if present; specific keys for specific test cases can be added. 
