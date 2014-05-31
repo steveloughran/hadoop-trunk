@@ -308,7 +308,8 @@ public class ContractTestUtils extends Assert {
     if (fileSystem == null) {
       return;
     }
-    Path path = new Path(cleanupPath).makeQualified(fileSystem);
+    Path path = new Path(cleanupPath).makeQualified(fileSystem.getUri(),
+        fileSystem.getWorkingDirectory());
     cleanup(action, fileSystem, path);
   }
 
@@ -415,13 +416,14 @@ public class ContractTestUtils extends Assert {
   }
 
   /**
-   * Fail with an exception that was receivedT
-   * @param text
-   * @param t
+   * Fail with an exception that was received
+   * @param text text to use in the exception
+   * @param thrown a (possibly null) throwable to init the cause with
+   * @throws AssertionError with the text and throwable -always
    */
-  public static void fail(String text, Throwable t) {
+  public static void fail(String text, Throwable thrown) {
     AssertionError e = new AssertionError(text);
-    e.initCause(t);
+    e.initCause(thrown);
     throw e;
   }
 
@@ -730,8 +732,6 @@ public class ContractTestUtils extends Assert {
     return System.getProperty("os.name").contains("OS X");
   }
 
-  //
-
   /**
    * compare content of file operations using a double byte array
    * @param concat concatenated files
@@ -755,5 +755,5 @@ public class ContractTestUtils extends Assert {
                 mismatch);
   }
 
- 
+
 }
