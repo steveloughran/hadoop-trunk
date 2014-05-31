@@ -310,12 +310,6 @@ public class FTPFileSystem extends FileSystem {
     }
   }
 
-  /** @deprecated Use delete(Path, boolean) instead */
-  @Deprecated
-  private boolean delete(FTPClient client, Path file) throws IOException {
-    return delete(client, file, false);
-  }
-
   /**
    * Convenience method, so that we don't open a new connection when using this
    * method from within another method. Otherwise every API invocation incurs
