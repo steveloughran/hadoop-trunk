@@ -257,6 +257,7 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
    * @return a list of matches
    * @throws IOException on any reported failure
    */
+
   private PartialListing list(String prefix, String delimiter,
       int maxListingLength, String priorLastKey) throws IOException {
     try {
@@ -412,7 +413,7 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
    * @throws IOException exception -always
    */
   private void handleException(Exception e) throws IOException {
-    throw processException(e, false);
+    throw processException(e, e);
   }
 
   /**
@@ -421,11 +422,11 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
    * @param isProcessingCause flag to true if the cause of an exception is being processed
    * @return an exception to throw. If isProcessingCause==true this may be null.
    */
-  private IOException processException(Throwable thrown, boolean isProcessingCause) {
-    IOException result = null;
+  private IOException processException(Throwable thrown, Throwable original) {
+    IOException result;
     if (thrown.getCause() != null) {
       // recurse down
-      result = processException(thrown.getCause(), true);
+      result = processException(thrown.getCause(), original);
     } else if (thrown instanceof HttpException) {
       // nested HttpException - examine error code and react
       HttpException httpException = (HttpException) thrown;
@@ -460,13 +461,14 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
       LOG.debug("S3ServiceException: {}: {} : {}",
           se.getErrorCode(), se.toString(), se, se);
       result = new S3Exception(se);
-    }
-
-    // here there is no exception derived yet. 
-    // if this is a recursive operation, return null
-
-    if (result == null & !isProcessingCause) {
-      result = new S3Exception(thrown);
+    } else if (thrown instanceof IOException) {
+      result = (IOException) thrown;
+    } else {
+      // here there is no exception derived yet. 
+      // this means no inner cause, and no translation made yet.
+      // convert the original to an IOException -rather than just the
+      // exception at the base of the tree
+      result = new S3Exception(original);
     }
 
     return result;
