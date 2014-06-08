@@ -14,44 +14,44 @@
   
 # Extending the File System specification and its tests
 
-This specification is incomplete. It doesn't cover all operations or
+The FileSystem specification is incomplete. It doesn't cover all operations or
 even interfaces and classes in the FileSystem APIs. There may
-be some minor issues with those that it does cover, including
-as corner cases, failure modes and other unexpected outcomes. It may also be that
-a standard filesystem significantly diverges from the specification, and 
+be some minor issues with those that it does cover, such
+as corner cases, failure modes, and other unexpected outcomes. It may also be that
+a standard FileSystem significantly diverges from the specification, and 
 it is felt that this needs to be documented and coped with in tests.
 
-Finally, the FileSystem classes and methods are not fixed forever-
-they may be extended with  new operations on existing classes, as well as,
-potentially, entirely new classes and interfaces.
+Finally, the FileSystem classes and methods are not fixed forever.
+They may be extended with new operations on existing classes, as well as
+potentially entirely new classes and interfaces.
 
-Accordingly, do not view this specification as a complete static document
--any more than you can view the rest of the Hadoop code.
+Accordingly, do not view this specification as a complete static document,
+any more than the rest of the Hadoop code.
 
-1. View it as an live document to accompany the reference implementation (HDFS),
+1. View it as a live document to accompany the reference implementation (HDFS),
 and the tests used to validate filesystems. 
 1. Don't be afraid to extend or correct it.
-1. If you are proposing enhancements to the filesystem APIs, you should extend the 
+1. If you are proposing enhancements to the FileSystem APIs, you should extend the 
 specification to match.
 
 ## How to update this specification
 
 1. Although found in the `hadoop-common` codebase, the HDFS team has ownership of 
-the FileSystem and FileContext APIs -work with them on the hdfs-dev mailing list.
+the FileSystem and FileContext APIs. Work with them on the hdfs-dev mailing list.
 
 1. Create JIRA issues in the `HADOOP` project, component `fs`, to cover changes
 in the APIs and/or specification.
 
-1. Code changes will of course require tests -ideally changes to the specification
-itself should be accompanied by new tests.
+1. Code changes will of course require tests. Ideally, changes to the specification
+itself are accompanied by new tests.
 
 1. If the change involves operations that already have an `Abstract*ContractTest`,
-add new test methods to the class -and verify that they work on filesystem-specific
+add new test methods to the class and verify that they work on filesystem-specific
 tests that subclass it. That includes the object stores as well as the local and
 HDFS filesystems. 
 
-1. If the changes add a new operation, add a new, abstract test class,
-with the same contract-driven architecture as the existing one -and an implementation
+1. If the changes add a new operation, add a new abstract test class
+with the same contract-driven architecture as the existing one, and an implementation
 subclass for all filesystems that support the operation.
 
 1. Add test methods to verify that invalid preconditions result in the expected
@@ -63,33 +63,33 @@ in tracking down problems.
 
 1. If possible, add tests to show concurrency expectations.
 
-If a filesystem fails a newly added test, then it may be because:
+If a FileSystem fails a newly added test, then it may be because:
 
-* the specification is wrong
-* the test is wrong
-* the test is looking for the wrong exception (i.e. it is too strict)
-* the specification and tests are correct -and it is the filesystem is not
+* The specification is wrong.
+* The test is wrong.
+* The test is looking for the wrong exception (i.e. it is too strict).
+* The specification and tests are correct -and it is the filesystem is not
 consistent with expectations.
 
-The HDFS filesystem has to be treated as correct in its behavior. 
-If the test and specification mismatch this behavior, then the specification
+HDFS has to be treated as correct in its behavior. 
+If the test and specification do not match this behavior, then the specification
 needs to be updated. Even so, there may be cases where the FS could be changed:
 
 1. The exception raised is a generic `IOException`, when a more informative
 subclass, such as `EOFException` can be raised.
-1. The filesystem does not fail correctly when passed an invalid set of arguments.
+1. The FileSystem does not fail correctly when passed an invalid set of arguments.
 This MAY be correctable, though must be done cautiously.
 
-If the mismatch is in the Local filesystem, then it probably cant be corrected, as
+If the mismatch is in LocalFileSystem, then it probably can't be corrected, as
 this is the native filesystem as accessed via the Java IO APIs.
 
-For other filesystems, their behaviour MAY be updated to more accurately reflect
-the behavior of HDFS and/or LocalFS. For most operations this is straightforward,
+For other FileSystems, their behaviour MAY be updated to more accurately reflect
+the behavior of HDFS and/or LocalFileSystem. For most operations this is straightforward,
 though the semantics of `rename()` are complicated enough that it is not clear
 that HDFS is the correct reference.
 
-If a test fails and it is felt that it is a unfixable filesystem-specific issue, then
+If a test fails and it is felt that it is a unfixable FileSystem-specific issue, then
 a new contract option to allow for different interpretations of the results should
 be added to the `ContractOptions` interface, the test modified to react to the
 presence/absence of the option, and the XML contract files for the standard
-filesystems updated to indicate when a feature/failure mode is present.
+FileSystems updated to indicate when a feature/failure mode is present.

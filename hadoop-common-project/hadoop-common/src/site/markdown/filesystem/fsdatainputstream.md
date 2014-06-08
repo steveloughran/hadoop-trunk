@@ -20,29 +20,29 @@
 # Class `FSDataInputStream extends DataInputStream`
   
 The core behavior of `FSDataInputStream` is defined by `java.io.DataInputStream`,
-with extensions that add key assumptions to the system
+with extensions that add key assumptions to the system.
 
 1. The source is a local or remote filesystem.
 1. The stream being read references a finite array of bytes.
 1. The length of the data does not change during the read process.
 1. The contents of the data does not change during the process.
 1. The source file remains present during the read process
-1. Callers may use `Seekable.seek()` to positions within this array, with future
+1. Callers may use `Seekable.seek()` to offsets within the array of bytes, with future
 reads starting at this offset.
-1. The cost of a forward or backwards seek is low.
-1. There is no requirement for the stream implementation to be thread safe.
- callers MUST assume that instances are not thread-safe.
+1. The cost of forward and backward seeks is low.
+1. There is no requirement for the stream implementation to be thread-safe.
+ Callers MUST assume that instances are not thread-safe.
 
 
 Files are opened via `FileSystem.open(p)`, which, if successful, returns:
 
     result = FSDataInputStream(0, FS.Files[p])
 
-The stream can be modeled as
+The stream can be modeled as:
 
     FSDIS = (pos, data[], isOpen)
 
-with access functions
+with access functions:
     
     pos(FSDIS) 
     data(FSDIS)
@@ -60,18 +60,18 @@ file as returned by `FileSystem.getFileStatus(Path p)`
 The semantics of `java.io.Closeable` are defined in the interface definition
 within the JRE.
 
-The operation MUST be idempotent; the following sequence is not an error
+The operation MUST be idempotent; the following sequence is not an error:
 
     FSDIS.close();
     FSDIS.close();
 
 #### Implementation Notes
 
-* Implementations SHOULD be robust against failure -if an inner stream
+* Implementations SHOULD be robust against failure. If an inner stream
 is closed, it should be checked for being `null` first.
 
 * Implementations SHOULD NOT raise `IOException` exceptions (or any other exception)
-during this operation -client applications often ignore these, or may fail
+during this operation. Client applications often ignore these, or may fail
 unexpectedly.
 
 
@@ -81,7 +81,7 @@ unexpectedly.
 #### Postconditions
     
      
-    FSDIS' = (undefined), (undefined), false)
+    FSDIS' = ((undefined), (undefined), False)
        
 
 ### `Seekable.getPos()`
@@ -102,7 +102,7 @@ Return the current position. The outcome when a stream is closed is undefined.
 Return the data at the current position. 
 
 1. Implementations should fail when a stream is closed
-1. There is no limit on how long `read())` may take to complete.
+1. There is no limit on how long `read()` may take to complete.
 
 #### Preconditions
 
@@ -111,7 +111,7 @@ Return the data at the current position.
 #### Postconditions
     
     if ( pos < len(data) ):
-       FSDIS' = (pos + 1, data, true)
+       FSDIS' = (pos + 1, data, True)
        result = data[pos]
     else
         result = -1
@@ -158,14 +158,14 @@ Exceptions that may be raised on precondition failure are
 
 Not all subclasses implement the Seek operation:
 
-    supported(FSDIS, Seekable.seek) else raise [UnsupportedOperation, IOException]
+    supported(FSDIS, Seekable.seek) else raise [UnsupportedOperationException, IOException]
 
 If the operation is supported, the file SHOULD be open:
 
     isOpen(FSDIS)
 
-Some filesystems do not perform this check, relying the `read()` contract
-to reject reads on a closed stream. (e.g. `RawLocalFileSystem`)
+Some filesystems do not perform this check, relying on the `read()` contract
+to reject reads on a closed stream (e.g. `RawLocalFileSystem`).
 
 A `seek(0)` MUST always succeed, as  the seek position must be 
 positive and less than the length of the Stream's:
@@ -178,7 +178,7 @@ instead return -1 on any `read()` operation where, at the time of the read,
 
 #### Postconditions
     
-    FSDIS' = (s, data, true)
+    FSDIS' = (s, data, True)
 
 There is an implicit invariant: a seek to the current position is a no-op
 
@@ -192,20 +192,20 @@ checks, leaving the input stream unchanged.
 
 This operation instructs the source to retrieve `data[]` from a different
 source from the current source. This is only relevant if the filesystem supports
-multiple replicas of a file -and there is currently >1 valid replica of the
+multiple replicas of a file and there is more than 1 replica of the
 data at offset `offset`.
 
 
 #### Preconditions
 
 Not all subclasses implement the operation operation, and instead
-either raise an exception -or return `False`.
+either raise an exception or return `False`.
 
-    supported(FSDIS, Seekable.seekToNewSource) else raise [UnsupportedOperation, IOException]
+    supported(FSDIS, Seekable.seekToNewSource) else raise [UnsupportedOperationException, IOException]
 
 Examples: `CompressionInputStream` , `HttpFSFileSystem`
 
-If supported, the file must be open
+If supported, the file must be open:
 
     isOpen(FSDIS)   
 
@@ -225,10 +225,10 @@ If the operation is supported and there is a new location for the data:
         result = True
 
 The new data is the original data (or an updated version of it, as covered
-in the Consistency section below) -but the block containing the data at `offset`
+in the Consistency section below), but the block containing the data at `offset`
 sourced from a different replica.
 
-If there is no other copy, `FSDIS` is  not updated; the response indicates this
+If there is no other copy, `FSDIS` is  not updated; the response indicates this:
 
         result = False
 
@@ -248,14 +248,14 @@ some of the implementations do not follow this guarantee.
 
 #### Implementation preconditions
 
-Not all `FSDataInputStream` support these operations -those that do
+Not all `FSDataInputStream` implementations support these operations. Those that do
 not implement `Seekable.seek()` do not implement the `PositionedReadable`
 interface. 
 
-    supported(FSDIS, Seekable.seek) else raise [UnsupportedOperation, IOException]
+    supported(FSDIS, Seekable.seek) else raise [UnsupportedOperationException, IOException]
 
-This could be considered "obvious" -if a stream is not seekable, a client
-cannot seek to a location to read it. It is also a side effect of the
+This could be considered obvious: if a stream is not Seekable, a client
+cannot seek to a location. It is also a side effect of the
 base class implementation, which uses `Seekable.seek()`.
 
 
@@ -280,8 +280,6 @@ or all of the buffer before reporting a failure.
   
 #### Preconditions
 
-  (All stated above)
-  
     position > 0 else raise [IllegalArgumentException, RuntimeException]
     len(buffer) + offset < len(data) else raise [IndexOutOfBoundException, RuntimeException]
     length >= 0
@@ -290,7 +288,7 @@ or all of the buffer before reporting a failure.
 #### Postconditions  
 
 The amount of data read is the less of the length or the amount
-of data available from the specified positiom
+of data available from the specified position:
  
     let available = min(length, len(data)-position)
     buffer'[offset..(offset+available-1)] = data[position..position+available -1]
@@ -301,8 +299,6 @@ of data available from the specified positiom
   
 #### Preconditions
 
-  (All stated above)
-
     position > 0 else raise [IllegalArgumentException, RuntimeException]
     length >= 0
     offset >= 0 
@@ -312,7 +308,7 @@ of data available from the specified positiom
 #### Postconditions  
 
 The amount of data read is the less of the length or the amount
-of data available from the specified positiom
+of data available from the specified position:
  
     let available = min(length, len(data)-position)
     buffer'[offset..(offset+length-1)] = data[position..(position + length -1)]
@@ -326,8 +322,8 @@ The semantics of this are exactly equivalent to
   
 ## Consistency 
 
-* All readers, local and remote of a data stream FSDIS provided from a `FileSystem.open(p)`
-are expected to receive access to the data `FS.Files[p]` at the time of opening.
+* All readers, local and remote, of a data stream FSDIS provided from a `FileSystem.open(p)`
+are expected to receive access to the data of `FS.Files[p]` at the time of opening.
 * If the underlying data is changed during the read process, these changes MAY or
 MAY NOT be visible.
 * Such changes are visible MAY be partially visible. 
@@ -339,7 +335,7 @@ At time t0
   
 At time t1
 
-    FS' = FS` where FS'.Files[p] = data1
+    FS' = FS' where FS'.Files[p] = data1
 
 From time `t >= t1`, the value of `FSDIS0` is undefined.
    
