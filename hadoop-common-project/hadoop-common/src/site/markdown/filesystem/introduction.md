@@ -38,7 +38,8 @@ consistency guarantees, and atomicity of operations.
 The "Local" FileSystem provides access to the underlying filesystem of the
 platform. Its behavior is defined by the operating system and can
 behave differently from HDFS. Examples of local filesystem quirks include
-case-sensitivity, action when attempting to rename a file atop another file, and whether it is possible to `seek()` past
+case-sensitivity, action when attempting to rename a file atop another file,
+and whether it is possible to `seek()` past
 the end of the file.
 
 There are also filesystems implemented by third parties that assert
@@ -163,7 +164,8 @@ connection request is refused.
 ## Core Expectations of a Hadoop Compatible FileSystem
 
 Here are the core expectations of a Hadoop-compatible FileSystem.
-Some FileSystems do not meet all these expectations; as a result, some programs may not work as expected.
+Some FileSystems do not meet all these expectations; as a result,
+ some programs may not work as expected.
 
 ### Atomicity
 
@@ -307,5 +309,69 @@ the file operation has succeeded or not.
 1. The time to delete a directory is independent of the size of the number of 
 child entries
 
+### Object Stores vs. Filesystems
 
+This specification refers to *Object Stores* in places, often using the 
+term *Blobstore*. Hadoop does provide FileSystem client classes for some of these
+even though they violate many of the requirements. This is why, although
+Hadoop can read and write data in an object store, the two which Hadoop ships
+with direct support for &mdash;Amazon S3 and OpenStack Swift&mdash cannot
+be used as direct replacement for HDFS.
 
+*What is an Object Store?*
+
+An object store is a data storage service, usually accessed over HTTP/HTTPS.
+A `PUT` request uploads an object/"Blob"; a `GET` request retrieves it; ranged
+`GET` operations permit portions of a blob to retrieved.
+To delete the object, the HTTP `DELETE` operation is invoked.
+ 
+Objects are stored by name: a string, possibly with "/" symbols in them. There
+is no notion of a directory; arbitrary names can be assigned to objects &mdash;
+within the limitations of the naming scheme imposed by the service's provider.
+ 
+The object stores invariably provide an operation to retrieve objects with
+a given prefix; a `GET` operation on the root of the service with the
+appropriate query parameters.
+
+Object stores usually prioritize availability &mdash;there is no single point
+of failure equivalent to the HDFS NameNode(s). They also strive for simple 
+non-POSIX APIs: the HTTP verbs are the operations allowed. 
+
+Hadoop FileSystem clients for object stores attempt to make the
+stores pretend that they are a FileSystem, a FileSystem with the same
+features and operations as HDFS. This is &mdash;ultimately&mdash;a pretence:
+they have different characteristics and occasionally the illusion fails.
+
+1. **Consistency**. Object stores are generally *Eventually Consistent*: it
+can take time for changes to objects &mdash;creation, deletion and updates&mdash;
+to become visible to all callers. Indeed, there is no guarantee a change is
+immediately visible to the client which just made the change. As an example,
+an object `test/data1.csv` may be overwritten with a new set of data, but when
+a `GET test/data1.csv` call is made shortly after the update, the original data
+returned. Hadoop assumes that filesystems are consistent; that creation, updates
+and deletions are immediately visible, and that the results of listing a directory
+are current with respect to the files within that directory. 
+
+1. **Atomicity**. Hadoop assumes that directory `rename()` operations are atomic, 
+as are `delete()` operations. Object store FileSystem clients implement these
+as operations on the individual objects whose names match the directory prefix.
+As a result, the changes take place a file at a time, and are not atomic. If
+an operation fails part way through the process, the the state of the object store
+reflects the partially completed operation.  Note also that client code
+assumes that these operations are `O(1)` &mdash;in an object store they are
+more likely to be be `O(child-entries)`.
+
+1. **Durability**. Hadoop assumes that `OutputStream` implementations write data
+to their (persistent) storage on a `flush()` operation. Object store implementations
+save all their written data to a local file, a file that is then only `PUT`
+to the object store in the final `close()` operation. As a result, there is
+never any partial data from incomplete or failed operations. Furthermore,
+as the write process only starts in  `close()` operation, that operation may take
+a time proportional to the quantity of data to upload, and inversely proportional
+to the network bandwidth. It may also fail &mdash;a failure that is better
+escalated than ignored.
+
+Object stores with these characteristics, can not be used as a direct replacement
+for HDFS. In terms of this specification, their implementations of the
+specified operations do not match those required. They are considered supported
+by the Hadoop development community, but not to the same extent as HDFS.
