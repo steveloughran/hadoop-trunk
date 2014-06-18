@@ -87,4 +87,9 @@
     <value>false</value>
   </property>
 
+  <property>
+    <name>fs.contract.rename-returns-false-if-source-missing</name>
+    <value>true</value>
+  </property>
+
 </configuration>
