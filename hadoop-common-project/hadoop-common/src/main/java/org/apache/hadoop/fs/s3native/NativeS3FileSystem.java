@@ -114,7 +114,7 @@ public class NativeS3FileSystem extends FileSystem {
       try {
         result = in.read();
       } catch (IOException e) {
-        LOG.info("Received IOException while reading '{}', attempting to reopen: {}",
+        LOG.info("Received IOException while reading '{}', attempting to reopen",
             key);
         LOG.debug("{}", e, e);
         try {
@@ -145,7 +145,8 @@ public class NativeS3FileSystem extends FileSystem {
       } catch (EOFException eof) {
         throw eof;
       } catch (IOException e) {
-        LOG.info( "Received IOException while reading '{}', attempting to reopen.", key);
+        LOG.info( "Received IOException while reading '{}'," +
+                  " attempting to reopen.", key);
         seek(pos);
         result = in.read(b, off, len);
       }

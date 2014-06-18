@@ -67,8 +67,8 @@
   </property>
 
   <property>
-    <name>fs.contract.supports-seek-past-eof</name>
-    <value>false</value>
+    <name>fs.contract.rejects-seek-past-eof</name>
+    <value>true</value>
   </property>
 
   <property>

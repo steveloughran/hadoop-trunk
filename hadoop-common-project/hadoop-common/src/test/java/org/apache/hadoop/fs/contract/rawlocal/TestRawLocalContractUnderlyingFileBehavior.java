@@ -19,34 +19,31 @@
 package org.apache.hadoop.fs.contract.rawlocal;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.contract.localfs.LocalFSContract;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 import java.io.File;
-import java.io.IOException;
 
-/**
- * Raw local filesystem. This is the inner OS-layer FS
- * before checksumming is added around it.
- */
-public class RawlocalFSContract extends LocalFSContract {
-  public RawlocalFSContract(Configuration conf) {
-    super(conf);
+public class TestRawLocalContractUnderlyingFileBehavior extends Assert {
+
+  private static File testDirectory;
+
+  @BeforeClass
+  public static void before() {
+    RawlocalFSContract contract =
+      new RawlocalFSContract(new Configuration());
+    testDirectory = contract.getTestDirectory();
+    testDirectory.mkdirs();
+    assertTrue(testDirectory.isDirectory());
+
   }
 
-  public static final String RAW_CONTRACT_XML = "contract/localfs.xml";
-
-  @Override
-  protected String getContractXml() {
-    return RAW_CONTRACT_XML;
-  }
-
-  @Override
-  protected FileSystem getLocalFS() throws IOException {
-    return FileSystem.getLocal(getConf()).getRawFileSystem();
-  }
-  
-  public File getTestDirectory() {
-    return new File(getTestDataDir());
+  @Test
+  public void testDeleteEmptyPath() throws Throwable {
+    File nonexistent = new File(testDirectory, "testDeleteEmptyPath");
+    assertFalse(nonexistent.exists());
+    assertFalse("nonexistent.delete() returned true", nonexistent.delete());
   }
 }

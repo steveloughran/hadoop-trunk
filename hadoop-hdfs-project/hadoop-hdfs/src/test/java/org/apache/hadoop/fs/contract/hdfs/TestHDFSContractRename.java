@@ -16,29 +16,30 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.fs.swift.contract;
+package org.apache.hadoop.fs.contract.hdfs;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.contract.AbstractBondedFSContract;
-import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
+import org.apache.hadoop.fs.contract.AbstractContractRenameTest;
+import org.apache.hadoop.fs.contract.AbstractFSContract;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 
-/**
- * The contract of OpenStack Swift: only enabled if the test binding data is provided
- */
-public class SwiftContract extends AbstractBondedFSContract {
+import java.io.IOException;
 
-  public static final String CONTRACT_XML = "contract/swift.xml";
+public class TestHDFSContractRename extends AbstractContractRenameTest {
 
-  public SwiftContract(Configuration conf) {
-    super(conf);
-    //insert the base features
-    addConfResource(CONTRACT_XML);
+  @BeforeClass
+  public static void createCluster() throws IOException {
+    HDFSContract.createCluster();
   }
 
+  @AfterClass
+  public static void teardownCluster() throws IOException {
+    HDFSContract.destroyCluster();
+  }
 
   @Override
-  public String getScheme() {
-    return SwiftNativeFileSystem.SWIFT;
+  protected AbstractFSContract createContract(Configuration conf) {
+    return new HDFSContract(conf);
   }
-
 }

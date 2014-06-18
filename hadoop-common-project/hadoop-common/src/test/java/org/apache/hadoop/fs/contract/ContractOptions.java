@@ -116,10 +116,10 @@ public interface ContractOptions {
   String SUPPORTS_SEEK = "supports-seek";
 
   /**
-   * Is seeking past the EOF supported?
+   * Is seeking past the EOF allowed?
    * @{value}
    */
-  String SUPPORTS_SEEK_PAST_EOF = "supports-seek-past-eof";
+  String REJECTS_SEEK_PAST_EOF = "rejects-seek-past-eof";
 
   /**
    * Is seeking on a closed file supported? Some filesystems only raise an

@@ -32,7 +32,7 @@ import org.junit.Assert;
 import java.io.IOException;
 
 /**
- * The contract of the Local filesystem.
+ * The contract of HDFS
  * This changes its feature set from platform for platform -the default
  * set is updated during initialization.
  */

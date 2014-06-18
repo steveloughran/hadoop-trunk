@@ -252,7 +252,7 @@ class Jets3tNativeFileSystemStore implements NativeFileSystemStore {
    * list objects 
    * @param prefix prefix
    * @param delimiter delimiter
-   * @param maxListingLengthm max no. of entries
+   * @param maxListingLength max no. of entries
    * @param priorLastKey last key in any previous search
    * @return a list of matches
    * @throws IOException on any reported failure

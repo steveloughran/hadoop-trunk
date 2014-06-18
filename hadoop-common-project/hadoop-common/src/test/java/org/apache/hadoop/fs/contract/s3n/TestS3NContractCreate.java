@@ -16,29 +16,23 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.fs.swift.contract;
+package org.apache.hadoop.fs.contract.s3n;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.contract.AbstractBondedFSContract;
-import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
+import org.apache.hadoop.fs.contract.AbstractContractCreateTest;
+import org.apache.hadoop.fs.contract.AbstractFSContract;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
 
-/**
- * The contract of OpenStack Swift: only enabled if the test binding data is provided
- */
-public class SwiftContract extends AbstractBondedFSContract {
-
-  public static final String CONTRACT_XML = "contract/swift.xml";
-
-  public SwiftContract(Configuration conf) {
-    super(conf);
-    //insert the base features
-    addConfResource(CONTRACT_XML);
-  }
-
+public class TestS3NContractCreate extends AbstractContractCreateTest {
 
   @Override
-  public String getScheme() {
-    return SwiftNativeFileSystem.SWIFT;
+  protected AbstractFSContract createContract(Configuration conf) {
+    return new NativeS3Contract(conf);
   }
 
+  @Override
+  public void testOverwriteEmptyDirectory() throws Throwable {
+    ContractTestUtils.skip(
+        "blobstores can't distinguish empty directories from files");
+  }
 }

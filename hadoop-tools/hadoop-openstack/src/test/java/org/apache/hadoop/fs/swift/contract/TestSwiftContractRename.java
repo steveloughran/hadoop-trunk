@@ -19,26 +19,14 @@
 package org.apache.hadoop.fs.swift.contract;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.contract.AbstractBondedFSContract;
-import org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem;
+import org.apache.hadoop.fs.contract.AbstractContractRenameTest;
+import org.apache.hadoop.fs.contract.AbstractFSContract;
 
-/**
- * The contract of OpenStack Swift: only enabled if the test binding data is provided
- */
-public class SwiftContract extends AbstractBondedFSContract {
-
-  public static final String CONTRACT_XML = "contract/swift.xml";
-
-  public SwiftContract(Configuration conf) {
-    super(conf);
-    //insert the base features
-    addConfResource(CONTRACT_XML);
-  }
-
+public class TestSwiftContractRename extends AbstractContractRenameTest {
 
   @Override
-  public String getScheme() {
-    return SwiftNativeFileSystem.SWIFT;
+  protected AbstractFSContract createContract(Configuration conf) {
+    return new SwiftContract(conf);
   }
 
 }

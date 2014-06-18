@@ -131,7 +131,6 @@ bucket is posted.
         <value>swift://swiftbucket.rackspace/</value>
       </property>
 
-
       <property>
         <name>fs.swift.service.rackspace.auth.url</name>
         <value>https://auth.api.rackspacecloud.com/v2.0/tokens</value>
