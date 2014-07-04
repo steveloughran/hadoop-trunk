@@ -68,21 +68,29 @@
     <artifactId>jackson-mapper-asl</artifactId>
     <scope>compile</scope>
    </dependency>
-   <dependency>
+   
+    <dependency>
     <groupId>commons-httpclient</groupId>
     <artifactId>commons-httpclient</artifactId>
     <scope>test</scope>
    </dependency>
+    <dependency>
+    <groupId>junit</groupId>
+    <artifactId>junit</artifactId>
+    <scope>test</scope>
+   </dependency>
+    
    <dependency>
     <groupId>org.skyscreamer</groupId>
     <artifactId>jsonassert</artifactId>
     <version>1.2.0</version>
     <scope>test</scope>
    </dependency>
+    <!-- <curator.version>2.4.1</curator.version>-->
    <dependency>
     <groupId>org.apache.curator</groupId>
     <artifactId>curator-framework</artifactId>
-    <version>2.2.0-incubating</version>
+    <version>2.4.1</version>
    </dependency>
    <dependency>
     <groupId>org.eclipse.jetty</groupId>
