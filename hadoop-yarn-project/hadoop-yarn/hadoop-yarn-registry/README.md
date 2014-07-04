@@ -1,0 +1,4 @@
+RegistryService
+===============
+
+A service registry
