@@ -25,7 +25,7 @@ import java.net.URI;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.http.HttpServer;
+import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
@@ -46,9 +46,10 @@ public class Registry extends AbstractService {
   public static final String ENCRYPTOR_ATTRIBUTE = "yarn.registry.encryptor";
 
   public static final String REGISTRY_HTTP_PLUGINS = "yarn.registry.plugins";
+/*
 
-  public static final class RegistryHttpServer extends HttpServer {
-    public RegistryHttpServer(String name, String bindAddress, int port,
+  public static final class HttpServer2 extends HttpServer2 {
+    public HttpServer2(String name, String bindAddress, int port,
         boolean findPort, Configuration conf) throws IOException {
       super(name, bindAddress, port, findPort, conf, null, null, null);
     }
@@ -60,8 +61,9 @@ public class Registry extends AbstractService {
       addFilterPathMapping(pathSpec, webAppContext);
     }
   }
+*/
 
-  private RegistryHttpServer httpServer = null;
+  private HttpServer2 httpServer = null;
   private String bindAddress = null;
   private Storage storage = null;
   private Encryptor enc = null;
@@ -98,7 +100,7 @@ public class Registry extends AbstractService {
     super.serviceInit(conf);
   }
 
-  protected void addJerseyResources(RegistryHttpServer httpServer, Configuration conf) {
+  protected void addJerseyResources(HttpServer2 httpServer, Configuration conf) {
       String packages = null;
       String extPackages = conf.getTrimmed(REGISTRY_HTTP_PLUGINS);
 
@@ -108,7 +110,7 @@ public class Registry extends AbstractService {
           packages = WebApp.class.getPackage().getName();
       }
 
-      httpServer.addJerseyResourcePackageWithFilter(packages, "/registry/*" );
+//      httpServer.addJerseyResourcePackageWithFilter(packages, "/registry/*" );
   }
 
   @Override
@@ -117,8 +119,13 @@ public class Registry extends AbstractService {
       storage.start();
       enc.start();
       Configuration conf = getConfig();
-      httpServer = new RegistryHttpServer("registry", bindAddress, port,
-          port == 0, conf);
+      HttpServer2.Builder builder = new HttpServer2.Builder();
+      builder.setName("registry")
+             .setFindPort(port == 0)
+             .addEndpoint(
+                 new URI("http", null, bindAddress, port, "/", null, null))
+          .setConf(conf);
+      httpServer = builder.build();
       httpServer.setAttribute(STORAGE_ATTRIBUTE, storage);
       httpServer.setAttribute(ENCRYPTOR_ATTRIBUTE, enc);
       this.addJerseyResources(httpServer, conf);
