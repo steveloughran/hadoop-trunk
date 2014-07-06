@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.api;
 
+import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 import java.util.HashMap;
@@ -25,10 +26,12 @@ import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 
-public class ServiceEntry {
+public class ServiceEntry extends ComponentEntry {
 
-  String registrationDate;
-  
-  public Map<String, Endpoint> endpoints =  new HashMap<String, Endpoint>();
+  /**
+   * List of Components
+   */
+  @JsonIgnore
+  public Map<String, ComponentEntry> components =  new HashMap<String, ComponentEntry>();
   
 }

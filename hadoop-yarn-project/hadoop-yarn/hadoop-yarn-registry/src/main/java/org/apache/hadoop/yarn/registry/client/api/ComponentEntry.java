@@ -19,15 +19,21 @@
 package org.apache.hadoop.yarn.registry.client.api;
 
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.map.annotate.JsonSerialize;
 
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-@JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
-public class Endpoint {
 
-  int addressType;
-  List<String> addresses;
-  String api;
+public class ComponentEntry {
+
+  /**
+   * The time the service was registered -as seen by the service making
+   * the registration request.
+   */
+  long registrationTime;
+  
+  public Map<String, Endpoint> external =  new HashMap<String, Endpoint>();
+  public Map<String, Endpoint> internal =  new HashMap<String, Endpoint>();
+  
 }

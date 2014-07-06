@@ -36,9 +36,9 @@ public class AddressTypes {
   /**
    * hostname:port pairs
    */
-  public static final int ADDRESS_HOSTNAME_AND_PORT =2;
+  public static final int ADDRESS_HOSTNAME_AND_PORT = 2;
   /**
    * path /a/b/c style
    */
-  public static final int ADDRESS_PATH =2;
+  public static final int ADDRESS_PATH = 3;
 }
