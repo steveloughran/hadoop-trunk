@@ -24,21 +24,22 @@ import java.io.IOException;
  * Generic StatusCode: status code and text -for HTTP responses or other
  * IPC services which return HTTP status codes and URIs
  */
-public class StatusCodeIOException extends IOException implements
+public class RESTIOException extends IOException implements
     HttpErrorProvider {
   
   public final int statusCode;
   public final String uri;
  
-  public StatusCodeIOException(String uri, int statusCode,
+  public RESTIOException(int statusCode, String uri,
       String message) {
     super(statusCode + ": "+ message);
     this.statusCode = statusCode;
     this.uri = uri;
   }
 
-  public StatusCodeIOException(int statusCode,
-      String uri, String message,
+  public RESTIOException(int statusCode,
+      String uri,
+      String message,
       Throwable cause) {
     super(message, cause);
     this.statusCode = statusCode;

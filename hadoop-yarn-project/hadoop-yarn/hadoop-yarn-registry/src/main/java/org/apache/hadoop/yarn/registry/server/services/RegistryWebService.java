@@ -26,22 +26,14 @@ import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 
 import java.net.URI;
 
-public class RegistryWebService extends CompositeService {
+public class RegistryWebService extends CompositeService
+implements RegistryConstants {
   private static final Log LOG = LogFactory.getLog(RegistryWebService.class);
-
-  //TODO move this into YarnConfiguration
-  public static final String REGISTRY_URI_CONF = "yarn.registry.uri";
-  public static final String REGISTRY_PROXY_ADDRESS_CONF = "yarn.registry.proxy.address";
-  public static final String REGISTRY_STORAGE_CLASS_CONF = "yarn.registry.storage.class";
-  public static final String REGISTRY_ENCRYPTOR_CLASS_CONF = "yarn.registry.encryptor.class";
-
-  public static final String STORAGE_ATTRIBUTE = "yarn.registry.storage";
-  public static final String ENCRYPTOR_ATTRIBUTE = "yarn.registry.encryptor";
-
-  public static final String REGISTRY_HTTP_PLUGINS = "yarn.registry.plugins";
+  
 /*
 
   public static final class HttpServer2 extends HttpServer2 {

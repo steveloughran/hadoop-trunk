@@ -28,7 +28,10 @@ import java.io.IOException;
 public class ExceptionGenerator {
 
   @SuppressWarnings("ThrowableInstanceNeverThrown")
-  IOException generate(int statusCode, String message) {
+  public static IOException generate(int statusCode,
+      String uri,
+      String message,
+      Exception e) {
     IOException result;
     switch (statusCode) {
       case HttpStatus.SC_NOT_FOUND:
@@ -43,7 +46,11 @@ public class ExceptionGenerator {
         result = new AccessControlException(message);
         break;
       default:
-        result = new StatusCodeIOException(uri, statusCode, message);
+        if (e instanceof  HttpErrorProvider) {
+          statusCode = ((HttpErrorProvider)e).getStatusCode();
+          uri = ((HttpErrorProvider)e).getURI();
+        }
+        result = new RESTIOException(statusCode, uri, message, e);
     }
     return result;
   }
