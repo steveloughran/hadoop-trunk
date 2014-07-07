@@ -16,19 +16,15 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.api;
+package org.apache.hadoop.yarn.registry.client.exceptions;
 
-import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
+public interface HttpErrorProvider {
+  
+  int getStatusCode();
 
-import java.io.IOException;
-
-public interface RegistryWriter extends RegistryReader {
-
-  public void putServiceEntry(String user,
-      String serviceClass, String name, ServiceEntry entry) throws
-      IOException;
-
-  public void deleteServiceEntry(String user,
-      String serviceClass, String name) throws
-      IOException;
+  /**
+   * Get the URI of this error. May be null or ""
+   * @return a URI or "". Null may be returned, but is discouraged
+   */
+  String getURI();
 }

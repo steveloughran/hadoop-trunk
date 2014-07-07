@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.registry.client.api;
 
+import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
+
 import java.io.IOException;
 import java.util.List;
 

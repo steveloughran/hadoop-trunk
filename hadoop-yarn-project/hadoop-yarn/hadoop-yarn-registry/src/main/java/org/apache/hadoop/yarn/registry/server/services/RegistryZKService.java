@@ -16,17 +16,20 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.zk;
+package org.apache.hadoop.yarn.registry.server.services;
 
-import org.apache.hadoop.yarn.registry.client.api.RegistryWriter;
-import org.apache.hadoop.yarn.registry.client.api.ServiceEntry;
-import org.apache.hadoop.yarn.registry.client.impl.AbstractRegistryWriterService;
+import org.apache.hadoop.service.AbstractService;
 
-import java.io.IOException;
-import java.util.List;
+/**
+ * This implements the ZK binding
+ */
+public class RegistryZKService extends AbstractService {
+  /**
+   * Construct the service.
 
-public class ZookeeperRegistryClient extends AbstractRegistryWriterService {
-  public ZookeeperRegistryClient(String name) {
+   * @param name service name
+   */
+  public RegistryZKService(String name) {
     super(name);
   }
 }

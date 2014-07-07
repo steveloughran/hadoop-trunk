@@ -33,11 +33,7 @@
   </properties>
 
   <dependencies>
-   <dependency>
-    <groupId>log4j</groupId>
-    <artifactId>log4j</artifactId>
-    <scope>runtime</scope>
-   </dependency>
+
    <dependency>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-yarn-api</artifactId>
@@ -152,7 +148,9 @@
                 <directory>${basedir}/src/main</directory>
                 <includes>
                   <include>java/**/*.java</include>
+                  <!--
                   <include>proto/**/*.proto</include>
+                    -->
                 </includes>
               </source>
             </configuration>
@@ -170,6 +168,7 @@
           </execution>
         </executions>
       </plugin>
+      <!--
       <plugin>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-maven-plugins</artifactId>
@@ -201,7 +200,8 @@
           </execution>
         </executions>
       </plugin>
-<!--      <plugin>
+        -->
+     <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.1</version>
@@ -209,7 +209,7 @@
           <source>1.7</source>
           <target>1.7</target>
         </configuration>
-      </plugin>-->
+      </plugin>
     </plugins>
   </build>
 </project>

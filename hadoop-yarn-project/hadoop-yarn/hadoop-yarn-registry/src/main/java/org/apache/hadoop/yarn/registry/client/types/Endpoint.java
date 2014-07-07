@@ -16,24 +16,20 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.api;
+package org.apache.hadoop.yarn.registry.client.types;
 
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+import org.codehaus.jackson.map.annotate.JsonSerialize;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+@JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+public class Endpoint {
+  public String description;
 
-public class ComponentEntry {
-
-  /**
-   * The time the service was registered -as seen by the service making
-   * the registration request.
-   */
-  long registrationTime;
-  
-  public Map<String, Endpoint> external =  new HashMap<String, Endpoint>();
-  public Map<String, Endpoint> internal =  new HashMap<String, Endpoint>();
-  
+  public int addressType;
+  public int protocolType;
+  public List<String> addresses;
+  public String api;
 }
