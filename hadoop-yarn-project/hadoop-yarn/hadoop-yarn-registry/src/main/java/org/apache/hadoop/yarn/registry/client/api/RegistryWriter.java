@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.api;
 
+import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
 
 import java.io.IOException;
@@ -25,10 +26,27 @@ import java.io.IOException;
 public interface RegistryWriter extends RegistryReader {
 
   public void putServiceEntry(String user,
-      String serviceClass, String name, ServiceEntry entry) throws
-      IOException;
+      String serviceClass,
+      String serviceName,
+      ServiceEntry entry)
+      throws IOException;
 
   public void deleteServiceEntry(String user,
-      String serviceClass, String name) throws
-      IOException;
+      String serviceClass,
+      String serviceName)
+      throws IOException;
+
+  public void putComponent(String user,
+      String serviceClass,
+      String serviceName,
+      String componentName,
+      ComponentEntry entry,
+      boolean ephemeral)
+      throws IOException;
+  
+  public void deleteComponent(String user,
+      String serviceClass,
+      String serviceName,
+      String componentName)
+      throws IOException;
 }

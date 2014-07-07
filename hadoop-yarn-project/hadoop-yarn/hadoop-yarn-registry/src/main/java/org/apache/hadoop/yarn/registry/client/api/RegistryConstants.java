@@ -51,4 +51,5 @@ public interface RegistryConstants {
   int DEFAULT_ZK_RETRY_TIMES = 5;
   int DEFAULT_ZK_RETRY_INTERVAL = 1000;
   int DEFAULT_ZK_RETRY_CEILING = 30000;
+  String REGISTRY_ROOT = "/yarnRegistry";
 }
