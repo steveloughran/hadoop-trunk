@@ -16,19 +16,29 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.api;
+package org.apache.hadoop.yarn.registry.client.types;
 
-import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
-import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
-public interface RegistryWriter extends RegistryReader {
+@JsonIgnoreProperties(ignoreUnknown = true)
 
-  public void putServiceEntry(String user,
-      String serviceClass, String name, ServiceEntry entry) throws
-      IOException;
+/**
+ * A single component
+ */
+public class ComponentEntry {
 
-  public void deleteServiceEntry(String user,
-      String serviceClass, String name) throws
-      IOException;
+  /**
+   * The time the service was registered -as seen by the service making
+   * the registration request.
+   */
+  public long registrationTime;
+
+  public String description;
+
+  public Map<String, Endpoint> external =  new HashMap<String, Endpoint>();
+  public Map<String, Endpoint> internal =  new HashMap<String, Endpoint>();
+  
 }

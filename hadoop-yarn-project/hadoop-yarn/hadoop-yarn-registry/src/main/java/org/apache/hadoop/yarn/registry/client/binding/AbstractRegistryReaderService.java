@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.impl;
+package org.apache.hadoop.yarn.registry.client.binding;
 
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.registry.client.api.RegistryReader;
-import org.apache.hadoop.yarn.registry.client.api.ServiceEntry;
+import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
 
 import java.io.IOException;
 import java.util.List;

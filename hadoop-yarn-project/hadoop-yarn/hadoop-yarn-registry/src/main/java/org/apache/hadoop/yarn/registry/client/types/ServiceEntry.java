@@ -16,17 +16,23 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.rest;
+package org.apache.hadoop.yarn.registry.client.types;
 
-import org.apache.hadoop.yarn.registry.client.api.RegistryReader;
-import org.apache.hadoop.yarn.registry.client.api.ServiceEntry;
-import org.apache.hadoop.yarn.registry.client.impl.AbstractRegistryReaderService;
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
-import java.io.IOException;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
-public class RestRegistryClient extends AbstractRegistryReaderService {
-  public RestRegistryClient(String name) {
-    super(name);
-  }
+@JsonIgnoreProperties(ignoreUnknown = true)
+
+public class ServiceEntry extends ComponentEntry {
+
+  /**
+   * List of Components
+   */
+  @JsonIgnore
+  public Map<String, ComponentEntry> components =
+      new HashMap<String, ComponentEntry>();
+  
 }

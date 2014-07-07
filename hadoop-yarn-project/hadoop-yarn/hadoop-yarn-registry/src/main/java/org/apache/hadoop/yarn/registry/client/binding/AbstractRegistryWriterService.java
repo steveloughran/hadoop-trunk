@@ -16,29 +16,31 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.api;
+package org.apache.hadoop.yarn.registry.client.binding;
 
-/**
- * Enum of address types -as integers. 
- * Why integers and not enums? Cross platform serialization as JSON
- */
-public class AddressTypes {
+import org.apache.hadoop.yarn.registry.client.api.RegistryWriter;
+import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
 
-  /**
-   * Any other address
-   */
-  public static final int ADDRESS_OTHER = 0;
+import java.io.IOException;
 
-  /**
-   * URI entries
-   */
-  public static final int ADDRESS_URI = 1;
-  /**
-   * hostname:port pairs
-   */
-  public static final int ADDRESS_HOSTNAME_AND_PORT = 2;
-  /**
-   * path /a/b/c style
-   */
-  public static final int ADDRESS_PATH = 3;
+public abstract class AbstractRegistryWriterService extends AbstractRegistryReaderService
+implements RegistryWriter{
+  protected AbstractRegistryWriterService(String name) {
+    super(name);
+  }
+
+  @Override
+  public void putServiceEntry(String user,
+      String serviceClass,
+      String name,
+      ServiceEntry entry) throws IOException {
+    
+  }
+
+  @Override
+  public void deleteServiceEntry(String user,
+      String serviceClass,
+      String name) throws IOException {
+
+  }
 }

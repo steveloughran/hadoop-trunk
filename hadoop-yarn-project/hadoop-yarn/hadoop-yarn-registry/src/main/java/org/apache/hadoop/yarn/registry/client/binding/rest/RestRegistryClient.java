@@ -16,22 +16,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.api;
+package org.apache.hadoop.yarn.registry.client.binding.rest;
 
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+import org.apache.hadoop.yarn.registry.client.binding.AbstractRegistryReaderService;
 
-import java.util.HashMap;
-import java.util.Map;
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-
-public class ServiceEntry extends ComponentEntry {
-
-  /**
-   * List of Components
-   */
-  @JsonIgnore
-  public Map<String, ComponentEntry> components =  new HashMap<String, ComponentEntry>();
-  
+/**
+ * The REST client is read-only. It is designed for use
+ * long-haul as well as short haul, and does not implement
+ * write operations
+ */
+public class RestRegistryClient extends AbstractRegistryReaderService {
+  public RestRegistryClient(String name) {
+    super(name);
+  }
 }

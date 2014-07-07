@@ -16,31 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.impl;
+package org.apache.hadoop.yarn.registry.client.binding.zk;
 
-import org.apache.hadoop.yarn.registry.client.api.RegistryWriter;
-import org.apache.hadoop.yarn.registry.client.api.ServiceEntry;
+import org.apache.hadoop.yarn.registry.client.binding.AbstractRegistryWriterService;
 
-import java.io.IOException;
-
-public abstract class AbstractRegistryWriterService extends AbstractRegistryReaderService
-implements RegistryWriter{
-  protected AbstractRegistryWriterService(String name) {
+/**
+ * The ZK client is R/W and is used  to register
+ * services as well as query them.
+ */
+public class ZookeeperRegistryClient extends AbstractRegistryWriterService {
+  public ZookeeperRegistryClient(String name) {
     super(name);
-  }
-
-  @Override
-  public void putServiceEntry(String user,
-      String serviceClass,
-      String name,
-      ServiceEntry entry) throws IOException {
-    
-  }
-
-  @Override
-  public void deleteServiceEntry(String user,
-      String serviceClass,
-      String name) throws IOException {
-
   }
 }

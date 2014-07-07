@@ -18,16 +18,19 @@
 
 package org.apache.hadoop.yarn.registry.client.api;
 
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.map.annotate.JsonSerialize;
-
 import java.util.List;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-@JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
-public class Endpoint {
+public interface RegistryVerbs<Parent, Child> {
 
-  int addressType;
-  List<String> addresses;
-  String api;
+
+  void create(String path, Parent parent);
+  void put(String path, Parent parent);
+  Parent get(String path);
+  Child getChild(String path, String child);
+  void delete (String path);
+  void exists(String path);
+  void sync(String path);
+  
+  
+  
 }
