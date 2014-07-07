@@ -27,18 +27,21 @@ public class AddressTypes {
   /**
    * Any other address
    */
-  public static final int ADDRESS_OTHER = 0;
+  public static final String ADDRESS_OTHER = "";
 
   /**
    * URI entries
    */
-  public static final int ADDRESS_URI = 1;
+  public static final String ADDRESS_URI = "uri";
+
   /**
-   * hostname:port pairs
+   * hostname/port. A "/" is used so that IPv6 addresses can be
+   * easily split from the port declaration. 
    */
-  public static final int ADDRESS_HOSTNAME_AND_PORT = 2;
+  public static final String ADDRESS_HOSTNAME_AND_PORT = "host/port";
+  
   /**
    * path /a/b/c style
    */
-  public static final int ADDRESS_PATH = 3;
+  public static final String ADDRESS_PATH = "path";
 }

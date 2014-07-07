@@ -49,9 +49,10 @@ public class RegistryZKService extends AbstractService
       unit.sleep(time);
     }
   };
+  public static final String PERMISSIONS_REGISTRY_ROOT = "world:anyone:rwcda";
 
   private CuratorFramework zk;
-  private List<ACL> zkAcl;
+  private List<ACL> rootACL;
   private BoundedExponentialBackoffRetry retry;
 
 
@@ -68,22 +69,30 @@ public class RegistryZKService extends AbstractService
   @Override
   protected void serviceStart() throws Exception {
     super.serviceStart();
-    Configuration conf = getConfig();
 
     retry = new BoundedExponentialBackoffRetry(10, 100, 10); //Don't hammer ZK
 
-    String root = conf.get(ZK_ROOT, "/yarnRegistry");
+    String root = getConfig().get(ZK_ROOT, REGISTRY_ROOT);
 
-    String zkAclConf = conf.get(ZK_ACL, "world:anyone:rwcda");
-    zkAclConf = ZKUtil.resolveConfIndirection(zkAclConf);
-    zkAcl = ZKUtil.parseACLs(zkAclConf);
+    rootACL = getACLs(ZK_ACL, PERMISSIONS_REGISTRY_ROOT);
     CuratorFramework tmp = newCurator("");
     if (tmp.checkExists().forPath(root) == null) {
-      tmp.create().withACL(zkAcl).forPath(root);
+      tmp.create().withACL(rootACL).forPath(root);
     }
     tmp.close();
     zk = newCurator(root);
     maybeCreate("/vh", CreateMode.PERSISTENT);
+  }
+
+  private List<ACL> getACLs(String confKey, String defaultPermissions) throws
+      IOException {
+    String zkAclConf = getConfig().get(confKey, defaultPermissions);
+    zkAclConf = ZKUtil.resolveConfIndirection(zkAclConf);
+    return ZKUtil.parseACLs(zkAclConf);
+  }
+
+  private List<ACL> createAclForUser(String username) {
+    return rootACL;
   }
 
   /**
@@ -177,7 +186,7 @@ public class RegistryZKService extends AbstractService
    */
   public void mkdir(String path, CreateMode mode) throws IOException {
     try {
-      zk.create().withMode(mode).withACL(zkAcl).forPath(path);
+      zk.create().withMode(mode).withACL(rootACL).forPath(path);
     } catch (Exception e) {
       throw operationFailure(path, "mkdir() ", e);
     }
@@ -192,7 +201,7 @@ public class RegistryZKService extends AbstractService
    */
   public void create(String path, CreateMode mode,  byte[] data) throws IOException {
     try {
-      zk.create().withMode(mode).withACL(zkAcl).forPath(path, data);
+      zk.create().withMode(mode).withACL(rootACL).forPath(path, data);
     } catch (Exception e) {
       throw operationFailure(path, "create()", e);
     }

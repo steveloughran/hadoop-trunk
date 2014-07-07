@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.api;
 
+import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
 
 import java.io.IOException;
@@ -26,9 +27,32 @@ import java.util.List;
 public interface RegistryReader {
   
   public List<String> getServiceClasses(String user) throws IOException;
-  public List<String> getServices(String user, String serviceClass) throws IOException;
-  public ServiceEntry getServiceEntry(String user,
-      String serviceClass, String name) throws
-      IOException;
+
+  public boolean serviceClassExists(String user, String serviceClass)
+      throws IOException;
+    
+  public List<String> listServices(String user, String serviceClass)
+      throws IOException;
+
+  public boolean serviceExists(String user, String serviceClass,
+      String serviceName) throws IOException;
+
+  public ServiceEntry getServiceInstance(String user,
+      String serviceClass, String serviceName)
+      throws IOException;
+
+  public List<String> listComponents(String user, String serviceClass,
+      String serviceName)
+      throws IOException;
+
+  public ComponentEntry getComponent(String user, String serviceClass,
+      String serviceName,
+      String componentName) throws IOException;
+  
+  public boolean componentExists(String user, String serviceClass,
+      String serviceName,
+      String componentName) throws IOException;
+  
+  
 }
 

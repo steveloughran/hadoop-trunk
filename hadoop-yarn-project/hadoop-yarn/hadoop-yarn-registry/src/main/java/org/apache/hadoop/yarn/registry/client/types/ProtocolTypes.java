@@ -19,25 +19,20 @@
 package org.apache.hadoop.yarn.registry.client.types;
 
 /**
- * Enum of endpoint protocols -as integers. 
- * Why integers and not enums? Cross platform serialization as JSON, and
- * better versioning. It is not an error for an endpoint to have a protocol
- * that is not recognised by a client
+ * some common protocol types
  */
-public class ProtocolTypes {
+public interface ProtocolTypes {
   
-  public static final int PROTOCOL_UNKNOWN  = 0;
-  public static final int PROTOCOL_WEBUI  = 1;
-  public static final int PROTOCOL_HADOOP_IPC  = 2;
-  public static final int PROTOCOL_HADOOP_IPC_PROTOBUF = 3;
-  public static final int PROTOCOL_ZOOKEEPER_BINDING  = 4;
-  public static final int PROTOCOL_RESTAPI  = 5;
-  public static final int PROTOCOL_WSAPI  = 6;
-  public static final int PROTOCOL_SUN_RPC  = 7;
-  public static final int PROTOCOL_THRIFT  = 8;
-  public static final int PROTOCOL_CORBA  = 9;
-  public static final int PROTOCOL_RMI  = 10;
-  public static final int PROTOCOL_DOTNET  = 11;
-  
+  String PROTOCOL_UNKNOWN  = "";
+  String PROTOCOL_WEBUI  = "webui";
+  String PROTOCOL_HADOOP_IPC  = "hadoop/IPC";
+  String PROTOCOL_HADOOP_IPC_PROTOBUF = "hadoop/protobuf";
+  String PROTOCOL_ZOOKEEPER_BINDING  = "zookeeper";
+  String PROTOCOL_RESTAPI  = "REST";
+  String PROTOCOL_WSAPI  = "WS";
+  String PROTOCOL_SUN_RPC  = "sunrpc";
+  String PROTOCOL_THRIFT  = "thrift";
+  String PROTOCOL_RMI  = "RMI";
+  String PROTOCOL_IIOP  = "IIOP";
   
 }
