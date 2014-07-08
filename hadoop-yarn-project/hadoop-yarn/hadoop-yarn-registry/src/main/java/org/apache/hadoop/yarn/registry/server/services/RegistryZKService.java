@@ -195,6 +195,11 @@ public class RegistryZKService extends AbstractService
   private IOException operationFailure(String path,
       String operation,
       Exception exception) {
+    if (exception instanceof KeeperException.NoNodeException) {
+      return new FileNotFoundException(path);
+    } else if (exception instanceof KeeperException.NodeExistsException) {
+      return new FileAlreadyExistsException(path);
+    }
     return ExceptionGenerator.generate(
         HttpStatus.SC_INTERNAL_SERVER_ERROR,
         path,
@@ -318,9 +323,6 @@ public class RegistryZKService extends AbstractService
       LOG.debug("Creating {} with {} bytes", path, data.length);
       zk.create().withMode(mode).withACL(acl).forPath(path, data);
     } catch (Exception e) {
-      if (existsRobust(path)) {
-        throw new FileAlreadyExistsException(path);
-      }
       throw operationFailure(path, "create()", e);
     }
   }
@@ -336,9 +338,6 @@ public class RegistryZKService extends AbstractService
       LOG.debug("Updating {} with {} bytes", path, data.length);
       zk.setData().forPath(path, data);
     } catch (Exception e) {
-      if (!existsRobust(path)) {
-        throw new FileNotFoundException(path);
-      }
       throw operationFailure(path, "update()", e);
     }
   }
@@ -373,14 +372,13 @@ public class RegistryZKService extends AbstractService
         delete.deletingChildrenIfNeeded();
       }
       delete.forPath(path);
+    } catch (KeeperException.NoNodeException e) {
+      // not an error
     } catch (Exception e) {
-      if (!existsRobust(path)) {
-        // not an error
-        return;
-      }
       throw operationFailure(path, "delete()", e);
     }
   }
+  
   public List<String> ls(String path) throws IOException {
     try {
       LOG.debug("ls {}", path);
@@ -389,11 +387,7 @@ public class RegistryZKService extends AbstractService
       return children;
 
     } catch (Exception e) {
-      IOException ioe = operationFailure(path, "ls()", e);
-      if (!existsRobust(path)) {
-        ioe = new FileNotFoundException(path);
-      }
-      throw ioe;
+      throw operationFailure(path, "ls()", e);
     }
   }
 
@@ -407,8 +401,6 @@ public class RegistryZKService extends AbstractService
     try {
       LOG.debug("Reading {}", path);
       return zk.getData().forPath(path);
-    } catch (KeeperException.NoNodeException e) {
-      return null;
     } catch (Exception e) {
       throw operationFailure(path, "read() " + path, e);
     }
