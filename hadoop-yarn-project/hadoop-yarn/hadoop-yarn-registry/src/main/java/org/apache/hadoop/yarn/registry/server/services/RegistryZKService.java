@@ -19,8 +19,12 @@
 package org.apache.hadoop.yarn.registry.server.services;
 
 import org.apache.curator.RetrySleeper;
+import org.apache.curator.ensemble.EnsembleProvider;
+import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.api.DeleteBuilder;
+import org.apache.curator.framework.api.GetChildrenBuilder;
 import org.apache.curator.retry.BoundedExponentialBackoffRetry;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.IOUtils;
@@ -32,7 +36,10 @@ import org.apache.http.HttpStatus;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.ACL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -42,7 +49,8 @@ import java.util.concurrent.TimeUnit;
  */
 public class RegistryZKService extends AbstractService
  implements RegistryConstants {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RegistryZKService.class);
   private static final RetrySleeper sleeper = new RetrySleeper() {
     @Override
     public void sleepFor(long time, TimeUnit unit) throws InterruptedException {
@@ -53,7 +61,6 @@ public class RegistryZKService extends AbstractService
 
   private CuratorFramework zk;
   private List<ACL> rootACL;
-  private BoundedExponentialBackoffRetry retry;
 
 
   /**
@@ -70,8 +77,6 @@ public class RegistryZKService extends AbstractService
   protected void serviceStart() throws Exception {
     super.serviceStart();
 
-    retry = new BoundedExponentialBackoffRetry(10, 100, 10); //Don't hammer ZK
-
     String root = getConfig().get(ZK_ROOT, REGISTRY_ROOT);
 
     rootACL = getACLs(ZK_ACL, PERMISSIONS_REGISTRY_ROOT);
@@ -81,14 +86,34 @@ public class RegistryZKService extends AbstractService
     }
     tmp.close();
     zk = newCurator(root);
-    maybeCreate("/vh", CreateMode.PERSISTENT);
   }
 
-  private List<ACL> getACLs(String confKey, String defaultPermissions) throws
-      IOException {
+  /**
+   * Get the ACLs defined in the config key for this service, or
+   * the default
+   * @param confKey configuration key
+   * @param defaultPermissions default values
+   * @return an ACL list. 
+   * @throws IOException
+   * @throws ZKUtil.BadAclFormatException on a bad ACL parse
+   */
+  protected List<ACL> getACLs(String confKey, String defaultPermissions) throws
+      IOException, ZKUtil.BadAclFormatException {
     String zkAclConf = getConfig().get(confKey, defaultPermissions);
-    zkAclConf = ZKUtil.resolveConfIndirection(zkAclConf);
-    return ZKUtil.parseACLs(zkAclConf);
+    return parseACLs(zkAclConf);
+  }
+
+  /**
+   * Parse an ACL list. This includes configuration indirection
+   * {@link ZKUtil#resolveConfIndirection(String)}
+   * @param zkAclConf configuration string
+   * @return an ACL list
+   * @throws IOException
+   * @throws ZKUtil.BadAclFormatException on a bad ACL parse
+   */
+  protected  List<ACL> parseACLs(String zkAclConf) throws IOException,
+      ZKUtil.BadAclFormatException {
+    return ZKUtil.parseACLs(ZKUtil.resolveConfIndirection(zkAclConf));
   }
 
   private List<ACL> createAclForUser(String username) {
@@ -104,13 +129,13 @@ public class RegistryZKService extends AbstractService
   }
 
   /**
-   * Create a new curator instance
+   * Create a new curator instance off the root path
    * @param root
-   * @return
+   * @return the newly created creator
    */
   private CuratorFramework newCurator(String root) {
     Configuration conf = getConfig();
-    String connectString = conf.get(ZK_HOSTS, DEFAULT_ZK_HOSTS) + root;
+    EnsembleProvider ensembleProvider = createEnsembleProvider(conf, root);
     int sessionTimeout = conf.getInt(ZK_SESSION_TIMEOUT,
         DEFAULT_ZK_SESSION_TIMEOUT);
     int connectionTimeout = conf.getInt(ZK_CONNECTION_TIMEOUT,
@@ -121,10 +146,11 @@ public class RegistryZKService extends AbstractService
     int retryCeiling = conf.getInt(ZK_RETRY_CEILING, DEFAULT_ZK_RETRY_CEILING);
 
     CuratorFrameworkFactory.Builder b = CuratorFrameworkFactory.builder();
-    b.connectString(connectString)
+    b.ensembleProvider(ensembleProvider)
      .connectionTimeoutMs(connectionTimeout)
      .sessionTimeoutMs(sessionTimeout)
-     .retryPolicy(new BoundedExponentialBackoffRetry(retryInterval, retryTimes,
+     .retryPolicy(new BoundedExponentialBackoffRetry(retryInterval,
+         retryTimes,
          retryCeiling));
 
     CuratorFramework framework = b.build();
@@ -134,20 +160,35 @@ public class RegistryZKService extends AbstractService
   }
 
   /**
+   * Create the ensemble provider for this registry. 
+   * The initial implementation returns a fixed ensemble; an
+   * Exhibitor-bonded ensemble provider is a future enhancement
+   * @param conf configuration
+   * @param root root path
+   * @return the ensemble provider for this ZK service
+   */
+  private EnsembleProvider createEnsembleProvider(Configuration conf,
+      String root) {
+    String connectString = conf.get(ZK_HOSTS, DEFAULT_ZK_HOSTS) + root;
+    LOG.debug("ZK connection is fixed at {}", connectString);
+    return new FixedEnsembleProvider(connectString);
+  }
+
+  /**
    * Create an IOE when an operation fails
    * @param path path of operation
    * @param operation operation attempted
-   * @param exception caught
+   * @param exception caught the exception caught
    * @return an IOE to throw that contains the path and operation details.
    */
   private IOException operationFailure(String path,
       String operation,
-      Exception e) {
+      Exception exception) {
     return ExceptionGenerator.generate(
         HttpStatus.SC_INTERNAL_SERVER_ERROR,
         path,
         "Failure of " + operation + " on " + path,
-        e);
+        exception);
   }
 
   /**
@@ -155,14 +196,37 @@ public class RegistryZKService extends AbstractService
    * The check is poll + create; there's a risk that another process
    * may create the same path before the create() operation is executed/
    * propagated to the ZK node polled.
+   * 
    * @param path path to create
+   * @return true iff the path was created
    * @throws IOException
    */
-  public void maybeCreate(String path, CreateMode mode) throws IOException {
-    if (!exists(path)) {
-      mkdir(path, mode);
-    }
+  public boolean maybeCreate(String path, CreateMode mode) throws IOException {
+    List<ACL> acl = rootACL;
+    return maybeCreate(path, mode, acl);
   }
+
+  /**
+   * Create a path if it does not exist. 
+   * The check is poll + create; there's a risk that another process
+   * may create the same path before the create() operation is executed/
+   * propagated to the ZK node polled.
+   *
+   * @param path path to create
+   * @param acl ACL for path -used when creating a new entry
+   * @return true iff the path was created
+   * @throws IOException
+   */
+  protected boolean maybeCreate(String path,
+      CreateMode mode,
+      List<ACL> acl) throws IOException {
+    if (!exists(path)) {
+      mkdir(path, mode, acl);
+      return true;
+    }
+    return false;
+  }
+
 
   /**
    * Poll for a path existing
@@ -173,6 +237,8 @@ public class RegistryZKService extends AbstractService
    */
   public boolean exists(String path) throws IOException {
     try {
+      LOG.debug("Exists({})", path);
+
       return zk.checkExists().forPath(path) != null;
     } catch (Exception e) {
       throw operationFailure(path, "existence check", e);
@@ -180,13 +246,38 @@ public class RegistryZKService extends AbstractService
   }
 
   /**
+   * Verify a path exists
+   * @param path path of operation
+   * @throws FileNotFoundException if the path is absent
+   * @throws IOException
+   */
+  public void verifyExists(String path) throws IOException {
+    if (!exists(path)) {
+      throw new FileNotFoundException(path);
+    }
+  }
+  /**
    * Create a directory
    * @param path path to create
+   * @param mode mode for path
    * @throws IOException
    */
   public void mkdir(String path, CreateMode mode) throws IOException {
+    mkdir(path, mode, rootACL);
+  }
+
+  /**
+   * Create a directory
+   * @param path path to create
+   * @param mode mode for path
+   * @param acl ACL for path
+   * @throws IOException
+   */
+  protected void mkdir(String path, CreateMode mode, List<ACL> acl) throws
+      IOException {
     try {
-      zk.create().withMode(mode).withACL(rootACL).forPath(path);
+      zk.create().withMode(mode).withACL(acl).forPath(path);
+      LOG.debug("Created path {} with mode {} and ACL {}", path, mode, acl );
     } catch (Exception e) {
       throw operationFailure(path, "mkdir() ", e);
     }
@@ -197,11 +288,15 @@ public class RegistryZKService extends AbstractService
    * without data
    * @param path path of operation
    * @param data initial data
+   * @param acl
    * @throws IOException
    */
-  public void create(String path, CreateMode mode,  byte[] data) throws IOException {
+  public void create(String path,
+      CreateMode mode,
+      byte[] data, List<ACL> acl) throws IOException {
     try {
-      zk.create().withMode(mode).withACL(rootACL).forPath(path, data);
+      LOG.debug("Creating {} with {} bytes", path, data.length);
+      zk.create().withMode(mode).withACL(acl).forPath(path, data);
     } catch (Exception e) {
       throw operationFailure(path, "create()", e);
     }
@@ -215,6 +310,7 @@ public class RegistryZKService extends AbstractService
    */
   public void update(String path, byte[] data) throws IOException {
     try {
+      LOG.debug("Updating {} with {} bytes", path, data.length);
       zk.setData().forPath(path, data);
     } catch (Exception e) {
       throw operationFailure(path, "update()", e);
@@ -225,13 +321,45 @@ public class RegistryZKService extends AbstractService
    * Create or update an entry
    * @param path path
    * @param data data
+   * @param acl ACL for path -used when creating a new entry
    * @throws IOException
    */
-  public void set(String path, CreateMode mode,  byte[] data) throws IOException {
+  public void set(String path, CreateMode mode, byte[] data, List<ACL> acl) throws IOException {
     if (!exists(path)) {
-      create(path, mode, data);
+      create(path, mode, data, acl);
     } else {
       update(path, data);
+    }
+  }
+  
+  public void rm(String path, boolean recursive) throws IOException {
+    try {
+      LOG.debug("Deleting {}", path);
+      DeleteBuilder delete = zk.delete();
+      if (recursive) {
+        delete.deletingChildrenIfNeeded();
+      }
+      delete.forPath(path);
+    } catch (Exception e) {
+      throw operationFailure(path, "delete()", e);
+    }
+  }
+  public List<String> ls(String path) throws IOException {
+    try {
+      LOG.debug("ls {}", path);
+      GetChildrenBuilder builder = zk.getChildren();
+      List<String> children = builder.forPath(path);
+      return children;
+
+    } catch (Exception e) {
+      try {
+        if (!exists(path)) {
+          throw new FileNotFoundException(path);
+        }
+      } catch (IOException ignored) {
+
+      }
+      throw operationFailure(path, "ls()", e);
     }
   }
 
@@ -243,6 +371,7 @@ public class RegistryZKService extends AbstractService
    */
   public byte[] read(String path) throws IOException {
     try {
+      LOG.debug("Reading {}", path);
       return zk.getData().forPath(path);
     } catch (KeeperException.NoNodeException e) {
       return null;
