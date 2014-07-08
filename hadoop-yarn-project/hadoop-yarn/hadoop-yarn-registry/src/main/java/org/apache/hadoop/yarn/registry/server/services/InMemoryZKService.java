@@ -55,9 +55,12 @@ public class InMemoryZKService extends AbstractService {
     super(name);
   }
 
-  public String getConnectionStr() {
+  public String getConnectionString() {
     InetSocketAddress addr = factory.getLocalAddress();
     return String.format("%s:%d", addr.getHostName(), addr.getPort());
+  }
+  public InetSocketAddress getConnectionAddress() {
+    return factory.getLocalAddress();
   }
 
   public InetSocketAddress getLocalAddress() {
@@ -84,11 +87,12 @@ public class InMemoryZKService extends AbstractService {
     zkServer.setTxnLogFactory(ftxn);
     zkServer.setTickTime(tickTime);
 
+    LOG.info("Starting Zookeeper server");
     factory = ServerCnxnFactory.createFactory();
     factory.configure(getAddress(port), -1);
     factory.startup(zkServer);
 
-    LOG.info("In memory ZK started: " + getConnectionStr());
+    LOG.info("In memory ZK started: " + getConnectionString());
     if (LOG.isDebugEnabled()) {
       StringWriter sw = new StringWriter();
       PrintWriter pw = new PrintWriter(sw);

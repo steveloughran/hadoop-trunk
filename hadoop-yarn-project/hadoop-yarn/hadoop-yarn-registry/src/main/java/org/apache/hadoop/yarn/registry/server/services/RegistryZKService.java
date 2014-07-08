@@ -80,14 +80,26 @@ public class RegistryZKService extends AbstractService
     String root = getConfig().get(ZK_ROOT, REGISTRY_ROOT);
 
     rootACL = getACLs(ZK_ACL, PERMISSIONS_REGISTRY_ROOT);
-    CuratorFramework tmp = newCurator("");
-    if (tmp.checkExists().forPath(root) == null) {
-      tmp.create().withACL(rootACL).forPath(root);
+    CuratorFramework rootCurator = newCurator("");
+    try {
+      if (rootCurator.checkExists().forPath(root) == null) {
+        rootCurator.create().withACL(rootACL).forPath(root);
+      }
+    } finally {
+      IOUtils.closeStream(rootCurator);
     }
-    tmp.close();
+    rootCurator.close();
     zk = newCurator(root);
   }
 
+  /**
+   * Close the ZK connection if it is open
+   */
+  @Override
+  public void serviceStop() {
+    IOUtils.closeStream(zk);
+  }
+  
   /**
    * Get the ACLs defined in the config key for this service, or
    * the default
@@ -120,13 +132,7 @@ public class RegistryZKService extends AbstractService
     return rootACL;
   }
 
-  /**
-   * Close the ZK connection if it is open
-   */
-  @Override
-  public void serviceStop() {
-    IOUtils.closeStream(zk);
-  }
+ 
 
   /**
    * Create a new curator instance off the root path

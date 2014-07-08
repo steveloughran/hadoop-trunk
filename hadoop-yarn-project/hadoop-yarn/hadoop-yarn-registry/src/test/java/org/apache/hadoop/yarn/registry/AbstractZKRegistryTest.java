@@ -21,6 +21,8 @@ package org.apache.hadoop.yarn.registry;
 import org.apache.commons.io.FileUtils;
 import org.apache.curator.test.TestingServer;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.registry.server.services.InMemoryZKService;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -34,7 +36,7 @@ import java.io.IOException;
 
 public class AbstractZKRegistryTest extends Assert {
   
-  protected static TestingServer zookeeper;
+  protected static InMemoryZKService zookeeper;
 
   @Rule
   public final Timeout testTimeout = new Timeout(10000);
@@ -48,7 +50,11 @@ public class AbstractZKRegistryTest extends Assert {
     File zkDir = new File("target/zookeeper");
     FileUtils.deleteDirectory(zkDir);
     assertTrue(zkDir.mkdirs());
-    zookeeper = new TestingServer(-1, zkDir);
+    zookeeper = new InMemoryZKService("ZK Service");
+    YarnConfiguration conf = new YarnConfiguration();
+    conf.set(InMemoryZKService.KEY_DATADIR,zkDir.getAbsolutePath());
+    zookeeper.init(conf);
+    zookeeper.start();
   }
 
   @AfterClass
@@ -69,7 +75,7 @@ public class AbstractZKRegistryTest extends Assert {
    * @return connection string
    */
   public String getConnectString() {
-    return zookeeper.getConnectString();
+    return zookeeper.getConnectionString();
   }
 
   

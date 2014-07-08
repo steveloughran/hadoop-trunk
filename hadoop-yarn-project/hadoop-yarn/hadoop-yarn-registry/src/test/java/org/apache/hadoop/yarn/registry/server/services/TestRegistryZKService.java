@@ -19,7 +19,9 @@
 package org.apache.hadoop.yarn.registry.server.services;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.junit.Test;
 
 public class TestRegistryZKService extends AbstractZKRegistryTest {
@@ -28,7 +30,17 @@ public class TestRegistryZKService extends AbstractZKRegistryTest {
   @Test
   public void testRegistryStart() throws Throwable {
     RegistryZKService service = new RegistryZKService("registry");
-    service.init(new Configuration());
+    service.init(createRegistryConfiguration());
     service.start();
+  }
+
+  protected YarnConfiguration createRegistryConfiguration() {
+    YarnConfiguration conf = new YarnConfiguration();
+    conf.setInt(RegistryConstants.ZK_CONNECTION_TIMEOUT, 1000);
+    conf.setInt(RegistryConstants.ZK_RETRY_INTERVAL, 500);
+    conf.setInt(RegistryConstants.ZK_RETRY_TIMES, 10);
+    conf.setInt(RegistryConstants.ZK_RETRY_CEILING, 10);
+    conf.set(RegistryConstants.ZK_HOSTS, zookeeper.getConnectionString());
+    return conf;
   }
 }
