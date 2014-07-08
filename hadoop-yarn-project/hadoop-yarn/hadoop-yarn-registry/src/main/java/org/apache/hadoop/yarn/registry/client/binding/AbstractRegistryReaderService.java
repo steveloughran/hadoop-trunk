@@ -20,7 +20,10 @@ package org.apache.hadoop.yarn.registry.client.binding;
 
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.registry.client.api.RegistryReader;
+import org.apache.hadoop.yarn.registry.client.exceptions.RESTIOException;
+import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
+import org.apache.http.HttpStatus;
 
 import java.io.IOException;
 import java.util.List;
@@ -32,21 +35,71 @@ public abstract class AbstractRegistryReaderService extends AbstractService impl
     super(name);
   }
 
+  protected IOException notImplemented() {
+    return new RESTIOException(HttpStatus.SC_INTERNAL_SERVER_ERROR,
+        "", "not implemented");
+  }
+  
   @Override
   public List<String> getServiceClasses(String user) throws IOException {
-    return null;
+    throw notImplemented();
   }
 
   @Override
-  public List<String> getServices(String user, String serviceClass) throws
+  public boolean serviceClassExists(String user, String serviceClass) throws
       IOException {
-    return null;
+    throw notImplemented();
+
   }
 
   @Override
-  public ServiceEntry getServiceEntry(String user,
-      String serviceClass,
-      String name) throws IOException {
-    return null;
+  public List<String> listServices(String user, String serviceClass) throws
+      IOException {
+    throw notImplemented();
+
   }
+
+  @Override
+  public boolean serviceExists(String user,
+      String serviceClass,
+      String serviceName) throws IOException {
+    throw notImplemented();
+
+  }
+
+  @Override
+  public ServiceEntry getServiceInstance(String user,
+      String serviceClass,
+      String serviceName) throws IOException {
+    throw notImplemented();
+
+  }
+
+  @Override
+  public List<String> listComponents(String user,
+      String serviceClass,
+      String serviceName) throws IOException {
+    throw notImplemented();
+
+  }
+
+  @Override
+  public ComponentEntry getComponent(String user,
+      String serviceClass,
+      String serviceName,
+      String componentName) throws IOException {
+    throw notImplemented();
+
+  }
+
+  @Override
+  public boolean componentExists(String user,
+      String serviceClass,
+      String serviceName,
+      String componentName) throws IOException {
+    throw notImplemented();
+
+  }
+
+
 }

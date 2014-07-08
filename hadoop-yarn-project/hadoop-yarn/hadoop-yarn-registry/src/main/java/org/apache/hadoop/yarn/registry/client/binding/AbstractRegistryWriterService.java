@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry.client.binding;
 
 import org.apache.hadoop.yarn.registry.client.api.RegistryWriter;
+import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
 
 import java.io.IOException;
@@ -29,18 +30,41 @@ implements RegistryWriter{
     super(name);
   }
 
+  
   @Override
   public void putServiceEntry(String user,
       String serviceClass,
       String name,
       ServiceEntry entry) throws IOException {
-    
+    throw notImplemented();
+
   }
 
   @Override
   public void deleteServiceEntry(String user,
       String serviceClass,
       String name) throws IOException {
+    throw notImplemented();
+
+  }
+
+  @Override
+  public void putComponent(String user,
+      String serviceClass,
+      String serviceName,
+      String componentName,
+      ComponentEntry entry,
+      boolean ephemeral) throws IOException {
+    throw notImplemented();
+
+  }
+
+  @Override
+  public void deleteComponent(String user,
+      String serviceClass,
+      String serviceName,
+      String componentName) throws IOException {
+    throw notImplemented();
 
   }
 }
