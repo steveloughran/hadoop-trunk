@@ -22,6 +22,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.curator.test.TestingServer;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.server.services.InMemoryZKService;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -78,6 +79,14 @@ public class AbstractZKRegistryTest extends Assert {
     return zookeeper.getConnectionString();
   }
 
-  
 
+  protected YarnConfiguration createRegistryConfiguration() {
+    YarnConfiguration conf = new YarnConfiguration();
+    conf.setInt(RegistryConstants.ZK_CONNECTION_TIMEOUT, 1000);
+    conf.setInt(RegistryConstants.ZK_RETRY_INTERVAL, 500);
+    conf.setInt(RegistryConstants.ZK_RETRY_TIMES, 10);
+    conf.setInt(RegistryConstants.ZK_RETRY_CEILING, 10);
+    conf.set(RegistryConstants.ZK_HOSTS, zookeeper.getConnectionString());
+    return conf;
+  }
 }

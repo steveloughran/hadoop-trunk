@@ -27,6 +27,7 @@ import org.apache.curator.framework.api.DeleteBuilder;
 import org.apache.curator.framework.api.GetChildrenBuilder;
 import org.apache.curator.retry.BoundedExponentialBackoffRetry;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ZKUtil;
@@ -72,6 +73,10 @@ public class RegistryZKService extends AbstractService
     super(name);
   }
 
+
+  public List<ACL> getRootACL() {
+    return rootACL;
+  }
 
   @Override
   protected void serviceStart() throws Exception {
@@ -223,7 +228,7 @@ public class RegistryZKService extends AbstractService
    * @return true iff the path was created
    * @throws IOException
    */
-  protected boolean maybeCreate(String path,
+  public boolean maybeCreate(String path,
       CreateMode mode,
       List<ACL> acl) throws IOException {
     if (!exists(path)) {
@@ -251,6 +256,14 @@ public class RegistryZKService extends AbstractService
     }
   }
 
+  protected boolean existsRobust(String path) {
+    try {
+      return exists(path);
+    } catch (IOException e) {
+      return false;
+    }
+  }
+  
   /**
    * Verify a path exists
    * @param path path of operation
@@ -299,11 +312,15 @@ public class RegistryZKService extends AbstractService
    */
   public void create(String path,
       CreateMode mode,
-      byte[] data, List<ACL> acl) throws IOException {
+      byte[] data,
+      List<ACL> acl) throws IOException {
     try {
       LOG.debug("Creating {} with {} bytes", path, data.length);
       zk.create().withMode(mode).withACL(acl).forPath(path, data);
     } catch (Exception e) {
+      if (existsRobust(path)) {
+        throw new FileAlreadyExistsException(path);
+      }
       throw operationFailure(path, "create()", e);
     }
   }
@@ -319,6 +336,9 @@ public class RegistryZKService extends AbstractService
       LOG.debug("Updating {} with {} bytes", path, data.length);
       zk.setData().forPath(path, data);
     } catch (Exception e) {
+      if (!existsRobust(path)) {
+        throw new FileNotFoundException(path);
+      }
       throw operationFailure(path, "update()", e);
     }
   }
@@ -337,7 +357,14 @@ public class RegistryZKService extends AbstractService
       update(path, data);
     }
   }
-  
+
+  /**
+   * Delete a directory/directory tree.
+   * It is not an error to delete a path that does not exist
+   * @param path path of operation
+   * @param recursive flag to trigger recursive deletion
+   * @throws IOException
+   */
   public void rm(String path, boolean recursive) throws IOException {
     try {
       LOG.debug("Deleting {}", path);
@@ -347,6 +374,10 @@ public class RegistryZKService extends AbstractService
       }
       delete.forPath(path);
     } catch (Exception e) {
+      if (!existsRobust(path)) {
+        // not an error
+        return;
+      }
       throw operationFailure(path, "delete()", e);
     }
   }
@@ -358,14 +389,11 @@ public class RegistryZKService extends AbstractService
       return children;
 
     } catch (Exception e) {
-      try {
-        if (!exists(path)) {
-          throw new FileNotFoundException(path);
-        }
-      } catch (IOException ignored) {
-
+      IOException ioe = operationFailure(path, "ls()", e);
+      if (!existsRobust(path)) {
+        ioe = new FileNotFoundException(path);
       }
-      throw operationFailure(path, "ls()", e);
+      throw ioe;
     }
   }
 
