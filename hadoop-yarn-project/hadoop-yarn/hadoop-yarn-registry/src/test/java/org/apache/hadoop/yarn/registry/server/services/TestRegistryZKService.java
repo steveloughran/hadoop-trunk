@@ -52,28 +52,16 @@ public class TestRegistryZKService extends AbstractZKRegistryTest {
     registry.init(createRegistryConfiguration());
     registry.start();
   }
-/*
 
-  @Test
-  public void testRegistryStartStop() throws Throwable {
-    createRegistry();
-    stopRegistry();
-  }
-*/
 
   @Test
   public void testLs() throws Throwable {
     registry.ls("/");
   }
 
-  @Test
+  @Test(expected = FileNotFoundException.class)
   public void testLsNotFound() throws Throwable {
-    try {
-      List<String> ls = registry.ls(MISSING);
-      fail("Expected an exception");
-    } catch (FileNotFoundException expected) {
-
-    }
+    List<String> ls = registry.ls(MISSING);
   }
 
   @Test
@@ -91,14 +79,9 @@ public class TestRegistryZKService extends AbstractZKRegistryTest {
     registry.verifyExists("/");
   }
 
-  @Test
+  @Test(expected = FileNotFoundException.class)
   public void testVerifyExistsMissing() throws Throwable {
-    try {
-      registry.verifyExists(MISSING);
-      fail("Expected an exception");
-    } catch (FileNotFoundException expected) {
-
-    }
+    registry.verifyExists(MISSING);
   }
 
   @Test
@@ -107,7 +90,11 @@ public class TestRegistryZKService extends AbstractZKRegistryTest {
     registry.verifyExists("/p1");
     registry.mkdir("/p1/p2", CreateMode.EPHEMERAL);
     registry.verifyExists("/p1/p2");
+  }
 
+  @Test(expected = FileNotFoundException.class)
+  public void testMkdirChild() throws Throwable {
+      registry.mkdir("/testMkdirChild/child", CreateMode.PERSISTENT);
   }
 
   @Test
@@ -190,18 +177,19 @@ public class TestRegistryZKService extends AbstractZKRegistryTest {
 
   @Test
   public void testUpdateDirectory() throws Throwable {
-    registry.mkdir("/testUpdateDirectory",CreateMode.PERSISTENT);
+    registry.mkdir("/testUpdateDirectory", CreateMode.PERSISTENT);
     registry.update("/testUpdateDirectory", getTestBuffer());
   }
 
   @Test
   public void testUpdateDirectorywithChild() throws Throwable {
-    registry.mkdir("/testUpdateDirectorywithChild",CreateMode.PERSISTENT_SEQUENTIAL);
-    registry.mkdir("/testUpdateDirectorywithChild/child",CreateMode.PERSISTENT);
+    registry.mkdir("/testUpdateDirectorywithChild", CreateMode.PERSISTENT);
+    registry.mkdir("/testUpdateDirectorywithChild/child",
+        CreateMode.PERSISTENT);
     registry.update("/testUpdateDirectorywithChild", getTestBuffer());
   }
 
-  
+
   protected byte[] getTestBuffer() {
     byte[] buffer = new byte[1];
     buffer[0] = '0';
