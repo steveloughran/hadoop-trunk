@@ -117,6 +117,7 @@ public class ZookeeperRegistryClient extends RegistryZKService
   public void deleteServiceEntry(String user,
       String serviceClass,
       String serviceName) throws IOException {
+    rm(buildServicePath(user,serviceClass, serviceName), true);
   }
 
   /**
@@ -158,13 +159,6 @@ public class ZookeeperRegistryClient extends RegistryZKService
   @Override
   public List<String> listServiceClasses(String user) throws IOException {
     return listChildren(buildUserPath(user));
-  }
-
-  protected List<String> listChildren(String path) throws IOException {
-    if (!exists(path)) {
-      return Collections.emptyList();
-    }
-    return ls(path);
   }
 
   @Override

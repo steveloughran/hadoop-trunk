@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -460,4 +461,10 @@ public class RegistryZKService extends AbstractService
     }
   }
 
+  public List<String> listChildren(String path) throws IOException {
+    if (!exists(path)) {
+      return Collections.emptyList();
+    }
+    return ls(path);
+  }
 }

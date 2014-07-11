@@ -86,7 +86,8 @@ public class BindingUtils {
   }
   
   public static String buildServicePath(String user,
-      String serviceClass, String serviceName) {
+      String serviceClass,
+      String serviceName) {
 
     return buildServiceClassPath(user, serviceClass)
            + "/" + validateServiceName(serviceName);

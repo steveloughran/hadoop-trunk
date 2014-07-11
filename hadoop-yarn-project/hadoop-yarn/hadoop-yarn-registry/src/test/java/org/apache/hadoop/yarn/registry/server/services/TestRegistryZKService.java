@@ -19,12 +19,9 @@
 package org.apache.hadoop.yarn.registry.server.services;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
 import org.apache.hadoop.yarn.registry.client.exceptions.RESTIOException;
 import org.apache.zookeeper.CreateMode;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
@@ -78,7 +75,7 @@ public class TestRegistryZKService extends AbstractZKRegistryTest {
 
   @Test(expected = FileNotFoundException.class)
   public void testMkdirChild() throws Throwable {
-      registry.mkdir("/testMkdirChild/child", CreateMode.PERSISTENT);
+    registry.mkdir("/testMkdirChild/child", CreateMode.PERSISTENT);
   }
 
   @Test
