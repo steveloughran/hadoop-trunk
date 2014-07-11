@@ -39,19 +39,29 @@ public class ComponentEntry {
 
   public String description;
 
-  public Map<String, Endpoint> external =  new HashMap<String, Endpoint>();
-  public Map<String, Endpoint> internal =  new HashMap<String, Endpoint>();
-  
-  
-  public void putExternal(String name, Endpoint endpoint) {
+  public Map<String, Endpoint> external = new HashMap<String, Endpoint>();
+  public Map<String, Endpoint> internal = new HashMap<String, Endpoint>();
+
+
+  public void putExternalEndpoint(String name, Endpoint endpoint) {
     Preconditions.checkArgument(name != null);
     Preconditions.checkArgument(endpoint != null);
     external.put(name, endpoint);
   }
-  
-  public void putInternal(String name, Endpoint endpoint) {
+
+  public void putInternalEndpoint(String name, Endpoint endpoint) {
     Preconditions.checkArgument(name != null);
     Preconditions.checkArgument(endpoint != null);
-    external.put(name, endpoint);
+    internal.put(name, endpoint);
   }
+
+  public Endpoint getInternalEndpoint(String name) {
+    return internal.get(name);
+  }
+
+  public Endpoint getExternalEndpoint(String name) {
+    return external.get(name);
+  }
+
+
 }

@@ -18,35 +18,31 @@
 
 package org.apache.hadoop.yarn.registry.client.types;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 public class TypeUtils {
 
-  public static Endpoint urlEndpoint(String api, 
+  public static Endpoint urlEndpoint(String api,
       String protocolType,
       String description,
       String... urls) {
     return new Endpoint(api, AddressTypes.ADDRESS_URI,
         protocolType, description, urls);
   }
-  
-  public static Endpoint restEndpoint(String api, 
+
+  public static Endpoint restEndpoint(String api,
       String description,
       String... urls) {
     return urlEndpoint(api, ProtocolTypes.PROTOCOL_RESTAPI,
         description, urls);
   }
-    
-  public static Endpoint webEndpoint(String api, 
+
+  public static Endpoint webEndpoint(String api,
       String description,
       String... urls) {
     return urlEndpoint(api, ProtocolTypes.PROTOCOL_WEBUI,
         description, urls);
   }
-  
-  public static Endpoint inetAddrEndpoint(String api, 
+
+  public static Endpoint inetAddrEndpoint(String api,
       String protocolType,
       String description,
       String... tuples) {
@@ -54,15 +50,15 @@ public class TypeUtils {
         AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
         protocolType, description, tuples);
   }
-  
-    public static Endpoint ipcEndpoint(String api, 
+
+  public static Endpoint ipcEndpoint(String api,
       String description,
-        boolean protobuf,
+      boolean protobuf,
       String... addresses) {
     return new Endpoint(api,
         AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
-         protobuf? ProtocolTypes.PROTOCOL_HADOOP_IPC_PROTOBUF  
-         : ProtocolTypes.PROTOCOL_HADOOP_IPC,
+        protobuf ? ProtocolTypes.PROTOCOL_HADOOP_IPC_PROTOBUF
+                 : ProtocolTypes.PROTOCOL_HADOOP_IPC,
         description,
         addresses);
   }

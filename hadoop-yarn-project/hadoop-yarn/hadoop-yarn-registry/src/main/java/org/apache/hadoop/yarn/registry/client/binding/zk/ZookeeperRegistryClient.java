@@ -20,7 +20,6 @@ package org.apache.hadoop.yarn.registry.client.binding.zk;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.registry.client.api.RegistryWriter;
-import org.apache.hadoop.yarn.registry.client.binding.AbstractRegistryWriterService;
 import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
 import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
@@ -30,13 +29,13 @@ import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.*;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
-
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+
+import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.buildComponentPath;
+import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.buildServiceClassPath;
+import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.buildServicePath;
+import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.buildUserPath;
 
 /**
  * The ZK client is R/W and is used  to register
@@ -47,16 +46,16 @@ public class ZookeeperRegistryClient extends RegistryZKService
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistryZKService.class);
 
-  private final JsonMarshal.ServiceEntryMarshal serviceEntryMarshal 
+  private final JsonMarshal.ServiceEntryMarshal serviceEntryMarshal
       = new JsonMarshal.ServiceEntryMarshal();
-  private final JsonMarshal.ComponentEntryMarshal componentEntryMarshal 
+  private final JsonMarshal.ComponentEntryMarshal componentEntryMarshal
       = new JsonMarshal.ComponentEntryMarshal();
 
   public static final String PERMISSIONS_REGISTRY_ROOT = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_SYSTEM = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_USERS = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_USER = "world:anyone:rwcda";
-  
+
   public ZookeeperRegistryClient(String name) {
     super(name);
   }
@@ -88,7 +87,7 @@ public class ZookeeperRegistryClient extends RegistryZKService
   private List<ACL> fullUserAccess(String user) throws IOException {
     return parseACLs(PERMISSIONS_REGISTRY_USER);
   }
-  
+
   @Override
   public void putServiceEntry(String user,
       String serviceClass,
@@ -106,7 +105,8 @@ public class ZookeeperRegistryClient extends RegistryZKService
         fullUserAccess(user));
   }
 
-  void maybeCreateServiceClassPath(String user, String serviceClass) throws IOException {
+  void maybeCreateServiceClassPath(String user, String serviceClass) throws
+      IOException {
     maybeCreateUserPath(user);
     maybeCreate(buildServiceClassPath(user, serviceClass),
         CreateMode.PERSISTENT,
@@ -117,7 +117,7 @@ public class ZookeeperRegistryClient extends RegistryZKService
   public void deleteServiceEntry(String user,
       String serviceClass,
       String serviceName) throws IOException {
-    rm(buildServicePath(user,serviceClass, serviceName), true);
+    rm(buildServicePath(user, serviceClass, serviceName), true);
   }
 
   /**
@@ -142,7 +142,7 @@ public class ZookeeperRegistryClient extends RegistryZKService
     String componentPath =
         buildComponentPath(user, serviceClass, serviceName, componentName);
     set(componentPath,
-        ephemeral? CreateMode.EPHEMERAL: CreateMode.PERSISTENT,
+        ephemeral ? CreateMode.EPHEMERAL : CreateMode.PERSISTENT,
         componentEntryMarshal.toBytes(entry),
         fullUserAccess(user));
   }

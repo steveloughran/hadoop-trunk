@@ -19,7 +19,7 @@
 package org.apache.hadoop.yarn.registry.client.exceptions;
 
 public interface HttpErrorProvider {
-  
+
   int getStatusCode();
 
   /**

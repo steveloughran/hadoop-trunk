@@ -73,7 +73,7 @@ public class JsonSerDeser<T> {
    * @throws JsonMappingException failure to map from the JSON to this class
    */
   public synchronized T fromJson(String json)
-    throws IOException, JsonParseException, JsonMappingException {
+      throws IOException, JsonParseException, JsonMappingException {
     try {
       return (T) (mapper.readValue(json, classType));
     } catch (IOException e) {
@@ -90,7 +90,7 @@ public class JsonSerDeser<T> {
    * @throws JsonMappingException failure to map from the JSON to this class
    */
   public synchronized T fromFile(File jsonFile)
-    throws IOException, JsonParseException, JsonMappingException {
+      throws IOException, JsonParseException, JsonMappingException {
     try {
       return (T) (mapper.readValue(jsonFile, classType));
     } catch (IOException e) {
@@ -107,8 +107,9 @@ public class JsonSerDeser<T> {
    * @throws JsonMappingException failure to map from the JSON to this class
    */
   public synchronized T fromResource(String resource)
-    throws IOException, JsonParseException, JsonMappingException {
-    try(InputStream resStream = this.getClass().getResourceAsStream(resource)) {
+      throws IOException, JsonParseException, JsonMappingException {
+    try (InputStream resStream = this.getClass()
+                                     .getResourceAsStream(resource)) {
       if (resStream == null) {
         throw new FileNotFoundException(resource);
       }
@@ -140,7 +141,7 @@ public class JsonSerDeser<T> {
     String json = new String(b, 0, b.length, UTF_8);
     return fromJson(json);
   }
-  
+
   /**
    * Load from a Hadoop filesystem
    * @param fs filesystem
@@ -152,7 +153,7 @@ public class JsonSerDeser<T> {
    * @throws JsonMappingException O/J mapping problems
    */
   public T load(FileSystem fs, Path path)
-    throws IOException, JsonParseException, JsonMappingException {
+      throws IOException, JsonParseException, JsonMappingException {
     FileStatus status = fs.getFileStatus(path);
     long len = status.getLen();
     byte[] b = new byte[(int) len];
@@ -173,8 +174,8 @@ public class JsonSerDeser<T> {
    * @throws IOException IO exception
    */
   public void save(FileSystem fs, Path path, T instance,
-                   boolean overwrite) throws
-                                      IOException {
+      boolean overwrite) throws
+      IOException {
     FSDataOutputStream dataOutputStream = fs.create(path, overwrite);
     writeJsonAsBytes(instance, dataOutputStream);
   }
@@ -185,8 +186,8 @@ public class JsonSerDeser<T> {
    * @throws IOException on any failure
    */
   private void writeJsonAsBytes(T instance,
-                                DataOutputStream dataOutputStream) throws
-                                                                   IOException {
+      DataOutputStream dataOutputStream) throws
+      IOException {
     try {
       byte[] b = toBytes(instance);
       dataOutputStream.write(b);
@@ -215,8 +216,8 @@ public class JsonSerDeser<T> {
    * @throws JsonMappingException O/J mapping problems
    */
   public synchronized String toJson(T instance) throws IOException,
-                                               JsonGenerationException,
-                                               JsonMappingException {
+      JsonGenerationException,
+      JsonMappingException {
     mapper.configure(SerializationConfig.Feature.INDENT_OUTPUT, true);
     return mapper.writeValueAsString(instance);
   }

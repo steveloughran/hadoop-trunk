@@ -24,13 +24,14 @@ import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
 
 import java.io.IOException;
 
-public abstract class AbstractRegistryWriterService extends AbstractRegistryReaderService
-implements RegistryWriter{
+public abstract class AbstractRegistryWriterService extends
+    AbstractRegistryReaderService
+    implements RegistryWriter {
   protected AbstractRegistryWriterService(String name) {
     super(name);
   }
 
-  
+
   @Override
   public void putServiceEntry(String user,
       String serviceClass,

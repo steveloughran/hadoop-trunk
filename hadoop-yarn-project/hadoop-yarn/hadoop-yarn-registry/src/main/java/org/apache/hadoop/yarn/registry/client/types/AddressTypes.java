@@ -39,7 +39,7 @@ public class AddressTypes {
    * easily split from the port declaration. 
    */
   public static final String ADDRESS_HOSTNAME_AND_PORT = "host/port";
-  
+
   /**
    * path /a/b/c style
    */

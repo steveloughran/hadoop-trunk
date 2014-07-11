@@ -56,7 +56,7 @@ public interface RegistryConstants {
   /**
    * Pattern of a hostname 
    */
-  String HOSTNAME_PATTERN = 
+  String HOSTNAME_PATTERN =
       "([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])";
   String COMPONENT_NAME_PATTERN = HOSTNAME_PATTERN;
   String SERVICE_NAME_PATTERN = HOSTNAME_PATTERN;

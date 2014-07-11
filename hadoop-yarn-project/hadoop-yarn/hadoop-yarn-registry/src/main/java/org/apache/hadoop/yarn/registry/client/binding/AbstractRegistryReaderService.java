@@ -39,7 +39,7 @@ public abstract class AbstractRegistryReaderService extends AbstractService impl
     return new RESTIOException(HttpStatus.SC_INTERNAL_SERVER_ERROR,
         "", "not implemented");
   }
-  
+
   @Override
   public List<String> listServiceClasses(String user) throws IOException {
     throw notImplemented();

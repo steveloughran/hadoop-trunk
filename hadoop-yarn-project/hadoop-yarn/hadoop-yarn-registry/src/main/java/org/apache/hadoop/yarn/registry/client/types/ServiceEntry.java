@@ -34,5 +34,5 @@ public class ServiceEntry extends ComponentEntry {
   @JsonIgnore
   public Map<String, ComponentEntry> components =
       new HashMap<String, ComponentEntry>();
-  
+
 }

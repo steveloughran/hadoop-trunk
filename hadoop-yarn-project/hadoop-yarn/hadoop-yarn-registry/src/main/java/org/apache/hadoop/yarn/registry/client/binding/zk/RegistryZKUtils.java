@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.registry.client.binding.zk;
 
 import com.google.common.base.Preconditions;
-import org.apache.curator.utils.ZKPaths;
 import org.apache.hadoop.yarn.registry.client.exceptions.RESTIOException;
 import org.apache.http.HttpStatus;
 import org.apache.zookeeper.common.PathUtils;
@@ -48,7 +47,8 @@ public class RegistryZKUtils {
  * @return an absolute path
  * @throws IllegalArgumentException if the path is invalide
  */
-  public static String createFullPath(String  base,  String path) throws RESTIOException {
+  public static String createFullPath(String base, String path) throws
+      RESTIOException {
     Preconditions.checkArgument(path != null, "null path");
     Preconditions.checkArgument(base != null, "null path");
     StringBuilder fullpath = new StringBuilder();
@@ -66,7 +66,7 @@ public class RegistryZKUtils {
     //here there may be a trailing "/"
     String finalpath = fullpath.toString();
     if (finalpath.endsWith("/") && !"/".equals(finalpath)) {
-      finalpath = finalpath.substring(0, finalpath.length()-1);
+      finalpath = finalpath.substring(0, finalpath.length() - 1);
 
     }
     return validateZKPath(finalpath);

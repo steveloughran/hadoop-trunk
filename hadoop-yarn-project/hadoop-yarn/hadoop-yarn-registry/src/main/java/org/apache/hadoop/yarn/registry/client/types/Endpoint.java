@@ -48,7 +48,7 @@ public class Endpoint {
   public Endpoint(String api,
       String addressType,
       String protocolType,
-      String description, String...addresses) {
+      String description, String... addresses) {
     this.api = api;
     this.addressType = addressType;
     this.protocolType = protocolType;
