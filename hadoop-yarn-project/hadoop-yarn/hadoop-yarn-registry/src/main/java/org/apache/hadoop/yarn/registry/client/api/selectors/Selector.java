@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.api;
+package org.apache.hadoop.yarn.registry.client.api.selectors;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -57,7 +57,7 @@ public abstract class Selector<T> implements Iterable<Map.Entry<String, T>> {
     }
   }
 
- 
+
   /**
    * Iterator with no entries
    */
@@ -71,14 +71,14 @@ public abstract class Selector<T> implements Iterable<Map.Entry<String, T>> {
 
     @Override
     public boolean hasNext() {
-      return entry!=null;
+      return entry != null;
     }
 
     @Override
     public Map.Entry<String, T> next() {
       Map.Entry<String, T> result = entry;
-      entry=null;
-      if (result==null) {
+      entry = null;
+      if (result == null) {
         throw new NoSuchElementException();
       }
       return result;

@@ -18,19 +18,22 @@
 
 package org.apache.hadoop.yarn.registry.client.api;
 
-import java.util.List;
-
 public interface RegistryVerbs<Parent, Child> {
 
 
   void create(String path, Parent parent);
+
   void put(String path, Parent parent);
+
   Parent get(String path);
+
   Child getChild(String path, String child);
-  void delete (String path);
+
+  void delete(String path);
+
   void exists(String path);
+
   void sync(String path);
-  
-  
-  
+
+
 }

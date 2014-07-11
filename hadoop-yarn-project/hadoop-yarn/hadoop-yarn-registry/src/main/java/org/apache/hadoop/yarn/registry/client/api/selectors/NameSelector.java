@@ -16,55 +16,27 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.api;
+package org.apache.hadoop.yarn.registry.client.api.selectors;
 
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Random;
-import java.util.Set;
 
-public class RandomSelector<T> extends Selector<T> {
+public class NameSelector<T> extends Selector<T> {
 
-  private final Random random;
+  final String name;
+  private final SelectorEntry<T> entry;
 
-  public RandomSelector(Map<String, T> entries) {
+  public NameSelector(String name, Map<String, T> entries) {
     super(entries);
-    random = new Random();
-  }
-
-
-  private Map.Entry<String, T> select() {
-    Map<String, T> map = entries;
-    int index = random.nextInt(map.size());
-    Set<Map.Entry<String, T>> entrySet = map.entrySet();
-    for (Map.Entry<String, T> entry : entrySet) {
-      if (index == 0) {
-        return entry;
-      }
-      index--;
-    }
-    return null;
+    this.name = name;
+    T lookup = entries.get(name);
+    entry = lookup != null ? new SelectorEntry<T>(name, lookup) : null;
   }
 
   @Override
   public Iterator<Map.Entry<String, T>> iterator() {
-    return new RandomEntry();
+    return new SingleEntryIterator(entry);
   }
 
-  protected class RandomEntry implements Iterator<Map.Entry<String, T>> {
-    @Override
-    public boolean hasNext() {
-      return entries.size() > 0;
-    }
 
-    @Override
-    public Map.Entry<String, T> next() {
-      return select();
-    }
-
-    @Override
-    public void remove() {
-
-    }
-  }
 }

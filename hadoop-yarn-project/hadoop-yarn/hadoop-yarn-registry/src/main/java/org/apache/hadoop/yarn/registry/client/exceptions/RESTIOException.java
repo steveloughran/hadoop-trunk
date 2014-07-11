@@ -26,13 +26,13 @@ import java.io.IOException;
  */
 public class RESTIOException extends IOException implements
     HttpErrorProvider {
-  
+
   public final int statusCode;
   public final String uri;
- 
+
   public RESTIOException(int statusCode, String uri,
       String message) {
-    super(statusCode + ": "+ message);
+    super(statusCode + ": " + message);
     this.statusCode = statusCode;
     this.uri = uri;
   }

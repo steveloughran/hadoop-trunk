@@ -22,18 +22,18 @@ import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
 
 public class JsonMarshal {
-  
+
   public static class ServiceEntryMarshal extends JsonSerDeser<ServiceEntry> {
     public ServiceEntryMarshal() {
       super(ServiceEntry.class);
     }
   }
-  
+
   public static class ComponentEntryMarshal extends JsonSerDeser<ComponentEntry> {
     public ComponentEntryMarshal() {
       super(ComponentEntry.class);
     }
   }
-  
-  
+
+
 }

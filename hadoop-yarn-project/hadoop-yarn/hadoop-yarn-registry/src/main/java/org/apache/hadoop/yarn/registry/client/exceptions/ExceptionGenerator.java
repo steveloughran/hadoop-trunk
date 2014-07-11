@@ -46,9 +46,9 @@ public class ExceptionGenerator {
         result = new AccessControlException(message);
         break;
       default:
-        if (e instanceof  HttpErrorProvider) {
-          statusCode = ((HttpErrorProvider)e).getStatusCode();
-          uri = ((HttpErrorProvider)e).getURI();
+        if (e instanceof HttpErrorProvider) {
+          statusCode = ((HttpErrorProvider) e).getStatusCode();
+          uri = ((HttpErrorProvider) e).getURI();
         }
         result = new RESTIOException(statusCode, uri, message, e);
     }

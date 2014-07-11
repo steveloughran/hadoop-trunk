@@ -23,6 +23,9 @@ import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
 
 import java.io.IOException;
 
+/**
+ * Interface to write to a registry
+ */
 public interface RegistryWriter extends RegistryReader {
 
   public void putServiceEntry(String user,
@@ -43,7 +46,7 @@ public interface RegistryWriter extends RegistryReader {
       ComponentEntry entry,
       boolean ephemeral)
       throws IOException;
-  
+
   public void deleteComponent(String user,
       String serviceClass,
       String serviceName,

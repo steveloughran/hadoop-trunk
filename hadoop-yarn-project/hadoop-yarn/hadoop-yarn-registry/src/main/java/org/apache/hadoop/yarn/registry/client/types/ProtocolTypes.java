@@ -22,17 +22,17 @@ package org.apache.hadoop.yarn.registry.client.types;
  * some common protocol types
  */
 public interface ProtocolTypes {
-  
-  String PROTOCOL_UNKNOWN  = "";
-  String PROTOCOL_WEBUI  = "webui";
-  String PROTOCOL_HADOOP_IPC  = "hadoop/IPC";
+
+  String PROTOCOL_UNKNOWN = "";
+  String PROTOCOL_WEBUI = "webui";
+  String PROTOCOL_HADOOP_IPC = "hadoop/IPC";
   String PROTOCOL_HADOOP_IPC_PROTOBUF = "hadoop/protobuf";
-  String PROTOCOL_ZOOKEEPER_BINDING  = "zookeeper";
-  String PROTOCOL_RESTAPI  = "REST";
-  String PROTOCOL_WSAPI  = "WS";
-  String PROTOCOL_SUN_RPC  = "sunrpc";
-  String PROTOCOL_THRIFT  = "thrift";
-  String PROTOCOL_RMI  = "RMI";
-  String PROTOCOL_IIOP  = "IIOP";
-  
+  String PROTOCOL_ZOOKEEPER_BINDING = "zookeeper";
+  String PROTOCOL_RESTAPI = "REST";
+  String PROTOCOL_WSAPI = "WS";
+  String PROTOCOL_SUN_RPC = "sunrpc";
+  String PROTOCOL_THRIFT = "thrift";
+  String PROTOCOL_RMI = "RMI";
+  String PROTOCOL_IIOP = "IIOP";
+
 }
