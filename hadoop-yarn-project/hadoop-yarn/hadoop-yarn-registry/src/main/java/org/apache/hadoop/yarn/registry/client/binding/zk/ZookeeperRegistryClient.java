@@ -97,6 +97,7 @@ public class ZookeeperRegistryClient extends RegistryZKService
     byte[] bytes = serviceEntryMarshal.toBytes(entry);
     maybeCreateServiceClassPath(user, serviceClass);
     String path = buildServicePath(user, serviceClass, serviceName);
+    set(path, CreateMode.PERSISTENT, bytes, fullUserAccess(user));
   }
 
   void maybeCreateUserPath(String user) throws IOException {

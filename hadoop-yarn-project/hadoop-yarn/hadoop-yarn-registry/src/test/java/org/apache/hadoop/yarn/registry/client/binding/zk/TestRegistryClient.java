@@ -34,10 +34,12 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
 
   public static final String SC_HADOOP = "org-apache-hadoop";
   public static final String WEBHDFS = "webhdfs";
+  public static final String USER = "yarn";
+  public static final String CLUSTERNAME = "namenode1";
   private RegistryZKService registry;
   private ZookeeperRegistryClient registryClient;
 
-//  @Before
+  @Before
   public void setupClient() {
     registryClient = new ZookeeperRegistryClient("registryClient");
     registryClient.init(createRegistryConfiguration());
@@ -49,7 +51,7 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
     ServiceOperations.stop(registryClient);
   }
   
-//  @Test
+  @Test
   public void testPutSE() throws Throwable {
 
     ServiceEntry se = new ServiceEntry();
@@ -59,16 +61,18 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
         TypeUtils.restEndpoint(("org_apache_hadoop_namenode_webhdfs"),
             WEBHDFS, "http://namenode:8020"));
 
-    registryClient.putServiceEntry("yarn", SC_HADOOP,
-        "namenode1",
+    registryClient.putServiceEntry(USER, SC_HADOOP,
+        CLUSTERNAME,
         se);
 
-    List<String> serviceClasses = registryClient.listServiceClasses("yarn");
+    List<String> serviceClasses = registryClient.listServiceClasses(USER);
     assertEquals(1, serviceClasses.size());
     assertEquals(SC_HADOOP, serviceClasses.get(0));
-    assertTrue(registryClient.serviceClassExists("yarn", SC_HADOOP));
-    List<String> hadoopServices = registryClient.listServices("yarn", SC_HADOOP);
-    assertEquals("namenode1", hadoopServices.get(0));
+    assertTrue(registryClient.serviceClassExists(USER, SC_HADOOP));
+    List<String> hadoopServices = registryClient.listServices(USER, SC_HADOOP);
+    assertEquals(1, hadoopServices.size());
+
+    assertEquals(CLUSTERNAME, hadoopServices.get(0));
   }
   
   
