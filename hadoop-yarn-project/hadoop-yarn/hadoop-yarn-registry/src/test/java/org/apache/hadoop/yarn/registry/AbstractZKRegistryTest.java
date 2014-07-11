@@ -19,11 +19,13 @@
 package org.apache.hadoop.yarn.registry;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.curator.test.TestingServer;
-import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.server.services.InMemoryZKService;
+import org.apache.hadoop.yarn.registry.server.services.RegistryZKService;
+import org.apache.zookeeper.common.PathUtils;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -36,24 +38,22 @@ import java.io.File;
 import java.io.IOException;
 
 public class AbstractZKRegistryTest extends Assert {
-  
-  protected static InMemoryZKService zookeeper;
 
+  protected static InMemoryZKService zookeeper;
   @Rule
   public final Timeout testTimeout = new Timeout(10000);
-
-
   @Rule
   public TestName methodName = new TestName();
+  protected RegistryZKService registry;
 
   @BeforeClass
   public static void createZKServer() throws Exception {
     File zkDir = new File("target/zookeeper");
     FileUtils.deleteDirectory(zkDir);
     assertTrue(zkDir.mkdirs());
-    zookeeper = new InMemoryZKService("ZK Service");
+    zookeeper = new InMemoryZKService("InMemoryZKService");
     YarnConfiguration conf = new YarnConfiguration();
-    conf.set(InMemoryZKService.KEY_DATADIR,zkDir.getAbsolutePath());
+    conf.set(InMemoryZKService.KEY_DATADIR, zkDir.getAbsolutePath());
     zookeeper.init(conf);
     zookeeper.start();
   }
@@ -62,6 +62,15 @@ public class AbstractZKRegistryTest extends Assert {
   public static void destroyZKServer() throws IOException {
     zookeeper.close();
   }
+
+  public static void assertValidZKPath(String path) {
+    try {
+      PathUtils.validatePath(path);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Invalid Path " + path + ": " + e, e);
+    }
+  }
+
   /**
    * give our thread a name
    */
@@ -79,7 +88,6 @@ public class AbstractZKRegistryTest extends Assert {
     return zookeeper.getConnectionString();
   }
 
-
   protected YarnConfiguration createRegistryConfiguration() {
     YarnConfiguration conf = new YarnConfiguration();
     conf.setInt(RegistryConstants.ZK_CONNECTION_TIMEOUT, 1000);
@@ -88,5 +96,24 @@ public class AbstractZKRegistryTest extends Assert {
     conf.setInt(RegistryConstants.ZK_RETRY_CEILING, 10);
     conf.set(RegistryConstants.ZK_HOSTS, zookeeper.getConnectionString());
     return conf;
+  }
+
+  @Before
+  public void startRegistry() {
+    createRegistry();
+  }
+
+  @After
+  public void stopRegistry() {
+    ServiceOperations.stop(registry);
+  }
+
+  /**
+   * Create an instance
+   */
+  protected void createRegistry() {
+    registry = new RegistryZKService("registry");
+    registry.init(createRegistryConfiguration());
+    registry.start();
   }
 }

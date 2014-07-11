@@ -41,7 +41,7 @@ public abstract class AbstractRegistryReaderService extends AbstractService impl
   }
   
   @Override
-  public List<String> getServiceClasses(String user) throws IOException {
+  public List<String> listServiceClasses(String user) throws IOException {
     throw notImplemented();
   }
 

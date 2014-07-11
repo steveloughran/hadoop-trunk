@@ -31,28 +31,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Test the lower level parts of the registry
+ */
 public class TestRegistryZKService extends AbstractZKRegistryTest {
 
-
   public static final String MISSING = "/missing";
-  private RegistryZKService registry;
-
-  @Before
-  public void startRegistry() {
-    createRegistry();
-  }
-
-  @After
-  public void stopRegistry() {
-    ServiceOperations.stop(registry);
-  }
-
-  protected void createRegistry() {
-    registry = new RegistryZKService("registry");
-    registry.init(createRegistryConfiguration());
-    registry.start();
-  }
-
 
   @Test
   public void testLs() throws Throwable {
@@ -118,7 +102,7 @@ public class TestRegistryZKService extends AbstractZKRegistryTest {
     try {
       registry.rm("/rm", false);
       fail("expected a failure");
-    } catch (RESTIOException e) {
+    } catch (RESTIOException expected) {
 
     }
   }

@@ -21,15 +21,38 @@ package org.apache.hadoop.yarn.registry.client.types;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
 
+import java.util.Arrays;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
 public class Endpoint {
-  public String description;
-
-  public int addressType;
-  public int protocolType;
-  public List<String> addresses;
   public String api;
+  public String addressType;
+  public String protocolType;
+  public String description;
+  public List<String> addresses;
+
+  public Endpoint() {
+  }
+
+
+  /**
+   * Build an endpoint with a list of addresses
+   * @param api
+   * @param addressType
+   * @param protocolType
+   * @param description
+   * @param addresses
+   */
+  public Endpoint(String api,
+      String addressType,
+      String protocolType,
+      String description, String...addresses) {
+    this.api = api;
+    this.addressType = addressType;
+    this.protocolType = protocolType;
+    this.description = description;
+    this.addresses = Arrays.asList(addresses);
+  }
 }
