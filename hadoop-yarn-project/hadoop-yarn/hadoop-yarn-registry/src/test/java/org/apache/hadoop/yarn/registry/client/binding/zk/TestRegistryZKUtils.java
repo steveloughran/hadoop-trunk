@@ -25,25 +25,34 @@ import org.junit.Test;
 public class TestRegistryZKUtils extends Assert {
   @Test
   public void testPaths() throws Throwable {
-    assertCreatedPathEquals("/","/","");
-    assertCreatedPathEquals("/","","");
-    assertCreatedPathEquals("/","","/");
-    
-    assertCreatedPathEquals("/a","/a","");
-    assertCreatedPathEquals("/a","/","a");
-    assertCreatedPathEquals("/a/b","/a","b");
-    assertCreatedPathEquals("/a/b","/a/","b");
-    assertCreatedPathEquals("/a/b","/a","/b");
-    assertCreatedPathEquals("/a/b","/a","/b/");
-    assertCreatedPathEquals("/a","/a","/");
+    assertCreatedPathEquals("/", "/", "");
+    assertCreatedPathEquals("/", "", "");
+    assertCreatedPathEquals("/", "", "/");
+
+    assertCreatedPathEquals("/a", "/a", "");
+    assertCreatedPathEquals("/a", "/", "a");
+    assertCreatedPathEquals("/a/b", "/a", "b");
+    assertCreatedPathEquals("/a/b", "/a/", "b");
+    assertCreatedPathEquals("/a/b", "/a", "/b");
+    assertCreatedPathEquals("/a/b", "/a", "/b/");
+    assertCreatedPathEquals("/a", "/a", "/");
+  }
+
+  @Test
+  public void testComplexPaths() throws Throwable {
+    assertCreatedPathEquals("/", "", "");
+    assertCreatedPathEquals("/yarn/registry/users/hadoop/org-apache-hadoop",
+        "/yarn/registry",
+        "users/hadoop/org-apache-hadoop/");
+
   }
 
 
   private static void assertCreatedPathEquals(String expected, String base,
       String path) throws RESTIOException {
     String fullPath = RegistryZKUtils.createFullPath(base, path);
-    assertEquals("\""+base+"\" + \""+path+"\" =\"" + fullPath +"\"",
+    assertEquals("\"" + base + "\" + \"" + path + "\" =\"" + fullPath + "\"",
         expected, fullPath);
-    
+
   }
 }
