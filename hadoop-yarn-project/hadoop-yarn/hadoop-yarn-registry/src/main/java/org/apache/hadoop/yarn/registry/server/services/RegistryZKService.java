@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.server.services;
 
+import com.google.common.base.Preconditions;
 import org.apache.curator.RetrySleeper;
 import org.apache.curator.ensemble.EnsembleProvider;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
@@ -32,6 +33,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import org.apache.hadoop.yarn.registry.client.binding.zk.ZKUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.ExceptionGenerator;
 import org.apache.http.HttpStatus;
 import org.apache.zookeeper.CreateMode;
@@ -82,9 +84,11 @@ public class RegistryZKService extends AbstractService
   protected void serviceStart() throws Exception {
     super.serviceStart();
 
-    String root = getConfig().get(ZK_ROOT, REGISTRY_ROOT);
+    String root = getConfig().get(ZK_ROOT, REGISTRY_NAMESPACE);
+    LOG.debug("Creating Registry with root {}", root);
 
     rootACL = getACLs(ZK_ACL, PERMISSIONS_REGISTRY_ROOT);
+/*
     CuratorFramework rootCurator = newCurator("");
     try {
       if (rootCurator.checkExists().forPath(root) == null) {
@@ -94,7 +98,10 @@ public class RegistryZKService extends AbstractService
       IOUtils.closeStream(rootCurator);
     }
     rootCurator.close();
-    zk = newCurator(root);
+*/
+//    zk = newCurator(root);
+    zk = newCurator("");
+    maybeCreate("/", CreateMode.PERSISTENT, rootACL);
   }
 
   /**
@@ -156,6 +163,7 @@ public class RegistryZKService extends AbstractService
         DEFAULT_ZK_RETRY_INTERVAL);
     int retryCeiling = conf.getInt(ZK_RETRY_CEILING, DEFAULT_ZK_RETRY_CEILING);
 
+    LOG.debug("Creating Curator ");
     CuratorFrameworkFactory.Builder b = CuratorFrameworkFactory.builder();
     b.ensembleProvider(ensembleProvider)
      .connectionTimeoutMs(connectionTimeout)
@@ -163,6 +171,17 @@ public class RegistryZKService extends AbstractService
      .retryPolicy(new BoundedExponentialBackoffRetry(retryInterval,
          retryTimes,
          retryCeiling));
+
+
+/*
+    if (!root.isEmpty()) {
+      String namespace = root;
+      if (namespace.startsWith("/")) {
+        namespace = namespace.substring(1);
+      }
+      b.namespace(namespace);
+    }
+*/
 
     CuratorFramework framework = b.build();
     framework.start();
@@ -195,16 +214,26 @@ public class RegistryZKService extends AbstractService
   private IOException operationFailure(String path,
       String operation,
       Exception exception) {
+    IOException ioe;
     if (exception instanceof KeeperException.NoNodeException) {
-      return new FileNotFoundException(path);
+      ioe = new FileNotFoundException(path);
     } else if (exception instanceof KeeperException.NodeExistsException) {
-      return new FileAlreadyExistsException(path);
+      ioe =
+          new FileAlreadyExistsException(path);
+      return ioe;
+    } else {
+      ioe = ExceptionGenerator.generate(
+          HttpStatus.SC_INTERNAL_SERVER_ERROR,
+          path,
+          "Failure of " + operation + " on " + path + ": " +
+          exception.toString(),
+          exception);
     }
-    return ExceptionGenerator.generate(
-        HttpStatus.SC_INTERNAL_SERVER_ERROR,
-        path,
-        "Failure of " + operation + " on " + path,
-        exception);
+    if (ioe.getCause() == null) {
+      ioe.initCause(exception);
+    }
+
+    return ioe;
   }
 
   /**
@@ -252,10 +281,14 @@ public class RegistryZKService extends AbstractService
    * @throws IOException
    */
   public boolean exists(String path) throws IOException {
+    Preconditions.checkNotNull(zk, "zookeeper binding");
     try {
+      ZKUtils.validateZKPath(path);
       LOG.debug("Exists({})", path);
 
       return zk.checkExists().forPath(path) != null;
+    } catch (FileNotFoundException e) {
+      return false;
     } catch (Exception e) {
       throw operationFailure(path, "existence check", e);
     }
@@ -299,6 +332,7 @@ public class RegistryZKService extends AbstractService
    */
   protected void mkdir(String path, CreateMode mode, List<ACL> acl) throws
       IOException {
+    ZKUtils.validateZKPath(path);
     try {
       zk.create().withMode(mode).withACL(acl).forPath(path);
       LOG.debug("Created path {} with mode {} and ACL {}", path, mode, acl );
@@ -319,6 +353,7 @@ public class RegistryZKService extends AbstractService
       CreateMode mode,
       byte[] data,
       List<ACL> acl) throws IOException {
+    ZKUtils.validateZKPath(path);
     try {
       LOG.debug("Creating {} with {} bytes", path, data.length);
       zk.create().withMode(mode).withACL(acl).forPath(path, data);
@@ -334,6 +369,7 @@ public class RegistryZKService extends AbstractService
    * @throws IOException
    */
   public void update(String path, byte[] data) throws IOException {
+    ZKUtils.validateZKPath(path);
     try {
       LOG.debug("Updating {} with {} bytes", path, data.length);
       zk.setData().forPath(path, data);
@@ -365,6 +401,7 @@ public class RegistryZKService extends AbstractService
    * @throws IOException
    */
   public void rm(String path, boolean recursive) throws IOException {
+    ZKUtils.validateZKPath(path);
     try {
       LOG.debug("Deleting {}", path);
       DeleteBuilder delete = zk.delete();
@@ -380,6 +417,7 @@ public class RegistryZKService extends AbstractService
   }
   
   public List<String> ls(String path) throws IOException {
+    ZKUtils.validateZKPath(path);
     try {
       LOG.debug("ls {}", path);
       GetChildrenBuilder builder = zk.getChildren();
@@ -398,6 +436,7 @@ public class RegistryZKService extends AbstractService
    * @throws IOException read failure
    */
   public byte[] read(String path) throws IOException {
+    ZKUtils.validateZKPath(path);
     try {
       LOG.debug("Reading {}", path);
       return zk.getData().forPath(path);

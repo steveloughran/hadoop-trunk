@@ -52,7 +52,12 @@ public interface RegistryConstants {
   int DEFAULT_ZK_RETRY_INTERVAL = 1000;
   int DEFAULT_ZK_RETRY_CEILING = 1000;
   String REGISTRY_ROOT = "/yarnRegistry";
-  String HOSTNAME_PATTERN = "[a-z0-9_]+";
+  String REGISTRY_NAMESPACE = "yarnregistry";
+  /**
+   * Pattern of a hostname 
+   */
+  String HOSTNAME_PATTERN = 
+      "([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])";
   String COMPONENT_NAME_PATTERN = HOSTNAME_PATTERN;
   String SERVICE_NAME_PATTERN = HOSTNAME_PATTERN;
   String SERVICE_CLASS_PATTERN = HOSTNAME_PATTERN;

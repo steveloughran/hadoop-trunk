@@ -39,9 +39,27 @@ import java.net.UnknownHostException;
  */
 public class InMemoryZKService extends AbstractService {
 
+
+  /**
+   * Tick time{ {@value}}
+   */
   public static final String KEY_TICK_TIME = "zkservice.ticktime";
+
+  /**
+   * port; 0 or below means "any" {@value}
+   */
   public static final String KEY_PORT = "zkservice.port";
+
+  /**
+   * Directory containing data: {@value}
+   */
   public static final String KEY_DATADIR = "zkservice.datadir";
+
+  /**
+   * Default directory containing data: {@value}
+   */
+  public static final String DEFAULT_DATADIR = "target/zookeeper";
+  
   private static final Logger
       LOG = LoggerFactory.getLogger(InMemoryZKService.class);
 
@@ -77,7 +95,7 @@ public class InMemoryZKService extends AbstractService {
     port = getConfig().getInt(KEY_PORT, 0);
     tickTime = getConfig().getInt(KEY_TICK_TIME,
         ZooKeeperServer.DEFAULT_TICK_TIME);
-    dataDir = new File(getConfig().get(KEY_DATADIR, "target/zookeeper"));
+    dataDir = new File(getConfig().get(KEY_DATADIR, DEFAULT_DATADIR));
   }
 
   @Override

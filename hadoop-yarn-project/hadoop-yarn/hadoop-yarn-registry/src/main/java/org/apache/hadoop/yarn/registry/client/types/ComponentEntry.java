@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.types;
 
+import com.google.common.base.Preconditions;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 import java.util.HashMap;
@@ -41,4 +42,16 @@ public class ComponentEntry {
   public Map<String, Endpoint> external =  new HashMap<String, Endpoint>();
   public Map<String, Endpoint> internal =  new HashMap<String, Endpoint>();
   
+  
+  public void putExternal(String name, Endpoint endpoint) {
+    Preconditions.checkArgument(name != null);
+    Preconditions.checkArgument(endpoint != null);
+    external.put(name, endpoint);
+  }
+  
+  public void putInternal(String name, Endpoint endpoint) {
+    Preconditions.checkArgument(name != null);
+    Preconditions.checkArgument(endpoint != null);
+    external.put(name, endpoint);
+  }
 }

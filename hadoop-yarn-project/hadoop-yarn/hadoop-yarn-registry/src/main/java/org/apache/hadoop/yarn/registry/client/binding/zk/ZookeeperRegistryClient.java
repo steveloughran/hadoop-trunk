@@ -64,11 +64,17 @@ public class ZookeeperRegistryClient extends RegistryZKService
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
+  }
+
+  @Override
+  protected void serviceStart() throws Exception {
+    super.serviceStart();
     // create the root directories
     if (maybeCreate(SYSTEM_PATH, CreateMode.PERSISTENT)) {
       LOG.info("Created ");
     }
-    maybeCreate(USERS_PATH, CreateMode.PERSISTENT, parseACLs(PERMISSIONS_REGISTRY_USERS));
+    maybeCreate(USERS_PATH, CreateMode.PERSISTENT,
+        parseACLs(PERMISSIONS_REGISTRY_USERS));
     maybeCreate(SYSTEM_PATH, CreateMode.PERSISTENT,
         parseACLs(PERMISSIONS_REGISTRY_SYSTEM));
   }
@@ -149,7 +155,7 @@ public class ZookeeperRegistryClient extends RegistryZKService
   }
 
   @Override
-  public List<String> getServiceClasses(String user) throws IOException {
+  public List<String> listServiceClasses(String user) throws IOException {
     return listChildren(buildUserPath(user));
   }
 

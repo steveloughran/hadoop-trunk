@@ -26,7 +26,7 @@ import java.util.List;
 
 public interface RegistryReader {
   
-  public List<String> getServiceClasses(String user) throws IOException;
+  public List<String> listServiceClasses(String user) throws IOException;
 
   public boolean serviceClassExists(String user, String serviceClass)
       throws IOException;
