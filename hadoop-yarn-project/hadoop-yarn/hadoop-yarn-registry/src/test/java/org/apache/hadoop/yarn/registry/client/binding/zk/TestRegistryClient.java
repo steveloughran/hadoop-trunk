@@ -21,14 +21,12 @@ package org.apache.hadoop.yarn.registry.client.binding.zk;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
-import org.apache.hadoop.yarn.registry.client.api.LivenessOptions;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
 import org.apache.hadoop.yarn.registry.client.types.TypeUtils;
-import org.apache.hadoop.yarn.registry.server.services.RegistryZKService;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -100,11 +98,15 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
   @Test
   public void testDeleteServiceEntry() throws Throwable {
     putExampleServiceEntry();
-    client.deleteServiceEntry(USER, SC_HADOOP, CLUSTERNAME);
+    deleteExampleServiceEntry();
     List<String> hadoopServices = client.listServices(USER, SC_HADOOP);
     assertEquals(0, hadoopServices.size());
     assertTrue(client.serviceClassExists(USER, SC_HADOOP));
     assertFalse(client.serviceExists(USER, SC_HADOOP, CLUSTERNAME));
+  }
+
+  protected void deleteExampleServiceEntry() throws IOException {
+    client.deleteServiceEntry(USER, SC_HADOOP, CLUSTERNAME);
   }
 
   @Test
@@ -146,7 +148,7 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
         false);
     assertEquals(1, client.listComponents(USER, SC_HADOOP,
         CLUSTERNAME).size());
-    client.deleteServiceEntry(USER, SC_HADOOP, CLUSTERNAME);
+    deleteExampleServiceEntry();
 
     // verify that when the service is deleted, so go the components
     assertEquals(0, client.listComponents(USER, SC_HADOOP,
@@ -185,7 +187,7 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
 
   @Test(expected = FileNotFoundException.class)
   public void testPutComponentNoService() throws Throwable {
-    client.deleteServiceEntry(USER, SC_HADOOP, CLUSTERNAME);
+    deleteExampleServiceEntry();
 
     client.putComponent(USER,
         SC_HADOOP,
@@ -281,47 +283,70 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
   @Test
   public void testServiceLiveness() throws Throwable {
     putExampleServiceEntry();
-    putServiceLiveness(LivenessOptions.CreateEphemeralLivenessEntry);
+    putServiceLiveness(true);
 
-    assertTrue("service is not live",
-        client.isServiceLive(USER, SC_HADOOP, CLUSTERNAME));
+    assertTrue("service is not live", isServiceLive());
 
-    putServiceLiveness(LivenessOptions.DeleteLivenessEntry);
-    assertFalse("service is live",
-        client.isServiceLive(USER, SC_HADOOP, CLUSTERNAME));
+    deleteServiceLiveness();
+    assertFalse("service is live", isServiceLive());
     
-    putServiceLiveness(LivenessOptions.CreateStaticLivenessEntry);
-    assertTrue("service is not live",
-        client.isServiceLive(USER, SC_HADOOP, CLUSTERNAME));
+    putServiceLiveness(false);
+    assertTrue("service is not live", isServiceLive());
 
-    try {
-      putServiceLiveness(LivenessOptions.CreateEphemeralLivenessEntry);
-      fail("expected an exception");
-    } catch (FileAlreadyExistsException expected) {
+  }
 
-    }
-
-
+  protected boolean isServiceLive() throws IOException {
+    return client.isServiceLive(USER, SC_HADOOP, CLUSTERNAME);
   }
 
   @Test(expected = FileAlreadyExistsException.class)
-  public void testServiceLivenessOverwrite() throws Throwable {
+  public void testPutServiceLivenessOverwrite() throws Throwable {
     putExampleServiceEntry();
-    putServiceLiveness(LivenessOptions.CreateEphemeralLivenessEntry);
-    putServiceLiveness(LivenessOptions.CreateEphemeralLivenessEntry);
+    putServiceLiveness(true);
+    putServiceLiveness(true);
   }
 
-  @Test(expected = FileNotFoundException.class)
-  public void testServiceLivenessNoService() throws Throwable {
-    putServiceLiveness(LivenessOptions.CreateEphemeralLivenessEntry);
+  @Test
+  public void testPutServiceLivenessNoService() throws Throwable {
+    deleteExampleServiceEntry();
+
+    try {
+      putServiceLiveness(true);
+      // if this is reached then parent directories are being created
+      // when they should not
+      fail("expected a failure, but the service liveness is " + isServiceLive());
+    } catch (FileNotFoundException e) {
+
+    }
+
+  }
+
+  @Test
+  public void testServiceLivenessMissingService() throws Throwable {
+    deleteExampleServiceEntry();
+    assertFalse("service is live", isServiceLive());
+  }
+
+  @Test
+  public void testDeleteServiceLivenessOfMissingServiceHarmless() throws
+      Throwable {
+    deleteExampleServiceEntry();
+    deleteServiceLiveness();
+    deleteServiceLiveness();
   }
   
-  
-  protected void putServiceLiveness(LivenessOptions livenessOption) throws
+  protected void putServiceLiveness(boolean ephemeral) throws
       IOException {
     client.putServiceLiveness(USER,
         SC_HADOOP,
-        CLUSTERNAME, livenessOption);
+        CLUSTERNAME, ephemeral);
+  }
+  
+  protected void deleteServiceLiveness() throws
+      IOException {
+    client.deleteServiceLiveness(USER,
+        SC_HADOOP,
+        CLUSTERNAME);
   }
 
   /**

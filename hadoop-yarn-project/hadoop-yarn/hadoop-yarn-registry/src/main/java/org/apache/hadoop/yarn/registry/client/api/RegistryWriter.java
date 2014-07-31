@@ -60,12 +60,15 @@ public interface RegistryWriter extends RegistryReader {
    * @param user
    * @param serviceClass
    * @param serviceName
-   * @param livenessOption
+   * @param ephemeral
    * @throws FileAlreadyExistsException if the entry already exists.
    * @throws IOException on any failure
    */
   public void putServiceLiveness(String user,
       String serviceClass,
-      String serviceName,
-      LivenessOptions livenessOption) throws IOException;
+      String serviceName, boolean ephemeral) throws IOException;
+  
+  public void deleteServiceLiveness(String user,
+      String serviceClass,
+      String serviceName) throws IOException;
 }
