@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry.client.binding.zk;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryWriter;
 import org.apache.hadoop.yarn.registry.client.api.LivenessOptions;
 import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.List;
 
+import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.buildComponentListPath;
 import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.buildComponentPath;
 import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.buildServiceClassPath;
 import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.buildServicePath;
@@ -97,8 +99,13 @@ public class ZookeeperRegistryClient extends RegistryZKService
       ServiceEntry entry) throws IOException {
     byte[] bytes = serviceEntryMarshal.toBytes(entry);
     maybeCreateServiceClassPath(user, serviceClass);
-    String path = buildServicePath(user, serviceClass, serviceName);
-    set(path, CreateMode.PERSISTENT, bytes, fullUserAccess(user));
+    String servicePath = buildServicePath(user, serviceClass, serviceName);
+    List<ACL> userAccess = fullUserAccess(user);
+    if (set(servicePath, CreateMode.PERSISTENT, bytes, userAccess)) {
+      maybeCreate(servicePath + RegistryConstants.COMPONENTS,
+          CreateMode.PERSISTENT,
+          userAccess);
+    }
   }
 
   @Override
@@ -183,7 +190,10 @@ public class ZookeeperRegistryClient extends RegistryZKService
       ComponentEntry entry,
       boolean ephemeral) throws IOException {
 
-    pathMustExist(buildServicePath(user, serviceClass, serviceName));
+    String servicePath = pathMustExist(buildServicePath(user, serviceClass, serviceName));
+    maybeCreate(servicePath + RegistryConstants.COMPONENTS,
+        CreateMode.PERSISTENT,
+        fullUserAccess(user));
     String componentPath =
         buildComponentPath(user, serviceClass, serviceName, componentName);
     set(componentPath,
@@ -238,7 +248,7 @@ public class ZookeeperRegistryClient extends RegistryZKService
   public List<String> listComponents(String user,
       String serviceClass,
       String serviceName) throws IOException {
-    return listChildren(buildServicePath(user, serviceClass, serviceName));
+    return listChildren(buildComponentListPath(user, serviceClass, serviceName));
   }
 
   @Override
