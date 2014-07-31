@@ -23,6 +23,11 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+/**
+ * Select an entry at random. This may return the same entry on two
+ * successive calls.
+ * @param <T>
+ */
 public class RandomSelector<T> extends Selector<T> {
 
   private final Random random;

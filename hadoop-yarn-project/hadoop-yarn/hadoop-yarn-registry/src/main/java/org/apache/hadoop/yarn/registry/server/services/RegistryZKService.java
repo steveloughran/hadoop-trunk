@@ -27,7 +27,6 @@ import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.api.DeleteBuilder;
 import org.apache.curator.framework.api.GetChildrenBuilder;
 import org.apache.curator.retry.BoundedExponentialBackoffRetry;
-import org.apache.curator.utils.ZKPaths;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.io.IOUtils;
@@ -111,7 +110,7 @@ public class RegistryZKService extends AbstractService
    * Close the ZK connection if it is open
    */
   @Override
-  public void serviceStop() {
+  public void serviceStop() throws Exception {
     IOUtils.closeStream(zk);
   }
 
@@ -149,8 +148,10 @@ public class RegistryZKService extends AbstractService
 
 
   /**
-   * Create a new curator instance off the root path
-   * @param root
+   * Create a new curator instance off the root path; using configuration
+   * options provided in the service configuration to set timeouts and
+   * retry policy.
+   * @param root root path
    * @return the newly created creator
    */
   private CuratorFramework newCurator(String root) {
@@ -230,8 +231,7 @@ public class RegistryZKService extends AbstractService
     if (exception instanceof KeeperException.NoNodeException) {
       ioe = new FileNotFoundException(path);
     } else if (exception instanceof KeeperException.NodeExistsException) {
-      ioe =
-          new FileAlreadyExistsException(path);
+      ioe = new FileAlreadyExistsException(path);
       return ioe;
     } else {
       ioe = ExceptionGenerator.generate(
@@ -277,7 +277,7 @@ public class RegistryZKService extends AbstractService
   public boolean maybeCreate(String path,
       CreateMode mode,
       List<ACL> acl) throws IOException {
-    if (!exists(path)) {
+    if (!pathExists(path)) {
       mkdir(path, mode, acl);
       return true;
     }
@@ -292,7 +292,7 @@ public class RegistryZKService extends AbstractService
    * queried.
    * @throws IOException
    */
-  public boolean exists(String path) throws IOException {
+  public boolean pathExists(String path) throws IOException {
     Preconditions.checkNotNull(zk, "zookeeper binding");
     try {
       path = createFullPath(path);
@@ -306,9 +306,9 @@ public class RegistryZKService extends AbstractService
     }
   }
 
-  protected boolean existsRobust(String path) {
+  protected boolean pathExistsRobust(String path) {
     try {
-      return exists(path);
+      return pathExists(path);
     } catch (IOException e) {
       return false;
     }
@@ -320,10 +320,11 @@ public class RegistryZKService extends AbstractService
    * @throws FileNotFoundException if the path is absent
    * @throws IOException
    */
-  public void verifyExists(String path) throws IOException {
-    if (!exists(path)) {
+  public String pathMustExist(String path) throws IOException {
+    if (!pathExists(path)) {
       throw new FileNotFoundException(path);
     }
+    return path;
   }
 
   /**
@@ -397,15 +398,18 @@ public class RegistryZKService extends AbstractService
    * @param data data
    * @param acl ACL for path -used when creating a new entry
    * @throws IOException
+   * @return true if the entry was created, false if it was simply updated.
    */
-  public void set(String path,
+  public boolean  set(String path,
       CreateMode mode,
       byte[] data,
       List<ACL> acl) throws IOException {
-    if (!exists(path)) {
+    if (!pathExists(path)) {
       create(path, mode, data, acl);
+      return true;
     } else {
       update(path, data);
+      return false;
     }
   }
 
@@ -417,27 +421,27 @@ public class RegistryZKService extends AbstractService
    * @throws IOException
    */
   public void rm(String path, boolean recursive) throws IOException {
-    path = createFullPath(path);
+    String fullpath = createFullPath(path);
     try {
-      LOG.debug("Deleting {}", path);
+      LOG.debug("Deleting {}", fullpath);
       DeleteBuilder delete = zk.delete();
       if (recursive) {
         delete.deletingChildrenIfNeeded();
       }
-      delete.forPath(path);
+      delete.forPath(fullpath);
     } catch (KeeperException.NoNodeException e) {
       // not an error
     } catch (Exception e) {
-      throw operationFailure(path, "delete()", e);
+      throw operationFailure(fullpath, "delete()", e);
     }
   }
 
   public List<String> ls(String path) throws IOException {
-    path = createFullPath(path);
+    String fullpath = createFullPath(path);
     try {
-      LOG.debug("ls {}", path);
+      LOG.debug("ls {}", fullpath);
       GetChildrenBuilder builder = zk.getChildren();
-      List<String> children = builder.forPath(path);
+      List<String> children = builder.forPath(fullpath);
       return children;
 
     } catch (Exception e) {
@@ -452,17 +456,23 @@ public class RegistryZKService extends AbstractService
    * @throws IOException read failure
    */
   public byte[] read(String path) throws IOException {
-    path = createFullPath(path);
+    String fullpath = createFullPath(path);
     try {
-      LOG.debug("Reading {}", path);
-      return zk.getData().forPath(path);
+      LOG.debug("Reading {}", fullpath);
+      return zk.getData().forPath(fullpath);
     } catch (Exception e) {
-      throw operationFailure(path, "read() " + path, e);
+      throw operationFailure(fullpath, "read()", e);
     }
   }
 
+  /**
+   * List the children of a path
+   * @param path path of operation
+   * @return the children -or an empty list if the path does not exist
+   * @throws IOException read failure
+   */
   public List<String> listChildren(String path) throws IOException {
-    if (!exists(path)) {
+    if (!pathExists(path)) {
       return Collections.emptyList();
     }
     return ls(path);

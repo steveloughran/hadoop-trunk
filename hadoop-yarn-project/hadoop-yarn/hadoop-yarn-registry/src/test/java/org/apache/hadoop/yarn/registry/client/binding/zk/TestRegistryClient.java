@@ -18,19 +18,25 @@
 
 package org.apache.hadoop.yarn.registry.client.binding.zk;
 
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
+import org.apache.hadoop.yarn.registry.client.api.LivenessOptions;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
 import org.apache.hadoop.yarn.registry.client.types.TypeUtils;
+import org.apache.hadoop.yarn.registry.server.services.RegistryZKService;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -43,6 +49,9 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
   public static final String DATANODE = "datanode";
   public static final String API_WEBHDFS = "org_apache_hadoop_namenode_webhdfs";
   public static final String API_HDFS = "org_apache_hadoop_namenode_dfs";
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestRegistryClient.class);
+  
   private ZookeeperRegistryClient client;
 
   @Before
@@ -61,13 +70,7 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
   @Test
   public void testPutServiceEntry() throws Throwable {
 
-    ServiceEntry se = new ServiceEntry();
-    se.description = methodName.getMethodName();
-    addSampleEndpoints(se, "namenode");
-
-    client.putServiceEntry(USER, SC_HADOOP,
-        CLUSTERNAME,
-        se);
+    putExampleServiceEntry();
 
     List<String> serviceClasses = client.listServiceClasses(USER);
     assertEquals(1, serviceClasses.size());
@@ -82,10 +85,21 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
     assertTrue(client.serviceExists(USER, SC_HADOOP, CLUSTERNAME));
   }
 
+  protected ServiceEntry putExampleServiceEntry() throws IOException {
+    ServiceEntry se = new ServiceEntry();
+    se.description = methodName.getMethodName();
+    addSampleEndpoints(se, "namenode");
+
+    client.putServiceEntry(USER, SC_HADOOP,
+        CLUSTERNAME,
+        se);
+    return se;
+  }
+
 
   @Test
   public void testDeleteServiceEntry() throws Throwable {
-    testPutServiceEntry();
+    putExampleServiceEntry();
     client.deleteServiceEntry(USER, SC_HADOOP, CLUSTERNAME);
     List<String> hadoopServices = client.listServices(USER, SC_HADOOP);
     assertEquals(0, hadoopServices.size());
@@ -95,7 +109,7 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
 
   @Test
   public void testPutComponentEntry() throws Throwable {
-    testPutServiceEntry();
+    putExampleServiceEntry();
 
     ComponentEntry component = new ComponentEntry();
     addSampleEndpoints(component, DATANODE);
@@ -113,6 +127,9 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
     assertTrue(client.serviceClassExists(USER, SC_HADOOP));
     List<String> components = client.listComponents(USER, SC_HADOOP,
         CLUSTERNAME);
+    for (String name : components) {
+      LOG.info(name);
+    }
     assertEquals(1, components.size());
 
     assertEquals(DATANODE, components.get(0));
@@ -180,7 +197,7 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
 
   @Test
   public void testOverwriteComponentEntry() throws Throwable {
-    testPutServiceEntry();
+    putExampleServiceEntry();
     ComponentEntry entry1 = new ComponentEntry();
     entry1.description = "entry1";
     addSampleEndpoints(entry1, "entry1");
@@ -228,7 +245,7 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
 
   @Test
   public void testReadServiceEntry() throws Throwable {
-    testPutServiceEntry();
+    putExampleServiceEntry();
     ServiceEntry instance = client.getServiceInstance(USER,
         SC_HADOOP,
         CLUSTERNAME);
@@ -241,7 +258,7 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
 
   @Test
   public void testReadComponent() throws Throwable {
-    testPutServiceEntry();
+    putExampleServiceEntry();
     ComponentEntry entry = new ComponentEntry();
     entry.description = methodName.getMethodName();
     addSampleEndpoints(entry, "datanode");
@@ -261,6 +278,51 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
     validateEntry(instance);
   }
 
+  @Test
+  public void testServiceLiveness() throws Throwable {
+    putExampleServiceEntry();
+    putServiceLiveness(LivenessOptions.CreateEphemeralLivenessEntry);
+
+    assertTrue("service is not live",
+        client.isServiceLive(USER, SC_HADOOP, CLUSTERNAME));
+
+    putServiceLiveness(LivenessOptions.DeleteLivenessEntry);
+    assertFalse("service is live",
+        client.isServiceLive(USER, SC_HADOOP, CLUSTERNAME));
+    
+    putServiceLiveness(LivenessOptions.CreateStaticLivenessEntry);
+    assertTrue("service is not live",
+        client.isServiceLive(USER, SC_HADOOP, CLUSTERNAME));
+
+    try {
+      putServiceLiveness(LivenessOptions.CreateEphemeralLivenessEntry);
+      fail("expected an exception");
+    } catch (FileAlreadyExistsException expected) {
+
+    }
+
+
+  }
+
+  @Test(expected = FileAlreadyExistsException.class)
+  public void testServiceLivenessOverwrite() throws Throwable {
+    putExampleServiceEntry();
+    putServiceLiveness(LivenessOptions.CreateEphemeralLivenessEntry);
+    putServiceLiveness(LivenessOptions.CreateEphemeralLivenessEntry);
+  }
+
+  @Test(expected = FileNotFoundException.class)
+  public void testServiceLivenessNoService() throws Throwable {
+    putServiceLiveness(LivenessOptions.CreateEphemeralLivenessEntry);
+  }
+  
+  
+  protected void putServiceLiveness(LivenessOptions livenessOption) throws
+      IOException {
+    client.putServiceLiveness(USER,
+        SC_HADOOP,
+        CLUSTERNAME, livenessOption);
+  }
 
   /**
    * Add some endpoints

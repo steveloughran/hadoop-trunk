@@ -49,14 +49,12 @@ public abstract class AbstractRegistryReaderService extends AbstractService impl
   public boolean serviceClassExists(String user, String serviceClass) throws
       IOException {
     throw notImplemented();
-
   }
 
   @Override
   public List<String> listServices(String user, String serviceClass) throws
       IOException {
     throw notImplemented();
-
   }
 
   @Override
@@ -64,7 +62,6 @@ public abstract class AbstractRegistryReaderService extends AbstractService impl
       String serviceClass,
       String serviceName) throws IOException {
     throw notImplemented();
-
   }
 
   @Override
@@ -72,7 +69,6 @@ public abstract class AbstractRegistryReaderService extends AbstractService impl
       String serviceClass,
       String serviceName) throws IOException {
     throw notImplemented();
-
   }
 
   @Override
@@ -80,7 +76,6 @@ public abstract class AbstractRegistryReaderService extends AbstractService impl
       String serviceClass,
       String serviceName) throws IOException {
     throw notImplemented();
-
   }
 
   @Override
@@ -89,7 +84,6 @@ public abstract class AbstractRegistryReaderService extends AbstractService impl
       String serviceName,
       String componentName) throws IOException {
     throw notImplemented();
-
   }
 
   @Override
@@ -98,8 +92,12 @@ public abstract class AbstractRegistryReaderService extends AbstractService impl
       String serviceName,
       String componentName) throws IOException {
     throw notImplemented();
-
   }
 
-
+  @Override
+  public boolean isServiceLive(String user,
+      String serviceClass,
+      String serviceName) throws IOException {
+    throw notImplemented();
+  }
 }

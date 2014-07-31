@@ -47,30 +47,30 @@ public class TestRegistryZKService extends AbstractZKRegistryTest {
 
   @Test
   public void testExists() throws Throwable {
-    assertTrue(registry.exists("/"));
+    assertTrue(registry.pathExists("/"));
   }
 
   @Test
   public void testExistsMissing() throws Throwable {
-    assertFalse(registry.exists(MISSING));
+    assertFalse(registry.pathExists(MISSING));
   }
 
   @Test
   public void testVerifyExists() throws Throwable {
-    registry.verifyExists("/");
+    registry.pathMustExist("/");
   }
 
   @Test(expected = FileNotFoundException.class)
   public void testVerifyExistsMissing() throws Throwable {
-    registry.verifyExists(MISSING);
+    registry.pathMustExist(MISSING);
   }
 
   @Test
   public void testMkdirs() throws Throwable {
     registry.mkdir("/p1", CreateMode.PERSISTENT);
-    registry.verifyExists("/p1");
+    registry.pathMustExist("/p1");
     registry.mkdir("/p1/p2", CreateMode.EPHEMERAL);
-    registry.verifyExists("/p1/p2");
+    registry.pathMustExist("/p1/p2");
   }
 
   @Test(expected = FileNotFoundException.class)
@@ -120,7 +120,7 @@ public class TestRegistryZKService extends AbstractZKRegistryTest {
         CreateMode.PERSISTENT, getTestBuffer(),
         registry.getRootACL()
     );
-    registry.verifyExists("/testCreate");
+    registry.pathMustExist("/testCreate");
   }
 
   @Test
@@ -179,7 +179,7 @@ public class TestRegistryZKService extends AbstractZKRegistryTest {
 
 
   public void verifyNotExists(String path) throws IOException {
-    if (registry.exists(path)) {
+    if (registry.pathExists(path)) {
       fail("Path should not exist: " + path);
     }
   }

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.api;
 
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
 
@@ -52,4 +53,19 @@ public interface RegistryWriter extends RegistryReader {
       String serviceName,
       String componentName)
       throws IOException;
+
+  /**
+   * Set the service liveness options. 
+   * It is an error to create an en
+   * @param user
+   * @param serviceClass
+   * @param serviceName
+   * @param livenessOption
+   * @throws FileAlreadyExistsException if the entry already exists.
+   * @throws IOException on any failure
+   */
+  public void putServiceLiveness(String user,
+      String serviceClass,
+      String serviceName,
+      LivenessOptions livenessOption) throws IOException;
 }

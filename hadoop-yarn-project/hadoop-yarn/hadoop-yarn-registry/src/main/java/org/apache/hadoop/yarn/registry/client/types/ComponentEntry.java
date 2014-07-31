@@ -27,7 +27,7 @@ import java.util.Map;
 @JsonIgnoreProperties(ignoreUnknown = true)
 
 /**
- * A single component
+ * JSON-marshallable description of a single component
  */
 public class ComponentEntry {
 

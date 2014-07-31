@@ -64,4 +64,5 @@ public interface RegistryConstants {
   String USERNAME_PATTERN = HOSTNAME_PATTERN;
   String USERS_PATH = "users/";
   String SYSTEM_PATH = "system/";
+  String LIVE = "/live";
 }

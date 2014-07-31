@@ -25,6 +25,9 @@ import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
+/**
+ * Code to generate exceptions from HTTP status codes.
+ */
 public class ExceptionGenerator {
 
   @SuppressWarnings("ThrowableInstanceNeverThrown")

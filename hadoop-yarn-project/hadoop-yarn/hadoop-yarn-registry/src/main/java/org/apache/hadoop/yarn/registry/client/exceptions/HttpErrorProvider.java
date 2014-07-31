@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.yarn.registry.client.exceptions;
 
+/**
+ * An interface that can be offered by any Exception which serves up
+ * HTTP error codes.
+ */
 public interface HttpErrorProvider {
 
   int getStatusCode();
