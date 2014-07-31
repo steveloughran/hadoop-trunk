@@ -63,5 +63,17 @@ public interface RegistryReader {
       String serviceClass,
       String serviceName,
       String componentName) throws IOException;
+
+  /**
+   * Probe for the service liveness entry existing
+   * @param user
+   * @param serviceClass
+   * @param serviceName
+   * @return
+   * @throws IOException
+   */
+  public boolean isServiceLive(String user,
+      String serviceClass,
+      String serviceName) throws IOException;
 }
 

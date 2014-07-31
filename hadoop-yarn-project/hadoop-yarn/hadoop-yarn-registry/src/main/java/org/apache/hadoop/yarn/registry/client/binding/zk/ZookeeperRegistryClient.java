@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.registry.client.binding.zk;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.registry.client.api.RegistryWriter;
+import org.apache.hadoop.yarn.registry.client.api.LivenessOptions;
 import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
 import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
@@ -55,6 +56,7 @@ public class ZookeeperRegistryClient extends RegistryZKService
   public static final String PERMISSIONS_REGISTRY_SYSTEM = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_USERS = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_USER = "world:anyone:rwcda";
+  private static byte[] NO_DATA = new byte[0];
 
   public ZookeeperRegistryClient(String name) {
     super(name);
@@ -99,6 +101,49 @@ public class ZookeeperRegistryClient extends RegistryZKService
     set(path, CreateMode.PERSISTENT, bytes, fullUserAccess(user));
   }
 
+  @Override
+  public void putServiceLiveness(String user,
+      String serviceClass,
+      String serviceName,
+      LivenessOptions livenessOption) throws IOException {
+    String liveness = livenessPath(user, serviceClass, serviceName);
+    LOG.debug("putServiceLiveness() on {} => {}", liveness, livenessOption);
+    switch (livenessOption) {
+      case CreateStaticLivenessEntry:
+        create(liveness, CreateMode.PERSISTENT, NO_DATA, fullUserAccess(user));
+        break;
+      case CreateEphemeralLivenessEntry:
+        create(liveness, CreateMode.EPHEMERAL, NO_DATA, fullUserAccess(user));
+        break;
+      case DeleteLivenessEntry:
+        rm(liveness, false);
+    }
+  }
+
+  /**
+   * build the liveness path
+   * @param user
+   * @param serviceClass
+   * @param serviceName
+   * @return
+   * @throws IOException
+   */
+  protected String livenessPath(String user,
+      String serviceClass,
+      String serviceName) throws IOException {
+    String servicePath =
+        pathMustExist(buildServicePath(user, serviceClass, serviceName));
+    return servicePath + LIVE;
+  }
+
+  @Override
+  public boolean isServiceLive(String user,
+      String serviceClass,
+      String serviceName) throws IOException {
+    String path = livenessPath(user, serviceClass, serviceName);
+    return pathExists(path);
+  }
+
   void maybeCreateUserPath(String user) throws IOException {
     maybeCreate(buildUserPath(user),
         CreateMode.PERSISTENT,
@@ -138,7 +183,7 @@ public class ZookeeperRegistryClient extends RegistryZKService
       ComponentEntry entry,
       boolean ephemeral) throws IOException {
 
-    verifyExists(buildServicePath(user, serviceClass, serviceName));
+    pathMustExist(buildServicePath(user, serviceClass, serviceName));
     String componentPath =
         buildComponentPath(user, serviceClass, serviceName, componentName);
     set(componentPath,
@@ -164,7 +209,7 @@ public class ZookeeperRegistryClient extends RegistryZKService
   @Override
   public boolean serviceClassExists(String user, String serviceClass) throws
       IOException {
-    return exists(buildServiceClassPath(user, serviceClass));
+    return pathExists(buildServiceClassPath(user, serviceClass));
   }
 
   @Override
@@ -177,7 +222,7 @@ public class ZookeeperRegistryClient extends RegistryZKService
   public boolean serviceExists(String user,
       String serviceClass,
       String serviceName) throws IOException {
-    return exists(buildServicePath(user, serviceClass, serviceName));
+    return pathExists(buildServicePath(user, serviceClass, serviceName));
   }
 
   @Override
@@ -211,7 +256,7 @@ public class ZookeeperRegistryClient extends RegistryZKService
       String serviceClass,
       String serviceName,
       String componentName) throws IOException {
-    return exists(buildComponentPath(user, serviceClass, serviceName,
+    return pathExists(buildComponentPath(user, serviceClass, serviceName,
         componentName));
 
   }

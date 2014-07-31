@@ -56,9 +56,8 @@ public class BindingUtils {
   public static String validate(Pattern pattern, String role, String s) {
     if (!pattern.matcher(s).matches()) {
       throw new IllegalArgumentException(role
-                                         + " value of \"" + s + "\""
-                                         + " does not match pattern " +
-                                         pattern.toString());
+               + " value of \"" + s + "\""
+               + " does not match pattern " + pattern);
 
     }
     return s;

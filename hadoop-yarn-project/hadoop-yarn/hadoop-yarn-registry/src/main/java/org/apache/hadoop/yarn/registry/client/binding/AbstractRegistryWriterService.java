@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry.client.binding;
 
 import org.apache.hadoop.yarn.registry.client.api.RegistryWriter;
+import org.apache.hadoop.yarn.registry.client.api.LivenessOptions;
 import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
 
@@ -38,7 +39,14 @@ public abstract class AbstractRegistryWriterService extends
       String name,
       ServiceEntry entry) throws IOException {
     throw notImplemented();
+  }
 
+  @Override
+  public void putServiceLiveness(String user,
+      String serviceClass,
+      String serviceName,
+      LivenessOptions livenessOption) throws IOException {
+    throw notImplemented();
   }
 
   @Override
@@ -46,7 +54,6 @@ public abstract class AbstractRegistryWriterService extends
       String serviceClass,
       String name) throws IOException {
     throw notImplemented();
-
   }
 
   @Override
@@ -57,7 +64,6 @@ public abstract class AbstractRegistryWriterService extends
       ComponentEntry entry,
       boolean ephemeral) throws IOException {
     throw notImplemented();
-
   }
 
   @Override
@@ -66,6 +72,5 @@ public abstract class AbstractRegistryWriterService extends
       String serviceName,
       String componentName) throws IOException {
     throw notImplemented();
-
   }
 }

@@ -24,6 +24,10 @@ import org.codehaus.jackson.map.annotate.JsonSerialize;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Description of a single service/component endpoint.
+ * It is designed to be marshalled as JSON
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
 public class Endpoint {

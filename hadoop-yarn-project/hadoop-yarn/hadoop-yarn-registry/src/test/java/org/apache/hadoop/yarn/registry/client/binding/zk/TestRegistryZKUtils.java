@@ -23,6 +23,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 public class TestRegistryZKUtils extends Assert {
+  
   @Test
   public void testPaths() throws Throwable {
     assertCreatedPathEquals("/", "/", "");
@@ -44,7 +45,6 @@ public class TestRegistryZKUtils extends Assert {
     assertCreatedPathEquals("/yarn/registry/users/hadoop/org-apache-hadoop",
         "/yarn/registry",
         "users/hadoop/org-apache-hadoop/");
-
   }
 
 

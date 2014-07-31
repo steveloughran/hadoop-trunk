@@ -21,6 +21,9 @@ package org.apache.hadoop.yarn.registry.client.binding;
 import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
 
+/**
+ * JSON marshalling support
+ */
 public class JsonMarshal {
 
   public static class ServiceEntryMarshal extends JsonSerDeser<ServiceEntry> {

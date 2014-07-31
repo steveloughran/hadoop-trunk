@@ -26,6 +26,9 @@ import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 
+/**
+ * JSON-marshallable service entry
+ */
 public class ServiceEntry extends ComponentEntry {
 
   /**

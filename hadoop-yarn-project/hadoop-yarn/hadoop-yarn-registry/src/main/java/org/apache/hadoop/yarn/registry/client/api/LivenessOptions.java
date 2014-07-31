@@ -16,17 +16,26 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.binding.rest;
-
-import org.apache.hadoop.yarn.registry.client.binding.AbstractRegistryReaderService;
+package org.apache.hadoop.yarn.registry.client.api;
 
 /**
- * The REST client is read-only. It is designed for use
- * long-haul as well as short haul, and does not implement
- * write operations.
+ * Options for liveness when defining a service, that is: what is the
+ * policy for the  /live entry
  */
-public class RestRegistryClient extends AbstractRegistryReaderService {
-  public RestRegistryClient(String name) {
-    super(name);
-  }
+public enum LivenessOptions {
+  /**
+   * Delete the entry
+   */
+  DeleteLivenessEntry,
+
+  /**
+   * Create an ephemeral entry
+   */
+  CreateEphemeralLivenessEntry,
+
+  /**
+   * Create a static entry
+   */
+  CreateStaticLivenessEntry,
+  
 }

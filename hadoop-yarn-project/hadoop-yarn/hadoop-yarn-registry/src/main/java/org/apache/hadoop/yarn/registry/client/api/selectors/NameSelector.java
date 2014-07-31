@@ -21,6 +21,10 @@ package org.apache.hadoop.yarn.registry.client.api.selectors;
 import java.util.Iterator;
 import java.util.Map;
 
+/**
+ * Select an entry by name
+ * @param <T>
+ */
 public class NameSelector<T> extends Selector<T> {
 
   final String name;
