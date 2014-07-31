@@ -367,12 +367,12 @@ public class RegistryZKService extends AbstractService
       CreateMode mode,
       byte[] data,
       List<ACL> acl) throws IOException {
-    path = createFullPath(path);
+    String fullpath = createFullPath(path);
     try {
-      LOG.debug("Creating {} with {} bytes", path, data.length);
-      zk.create().withMode(mode).withACL(acl).forPath(path, data);
+      LOG.debug("Creating {} with {} bytes", fullpath, data.length);
+      zk.create().withMode(mode).withACL(acl).forPath(fullpath, data);
     } catch (Exception e) {
-      throw operationFailure(path, "create()", e);
+      throw operationFailure(fullpath, "create()", e);
     }
   }
 

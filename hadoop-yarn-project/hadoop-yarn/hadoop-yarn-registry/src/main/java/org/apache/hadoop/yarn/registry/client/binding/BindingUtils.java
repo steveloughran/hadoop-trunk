@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
-import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-
 import java.util.regex.Pattern;
 
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
@@ -75,43 +73,48 @@ public class BindingUtils {
     return validate(componentNameValidator, "Component Name", componentName);
   }
 
-  public static String buildUserPath(String user) {
+  /**
+   * Buld the user path -switches to the system path if the user is ""
+   * @param user username or ""
+   * @return the path to the user
+   */
+  public static String userPath(String user) {
     if (user.isEmpty()) {
       return SYSTEM_PATH;
     }
     return USERS_PATH + validateUserName(user);
   }
 
-  public static String buildServiceClassPath(String user,
+  public static String serviceclassPath(String user,
       String serviceClass) {
 
-    return buildUserPath(user) + "/" + validateServiceClass(serviceClass);
+    return userPath(user) + "/" + validateServiceClass(serviceClass);
   }
 
-  public static String buildServicePath(String user,
+  public static String servicePath(String user,
       String serviceClass,
       String serviceName) {
 
-    return buildServiceClassPath(user, serviceClass)
+    return serviceclassPath(user, serviceClass)
            + "/" + validateServiceName(serviceName);
   }
 
-  public static String buildComponentListPath(String user,
+  public static String componentListPath(String user,
       String serviceClass, String serviceName) {
 
-    return buildServicePath(user, serviceClass, serviceName) + COMPONENTS;
+    return servicePath(user, serviceClass, serviceName) + COMPONENTS;
   }
   
-  public static String buildServiceLivenessPath(String user,
+  public static String livenessPath(String user,
       String serviceClass, String serviceName) {
 
-    return buildServicePath(user, serviceClass, serviceName) + LIVE;
+    return servicePath(user, serviceClass, serviceName) + LIVE;
   }
   
-  public static String buildComponentPath(String user,
+  public static String componentPath(String user,
       String serviceClass, String serviceName, String componentName) {
 
-    return buildComponentListPath(user, serviceClass, serviceName)
+    return componentListPath(user, serviceClass, serviceName)
            + "/" + validateComponentName(componentName);
   } 
 
