@@ -65,4 +65,5 @@ public interface RegistryConstants {
   String USERS_PATH = "users/";
   String SYSTEM_PATH = "system/";
   String LIVE = "/live";
+  String COMPONENTS = "/components";
 }

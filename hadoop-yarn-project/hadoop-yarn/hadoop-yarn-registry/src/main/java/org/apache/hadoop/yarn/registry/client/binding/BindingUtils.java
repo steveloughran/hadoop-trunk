@@ -18,15 +18,11 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+
 import java.util.regex.Pattern;
 
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.COMPONENT_NAME_PATTERN;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.HOSTNAME_PATTERN;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.SERVICE_CLASS_PATTERN;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.SERVICE_NAME_PATTERN;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.SYSTEM_PATH;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.USERNAME_PATTERN;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.USERS_PATH;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
 /**
  * General utils for component bindings
@@ -100,12 +96,24 @@ public class BindingUtils {
            + "/" + validateServiceName(serviceName);
   }
 
+  public static String buildComponentListPath(String user,
+      String serviceClass, String serviceName) {
+
+    return buildServicePath(user, serviceClass, serviceName) + COMPONENTS;
+  }
+  
+  public static String buildServiceLivenessPath(String user,
+      String serviceClass, String serviceName) {
+
+    return buildServicePath(user, serviceClass, serviceName) + LIVE;
+  }
+  
   public static String buildComponentPath(String user,
       String serviceClass, String serviceName, String componentName) {
 
-    return buildServicePath(user, serviceClass, serviceName)
+    return buildComponentListPath(user, serviceClass, serviceName)
            + "/" + validateComponentName(componentName);
-  }
+  } 
 
 
 }
