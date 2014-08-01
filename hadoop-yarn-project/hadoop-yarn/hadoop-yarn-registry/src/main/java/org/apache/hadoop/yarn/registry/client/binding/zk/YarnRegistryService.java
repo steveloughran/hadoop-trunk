@@ -26,7 +26,7 @@ import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
 import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
-import org.apache.hadoop.yarn.registry.server.services.RegistryZKService;
+import org.apache.hadoop.yarn.registry.server.services.CuratorService;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
@@ -38,13 +38,15 @@ import java.util.List;
 import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.*;
 
 /**
- * The ZK client is R/W and is used  to register
+ * The YARN ZK registry service is R/W and is used  to register
  * services as well as query them.
+ * 
+ * It's a YARN service: ephemeral nodes last as long as the client exists
  */
-public class ZookeeperRegistryClient extends RegistryZKService
+public class YarnRegistryService extends CuratorService
     implements RegistryWriter {
   private static final Logger LOG =
-      LoggerFactory.getLogger(RegistryZKService.class);
+      LoggerFactory.getLogger(CuratorService.class);
 
   private final JsonMarshal.ServiceEntryMarshal serviceEntryMarshal
       = new JsonMarshal.ServiceEntryMarshal();
@@ -57,7 +59,7 @@ public class ZookeeperRegistryClient extends RegistryZKService
   public static final String PERMISSIONS_REGISTRY_USER = "world:anyone:rwcda";
   private static byte[] NO_DATA = new byte[0];
 
-  public ZookeeperRegistryClient(String name) {
+  public YarnRegistryService(String name) {
     super(name);
   }
 

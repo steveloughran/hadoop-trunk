@@ -50,13 +50,13 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * This implements the ZK binding
+ * This service binds to Zookeeper via Apache Curator
  */
-public class RegistryZKService extends AbstractService
+public class CuratorService extends AbstractService
     implements RegistryConstants {
   public static final String PERMISSIONS_REGISTRY_ROOT = "world:anyone:rwcda";
   private static final Logger LOG =
-      LoggerFactory.getLogger(RegistryZKService.class);
+      LoggerFactory.getLogger(CuratorService.class);
   private static final RetrySleeper sleeper = new RetrySleeper() {
     @Override
     public void sleepFor(long time, TimeUnit unit) throws InterruptedException {
@@ -73,7 +73,7 @@ public class RegistryZKService extends AbstractService
 
    * @param name service name
    */
-  public RegistryZKService(String name) {
+  public CuratorService(String name) {
     super(name);
   }
 

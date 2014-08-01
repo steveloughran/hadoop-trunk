@@ -37,7 +37,7 @@ import java.net.UnknownHostException;
  * This is a Zookeeper service instance that is contained in a YARN
  * service...it's been derived from Apache Twill for testing purposes
  */
-public class InMemoryZKService extends AbstractService {
+public class InMemoryLocalhostZKService extends AbstractService {
 
 
   /**
@@ -61,7 +61,7 @@ public class InMemoryZKService extends AbstractService {
   public static final String DEFAULT_DATADIR = "target/zookeeper";
   
   private static final Logger
-      LOG = LoggerFactory.getLogger(InMemoryZKService.class);
+      LOG = LoggerFactory.getLogger(InMemoryLocalhostZKService.class);
 
   private File dataDir;
   private int tickTime;
@@ -69,7 +69,7 @@ public class InMemoryZKService extends AbstractService {
 
   private ServerCnxnFactory factory;
 
-  public InMemoryZKService(String name) {
+  public InMemoryLocalhostZKService(String name) {
     super(name);
   }
 
@@ -95,7 +95,12 @@ public class InMemoryZKService extends AbstractService {
     port = getConfig().getInt(KEY_PORT, 0);
     tickTime = getConfig().getInt(KEY_TICK_TIME,
         ZooKeeperServer.DEFAULT_TICK_TIME);
-    dataDir = new File(getConfig().get(KEY_DATADIR, DEFAULT_DATADIR));
+    String datapathname = getConfig().getTrimmed(KEY_DATADIR,"");
+    if (datapathname.isEmpty()) {
+      throw new IllegalArgumentException("No data directory defined in "
+                                         + KEY_DATADIR);
+    }
+    dataDir = new File(datapathname);
   }
 
   @Override
@@ -105,7 +110,7 @@ public class InMemoryZKService extends AbstractService {
     zkServer.setTxnLogFactory(ftxn);
     zkServer.setTickTime(tickTime);
 
-    LOG.info("Starting Zookeeper server");
+    LOG.info("Starting Local Zookeeper service");
     factory = ServerCnxnFactory.createFactory();
     factory.configure(getAddress(port), -1);
     factory.startup(zkServer);

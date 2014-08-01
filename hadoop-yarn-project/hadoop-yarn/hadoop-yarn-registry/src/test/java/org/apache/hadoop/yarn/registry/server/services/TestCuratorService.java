@@ -29,9 +29,9 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * Test the lower level parts of the registry
+ * Test the curator service
  */
-public class TestRegistryZKService extends AbstractZKRegistryTest {
+public class TestCuratorService extends AbstractZKRegistryTest {
 
   public static final String MISSING = "/missing";
 
