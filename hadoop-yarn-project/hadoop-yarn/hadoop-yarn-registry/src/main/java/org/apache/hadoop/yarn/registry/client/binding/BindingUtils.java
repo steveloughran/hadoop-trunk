@@ -102,13 +102,13 @@ public class BindingUtils {
   public static String componentListPath(String user,
       String serviceClass, String serviceName) {
 
-    return servicePath(user, serviceClass, serviceName) + COMPONENTS;
+    return servicePath(user, serviceClass, serviceName) + ZNODE_COMPONENTS;
   }
   
   public static String livenessPath(String user,
       String serviceClass, String serviceName) {
 
-    return servicePath(user, serviceClass, serviceName) + LIVE;
+    return servicePath(user, serviceClass, serviceName) + ZNODE_LIVE;
   }
   
   public static String componentPath(String user,

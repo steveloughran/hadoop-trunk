@@ -63,9 +63,14 @@ public class CuratorService extends AbstractService
       unit.sleep(time);
     }
   };
-  private CuratorFramework zk;
+  private CuratorFramework curator;
   private List<ACL> rootACL;
   private String registryRoot;
+  /**
+   * set the connection parameters
+   */
+  private String connectionParameterDescription;
+  private String zookeeperQuorum;
 
 
   /**
@@ -86,10 +91,11 @@ public class CuratorService extends AbstractService
   protected void serviceStart() throws Exception {
     super.serviceStart();
 
-    registryRoot = getConfig().get(ZK_ROOT, REGISTRY_NAMESPACE);
+    registryRoot = getConfig().getTrimmed(REGISTRY_ZK_ROOT,
+        DEFAULT_REGISTRY_ROOT) ;
     LOG.debug("Creating Registry with root {}", registryRoot);
 
-    rootACL = getACLs(ZK_ACL, PERMISSIONS_REGISTRY_ROOT);
+    rootACL = getACLs(REGISTRY_ZK_ACL, PERMISSIONS_REGISTRY_ROOT);
 /*
     CuratorFramework rootCurator = newCurator("");
     try {
@@ -102,7 +108,7 @@ public class CuratorService extends AbstractService
     rootCurator.close();
 */
 //    zk = newCurator(root);
-    zk = newCurator("");
+    curator = newCurator();
     maybeCreate("", CreateMode.PERSISTENT, rootACL);
   }
 
@@ -111,7 +117,7 @@ public class CuratorService extends AbstractService
    */
   @Override
   public void serviceStop() throws Exception {
-    IOUtils.closeStream(zk);
+    IOUtils.closeStream(curator);
   }
 
   /**
@@ -151,22 +157,22 @@ public class CuratorService extends AbstractService
    * Create a new curator instance off the root path; using configuration
    * options provided in the service configuration to set timeouts and
    * retry policy.
-   * @param root root path
    * @return the newly created creator
    */
-  private CuratorFramework newCurator(String root) {
+  private CuratorFramework newCurator() {
     Configuration conf = getConfig();
-    EnsembleProvider ensembleProvider = createEnsembleProvider(conf, root);
-    int sessionTimeout = conf.getInt(ZK_SESSION_TIMEOUT,
+    EnsembleProvider ensembleProvider = createEnsembleProvider();
+    int sessionTimeout = conf.getInt(REGISTRY_ZK_SESSION_TIMEOUT,
         DEFAULT_ZK_SESSION_TIMEOUT);
-    int connectionTimeout = conf.getInt(ZK_CONNECTION_TIMEOUT,
+    int connectionTimeout = conf.getInt(REGISTRY_ZK_CONNECTION_TIMEOUT,
         DEFAULT_ZK_CONNECTION_TIMEOUT);
-    int retryTimes = conf.getInt(ZK_RETRY_TIMES, DEFAULT_ZK_RETRY_TIMES);
-    int retryInterval = conf.getInt(ZK_RETRY_INTERVAL,
+    int retryTimes = conf.getInt(REGISTRY_ZK_RETRY_TIMES, DEFAULT_ZK_RETRY_TIMES);
+    int retryInterval = conf.getInt(REGISTRY_ZK_RETRY_INTERVAL,
         DEFAULT_ZK_RETRY_INTERVAL);
-    int retryCeiling = conf.getInt(ZK_RETRY_CEILING, DEFAULT_ZK_RETRY_CEILING);
+    int retryCeiling = conf.getInt(REGISTRY_ZK_RETRY_CEILING, DEFAULT_ZK_RETRY_CEILING);
 
-    LOG.debug("Creating Curator ");
+    LOG.debug("Creating CuratorService with connection {}",
+        connectionParameterDescription);
     CuratorFrameworkFactory.Builder b = CuratorFrameworkFactory.builder();
     b.ensembleProvider(ensembleProvider)
      .connectionTimeoutMs(connectionTimeout)
@@ -192,12 +198,25 @@ public class CuratorService extends AbstractService
     return framework;
   }
 
+  @Override
+  public String toString() {
+    return super.toString()
+           + " ZK quorum=\"" + getCurrentZookeeperQuorum() +"\""
+           + " root=\"" + registryRoot + "\"";
+
+  }
+
+
+  public String getCurrentZookeeperQuorum() {
+    return zookeeperQuorum;
+  }
+
   /*
-   * Create a full path from the registry root and the supplied subdir
-   * @param path path of operation
-   * @return an absolute path
-   * @throws IllegalArgumentException if the path is invalide
-   */
+       * Create a full path from the registry root and the supplied subdir
+       * @param path path of operation
+       * @return an absolute path
+       * @throws IllegalArgumentException if the path is invalide
+       */
   protected String createFullPath(String path) throws RESTIOException {
     return RegistryZKUtils.createFullPath(registryRoot, path);
   }
@@ -205,15 +224,19 @@ public class CuratorService extends AbstractService
   /**
    * Create the ensemble provider for this registry. 
    * The initial implementation returns a fixed ensemble; an
-   * Exhibitor-bonded ensemble provider is a future enhancement
-   * @param conf configuration
-   * @param root root path
+   * Exhibitor-bonded ensemble provider is a future enhancement.
+   * 
+   * This sets {@link #connectionParameterDescription} to the binding info
+   * for use in toString and logging;
+   * 
    * @return the ensemble provider for this ZK service
    */
-  private EnsembleProvider createEnsembleProvider(Configuration conf,
-      String root) {
-    String connectString = conf.get(ZK_HOSTS, DEFAULT_ZK_HOSTS) + root;
-    LOG.debug("ZK connection is fixed at {}", connectString);
+  private EnsembleProvider createEnsembleProvider() {
+    String connectString = getConfig().getTrimmed(REGISTRY_ZK_QUORUM,
+        DEFAULT_ZK_HOSTS);
+    connectionParameterDescription =
+        "fixed ZK quorum \"" + connectString + "\"";
+    zookeeperQuorum = connectString;
     return new FixedEnsembleProvider(connectString);
   }
 
@@ -293,12 +316,12 @@ public class CuratorService extends AbstractService
    * @throws IOException
    */
   public boolean pathExists(String path) throws IOException {
-    Preconditions.checkNotNull(zk, "zookeeper binding");
+    Preconditions.checkNotNull(curator, "zookeeper binding");
     try {
       path = createFullPath(path);
       LOG.debug("Exists({})", path);
 
-      return zk.checkExists().forPath(path) != null;
+      return curator.checkExists().forPath(path) != null;
     } catch (FileNotFoundException e) {
       return false;
     } catch (Exception e) {
@@ -348,7 +371,7 @@ public class CuratorService extends AbstractService
       IOException {
     path = createFullPath(path);
     try {
-      zk.create().withMode(mode).withACL(acl).forPath(path);
+      curator.create().withMode(mode).withACL(acl).forPath(path);
       LOG.debug("Created path {} with mode {} and ACL {}", path, mode, acl);
     } catch (Exception e) {
       throw operationFailure(path, "mkdir() ", e);
@@ -370,7 +393,7 @@ public class CuratorService extends AbstractService
     String fullpath = createFullPath(path);
     try {
       LOG.debug("Creating {} with {} bytes", fullpath, data.length);
-      zk.create().withMode(mode).withACL(acl).forPath(fullpath, data);
+      curator.create().withMode(mode).withACL(acl).forPath(fullpath, data);
     } catch (Exception e) {
       throw operationFailure(fullpath, "create()", e);
     }
@@ -386,7 +409,7 @@ public class CuratorService extends AbstractService
     path = createFullPath(path);
     try {
       LOG.debug("Updating {} with {} bytes", path, data.length);
-      zk.setData().forPath(path, data);
+      curator.setData().forPath(path, data);
     } catch (Exception e) {
       throw operationFailure(path, "update()", e);
     }
@@ -424,7 +447,7 @@ public class CuratorService extends AbstractService
     String fullpath = createFullPath(path);
     try {
       LOG.debug("Deleting {}", fullpath);
-      DeleteBuilder delete = zk.delete();
+      DeleteBuilder delete = curator.delete();
       if (recursive) {
         delete.deletingChildrenIfNeeded();
       }
@@ -440,7 +463,7 @@ public class CuratorService extends AbstractService
     String fullpath = createFullPath(path);
     try {
       LOG.debug("ls {}", fullpath);
-      GetChildrenBuilder builder = zk.getChildren();
+      GetChildrenBuilder builder = curator.getChildren();
       List<String> children = builder.forPath(fullpath);
       return children;
 
@@ -459,7 +482,7 @@ public class CuratorService extends AbstractService
     String fullpath = createFullPath(path);
     try {
       LOG.debug("Reading {}", fullpath);
-      return zk.getData().forPath(fullpath);
+      return curator.getData().forPath(fullpath);
     } catch (Exception e) {
       throw operationFailure(fullpath, "read()", e);
     }

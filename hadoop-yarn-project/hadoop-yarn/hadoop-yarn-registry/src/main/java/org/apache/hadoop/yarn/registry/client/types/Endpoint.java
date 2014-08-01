@@ -21,6 +21,8 @@ package org.apache.hadoop.yarn.registry.client.types;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
 
+import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -43,11 +45,11 @@ public class Endpoint {
 
   /**
    * Build an endpoint with a list of addresses
-   * @param api
-   * @param addressType
-   * @param protocolType
-   * @param description
-   * @param addresses
+   * @param api API name
+   * @param addressType address type
+   * @param protocolType protocol type
+   * @param description description text
+   * @param addresses addresses
    */
   public Endpoint(String api,
       String addressType,
@@ -58,5 +60,28 @@ public class Endpoint {
     this.protocolType = protocolType;
     this.description = description;
     this.addresses = Arrays.asList(addresses);
+  }
+
+  /**
+   * Build an endpoint from a list of URIs; each URI
+   * is ASCII-encoded and added to the list of addresses.
+   * @param api API name
+   * @param protocolType protocol type
+   * @param description description text
+   * @param uris
+   */
+  public Endpoint(String api,
+      String protocolType,
+      String description,
+      URI...uris) {
+    this.api = api;
+    this.addressType = AddressTypes.ADDRESS_URI;
+    
+    this.protocolType = protocolType;
+    this.description = description;
+    ArrayList<String> addrs = new ArrayList<>(uris.length);
+    for (URI uri : uris) {
+      addrs.add(uri.toASCIIString());
+    }
   }
 }

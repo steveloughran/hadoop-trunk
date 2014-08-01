@@ -18,7 +18,12 @@
 
 package org.apache.hadoop.yarn.registry.client.types;
 
-public class TypeUtils {
+import java.net.InetSocketAddress;
+
+/**
+ * Utils to work with registry types
+ */
+public class RegistryTypeUtils {
 
   public static Endpoint urlEndpoint(String api,
       String protocolType,
@@ -31,7 +36,7 @@ public class TypeUtils {
   public static Endpoint restEndpoint(String api,
       String description,
       String... urls) {
-    return urlEndpoint(api, ProtocolTypes.PROTOCOL_RESTAPI,
+    return urlEndpoint(api, ProtocolTypes.PROTOCOL_REST,
         description, urls);
   }
 
@@ -63,4 +68,7 @@ public class TypeUtils {
         addresses);
   }
 
+  public static String toWireFormat(InetSocketAddress address) {
+    return String.format("%s/%d", address.getHostString(), address.getPort());
+  }
 }
