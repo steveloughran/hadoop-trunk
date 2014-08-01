@@ -56,17 +56,45 @@ public interface RegistryWriter extends RegistryReader {
 
   /**
    * Set the service liveness options. 
-   * It is an error to create an en
-   * @param user
-   * @param serviceClass
-   * @param serviceName
-   * @param ephemeral
+   * 
+   * This sets the liveness znode to either a static or ephemeral
+   * node. The policy on what do do if the node already exists
+   * can be set.
+   * 
+   * <ol>
+   *   <li>
+   *    It is an error to create an liveness znode if the service does not exist
+   *   </li>
+   *   <li>
+   *    If the entry exists and <code>forceDelete==false</code>, then
+   *    the set operation will fail with a <code>FileAlreadyExistsException</code>.
+   *   </li>
+   *   <li>
+   *    If <code>forceDelete==true</code>, then
+   *    the set operation will repeatedly attempt to delete then
+   *    set the znode until it can be set (i.e. this ZK session
+   *    owns the node).
+   *   </li>
+   * </ol>
+   * When the function returns successfully, it means that
+   * at the time the node was created, the node was owned by
+   * this session. As other ZK clients may also set the liveness,
+   * there is no guarantee that the znode is now owned by
+   * this session.
+   * 
+   * @param user username
+   * @param serviceClass service class
+   * @param serviceName name of the service
+   * @param ephemeral flag to indicate the node is ephemeral
+   * @param forceDelete flag to indicate the existing node should
+   * be force deleted.
    * @throws FileAlreadyExistsException if the entry already exists.
    * @throws IOException on any failure
    */
   public void putServiceLiveness(String user,
       String serviceClass,
-      String serviceName, boolean ephemeral) throws IOException;
+      String serviceName,
+      boolean ephemeral, boolean forceDelete) throws IOException;
   
   public void deleteServiceLiveness(String user,
       String serviceClass,

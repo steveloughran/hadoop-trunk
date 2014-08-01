@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry.client.binding.zk;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryWriter;
 import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
@@ -108,13 +109,23 @@ public class ZookeeperRegistryClient extends RegistryZKService
   public void putServiceLiveness(String user,
       String serviceClass,
       String serviceName,
-      boolean ephemeral) throws IOException {
+      boolean ephemeral, boolean forceDelete) throws IOException {
     serviceMustExist(user, serviceClass, serviceName);
 
     String liveness = livenessPath(user, serviceClass, serviceName);
     LOG.debug("putServiceLiveness() on {} => {}", liveness, ephemeral);
     CreateMode mode = ephemeral ? CreateMode.EPHEMERAL : CreateMode.PERSISTENT;
-    create(liveness, mode, NO_DATA, fullUserAccess(user));
+    while (true) try {
+      create(liveness, mode, NO_DATA, fullUserAccess(user));
+      break;
+    } catch (FileAlreadyExistsException e) {
+      // file exists: choose policy to react to this
+      if (forceDelete) {
+        rm(liveness, false);
+      } else {
+        throw e;
+      }
+    }
   }
 
   /**
