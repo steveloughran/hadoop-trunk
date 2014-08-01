@@ -38,7 +38,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-public class TestRegistryClient extends AbstractZKRegistryTest {
+/**
+ * Tests for the YARN registry
+ */
+public class TestYARNRegistryService extends AbstractZKRegistryTest {
 
   public static final String SC_HADOOP = "org-apache-hadoop";
   public static final String WEBHDFS = "webhdfs";
@@ -48,13 +51,13 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
   public static final String API_WEBHDFS = "org_apache_hadoop_namenode_webhdfs";
   public static final String API_HDFS = "org_apache_hadoop_namenode_dfs";
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestRegistryClient.class);
+      LoggerFactory.getLogger(TestYARNRegistryService.class);
   
-  private ZookeeperRegistryClient client;
+  private YarnRegistryService client;
 
   @Before
   public void setupClient() {
-    client = new ZookeeperRegistryClient("registryClient");
+    client = new YarnRegistryService("yarnRegistry");
     client.init(createRegistryConfiguration());
     client.start();
   }

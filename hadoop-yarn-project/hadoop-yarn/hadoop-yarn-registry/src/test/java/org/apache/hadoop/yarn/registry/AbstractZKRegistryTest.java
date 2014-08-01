@@ -22,8 +22,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.server.services.InMemoryZKService;
-import org.apache.hadoop.yarn.registry.server.services.RegistryZKService;
+import org.apache.hadoop.yarn.registry.server.services.CuratorService;
+import org.apache.hadoop.yarn.registry.server.services.InMemoryLocalhostZKService;
 import org.apache.zookeeper.common.PathUtils;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -39,21 +39,21 @@ import java.io.IOException;
 
 public class AbstractZKRegistryTest extends Assert {
 
-  protected static InMemoryZKService zookeeper;
+  protected static InMemoryLocalhostZKService zookeeper;
   @Rule
   public final Timeout testTimeout = new Timeout(10000);
   @Rule
   public TestName methodName = new TestName();
-  protected RegistryZKService registry;
+  protected CuratorService registry;
 
   @BeforeClass
   public static void createZKServer() throws Exception {
     File zkDir = new File("target/zookeeper");
     FileUtils.deleteDirectory(zkDir);
     assertTrue(zkDir.mkdirs());
-    zookeeper = new InMemoryZKService("InMemoryZKService");
+    zookeeper = new InMemoryLocalhostZKService("InMemoryZKService");
     YarnConfiguration conf = new YarnConfiguration();
-    conf.set(InMemoryZKService.KEY_DATADIR, zkDir.getAbsolutePath());
+    conf.set(InMemoryLocalhostZKService.KEY_DATADIR, zkDir.getAbsolutePath());
     zookeeper.init(conf);
     zookeeper.start();
   }
@@ -112,7 +112,7 @@ public class AbstractZKRegistryTest extends Assert {
    * Create an instance
    */
   protected void createRegistry() {
-    registry = new RegistryZKService("registry");
+    registry = new CuratorService("registry");
     registry.init(createRegistryConfiguration());
     registry.start();
   }
