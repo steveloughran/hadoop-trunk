@@ -43,7 +43,7 @@ public abstract class AbstractRegistryWriterService extends
   @Override
   public void putServiceLiveness(String user,
       String serviceClass,
-      String serviceName, boolean ephemeral) throws IOException {
+      String serviceName, boolean ephemeral, boolean forceDelete) throws IOException {
     throw notImplemented();
   }
 

@@ -283,14 +283,14 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
   @Test
   public void testServiceLiveness() throws Throwable {
     putExampleServiceEntry();
-    putServiceLiveness(true);
+    putServiceLiveness(true, true);
 
     assertTrue("service is not live", isServiceLive());
 
     deleteServiceLiveness();
     assertFalse("service is live", isServiceLive());
     
-    putServiceLiveness(false);
+    putServiceLiveness(false, true);
     assertTrue("service is not live", isServiceLive());
 
   }
@@ -302,8 +302,17 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
   @Test(expected = FileAlreadyExistsException.class)
   public void testPutServiceLivenessOverwrite() throws Throwable {
     putExampleServiceEntry();
-    putServiceLiveness(true);
-    putServiceLiveness(true);
+    putServiceLiveness(true, true);
+    putServiceLiveness(true, false);
+  }
+
+  @Test()
+  public void testPutServiceLivenessForcedOverwrite() throws Throwable {
+    putExampleServiceEntry();
+    putServiceLiveness(true, true);
+    putServiceLiveness(true, true);
+    putServiceLiveness(true, true);
+    putServiceLiveness(true, true);
   }
 
   @Test
@@ -311,7 +320,7 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
     deleteExampleServiceEntry();
 
     try {
-      putServiceLiveness(true);
+      putServiceLiveness(true, true);
       // if this is reached then parent directories are being created
       // when they should not
       fail("expected a failure, but the service liveness is " + isServiceLive());
@@ -335,11 +344,13 @@ public class TestRegistryClient extends AbstractZKRegistryTest {
     deleteServiceLiveness();
   }
   
-  protected void putServiceLiveness(boolean ephemeral) throws
+  protected void putServiceLiveness(boolean ephemeral, boolean forceDelete) throws
       IOException {
     client.putServiceLiveness(USER,
         SC_HADOOP,
-        CLUSTERNAME, ephemeral);
+        CLUSTERNAME,
+        ephemeral,
+        forceDelete);
   }
   
   protected void deleteServiceLiveness() throws
