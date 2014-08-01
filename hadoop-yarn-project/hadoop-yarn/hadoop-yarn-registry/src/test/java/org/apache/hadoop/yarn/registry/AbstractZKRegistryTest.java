@@ -44,7 +44,7 @@ public class AbstractZKRegistryTest extends Assert {
   public final Timeout testTimeout = new Timeout(10000);
   @Rule
   public TestName methodName = new TestName();
-  protected CuratorService registry;
+  protected CuratorService curatorService;
 
   @BeforeClass
   public static void createZKServer() throws Exception {
@@ -90,30 +90,30 @@ public class AbstractZKRegistryTest extends Assert {
 
   protected YarnConfiguration createRegistryConfiguration() {
     YarnConfiguration conf = new YarnConfiguration();
-    conf.setInt(RegistryConstants.ZK_CONNECTION_TIMEOUT, 1000);
-    conf.setInt(RegistryConstants.ZK_RETRY_INTERVAL, 500);
-    conf.setInt(RegistryConstants.ZK_RETRY_TIMES, 10);
-    conf.setInt(RegistryConstants.ZK_RETRY_CEILING, 10);
-    conf.set(RegistryConstants.ZK_HOSTS, zookeeper.getConnectionString());
+    conf.setInt(RegistryConstants.REGISTRY_ZK_CONNECTION_TIMEOUT, 1000);
+    conf.setInt(RegistryConstants.REGISTRY_ZK_RETRY_INTERVAL, 500);
+    conf.setInt(RegistryConstants.REGISTRY_ZK_RETRY_TIMES, 10);
+    conf.setInt(RegistryConstants.REGISTRY_ZK_RETRY_CEILING, 10);
+    conf.set(RegistryConstants.REGISTRY_ZK_QUORUM, zookeeper.getConnectionString());
     return conf;
   }
 
   @Before
-  public void startRegistry() {
-    createRegistry();
+  public void startCurator() {
+    createCuratorService();
   }
 
   @After
-  public void stopRegistry() {
-    ServiceOperations.stop(registry);
+  public void stopCurator() {
+    ServiceOperations.stop(curatorService);
   }
 
   /**
    * Create an instance
    */
-  protected void createRegistry() {
-    registry = new CuratorService("registry");
-    registry.init(createRegistryConfiguration());
-    registry.start();
+  protected void createCuratorService() {
+    curatorService = new CuratorService("curatorService");
+    curatorService.init(createRegistryConfiguration());
+    curatorService.start();
   }
 }

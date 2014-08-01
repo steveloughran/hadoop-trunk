@@ -37,103 +37,102 @@ public class TestCuratorService extends AbstractZKRegistryTest {
 
   @Test
   public void testLs() throws Throwable {
-    registry.ls("/");
+    curatorService.ls("/");
   }
 
   @Test(expected = FileNotFoundException.class)
   public void testLsNotFound() throws Throwable {
-    List<String> ls = registry.ls(MISSING);
+    List<String> ls = curatorService.ls(MISSING);
   }
 
   @Test
   public void testExists() throws Throwable {
-    assertTrue(registry.pathExists("/"));
+    assertTrue(curatorService.pathExists("/"));
   }
 
   @Test
   public void testExistsMissing() throws Throwable {
-    assertFalse(registry.pathExists(MISSING));
+    assertFalse(curatorService.pathExists(MISSING));
   }
 
   @Test
   public void testVerifyExists() throws Throwable {
-    registry.pathMustExist("/");
+    curatorService.pathMustExist("/");
   }
 
   @Test(expected = FileNotFoundException.class)
   public void testVerifyExistsMissing() throws Throwable {
-    registry.pathMustExist(MISSING);
+    curatorService.pathMustExist(MISSING);
   }
 
   @Test
   public void testMkdirs() throws Throwable {
-    registry.mkdir("/p1", CreateMode.PERSISTENT);
-    registry.pathMustExist("/p1");
-    registry.mkdir("/p1/p2", CreateMode.EPHEMERAL);
-    registry.pathMustExist("/p1/p2");
+    curatorService.mkdir("/p1", CreateMode.PERSISTENT);
+    curatorService.pathMustExist("/p1");
+    curatorService.mkdir("/p1/p2", CreateMode.EPHEMERAL);
+    curatorService.pathMustExist("/p1/p2");
   }
 
   @Test(expected = FileNotFoundException.class)
   public void testMkdirChild() throws Throwable {
-    registry.mkdir("/testMkdirChild/child", CreateMode.PERSISTENT);
+    curatorService.mkdir("/testMkdirChild/child", CreateMode.PERSISTENT);
   }
 
   @Test
   public void testMaybeCreate() throws Throwable {
-    assertTrue(registry.maybeCreate("/p3", CreateMode.PERSISTENT));
-    assertFalse(registry.maybeCreate("/p3", CreateMode.PERSISTENT));
+    assertTrue(curatorService.maybeCreate("/p3", CreateMode.PERSISTENT));
+    assertFalse(curatorService.maybeCreate("/p3", CreateMode.PERSISTENT));
   }
 
   @Test
   public void testRM() throws Throwable {
-    registry.mkdir("/rm", CreateMode.PERSISTENT);
-    registry.rm("/rm", false);
+    curatorService.mkdir("/rm", CreateMode.PERSISTENT);
+    curatorService.rm("/rm", false);
     verifyNotExists("/rm");
-    registry.rm("/rm", false);
+    curatorService.rm("/rm", false);
   }
 
   @Test
   public void testRMNonRf() throws Throwable {
-    registry.mkdir("/rm", CreateMode.PERSISTENT);
-    registry.mkdir("/rm/child", CreateMode.PERSISTENT);
+    curatorService.mkdir("/rm", CreateMode.PERSISTENT);
+    curatorService.mkdir("/rm/child", CreateMode.PERSISTENT);
     try {
-      registry.rm("/rm", false);
+      curatorService.rm("/rm", false);
       fail("expected a failure");
     } catch (RESTIOException expected) {
 
     }
   }
 
-
   @Test
   public void testRMNRf() throws Throwable {
-    registry.mkdir("/rm", CreateMode.PERSISTENT);
-    registry.mkdir("/rm/child", CreateMode.PERSISTENT);
-    registry.rm("/rm", true);
+    curatorService.mkdir("/rm", CreateMode.PERSISTENT);
+    curatorService.mkdir("/rm/child", CreateMode.PERSISTENT);
+    curatorService.rm("/rm", true);
     verifyNotExists("/rm");
-    registry.rm("/rm", true);
+    curatorService.rm("/rm", true);
   }
 
   @Test
   public void testCreate() throws Throwable {
-    registry.create("/testCreate",
+    curatorService.create("/testCreate",
         CreateMode.PERSISTENT, getTestBuffer(),
-        registry.getRootACL()
+        curatorService.getRootACL()
     );
-    registry.pathMustExist("/testCreate");
+    curatorService.pathMustExist("/testCreate");
   }
 
   @Test
   public void testCreateTwice() throws Throwable {
     byte[] buffer = getTestBuffer();
-    registry.create("/testCreateTwice",
+    curatorService.create("/testCreateTwice",
         CreateMode.PERSISTENT, buffer,
-        registry.getRootACL()
+        curatorService.getRootACL()
     );
     try {
-      registry.create("/testCreateTwice",
+      curatorService.create("/testCreateTwice",
           CreateMode.PERSISTENT, buffer,
-          registry.getRootACL()
+          curatorService.getRootACL()
       );
       fail();
     } catch (FileAlreadyExistsException e) {
@@ -144,30 +143,30 @@ public class TestCuratorService extends AbstractZKRegistryTest {
   @Test
   public void testCreateUpdate() throws Throwable {
     byte[] buffer = getTestBuffer();
-    registry.create("/testCreateUpdate",
+    curatorService.create("/testCreateUpdate",
         CreateMode.PERSISTENT, buffer,
-        registry.getRootACL()
+        curatorService.getRootACL()
     );
-    registry.update("/testCreateUpdate", buffer);
+    curatorService.update("/testCreateUpdate", buffer);
   }
 
   @Test(expected = FileNotFoundException.class)
   public void testUpdateMissing() throws Throwable {
-    registry.update("/testUpdateMissing", getTestBuffer());
+    curatorService.update("/testUpdateMissing", getTestBuffer());
   }
 
   @Test
   public void testUpdateDirectory() throws Throwable {
-    registry.mkdir("/testUpdateDirectory", CreateMode.PERSISTENT);
-    registry.update("/testUpdateDirectory", getTestBuffer());
+    curatorService.mkdir("/testUpdateDirectory", CreateMode.PERSISTENT);
+    curatorService.update("/testUpdateDirectory", getTestBuffer());
   }
 
   @Test
   public void testUpdateDirectorywithChild() throws Throwable {
-    registry.mkdir("/testUpdateDirectorywithChild", CreateMode.PERSISTENT);
-    registry.mkdir("/testUpdateDirectorywithChild/child",
+    curatorService.mkdir("/testUpdateDirectorywithChild", CreateMode.PERSISTENT);
+    curatorService.mkdir("/testUpdateDirectorywithChild/child",
         CreateMode.PERSISTENT);
-    registry.update("/testUpdateDirectorywithChild", getTestBuffer());
+    curatorService.update("/testUpdateDirectorywithChild", getTestBuffer());
   }
 
 
@@ -179,7 +178,7 @@ public class TestCuratorService extends AbstractZKRegistryTest {
 
 
   public void verifyNotExists(String path) throws IOException {
-    if (registry.pathExists(path)) {
+    if (curatorService.pathExists(path)) {
       fail("Path should not exist: " + path);
     }
   }

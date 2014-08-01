@@ -19,40 +19,61 @@
 package org.apache.hadoop.yarn.registry.client.api;
 
 public interface RegistryConstants {
-  String ZK_HOSTS = "yarn.registry.zk.connect-hosts";
-  String ZK_SESSION_TIMEOUT =
-      "yarn.registry.zk.session-timeout-ms";
-  String ZK_CONNECTION_TIMEOUT =
-      "yarn.registry.zk.connection-timeout-ms";
-  String ZK_ROOT = "yarn.registry.zk.root-node";
-  String ZK_ACL = "yarn.registry.zk.acl";
-  String ZK_RETRY_TIMES = "yarn.registry.zk.retry.times";
-  String ZK_RETRY_INTERVAL =
-      "yarn.registry.zk.retry.interval-ms";
-  String ZK_RETRY_CEILING =
-      "yarn.registry.zk.retry.ceiling-ms";
+  String REGISTRY_PREFIX = "yarn.registry";
 
-  String REGISTRY_URI_CONF = "yarn.registry.uri";
-  String REGISTRY_PROXY_ADDRESS_CONF =
-      "yarn.registry.proxy.address";
-  String REGISTRY_STORAGE_CLASS_CONF =
-      "yarn.registry.storage.class";
-  String REGISTRY_ENCRYPTOR_CLASS_CONF =
-      "yarn.registry.encryptor.class";
+  /**
+   * List of hostname:port pairs defining the ZK quorum
+   */
+  String REGISTRY_ZK_QUORUM = REGISTRY_PREFIX + ".zk.quorum";
 
-  String STORAGE_ATTRIBUTE = "yarn.registry.storage";
-  String ENCRYPTOR_ATTRIBUTE = "yarn.registry.encryptor";
+  /**
+   * Zookeeper session timeout in milliseconds
+   */
+  String REGISTRY_ZK_SESSION_TIMEOUT = REGISTRY_PREFIX + ".zk.session-timeout-ms";
 
-  String REGISTRY_HTTP_PLUGINS = "yarn.registry.plugins";
+  /**
+   * Zookeeper connect retry count
+   */
+  String REGISTRY_ZK_RETRY_TIMES = REGISTRY_PREFIX + ".zk.retry.times";
+
+  /**
+   * Zookeeper connection timeout in milliseconds
+   */
+
+  String REGISTRY_ZK_CONNECTION_TIMEOUT = REGISTRY_PREFIX + ".zk.connection-timeout-ms";
+  
+  /**
+   * Zookeeper connect interval in milliseconds
+   */
+  String REGISTRY_ZK_RETRY_INTERVAL = REGISTRY_PREFIX + ".zk.retry.interval-ms";
+  /**
+   * Zookeeper retry limit in milliseconds
+   */
+  String REGISTRY_ZK_RETRY_CEILING = REGISTRY_PREFIX + ".zk.retry.ceiling-ms";
+  String REGISTRY_ZK_ROOT = REGISTRY_PREFIX + ".zk.root";
+  String REGISTRY_ZK_ACL = REGISTRY_PREFIX + ".zk.acl";
+
+  String REGISTRY_URI_CONF = REGISTRY_PREFIX + ".uri";
+  String REGISTRY_PROXY_ADDRESS_CONF = REGISTRY_PREFIX + ".proxy.address";
+/*
+  String REGISTRY_STORAGE_CLASS_CONF = REGISTRY_PREFIX + ".storage.class";
+  String REGISTRY_ENCRYPTOR_CLASS_CONF = REGISTRY_PREFIX + ".encryptor.class";
+
+  String REGISTRY_STORAGE_ATTRIBUTE = REGISTRY_PREFIX + ".storage";
+  String REGISTRY_ENCRYPTOR_ATTRIBUTE = REGISTRY_PREFIX + ".encryptor";
+
+  String REGISTRY_REGISTRY_HTTP_PLUGINS = REGISTRY_PREFIX + ".plugins";
+
+  */
 
   String DEFAULT_ZK_HOSTS = "localhost:2181";
   int DEFAULT_ZK_SESSION_TIMEOUT = 20000;
   int DEFAULT_ZK_CONNECTION_TIMEOUT = 15000;
   int DEFAULT_ZK_RETRY_TIMES = 5;
   int DEFAULT_ZK_RETRY_INTERVAL = 1000;
-  int DEFAULT_ZK_RETRY_CEILING = 1000;
-  String REGISTRY_ROOT = "/yarnRegistry";
-  String REGISTRY_NAMESPACE = "yarnregistry";
+  int DEFAULT_ZK_RETRY_CEILING = 20;
+  String DEFAULT_REGISTRY_ROOT = "/yarnRegistry";
+  
   /**
    * Pattern of a hostname 
    */
@@ -64,6 +85,6 @@ public interface RegistryConstants {
   String USERNAME_PATTERN = HOSTNAME_PATTERN;
   String USERS_PATH = "users/";
   String SYSTEM_PATH = "system/";
-  String LIVE = "/live";
-  String COMPONENTS = "/components";
+  String ZNODE_LIVE = "/live";
+  String ZNODE_COMPONENTS = "/components";
 }

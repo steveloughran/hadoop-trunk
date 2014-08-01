@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.binding.zk;
+package org.apache.hadoop.yarn.registry.server.services;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -26,7 +26,6 @@ import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
 import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
-import org.apache.hadoop.yarn.registry.server.services.CuratorService;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
@@ -72,9 +71,7 @@ public class YarnRegistryService extends CuratorService
   protected void serviceStart() throws Exception {
     super.serviceStart();
     // create the root directories
-    if (maybeCreate(SYSTEM_PATH, CreateMode.PERSISTENT)) {
-      LOG.info("Created ");
-    }
+    maybeCreate(SYSTEM_PATH, CreateMode.PERSISTENT);
     maybeCreate(USERS_PATH, CreateMode.PERSISTENT,
         parseACLs(PERMISSIONS_REGISTRY_USERS));
     maybeCreate(SYSTEM_PATH, CreateMode.PERSISTENT,
@@ -101,7 +98,7 @@ public class YarnRegistryService extends CuratorService
     String servicePath = servicePath(user, serviceClass, serviceName);
     List<ACL> userAccess = fullUserAccess(user);
     if (set(servicePath, CreateMode.PERSISTENT, bytes, userAccess)) {
-      maybeCreate(servicePath + RegistryConstants.COMPONENTS,
+      maybeCreate(servicePath + RegistryConstants.ZNODE_COMPONENTS,
           CreateMode.PERSISTENT,
           userAccess);
     }
@@ -201,7 +198,7 @@ public class YarnRegistryService extends CuratorService
       boolean ephemeral) throws IOException {
     String servicePath = pathMustExist(
         servicePath(user, serviceClass, serviceName));
-    maybeCreate(servicePath + RegistryConstants.COMPONENTS,
+    maybeCreate(servicePath + RegistryConstants.ZNODE_COMPONENTS,
         CreateMode.PERSISTENT,
         fullUserAccess(user));
     String componentPath =

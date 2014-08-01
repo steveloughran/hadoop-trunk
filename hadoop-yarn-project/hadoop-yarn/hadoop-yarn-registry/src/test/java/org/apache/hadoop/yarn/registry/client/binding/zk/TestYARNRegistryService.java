@@ -25,8 +25,9 @@ import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
+import org.apache.hadoop.yarn.registry.client.types.RegistryTypeUtils;
 import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
-import org.apache.hadoop.yarn.registry.client.types.TypeUtils;
+import org.apache.hadoop.yarn.registry.server.services.YarnRegistryService;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -41,7 +42,7 @@ import java.util.Map;
 /**
  * Tests for the YARN registry
  */
-public class TestYARNRegistryService extends AbstractZKRegistryTest {
+public class TestYarnRegistryService extends AbstractZKRegistryTest {
 
   public static final String SC_HADOOP = "org-apache-hadoop";
   public static final String WEBHDFS = "webhdfs";
@@ -51,20 +52,20 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
   public static final String API_WEBHDFS = "org_apache_hadoop_namenode_webhdfs";
   public static final String API_HDFS = "org_apache_hadoop_namenode_dfs";
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestYARNRegistryService.class);
+      LoggerFactory.getLogger(TestYarnRegistryService.class);
   
-  private YarnRegistryService client;
+  private YarnRegistryService yarnRegistry;
 
   @Before
   public void setupClient() {
-    client = new YarnRegistryService("yarnRegistry");
-    client.init(createRegistryConfiguration());
-    client.start();
+    yarnRegistry = new YarnRegistryService("yarnRegistry");
+    yarnRegistry.init(createRegistryConfiguration());
+    yarnRegistry.start();
   }
 
   @After
   public void teardownClient() {
-    ServiceOperations.stop(client);
+    ServiceOperations.stop(yarnRegistry);
   }
 
 
@@ -73,17 +74,17 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
 
     putExampleServiceEntry();
 
-    List<String> serviceClasses = client.listServiceClasses(USER);
+    List<String> serviceClasses = yarnRegistry.listServiceClasses(USER);
     assertEquals(1, serviceClasses.size());
     assertEquals(SC_HADOOP, serviceClasses.get(0));
-    assertTrue(client.serviceClassExists(USER, SC_HADOOP));
-    List<String> hadoopServices = client.listServices(USER, SC_HADOOP);
+    assertTrue(yarnRegistry.serviceClassExists(USER, SC_HADOOP));
+    List<String> hadoopServices = yarnRegistry.listServices(USER, SC_HADOOP);
     assertEquals(1, hadoopServices.size());
 
     assertEquals(CLUSTERNAME, hadoopServices.get(0));
 
-    assertTrue(client.serviceClassExists(USER, SC_HADOOP));
-    assertTrue(client.serviceExists(USER, SC_HADOOP, CLUSTERNAME));
+    assertTrue(yarnRegistry.serviceClassExists(USER, SC_HADOOP));
+    assertTrue(yarnRegistry.serviceExists(USER, SC_HADOOP, CLUSTERNAME));
   }
 
   protected ServiceEntry putExampleServiceEntry() throws IOException {
@@ -91,7 +92,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
     se.description = methodName.getMethodName();
     addSampleEndpoints(se, "namenode");
 
-    client.putServiceEntry(USER, SC_HADOOP,
+    yarnRegistry.putServiceEntry(USER, SC_HADOOP,
         CLUSTERNAME,
         se);
     return se;
@@ -102,14 +103,14 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
   public void testDeleteServiceEntry() throws Throwable {
     putExampleServiceEntry();
     deleteExampleServiceEntry();
-    List<String> hadoopServices = client.listServices(USER, SC_HADOOP);
+    List<String> hadoopServices = yarnRegistry.listServices(USER, SC_HADOOP);
     assertEquals(0, hadoopServices.size());
-    assertTrue(client.serviceClassExists(USER, SC_HADOOP));
-    assertFalse(client.serviceExists(USER, SC_HADOOP, CLUSTERNAME));
+    assertTrue(yarnRegistry.serviceClassExists(USER, SC_HADOOP));
+    assertFalse(yarnRegistry.serviceExists(USER, SC_HADOOP, CLUSTERNAME));
   }
 
   protected void deleteExampleServiceEntry() throws IOException {
-    client.deleteServiceEntry(USER, SC_HADOOP, CLUSTERNAME);
+    yarnRegistry.deleteServiceEntry(USER, SC_HADOOP, CLUSTERNAME);
   }
 
   @Test
@@ -119,18 +120,18 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
     ComponentEntry component = new ComponentEntry();
     addSampleEndpoints(component, DATANODE);
 
-    client.putComponent(USER,
+    yarnRegistry.putComponent(USER,
         SC_HADOOP,
         CLUSTERNAME,
         DATANODE,
         component,
         true);
 
-    List<String> serviceClasses = client.listServiceClasses(USER);
+    List<String> serviceClasses = yarnRegistry.listServiceClasses(USER);
     assertEquals(1, serviceClasses.size());
     assertEquals(SC_HADOOP, serviceClasses.get(0));
-    assertTrue(client.serviceClassExists(USER, SC_HADOOP));
-    List<String> components = client.listComponents(USER, SC_HADOOP,
+    assertTrue(yarnRegistry.serviceClassExists(USER, SC_HADOOP));
+    List<String> components = yarnRegistry.listComponents(USER, SC_HADOOP,
         CLUSTERNAME);
     for (String name : components) {
       LOG.info(name);
@@ -138,53 +139,55 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
     assertEquals(1, components.size());
 
     assertEquals(DATANODE, components.get(0));
-    assertTrue(client.componentExists(USER, SC_HADOOP, CLUSTERNAME, DATANODE));
+    assertTrue(yarnRegistry.componentExists(USER, SC_HADOOP, CLUSTERNAME, DATANODE));
 
-    client.deleteComponent(USER, SC_HADOOP, CLUSTERNAME, DATANODE);
-    assertEquals(0, client.listComponents(USER, SC_HADOOP,
+    yarnRegistry.deleteComponent(USER, SC_HADOOP, CLUSTERNAME, DATANODE);
+    assertEquals(0, yarnRegistry.listComponents(USER, SC_HADOOP,
         CLUSTERNAME).size());
-    client.putComponent(USER,
+    yarnRegistry.putComponent(USER,
         SC_HADOOP,
         CLUSTERNAME,
         DATANODE,
         component,
         false);
-    assertEquals(1, client.listComponents(USER, SC_HADOOP,
+    assertEquals(1, yarnRegistry.listComponents(USER, SC_HADOOP,
         CLUSTERNAME).size());
     deleteExampleServiceEntry();
 
     // verify that when the service is deleted, so go the components
-    assertEquals(0, client.listComponents(USER, SC_HADOOP,
+    assertEquals(0, yarnRegistry.listComponents(USER, SC_HADOOP,
         CLUSTERNAME).size());
-    assertFalse(client.componentExists(USER, SC_HADOOP, CLUSTERNAME, DATANODE));
+    assertFalse(yarnRegistry.componentExists(USER, SC_HADOOP, CLUSTERNAME, DATANODE));
 
   }
 
   @Test
   public void testLookforUndefinedServiceClass() throws Throwable {
-    assertFalse(client.serviceClassExists("user2", "hadoop0"));
+    assertFalse(yarnRegistry.serviceClassExists("user2", "hadoop0"));
   }
 
   @Test
   public void testLookforUndefinedComponent() throws Throwable {
     assertFalse(
-        client.componentExists("user2", "hadoop0", "cluster-3", "dn-0"));
+        yarnRegistry.componentExists("user2", "hadoop0", "cluster-3",
+            "dn-0"));
   }
 
   @Test
   public void testLookforUndefinedService() throws Throwable {
-    assertFalse(client.serviceExists("user2", "hadoop0", "cluster-3"));
+    assertFalse(
+        yarnRegistry.serviceExists("user2", "hadoop0", "cluster-3"));
   }
 
 
   @Test(expected = FileNotFoundException.class)
   public void testGetUndefinedComponent() throws Throwable {
-    client.getComponent("user2", "hadoop0", "cluster-3", "dn-0");
+    yarnRegistry.getComponent("user2", "hadoop0", "cluster-3", "dn-0");
   }
 
   @Test(expected = FileNotFoundException.class)
   public void testGetUndefinedService() throws Throwable {
-    client.getServiceInstance("user2", "hadoop0", "cluster-3");
+    yarnRegistry.getServiceInstance("user2", "hadoop0", "cluster-3");
   }
 
 
@@ -192,7 +195,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
   public void testPutComponentNoService() throws Throwable {
     deleteExampleServiceEntry();
 
-    client.putComponent(USER,
+    yarnRegistry.putComponent(USER,
         SC_HADOOP,
         CLUSTERNAME,
         DATANODE,
@@ -207,7 +210,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
     entry1.description = "entry1";
     addSampleEndpoints(entry1, "entry1");
 
-    client.putComponent(USER,
+    yarnRegistry.putComponent(USER,
         SC_HADOOP,
         CLUSTERNAME,
         DATANODE,
@@ -216,14 +219,14 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
     ComponentEntry entry2 = new ComponentEntry();
     entry2.description = "entry2";
 
-    client.putComponent(USER,
+    yarnRegistry.putComponent(USER,
         SC_HADOOP,
         CLUSTERNAME,
         DATANODE,
         entry2,
         true);
 
-    ComponentEntry entry3 = client.getComponent(USER,
+    ComponentEntry entry3 = yarnRegistry.getComponent(USER,
         SC_HADOOP,
         CLUSTERNAME,
         DATANODE);
@@ -240,18 +243,18 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
 
   @Test
   public void testDeleteMissingService() throws Throwable {
-    client.deleteServiceEntry("user2", "hadoop0", "cluster-3");
+    yarnRegistry.deleteServiceEntry("user2", "hadoop0", "cluster-3");
   }
 
   @Test
   public void testDeleteUndefinedComponent() throws Throwable {
-    client.deleteComponent("user2", "hadoop0", "cluster-3", "dn-0");
+    yarnRegistry.deleteComponent("user2", "hadoop0", "cluster-3", "dn-0");
   }
 
   @Test
   public void testReadServiceEntry() throws Throwable {
     putExampleServiceEntry();
-    ServiceEntry instance = client.getServiceInstance(USER,
+    ServiceEntry instance = yarnRegistry.getServiceInstance(USER,
         SC_HADOOP,
         CLUSTERNAME);
     assertEquals(
@@ -267,13 +270,13 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
     ComponentEntry entry = new ComponentEntry();
     entry.description = methodName.getMethodName();
     addSampleEndpoints(entry, "datanode");
-    client.putComponent(USER,
+    yarnRegistry.putComponent(USER,
         SC_HADOOP,
         CLUSTERNAME,
         DATANODE,
         entry,
         true);
-    ComponentEntry instance = client.getComponent(USER,
+    ComponentEntry instance = yarnRegistry.getComponent(USER,
         SC_HADOOP,
         CLUSTERNAME, DATANODE);
     assertEquals(
@@ -299,7 +302,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
   }
 
   protected boolean isServiceLive() throws IOException {
-    return client.isServiceLive(USER, SC_HADOOP, CLUSTERNAME);
+    return yarnRegistry.isServiceLive(USER, SC_HADOOP, CLUSTERNAME);
   }
 
   @Test(expected = FileAlreadyExistsException.class)
@@ -349,7 +352,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
   
   protected void putServiceLiveness(boolean ephemeral, boolean forceDelete) throws
       IOException {
-    client.putServiceLiveness(USER,
+    yarnRegistry.putServiceLiveness(USER,
         SC_HADOOP,
         CLUSTERNAME,
         ephemeral,
@@ -358,7 +361,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
   
   protected void deleteServiceLiveness() throws
       IOException {
-    client.deleteServiceLiveness(USER,
+    yarnRegistry.deleteServiceLiveness(USER,
         SC_HADOOP,
         CLUSTERNAME);
   }
@@ -369,13 +372,14 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
    */
   protected void addSampleEndpoints(ComponentEntry entry, String hostname) {
     entry.putExternalEndpoint("web",
-        TypeUtils.webEndpoint("UI", "web UI", "http://" + hostname + ":80"));
+        RegistryTypeUtils.webEndpoint("UI", "web UI",
+            "http://" + hostname + ":80"));
     entry.putExternalEndpoint(WEBHDFS,
-        TypeUtils.restEndpoint(API_WEBHDFS,
+        RegistryTypeUtils.restEndpoint(API_WEBHDFS,
             WEBHDFS, "http://" + hostname + ":8020"));
 
     entry.putInternalEndpoint("nnipc",
-        TypeUtils.ipcEndpoint(API_HDFS,
+        RegistryTypeUtils.ipcEndpoint(API_HDFS,
             "hdfs", true, hostname + "/8030"));
   }
 
@@ -392,7 +396,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
     assertNotNull(webhdfs);
     assertEquals(API_WEBHDFS, webhdfs.api);
     assertEquals(AddressTypes.ADDRESS_URI, webhdfs.addressType);
-    assertEquals(ProtocolTypes.PROTOCOL_RESTAPI, webhdfs.protocolType);
+    assertEquals(ProtocolTypes.PROTOCOL_REST, webhdfs.protocolType);
     List<String> addresses = webhdfs.addresses;
     assertEquals(1, addresses.size());
     String addr = addresses.get(0);
@@ -403,6 +407,8 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
     assertNotNull(nnipc);
     assertEquals(ProtocolTypes.PROTOCOL_HADOOP_IPC_PROTOBUF,
         nnipc.protocolType);
+    Endpoint web = instance.getExternalEndpoint("web");
+    assertNotNull(web);
   }
 
 
