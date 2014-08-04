@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.server.services;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.curator.RetrySleeper;
 import org.apache.curator.ensemble.EnsembleProvider;
@@ -34,6 +35,7 @@ import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.zk.RegistryZKUtils;
+import org.apache.hadoop.yarn.registry.client.binding.zk.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.ExceptionGenerator;
 import org.apache.hadoop.yarn.registry.client.exceptions.RESTIOException;
 import org.apache.http.HttpStatus;
@@ -499,5 +501,10 @@ public class CuratorService extends AbstractService
       return Collections.emptyList();
     }
     return ls(path);
+  }
+  
+  @VisibleForTesting
+  public ZKPathDumper dumpPath() {
+    return new ZKPathDumper(curator, registryRoot);
   }
 }
