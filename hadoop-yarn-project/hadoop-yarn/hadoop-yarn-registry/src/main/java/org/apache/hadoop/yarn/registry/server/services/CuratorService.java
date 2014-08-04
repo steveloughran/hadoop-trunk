@@ -504,7 +504,7 @@ public class CuratorService extends AbstractService
   }
   
   @VisibleForTesting
-  public ZKPathDumper dumpPath() {
-    return new ZKPathDumper(curator, registryRoot);
+  public ZKPathDumper dumpPath(boolean verbose) {
+    return new ZKPathDumper(curator, registryRoot, verbose);
   }
 }
