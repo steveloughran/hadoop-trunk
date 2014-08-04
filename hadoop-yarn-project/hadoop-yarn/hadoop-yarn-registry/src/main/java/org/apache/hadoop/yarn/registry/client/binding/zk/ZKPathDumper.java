@@ -21,6 +21,7 @@ package org.apache.hadoop.yarn.registry.client.binding.zk;
 import com.google.common.base.Preconditions;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.api.GetChildrenBuilder;
+import org.apache.zookeeper.data.Stat;
 
 import java.util.List;
 
@@ -32,24 +33,39 @@ import java.util.List;
  * 
  * It will also catch any exceptions raised in the operation,
  * so the log action will never fail.
+ * 
+ * The verbose flag includes the size of the data; this is calculated by
+ * retrieving all the data, so scales <code>O(data)</code> -that is: not well
+ * at all.
  */
 public class ZKPathDumper {
 
   private final CuratorFramework curator;
-  private final String registryRoot;
+  private final String root;
+  private final boolean verbose;
 
-  public ZKPathDumper(CuratorFramework curator, String registryRoot) {
+  /**
+   * Create a path dumper -but do not dump the path until asked
+   * @param curator curator instance
+   * @param root root
+   * @param verbose flag to ask for verbose details. This uses more network
+   * IO and does not scale well.
+   */
+  public ZKPathDumper(CuratorFramework curator,
+      String root,
+      boolean verbose) {
+    this.verbose = verbose;
     Preconditions.checkArgument(curator != null);
-    Preconditions.checkArgument(registryRoot != null);
+    Preconditions.checkArgument(root != null);
     this.curator = curator;
-    this.registryRoot = registryRoot;
+    this.root = root;
   }
 
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
-    builder.append("ZK tree for ").append(registryRoot).append('\n');
-    expand(builder, registryRoot, 1);
+    builder.append("ZK tree for ").append(root).append('\n');
+    expand(builder, root, 1);
     return builder.toString();
   }
 
@@ -60,11 +76,28 @@ public class ZKPathDumper {
       GetChildrenBuilder childrenBuilder = curator.getChildren();
       List<String> children = childrenBuilder.forPath(path);
       for (String child : children) {
+        String childPath = path + "/" + child;
+        String verboseData = "";
+        if (verbose) {
+          Stat stat = new Stat();
+          byte[] bytes;
+          bytes = curator.getData().storingStatIn(stat).forPath(childPath);
+          StringBuilder verboseDataBuilder = new StringBuilder(64);
+          verboseDataBuilder.append("  [").append(bytes.length).append("]");
+          if (stat.getEphemeralOwner()>0) {
+            verboseDataBuilder.append("*");
+          }
+          verboseData = verboseDataBuilder.toString();
+        }
+
         // print each child
         append(builder, indent, ' ');
-        builder.append('/').append(child).append('\n');
+        builder.append('/').append(child);
+        if (verbose) {
+          builder.append(verboseData);
+        }
+        builder.append('\n');
         // recurse
-        String childPath = path + "/" + child;
         expand(builder, childPath, indent + 1);
       }
     } catch (Exception e) {
