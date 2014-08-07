@@ -42,7 +42,7 @@ import java.util.Map;
 /**
  * Tests for the YARN registry
  */
-public class TestYarnRegistryService extends AbstractZKRegistryTest {
+public class TestYARNRegistryService extends AbstractZKRegistryTest {
 
   public static final String SC_HADOOP = "org-apache-hadoop";
   public static final String WEBHDFS = "webhdfs";
@@ -52,7 +52,7 @@ public class TestYarnRegistryService extends AbstractZKRegistryTest {
   public static final String API_WEBHDFS = "org_apache_hadoop_namenode_webhdfs";
   public static final String API_HDFS = "org_apache_hadoop_namenode_dfs";
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestYarnRegistryService.class);
+      LoggerFactory.getLogger(TestYARNRegistryService.class);
   
   private YarnRegistryService yarnRegistry;
 
