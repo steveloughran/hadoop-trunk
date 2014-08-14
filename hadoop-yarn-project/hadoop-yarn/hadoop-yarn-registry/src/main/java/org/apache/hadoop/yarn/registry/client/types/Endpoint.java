@@ -79,7 +79,7 @@ public class Endpoint {
     
     this.protocolType = protocolType;
     this.description = description;
-    ArrayList<String> addrs = new ArrayList<>(uris.length);
+    ArrayList<String> addrs = new ArrayList<String>(uris.length);
     for (URI uri : uris) {
       addrs.add(uri.toASCIIString());
     }
