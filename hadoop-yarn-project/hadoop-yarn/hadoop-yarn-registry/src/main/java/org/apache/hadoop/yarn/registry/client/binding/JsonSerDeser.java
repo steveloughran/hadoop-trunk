@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IOUtils;
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.DeserializationConfig;
@@ -108,8 +109,9 @@ public class JsonSerDeser<T> {
    */
   public synchronized T fromResource(String resource)
       throws IOException, JsonParseException, JsonMappingException {
-    try (InputStream resStream = this.getClass()
-                                     .getResourceAsStream(resource)) {
+    InputStream resStream = null;
+    try  {
+      resStream = this.getClass().getResourceAsStream(resource);
       if (resStream == null) {
         throw new FileNotFoundException(resource);
       }
@@ -117,6 +119,8 @@ public class JsonSerDeser<T> {
     } catch (IOException e) {
       log.error("Exception while parsing json resource {}: {}", resource, e);
       throw e;
+    } finally {
+      IOUtils.closeStream(resStream);
     }
   }
 
