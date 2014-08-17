@@ -16,26 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.types;
+package org.apache.hadoop.yarn.registry.client.exceptions;
 
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+import java.io.IOException;
 
-import java.util.HashMap;
-import java.util.Map;
+public class InvalidPathnameException extends IOException {
+  public InvalidPathnameException(String message) {
+    super(message);
+  }
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-
-/**
- * JSON-marshallable service entry
- */
-public class ServiceEntry extends ComponentEntry {
-
-  /**
-   * List of Components
-   */
-  @JsonIgnore
-  public Map<String, ComponentEntry> components =
-      new HashMap<String, ComponentEntry>();
-
+  public InvalidPathnameException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

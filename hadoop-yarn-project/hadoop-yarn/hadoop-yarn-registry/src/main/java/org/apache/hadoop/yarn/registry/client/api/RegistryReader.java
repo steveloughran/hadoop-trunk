@@ -18,8 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.api;
 
-import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
-import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 
 import java.io.IOException;
 import java.util.List;
@@ -44,7 +43,7 @@ public interface RegistryReader {
       String serviceClass,
       String serviceName) throws IOException;
 
-  public ServiceEntry getServiceInstance(String user,
+  public ServiceRecord getServiceInstance(String user,
       String serviceClass,
       String serviceName)
       throws IOException;
@@ -54,7 +53,7 @@ public interface RegistryReader {
       String serviceName)
       throws IOException;
 
-  public ComponentEntry getComponent(String user,
+  public ServiceRecord getComponent(String user,
       String serviceClass,
       String serviceName,
       String componentName) throws IOException;

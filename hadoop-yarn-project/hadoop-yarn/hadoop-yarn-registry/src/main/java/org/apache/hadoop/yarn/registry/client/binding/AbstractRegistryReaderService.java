@@ -21,8 +21,7 @@ package org.apache.hadoop.yarn.registry.client.binding;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.registry.client.api.RegistryReader;
 import org.apache.hadoop.yarn.registry.client.exceptions.RESTIOException;
-import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
-import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.http.HttpStatus;
 
 import java.io.IOException;
@@ -65,7 +64,7 @@ public abstract class AbstractRegistryReaderService extends AbstractService impl
   }
 
   @Override
-  public ServiceEntry getServiceInstance(String user,
+  public ServiceRecord getServiceInstance(String user,
       String serviceClass,
       String serviceName) throws IOException {
     throw notImplemented();
@@ -79,7 +78,7 @@ public abstract class AbstractRegistryReaderService extends AbstractService impl
   }
 
   @Override
-  public ComponentEntry getComponent(String user,
+  public ServiceRecord getComponent(String user,
       String serviceClass,
       String serviceName,
       String componentName) throws IOException {

@@ -73,7 +73,7 @@ public class Endpoint {
   public Endpoint(String api,
       String protocolType,
       String description,
-      URI...uris) {
+      URI... uris) {
     this.api = api;
     this.addressType = AddressTypes.ADDRESS_URI;
     

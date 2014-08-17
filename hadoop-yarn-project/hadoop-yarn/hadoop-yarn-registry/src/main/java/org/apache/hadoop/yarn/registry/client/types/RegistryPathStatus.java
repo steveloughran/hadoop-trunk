@@ -16,20 +16,19 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.binding;
+package org.apache.hadoop.yarn.registry.client.types;
 
-import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 
 /**
- * JSON marshalling support
+ * Output of a stat() call
  */
-public class JsonMarshal {
+public class RegistryPathStatus {
 
-  public static class ServiceRecordMarshal extends JsonSerDeser<ServiceRecord> {
-    public ServiceRecordMarshal() {
-      super(ServiceRecord.class);
-    }
-  }
-
-
+  String name; // child Name
+  long time;
+  long size;
+  /**
+   * Does the entry have a record?
+   */
+  boolean hasRecord;
 }

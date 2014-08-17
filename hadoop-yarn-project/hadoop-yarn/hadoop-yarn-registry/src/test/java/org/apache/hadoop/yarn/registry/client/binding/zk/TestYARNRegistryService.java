@@ -22,11 +22,10 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
-import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 import org.apache.hadoop.yarn.registry.client.types.RegistryTypeUtils;
-import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.server.services.YarnRegistryService;
 import org.junit.After;
 import org.junit.Before;
@@ -87,8 +86,8 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
     assertTrue(yarnRegistry.serviceExists(USER, SC_HADOOP, CLUSTERNAME));
   }
 
-  protected ServiceEntry putExampleServiceEntry() throws IOException {
-    ServiceEntry se = new ServiceEntry();
+  protected ServiceRecord putExampleServiceEntry() throws IOException {
+    ServiceRecord se = new ServiceRecord();
     se.description = methodName.getMethodName();
     addSampleEndpoints(se, "namenode");
 
@@ -117,7 +116,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
   public void testPutComponentEntry() throws Throwable {
     putExampleServiceEntry();
 
-    ComponentEntry component = new ComponentEntry();
+    ServiceRecord component = new ServiceRecord();
     addSampleEndpoints(component, DATANODE);
 
     yarnRegistry.putComponent(USER,
@@ -199,14 +198,14 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
         SC_HADOOP,
         CLUSTERNAME,
         DATANODE,
-        new ComponentEntry(),
+        new ServiceRecord(),
         true);
   }
 
   @Test
   public void testOverwriteComponentEntry() throws Throwable {
     putExampleServiceEntry();
-    ComponentEntry entry1 = new ComponentEntry();
+    ServiceRecord entry1 = new ServiceRecord();
     entry1.description = "entry1";
     addSampleEndpoints(entry1, "entry1");
 
@@ -216,7 +215,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
         DATANODE,
         entry1,
         true);
-    ComponentEntry entry2 = new ComponentEntry();
+    ServiceRecord entry2 = new ServiceRecord();
     entry2.description = "entry2";
 
     yarnRegistry.putComponent(USER,
@@ -226,7 +225,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
         entry2,
         true);
 
-    ComponentEntry entry3 = yarnRegistry.getComponent(USER,
+    ServiceRecord entry3 = yarnRegistry.getComponent(USER,
         SC_HADOOP,
         CLUSTERNAME,
         DATANODE);
@@ -254,7 +253,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
   @Test
   public void testReadServiceEntry() throws Throwable {
     putExampleServiceEntry();
-    ServiceEntry instance = yarnRegistry.getServiceInstance(USER,
+    ServiceRecord instance = yarnRegistry.getServiceInstance(USER,
         SC_HADOOP,
         CLUSTERNAME);
     assertEquals(
@@ -267,7 +266,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
   @Test
   public void testReadComponent() throws Throwable {
     putExampleServiceEntry();
-    ComponentEntry entry = new ComponentEntry();
+    ServiceRecord entry = new ServiceRecord();
     entry.description = methodName.getMethodName();
     addSampleEndpoints(entry, "datanode");
     yarnRegistry.putComponent(USER,
@@ -276,7 +275,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
         DATANODE,
         entry,
         true);
-    ComponentEntry instance = yarnRegistry.getComponent(USER,
+    ServiceRecord instance = yarnRegistry.getComponent(USER,
         SC_HADOOP,
         CLUSTERNAME, DATANODE);
     assertEquals(
@@ -370,7 +369,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
    * Add some endpoints
    * @param entry entry
    */
-  protected void addSampleEndpoints(ComponentEntry entry, String hostname) {
+  protected void addSampleEndpoints(ServiceRecord entry, String hostname) {
     entry.putExternalEndpoint("web",
         RegistryTypeUtils.webEndpoint("UI", "web UI",
             "http://" + hostname + ":80"));
@@ -385,10 +384,10 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
 
   /**
    * General code to validate bits of a component/service entry built iwth
-   * {@link #addSampleEndpoints(ComponentEntry, String)}
+   * {@link #addSampleEndpoints(ServiceRecord, String)}
    * @param instance instance to check
    */
-  protected void validateEntry(ComponentEntry instance) {
+  protected void validateEntry(ServiceRecord instance) {
     Map<String, Endpoint> externalEndpointMap = instance.external;
     assertEquals(2, externalEndpointMap.size());
 
