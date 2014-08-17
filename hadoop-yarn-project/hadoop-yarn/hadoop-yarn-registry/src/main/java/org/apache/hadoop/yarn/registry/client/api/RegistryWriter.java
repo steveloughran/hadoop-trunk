@@ -19,8 +19,7 @@
 package org.apache.hadoop.yarn.registry.client.api;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
-import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 
 import java.io.IOException;
 
@@ -32,7 +31,7 @@ public interface RegistryWriter extends RegistryReader {
   public void putServiceEntry(String user,
       String serviceClass,
       String serviceName,
-      ServiceEntry entry)
+      ServiceRecord entry)
       throws IOException;
 
   public void deleteServiceEntry(String user,
@@ -44,7 +43,7 @@ public interface RegistryWriter extends RegistryReader {
       String serviceClass,
       String serviceName,
       String componentName,
-      ComponentEntry entry,
+      ServiceRecord entry,
       boolean ephemeral)
       throws IOException;
 

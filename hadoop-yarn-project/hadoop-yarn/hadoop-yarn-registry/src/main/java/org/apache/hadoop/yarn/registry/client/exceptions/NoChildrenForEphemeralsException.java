@@ -16,20 +16,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.binding;
+package org.apache.hadoop.yarn.registry.client.exceptions;
 
-import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import java.io.IOException;
 
-/**
- * JSON marshalling support
- */
-public class JsonMarshal {
-
-  public static class ServiceRecordMarshal extends JsonSerDeser<ServiceRecord> {
-    public ServiceRecordMarshal() {
-      super(ServiceRecord.class);
-    }
+public class NoChildrenForEphemeralsException extends IOException {
+  public NoChildrenForEphemeralsException(String message) {
+    super(message);
   }
 
-
+  public NoChildrenForEphemeralsException(String message,
+      Throwable cause) {
+    super(message, cause);
+  }
 }

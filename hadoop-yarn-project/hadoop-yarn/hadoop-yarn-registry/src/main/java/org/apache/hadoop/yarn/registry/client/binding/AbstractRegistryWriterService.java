@@ -19,8 +19,7 @@
 package org.apache.hadoop.yarn.registry.client.binding;
 
 import org.apache.hadoop.yarn.registry.client.api.RegistryWriter;
-import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
-import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 
 import java.io.IOException;
 
@@ -36,7 +35,7 @@ public abstract class AbstractRegistryWriterService extends
   public void putServiceEntry(String user,
       String serviceClass,
       String name,
-      ServiceEntry entry) throws IOException {
+      ServiceRecord entry) throws IOException {
     throw notImplemented();
   }
 
@@ -59,7 +58,7 @@ public abstract class AbstractRegistryWriterService extends
       String serviceClass,
       String serviceName,
       String componentName,
-      ComponentEntry entry,
+      ServiceRecord entry,
       boolean ephemeral) throws IOException {
     throw notImplemented();
   }

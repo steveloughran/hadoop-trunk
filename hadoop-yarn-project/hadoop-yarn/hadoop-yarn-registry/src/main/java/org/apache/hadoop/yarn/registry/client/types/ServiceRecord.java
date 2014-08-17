@@ -29,13 +29,18 @@ import java.util.Map;
 /**
  * JSON-marshallable description of a single component
  */
-public class ComponentEntry {
+public class ServiceRecord {
 
   /**
    * The time the service was registered -as seen by the service making
    * the registration request.
    */
   public long registrationTime;
+
+  /**
+   * ID. For containers: container ID. For application instances, application ID.
+   */
+  public String id;
 
   public String description;
 

@@ -24,8 +24,7 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryWriter;
 import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
-import org.apache.hadoop.yarn.registry.client.types.ComponentEntry;
-import org.apache.hadoop.yarn.registry.client.types.ServiceEntry;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
@@ -34,7 +33,12 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.List;
 
-import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.*;
+import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.componentListPath;
+import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.componentPath;
+import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.livenessPath;
+import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.servicePath;
+import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.serviceclassPath;
+import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.userPath;
 
 /**
  * The YARN ZK registry service is R/W and is used  to register
@@ -47,10 +51,8 @@ public class YarnRegistryService extends CuratorService
   private static final Logger LOG =
       LoggerFactory.getLogger(CuratorService.class);
 
-  private final JsonMarshal.ServiceEntryMarshal serviceEntryMarshal
-      = new JsonMarshal.ServiceEntryMarshal();
-  private final JsonMarshal.ComponentEntryMarshal componentEntryMarshal
-      = new JsonMarshal.ComponentEntryMarshal();
+  private final JsonMarshal.ServiceRecordMarshal serviceRecordMarshal
+      = new JsonMarshal.ServiceRecordMarshal();
 
   public static final String PERMISSIONS_REGISTRY_ROOT = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_SYSTEM = "world:anyone:rwcda";
@@ -92,8 +94,8 @@ public class YarnRegistryService extends CuratorService
   public void putServiceEntry(String user,
       String serviceClass,
       String serviceName,
-      ServiceEntry entry) throws IOException {
-    byte[] bytes = serviceEntryMarshal.toBytes(entry);
+      ServiceRecord entry) throws IOException {
+    byte[] bytes = serviceRecordMarshal.toBytes(entry);
     maybeCreateServiceClassPath(user, serviceClass);
     String servicePath = servicePath(user, serviceClass, serviceName);
     List<ACL> userAccess = fullUserAccess(user);
@@ -194,7 +196,7 @@ public class YarnRegistryService extends CuratorService
       String serviceClass,
       String serviceName,
       String componentName,
-      ComponentEntry entry,
+      ServiceRecord entry,
       boolean ephemeral) throws IOException {
     String servicePath = pathMustExist(
         servicePath(user, serviceClass, serviceName));
@@ -205,7 +207,7 @@ public class YarnRegistryService extends CuratorService
         componentPath(user, serviceClass, serviceName, componentName);
     set(componentPath,
         ephemeral ? CreateMode.EPHEMERAL : CreateMode.PERSISTENT,
-        componentEntryMarshal.toBytes(entry),
+        serviceRecordMarshal.toBytes(entry),
         fullUserAccess(user));
   }
 
@@ -243,11 +245,11 @@ public class YarnRegistryService extends CuratorService
   }
 
   @Override
-  public ServiceEntry getServiceInstance(String user,
+  public ServiceRecord getServiceInstance(String user,
       String serviceClass,
       String serviceName) throws IOException {
     String path = servicePath(user, serviceClass, serviceName);
-    return serviceEntryMarshal.fromBytes(read(path));
+    return serviceRecordMarshal.fromBytes(read(path));
   }
 
   @Override
@@ -258,13 +260,13 @@ public class YarnRegistryService extends CuratorService
   }
 
   @Override
-  public ComponentEntry getComponent(String user,
+  public ServiceRecord getComponent(String user,
       String serviceClass,
       String serviceName,
       String componentName) throws IOException {
     String path =
         componentPath(user, serviceClass, serviceName, componentName);
-    return componentEntryMarshal.fromBytes(read(path));
+    return serviceRecordMarshal.fromBytes(read(path));
   }
 
   @Override
