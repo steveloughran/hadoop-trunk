@@ -16,17 +16,31 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.binding.rest;
+package org.apache.hadoop.yarn.registry.client.draft1.selectors;
 
-import org.apache.hadoop.yarn.registry.client.binding.AbstractRegistryReaderService;
+import java.util.Iterator;
+import java.util.Map;
 
 /**
- * The REST client is read-only. It is designed for use
- * long-haul as well as short haul, and does not implement
- * write operations.
+ * Select an entry by name
+ * @param <T>
  */
-public class RestRegistryClient extends AbstractRegistryReaderService {
-  public RestRegistryClient(String name) {
-    super(name);
+public class NameSelector<T> extends Selector<T> {
+
+  final String name;
+  private final SelectorEntry<T> entry;
+
+  public NameSelector(String name, Map<String, T> entries) {
+    super(entries);
+    this.name = name;
+    T lookup = entries.get(name);
+    entry = lookup != null ? new SelectorEntry<T>(name, lookup) : null;
   }
+
+  @Override
+  public Iterator<Map.Entry<String, T>> iterator() {
+    return new SingleEntryIterator(entry);
+  }
+
+
 }

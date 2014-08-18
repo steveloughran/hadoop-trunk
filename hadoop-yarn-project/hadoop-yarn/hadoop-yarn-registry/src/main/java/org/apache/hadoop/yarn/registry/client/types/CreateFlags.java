@@ -16,24 +16,22 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.api;
+package org.apache.hadoop.yarn.registry.client.types;
 
-public interface RegistryVerbs<Parent, Child> {
+/**
+ * Flags to use when creating a service entry
+ */
+public enum CreateFlags {
 
+  /**
+   * The entry is ephemeral, when this session is closed the entry
+   * will be deleted.
+   */
+  Ephemeral,
 
-  void create(String path, Parent parent);
-
-  void put(String path, Parent parent);
-
-  Parent get(String path);
-
-  Child getChild(String path, String child);
-
-  void delete(String path);
-
-  void exists(String path);
-
-  void sync(String path);
-
-
+  /**
+   * The entry should be created even if an existing entry is there.
+   */
+  Overwrite,
+  
 }

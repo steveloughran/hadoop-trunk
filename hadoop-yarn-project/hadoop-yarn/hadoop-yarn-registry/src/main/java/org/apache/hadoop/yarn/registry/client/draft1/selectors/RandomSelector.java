@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.api.selectors;
+package org.apache.hadoop.yarn.registry.client.draft1.selectors;
 
 import java.util.Iterator;
 import java.util.Map;

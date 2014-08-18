@@ -20,7 +20,15 @@ package org.apache.hadoop.yarn.registry.client.binding;
 
 import java.util.regex.Pattern;
 
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.COMPONENT_NAME_PATTERN;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.HOSTNAME_PATTERN;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.SERVICE_CLASS_PATTERN;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.SERVICE_NAME_PATTERN;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.SYSTEM_PATH;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.USERNAME_PATTERN;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.USERS_PATH;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.ZNODE_COMPONENTS;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.ZNODE_LIVE;
 
 /**
  * General utils for component bindings

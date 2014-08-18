@@ -16,7 +16,11 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.types;
+package org.apache.hadoop.yarn.registry.client.binding;
+
+import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
+import org.apache.hadoop.yarn.registry.client.types.Endpoint;
+import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 
 import java.net.InetSocketAddress;
 

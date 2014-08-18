@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.server.services;
+package org.apache.hadoop.yarn.registry.client.draft1;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.api.RegistryWriter;
 import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import org.apache.hadoop.yarn.registry.server.services.CuratorService;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
@@ -46,7 +46,7 @@ import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.userPa
  * 
  * It's a YARN service: ephemeral nodes last as long as the client exists
  */
-public class YarnRegistryService extends CuratorService
+public class RegistryWriterService extends CuratorService
     implements RegistryWriter {
   private static final Logger LOG =
       LoggerFactory.getLogger(CuratorService.class);
@@ -60,7 +60,7 @@ public class YarnRegistryService extends CuratorService
   public static final String PERMISSIONS_REGISTRY_USER = "world:anyone:rwcda";
   private static byte[] NO_DATA = new byte[0];
 
-  public YarnRegistryService(String name) {
+  public RegistryWriterService(String name) {
     super(name);
   }
 

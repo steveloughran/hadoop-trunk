@@ -16,17 +16,18 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.api;
+package org.apache.hadoop.yarn.registry.client.draft1;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Interface to write to a registry
  */
-public interface RegistryWriter extends RegistryReader {
+public interface RegistryWriter  {
 
   public void putServiceEntry(String user,
       String serviceClass,
@@ -55,11 +56,11 @@ public interface RegistryWriter extends RegistryReader {
 
   /**
    * Set the service liveness options. 
-   * 
+   *
    * This sets the liveness znode to either a static or ephemeral
    * node. The policy on what do do if the node already exists
    * can be set.
-   * 
+   *
    * <ol>
    *   <li>
    *    It is an error to create an liveness znode if the service does not exist
@@ -80,7 +81,7 @@ public interface RegistryWriter extends RegistryReader {
    * this session. As other ZK clients may also set the liveness,
    * there is no guarantee that the znode is now owned by
    * this session.
-   * 
+   *
    * @param user username
    * @param serviceClass service class
    * @param serviceName name of the service
@@ -94,8 +95,55 @@ public interface RegistryWriter extends RegistryReader {
       String serviceClass,
       String serviceName,
       boolean ephemeral, boolean forceDelete) throws IOException;
-  
+
   public void deleteServiceLiveness(String user,
+      String serviceClass,
+      String serviceName) throws IOException;
+
+  List<String> listServiceClasses(String user)
+      throws IOException;
+
+  boolean serviceClassExists(String user,
+      String serviceClass)
+      throws IOException;
+
+  List<String> listServices(String user,
+      String serviceClass)
+      throws IOException;
+
+  boolean serviceExists(String user,
+      String serviceClass,
+      String serviceName) throws IOException;
+
+  ServiceRecord getServiceInstance(String user,
+      String serviceClass,
+      String serviceName)
+      throws IOException;
+
+  List<String> listComponents(String user,
+      String serviceClass,
+      String serviceName)
+      throws IOException;
+
+  ServiceRecord getComponent(String user,
+      String serviceClass,
+      String serviceName,
+      String componentName) throws IOException;
+
+  boolean componentExists(String user,
+      String serviceClass,
+      String serviceName,
+      String componentName) throws IOException;
+
+  /**
+   * Probe for the service liveness entry existing
+   * @param user
+   * @param serviceClass
+   * @param serviceName
+   * @return
+   * @throws IOException
+   */
+  boolean isServiceLive(String user,
       String serviceClass,
       String serviceName) throws IOException;
 }

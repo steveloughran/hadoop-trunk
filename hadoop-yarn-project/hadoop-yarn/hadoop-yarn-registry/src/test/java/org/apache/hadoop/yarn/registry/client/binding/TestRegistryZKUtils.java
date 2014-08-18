@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.binding.zk;
+package org.apache.hadoop.yarn.registry.client.binding;
 
+import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.RESTIOException;
 import org.junit.Assert;
 import org.junit.Test;

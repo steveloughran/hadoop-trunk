@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.binding.zk;
+package org.apache.hadoop.yarn.registry.client.binding;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.yarn.registry.client.exceptions.RESTIOException;

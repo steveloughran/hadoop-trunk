@@ -17,7 +17,7 @@
 */
 
 
-package org.apache.hadoop.yarn.registry.server.services;
+package org.apache.hadoop.yarn.registry.server.web;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;

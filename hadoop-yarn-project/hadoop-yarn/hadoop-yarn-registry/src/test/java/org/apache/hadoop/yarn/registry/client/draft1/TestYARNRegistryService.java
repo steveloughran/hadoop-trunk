@@ -16,17 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.binding.zk;
+package org.apache.hadoop.yarn.registry.client.draft1;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
-import org.apache.hadoop.yarn.registry.client.types.RegistryTypeUtils;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
-import org.apache.hadoop.yarn.registry.server.services.YarnRegistryService;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -53,11 +52,11 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestYARNRegistryService.class);
   
-  private YarnRegistryService yarnRegistry;
+  private RegistryWriterService yarnRegistry;
 
   @Before
   public void setupClient() {
-    yarnRegistry = new YarnRegistryService("yarnRegistry");
+    yarnRegistry = new RegistryWriterService("yarnRegistry");
     yarnRegistry.init(createRegistryConfiguration());
     yarnRegistry.start();
   }
