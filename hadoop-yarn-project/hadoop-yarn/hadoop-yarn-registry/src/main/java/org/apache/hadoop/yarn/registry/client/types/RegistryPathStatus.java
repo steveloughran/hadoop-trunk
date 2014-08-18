@@ -24,11 +24,14 @@ package org.apache.hadoop.yarn.registry.client.types;
  */
 public class RegistryPathStatus {
 
-  String name; // child Name
-  long time;
-  long size;
+  /**
+   * Path in the registry to this entry
+   */
+  public String path; 
+  public long time;
+  public long size;
   /**
    * Does the entry have a record?
    */
-  boolean hasRecord;
+  public boolean hasRecord;
 }

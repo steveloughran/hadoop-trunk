@@ -30,6 +30,7 @@ import org.apache.curator.framework.api.GetChildrenBuilder;
 import org.apache.curator.retry.BoundedExponentialBackoffRetry;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ZKUtil;
@@ -37,11 +38,12 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.ExceptionGenerator;
-import org.apache.hadoop.yarn.registry.client.exceptions.RESTIOException;
+import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.http.HttpStatus;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.ACL;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -219,7 +221,7 @@ public class CuratorService extends AbstractService
        * @return an absolute path
        * @throws IllegalArgumentException if the path is invalide
        */
-  protected String createFullPath(String path) throws RESTIOException {
+  protected String createFullPath(String path) throws IOException {
     return RegistryZKUtils.createFullPath(registryRoot, path);
   }
 
@@ -249,7 +251,7 @@ public class CuratorService extends AbstractService
    * @param exception caught the exception caught
    * @return an IOE to throw that contains the path and operation details.
    */
-  private IOException operationFailure(String path,
+  protected IOException operationFailure(String path,
       String operation,
       Exception exception) {
     IOException ioe;
@@ -257,7 +259,13 @@ public class CuratorService extends AbstractService
       ioe = new FileNotFoundException(path);
     } else if (exception instanceof KeeperException.NodeExistsException) {
       ioe = new FileAlreadyExistsException(path);
-      return ioe;
+      
+    } else if (exception instanceof KeeperException.NotEmptyException) {
+      ioe = new PathIsNotEmptyDirectoryException(path);
+      
+    } else if (exception instanceof KeeperException.NoChildrenForEphemeralsException) {
+      ioe = new NoChildrenForEphemeralsException(path + ": " + exception,
+          exception);
     } else {
       ioe = ExceptionGenerator.generate(
           HttpStatus.SC_INTERNAL_SERVER_ERROR,
@@ -302,8 +310,8 @@ public class CuratorService extends AbstractService
   public boolean maybeCreate(String path,
       CreateMode mode,
       List<ACL> acl) throws IOException {
-    if (!pathExists(path)) {
-      mkdir(path, mode, acl);
+    if (!zkPathExists(path)) {
+      zkMkPath(path, mode, acl);
       return true;
     }
     return false;
@@ -311,19 +319,32 @@ public class CuratorService extends AbstractService
 
 
   /**
+   * Stat the file
+   * @param path
+   * @return
+   * @throws IOException
+   */
+  public Stat zkStat(String path) throws IOException {
+    String fullpath = createFullPath(path);
+    try {
+      LOG.debug("Stat {}", fullpath);
+      return curator.checkExists().forPath(fullpath);
+    } catch (Exception e) {
+      throw operationFailure(fullpath, "read()", e);
+    }
+  }
+  
+  /**
    * Poll for a path existing
    * @param path path of operation
    * @return true if the path was visible from the ZK server
    * queried.
    * @throws IOException
    */
-  public boolean pathExists(String path) throws IOException {
-    Preconditions.checkNotNull(curator, "zookeeper binding");
+  public boolean zkPathExists(String path) throws IOException {
     try {
-      path = createFullPath(path);
-      LOG.debug("Exists({})", path);
+      return zkStat(path) != null;
 
-      return curator.checkExists().forPath(path) != null;
     } catch (FileNotFoundException e) {
       return false;
     } catch (Exception e) {
@@ -333,7 +354,7 @@ public class CuratorService extends AbstractService
 
   protected boolean pathExistsRobust(String path) {
     try {
-      return pathExists(path);
+      return zkPathExists(path);
     } catch (IOException e) {
       return false;
     }
@@ -345,21 +366,21 @@ public class CuratorService extends AbstractService
    * @throws FileNotFoundException if the path is absent
    * @throws IOException
    */
-  public String pathMustExist(String path) throws IOException {
-    if (!pathExists(path)) {
+  public String zkPathMustExist(String path) throws IOException {
+    if (!zkPathExists(path)) {
       throw new FileNotFoundException(path);
     }
     return path;
   }
 
   /**
-   * Create a directory
+   * Create a path
    * @param path path to create
    * @param mode mode for path
    * @throws IOException
    */
-  public void mkdir(String path, CreateMode mode) throws IOException {
-    mkdir(path, mode, rootACL);
+  public void zkMkpath(String path, CreateMode mode) throws IOException {
+    zkMkPath(path, mode, rootACL);
   }
 
   /**
@@ -369,7 +390,7 @@ public class CuratorService extends AbstractService
    * @param acl ACL for path
    * @throws IOException
    */
-  protected void mkdir(String path, CreateMode mode, List<ACL> acl) throws
+  protected void zkMkPath(String path, CreateMode mode, List<ACL> acl) throws
       IOException {
     path = createFullPath(path);
     try {
@@ -388,7 +409,7 @@ public class CuratorService extends AbstractService
    * @param acl
    * @throws IOException
    */
-  public void create(String path,
+  public void zkCreate(String path,
       CreateMode mode,
       byte[] data,
       List<ACL> acl) throws IOException {
@@ -407,7 +428,7 @@ public class CuratorService extends AbstractService
    * @param data new data
    * @throws IOException
    */
-  public void update(String path, byte[] data) throws IOException {
+  public void zkUpdate(String path, byte[] data) throws IOException {
     path = createFullPath(path);
     try {
       LOG.debug("Updating {} with {} bytes", path, data.length);
@@ -425,15 +446,15 @@ public class CuratorService extends AbstractService
    * @throws IOException
    * @return true if the entry was created, false if it was simply updated.
    */
-  public boolean  set(String path,
+  public boolean zkSet(String path,
       CreateMode mode,
       byte[] data,
       List<ACL> acl) throws IOException {
-    if (!pathExists(path)) {
-      create(path, mode, data, acl);
+    if (!zkPathExists(path)) {
+      zkCreate(path, mode, data, acl);
       return true;
     } else {
-      update(path, data);
+      zkUpdate(path, data);
       return false;
     }
   }
@@ -445,7 +466,7 @@ public class CuratorService extends AbstractService
    * @param recursive flag to trigger recursive deletion
    * @throws IOException
    */
-  public void rm(String path, boolean recursive) throws IOException {
+  public void zkDelete(String path, boolean recursive) throws IOException {
     String fullpath = createFullPath(path);
     try {
       LOG.debug("Deleting {}", fullpath);
@@ -461,7 +482,7 @@ public class CuratorService extends AbstractService
     }
   }
 
-  public List<String> ls(String path) throws IOException {
+  public List<String> zkList(String path) throws IOException {
     String fullpath = createFullPath(path);
     try {
       LOG.debug("ls {}", fullpath);
@@ -480,7 +501,7 @@ public class CuratorService extends AbstractService
    * @return the data
    * @throws IOException read failure
    */
-  public byte[] read(String path) throws IOException {
+  public byte[] zkRead(String path) throws IOException {
     String fullpath = createFullPath(path);
     try {
       LOG.debug("Reading {}", fullpath);
@@ -490,6 +511,7 @@ public class CuratorService extends AbstractService
     }
   }
 
+
   /**
    * List the children of a path
    * @param path path of operation
@@ -497,10 +519,10 @@ public class CuratorService extends AbstractService
    * @throws IOException read failure
    */
   public List<String> listChildren(String path) throws IOException {
-    if (!pathExists(path)) {
+    if (!zkPathExists(path)) {
       return Collections.emptyList();
     }
-    return ls(path);
+    return zkList(path);
   }
   
   @VisibleForTesting

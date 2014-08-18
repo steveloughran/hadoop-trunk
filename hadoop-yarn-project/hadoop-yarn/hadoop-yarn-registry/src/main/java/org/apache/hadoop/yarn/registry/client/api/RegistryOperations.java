@@ -23,7 +23,6 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
-import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 
@@ -43,15 +42,13 @@ public interface RegistryOperations {
    * 
    * Any other failure raises an exception
    * @param path
-   * @return true if the directory was created, false if it
-   * was already there.
    * @throws FileNotFoundException parent path is not in the registry.
    * @throws NoChildrenForEphemeralsException the parent is ephemeral.
    * @throws AccessControlException access permission failure.
    * @throws InvalidPathnameException path name is invalid.
    * @throws IOException Any other IO Exception.
    */
-  boolean mkdir(String path)
+  void mkdir(String path)
       throws FileNotFoundException,
       NoChildrenForEphemeralsException,
       AccessControlException,
@@ -62,7 +59,7 @@ public interface RegistryOperations {
    * Set a service record to an entry
    * @param path path to service record
    * @param record service record service record to create/update
-   * @param flags creation flags
+   * @param createFlags
    * @throws FileNotFoundException the parent path does not exist
    * @throws NoChildrenForEphemeralsException the parent is ephemeral
    * @throws FileAlreadyExistsException path exists but create flags
@@ -71,7 +68,7 @@ public interface RegistryOperations {
    * @throws InvalidPathnameException path name is invalid.
    * @throws IOException Any other IO Exception.
    */
-  void create(String path, ServiceRecord record, CreateFlags... flags)
+  void create(String path, ServiceRecord record, int createFlags)
       throws FileNotFoundException,
       NoChildrenForEphemeralsException,
       FileAlreadyExistsException,

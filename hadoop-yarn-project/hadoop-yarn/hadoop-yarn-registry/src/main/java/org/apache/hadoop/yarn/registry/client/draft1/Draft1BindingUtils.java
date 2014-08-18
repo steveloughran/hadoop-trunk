@@ -16,22 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.types;
+package org.apache.hadoop.yarn.registry.client.draft1;
 
-/**
- * Flags to use when creating a service entry
- */
-public interface CreateFlags {
+import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 
-  /**
-   * The entry is ephemeral, when this session is closed the entry
-   * will be deleted.
-   */
-  int EPHEMERAL = 1;
+public class Draft1BindingUtils {
+  public static final String ZNODE_LIVE = "/live";
 
-  /**
-   * The entry should be created even if an existing entry is there.
-   */
-  int OVERWRITE = 2;
-  
+  public static String livenessPath(String user,
+      String serviceClass, String serviceName) {
+
+    return BindingUtils.servicePath(user, serviceClass, serviceName) + ZNODE_LIVE;
+  }
 }

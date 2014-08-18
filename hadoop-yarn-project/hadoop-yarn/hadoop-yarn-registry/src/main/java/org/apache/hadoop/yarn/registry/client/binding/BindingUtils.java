@@ -20,32 +20,16 @@ package org.apache.hadoop.yarn.registry.client.binding;
 
 import java.util.regex.Pattern;
 
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.COMPONENT_NAME_PATTERN;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.HOSTNAME_PATTERN;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.SERVICE_CLASS_PATTERN;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.SERVICE_NAME_PATTERN;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.SYSTEM_PATH;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.USERNAME_PATTERN;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.USERS_PATH;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.ZNODE_COMPONENTS;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.ZNODE_LIVE;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
 /**
- * General utils for component bindings
+ * General utils for service bindings
  */
 public class BindingUtils {
 
 
-  private static Pattern hostnameValidator = Pattern.compile(
+  private static Pattern pathElementValidator = Pattern.compile(
       HOSTNAME_PATTERN);
-  private static Pattern userNameValidator = Pattern.compile(
-      USERNAME_PATTERN);
-  private static Pattern serviceClassValidator = Pattern.compile(
-      SERVICE_CLASS_PATTERN);
-  private static Pattern serviceNameValidator = Pattern.compile(
-      SERVICE_NAME_PATTERN);
-  private static Pattern componentNameValidator = Pattern.compile(
-      COMPONENT_NAME_PATTERN);
 
 
   /**
@@ -65,22 +49,6 @@ public class BindingUtils {
     return s;
   }
 
-  public static String validateServiceClass(String serviceClass) {
-    return validate(serviceClassValidator, "Service Class", serviceClass);
-  }
-
-  public static String validateServiceName(String serviceName) {
-    return validate(serviceNameValidator, "Service Name", serviceName);
-  }
-
-  public static String validateUserName(String user) {
-    return validate(userNameValidator, "User", user);
-  }
-
-  public static String validateComponentName(String componentName) {
-    return validate(componentNameValidator, "Component Name", componentName);
-  }
-
   /**
    * Buld the user path -switches to the system path if the user is ""
    * @param user username or ""
@@ -88,15 +56,16 @@ public class BindingUtils {
    */
   public static String userPath(String user) {
     if (user.isEmpty()) {
-      return SYSTEM_PATH;
+      return PATH_SYSTEM_SERVICES_PATH;
     }
-    return USERS_PATH + validateUserName(user);
+    return PATH_USERS + validate(pathElementValidator, "Path Element", user);
   }
 
   public static String serviceclassPath(String user,
       String serviceClass) {
 
-    return userPath(user) + "/" + validateServiceClass(serviceClass);
+    return userPath(user) + "/" +
+           validate(pathElementValidator, "Path Element", serviceClass);
   }
 
   public static String servicePath(String user,
@@ -104,26 +73,21 @@ public class BindingUtils {
       String serviceName) {
 
     return serviceclassPath(user, serviceClass)
-           + "/" + validateServiceName(serviceName);
+           + "/" + validate(pathElementValidator, "Path Element", serviceName);
   }
 
   public static String componentListPath(String user,
       String serviceClass, String serviceName) {
 
-    return servicePath(user, serviceClass, serviceName) + ZNODE_COMPONENTS;
+    return servicePath(user, serviceClass, serviceName) + PATH_COMPONENTS;
   }
-  
-  public static String livenessPath(String user,
-      String serviceClass, String serviceName) {
 
-    return servicePath(user, serviceClass, serviceName) + ZNODE_LIVE;
-  }
-  
   public static String componentPath(String user,
       String serviceClass, String serviceName, String componentName) {
 
     return componentListPath(user, serviceClass, serviceName)
-           + "/" + validateComponentName(componentName);
+           + "/" +
+           validate(pathElementValidator, "Path Element", componentName);
   } 
 
 
