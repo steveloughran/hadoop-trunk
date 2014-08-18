@@ -79,12 +79,7 @@ public interface RegistryConstants {
    */
   String HOSTNAME_PATTERN =
       "([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])";
-  String COMPONENT_NAME_PATTERN = HOSTNAME_PATTERN;
-  String SERVICE_NAME_PATTERN = HOSTNAME_PATTERN;
-  String SERVICE_CLASS_PATTERN = HOSTNAME_PATTERN;
-  String USERNAME_PATTERN = HOSTNAME_PATTERN;
-  String USERS_PATH = "users/";
-  String SYSTEM_PATH = "system/";
-  String ZNODE_LIVE = "/live";
-  String ZNODE_COMPONENTS = "/components";
+  String PATH_USERS = "users/";
+  String PATH_SYSTEM_SERVICES_PATH = "services/";
+  String PATH_COMPONENTS = "/components";
 }

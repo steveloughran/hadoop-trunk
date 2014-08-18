@@ -19,9 +19,10 @@
 package org.apache.hadoop.yarn.registry.client.binding;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.yarn.registry.client.exceptions.RESTIOException;
-import org.apache.http.HttpStatus;
+import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.zookeeper.common.PathUtils;
+
+import java.io.IOException;
 
 public class RegistryZKUtils {
 
@@ -30,13 +31,13 @@ public class RegistryZKUtils {
    * the exception text
    * @param path path to validate
    */
-  public static String validateZKPath(String path) throws RESTIOException {
+  public static String validateZKPath(String path) throws
+      InvalidPathnameException {
     try {
       PathUtils.validatePath(path);
       return path;
     } catch (IllegalArgumentException e) {
-      throw new RESTIOException(HttpStatus.SC_INTERNAL_SERVER_ERROR,
-          path,
+      throw new InvalidPathnameException(
           "Invalid Path \"" + path + "\" : " + e, e);
     }
   }
@@ -48,7 +49,7 @@ public class RegistryZKUtils {
  * @throws IllegalArgumentException if the path is invalide
  */
   public static String createFullPath(String base, String path) throws
-      RESTIOException {
+      IOException {
     Preconditions.checkArgument(path != null, "null path");
     Preconditions.checkArgument(base != null, "null path");
     StringBuilder fullpath = new StringBuilder();

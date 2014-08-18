@@ -21,7 +21,6 @@ package org.apache.hadoop.yarn.registry.client.draft1;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.server.services.CuratorService;
@@ -35,7 +34,7 @@ import java.util.List;
 
 import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.componentListPath;
 import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.componentPath;
-import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.livenessPath;
+import static org.apache.hadoop.yarn.registry.client.draft1.Draft1BindingUtils.livenessPath;
 import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.servicePath;
 import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.serviceclassPath;
 import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.userPath;
@@ -49,7 +48,7 @@ import static org.apache.hadoop.yarn.registry.client.binding.BindingUtils.userPa
 public class RegistryWriterService extends CuratorService
     implements RegistryWriter {
   private static final Logger LOG =
-      LoggerFactory.getLogger(CuratorService.class);
+      LoggerFactory.getLogger(RegistryWriterService.class);
 
   private final JsonMarshal.ServiceRecordMarshal serviceRecordMarshal
       = new JsonMarshal.ServiceRecordMarshal();
@@ -59,6 +58,7 @@ public class RegistryWriterService extends CuratorService
   public static final String PERMISSIONS_REGISTRY_USERS = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_USER = "world:anyone:rwcda";
   private static byte[] NO_DATA = new byte[0];
+  private List<ACL> userAcl;
 
   public RegistryWriterService(String name) {
     super(name);
@@ -67,16 +67,17 @@ public class RegistryWriterService extends CuratorService
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
+    userAcl = parseACLs(PERMISSIONS_REGISTRY_USERS);
   }
 
   @Override
   protected void serviceStart() throws Exception {
     super.serviceStart();
     // create the root directories
-    maybeCreate(SYSTEM_PATH, CreateMode.PERSISTENT);
-    maybeCreate(USERS_PATH, CreateMode.PERSISTENT,
-        parseACLs(PERMISSIONS_REGISTRY_USERS));
-    maybeCreate(SYSTEM_PATH, CreateMode.PERSISTENT,
+    maybeCreate(PATH_SYSTEM_SERVICES_PATH, CreateMode.PERSISTENT);
+    maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
+        userAcl);
+    maybeCreate(PATH_SYSTEM_SERVICES_PATH, CreateMode.PERSISTENT,
         parseACLs(PERMISSIONS_REGISTRY_SYSTEM));
   }
 
@@ -90,6 +91,10 @@ public class RegistryWriterService extends CuratorService
     return parseACLs(PERMISSIONS_REGISTRY_USER);
   }
 
+  public List<ACL> getUserAcl() {
+    return userAcl;
+  }
+
   @Override
   public void putServiceEntry(String user,
       String serviceClass,
@@ -99,8 +104,8 @@ public class RegistryWriterService extends CuratorService
     maybeCreateServiceClassPath(user, serviceClass);
     String servicePath = servicePath(user, serviceClass, serviceName);
     List<ACL> userAccess = fullUserAccess(user);
-    if (set(servicePath, CreateMode.PERSISTENT, bytes, userAccess)) {
-      maybeCreate(servicePath + RegistryConstants.ZNODE_COMPONENTS,
+    if (zkSet(servicePath, CreateMode.PERSISTENT, bytes, userAccess)) {
+      maybeCreate(servicePath + RegistryConstants.PATH_COMPONENTS,
           CreateMode.PERSISTENT,
           userAccess);
     }
@@ -117,12 +122,12 @@ public class RegistryWriterService extends CuratorService
     LOG.debug("putServiceLiveness() on {} => {}", liveness, ephemeral);
     CreateMode mode = ephemeral ? CreateMode.EPHEMERAL : CreateMode.PERSISTENT;
     while (true) try {
-      create(liveness, mode, NO_DATA, fullUserAccess(user));
+      zkCreate(liveness, mode, NO_DATA, fullUserAccess(user));
       break;
     } catch (FileAlreadyExistsException e) {
       // file exists: choose policy to react to this
       if (forceDelete) {
-        rm(liveness, false);
+        zkDelete(liveness, false);
       } else {
         throw e;
       }
@@ -139,7 +144,7 @@ public class RegistryWriterService extends CuratorService
   protected void serviceMustExist(String user,
       String serviceClass,
       String serviceName) throws IOException {
-    pathMustExist(servicePath(user, serviceClass, serviceName));
+    zkPathMustExist(servicePath(user, serviceClass, serviceName));
   }
 
   @Override
@@ -147,8 +152,8 @@ public class RegistryWriterService extends CuratorService
       String serviceClass,
       String serviceName) throws IOException {
     String liveness =
-        BindingUtils.livenessPath(user, serviceClass, serviceName);
-    rm(liveness, false);
+        Draft1BindingUtils.livenessPath(user, serviceClass, serviceName);
+    zkDelete(liveness, false);
   }
 
   @Override
@@ -156,8 +161,8 @@ public class RegistryWriterService extends CuratorService
       String serviceClass,
       String serviceName) throws IOException {
     String path =
-        BindingUtils.livenessPath(user, serviceClass, serviceName);
-    return pathExists(path);
+        Draft1BindingUtils.livenessPath(user, serviceClass, serviceName);
+    return zkPathExists(path);
   }
 
   void maybeCreateUserPath(String user) throws IOException {
@@ -178,7 +183,7 @@ public class RegistryWriterService extends CuratorService
   public void deleteServiceEntry(String user,
       String serviceClass,
       String serviceName) throws IOException {
-    rm(servicePath(user, serviceClass, serviceName), true);
+    zkDelete(servicePath(user, serviceClass, serviceName), true);
   }
 
   /**
@@ -198,14 +203,14 @@ public class RegistryWriterService extends CuratorService
       String componentName,
       ServiceRecord entry,
       boolean ephemeral) throws IOException {
-    String servicePath = pathMustExist(
+    String servicePath = zkPathMustExist(
         servicePath(user, serviceClass, serviceName));
-    maybeCreate(servicePath + RegistryConstants.ZNODE_COMPONENTS,
+    maybeCreate(servicePath + RegistryConstants.PATH_COMPONENTS,
         CreateMode.PERSISTENT,
         fullUserAccess(user));
     String componentPath =
         componentPath(user, serviceClass, serviceName, componentName);
-    set(componentPath,
+    zkSet(componentPath,
         ephemeral ? CreateMode.EPHEMERAL : CreateMode.PERSISTENT,
         serviceRecordMarshal.toBytes(entry),
         fullUserAccess(user));
@@ -216,7 +221,7 @@ public class RegistryWriterService extends CuratorService
       String serviceClass,
       String serviceName,
       String componentName) throws IOException {
-    rm(componentPath(user, serviceClass, serviceName, componentName),
+    zkDelete(componentPath(user, serviceClass, serviceName, componentName),
         false);
   }
 
@@ -228,7 +233,7 @@ public class RegistryWriterService extends CuratorService
   @Override
   public boolean serviceClassExists(String user, String serviceClass) throws
       IOException {
-    return pathExists(serviceclassPath(user, serviceClass));
+    return zkPathExists(serviceclassPath(user, serviceClass));
   }
 
   @Override
@@ -241,7 +246,7 @@ public class RegistryWriterService extends CuratorService
   public boolean serviceExists(String user,
       String serviceClass,
       String serviceName) throws IOException {
-    return pathExists(servicePath(user, serviceClass, serviceName));
+    return zkPathExists(servicePath(user, serviceClass, serviceName));
   }
 
   @Override
@@ -249,7 +254,7 @@ public class RegistryWriterService extends CuratorService
       String serviceClass,
       String serviceName) throws IOException {
     String path = servicePath(user, serviceClass, serviceName);
-    return serviceRecordMarshal.fromBytes(read(path));
+    return serviceRecordMarshal.fromBytes(zkRead(path));
   }
 
   @Override
@@ -266,7 +271,7 @@ public class RegistryWriterService extends CuratorService
       String componentName) throws IOException {
     String path =
         componentPath(user, serviceClass, serviceName, componentName);
-    return serviceRecordMarshal.fromBytes(read(path));
+    return serviceRecordMarshal.fromBytes(zkRead(path));
   }
 
   @Override
@@ -274,7 +279,7 @@ public class RegistryWriterService extends CuratorService
       String serviceClass,
       String serviceName,
       String componentName) throws IOException {
-    return pathExists(componentPath(user, serviceClass, serviceName,
+    return zkPathExists(componentPath(user, serviceClass, serviceName,
         componentName));
   }
 }
