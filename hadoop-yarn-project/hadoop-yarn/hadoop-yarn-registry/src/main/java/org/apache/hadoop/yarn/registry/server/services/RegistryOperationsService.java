@@ -21,6 +21,7 @@ package org.apache.hadoop.yarn.registry.server.services;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
@@ -35,7 +36,6 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -93,7 +93,7 @@ implements RegistryOperations{
 
   @Override
   public void mkdir(String path) throws
-      FileNotFoundException,
+      PathNotFoundException,
       NoChildrenForEphemeralsException,
       AccessControlException,
       InvalidPathnameException,
@@ -106,7 +106,7 @@ implements RegistryOperations{
   public void create(String path,
       ServiceRecord record,
       int createFlags) throws
-      FileNotFoundException,
+      PathNotFoundException,
       NoChildrenForEphemeralsException,
       FileAlreadyExistsException,
       AccessControlException,
@@ -122,16 +122,16 @@ implements RegistryOperations{
 
   @Override
   public ServiceRecord resolve(String path) throws
-      FileNotFoundException,
+      PathNotFoundException,
       AccessControlException,
       InvalidPathnameException,
       IOException {
-    return null;
+    return serviceRecordMarshal.fromBytes(zkRead(path));
   }
 
   @Override
   public RegistryPathStatus stat(String path) throws
-      FileNotFoundException,
+      PathNotFoundException,
       AccessControlException,
       InvalidPathnameException,
       IOException {
@@ -146,7 +146,7 @@ implements RegistryOperations{
 
   @Override
   public RegistryPathStatus[] listDir(String path) throws
-      FileNotFoundException,
+      PathNotFoundException,
       AccessControlException,
       InvalidPathnameException,
       IOException {
@@ -163,7 +163,7 @@ implements RegistryOperations{
 
   @Override
   public void delete(String path, boolean recursive) throws
-      FileNotFoundException,
+      PathNotFoundException,
       PathIsNotEmptyDirectoryException,
       AccessControlException,
       InvalidPathnameException,

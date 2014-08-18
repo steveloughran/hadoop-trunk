@@ -31,6 +31,7 @@ import org.apache.curator.retry.BoundedExponentialBackoffRetry;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ZKUtil;
@@ -256,7 +257,7 @@ public class CuratorService extends AbstractService
       Exception exception) {
     IOException ioe;
     if (exception instanceof KeeperException.NoNodeException) {
-      ioe = new FileNotFoundException(path);
+      ioe = new PathNotFoundException(path);
     } else if (exception instanceof KeeperException.NodeExistsException) {
       ioe = new FileAlreadyExistsException(path);
       
@@ -345,7 +346,7 @@ public class CuratorService extends AbstractService
     try {
       return zkStat(path) != null;
 
-    } catch (FileNotFoundException e) {
+    } catch (PathNotFoundException e) {
       return false;
     } catch (Exception e) {
       throw operationFailure(path, "existence check", e);
@@ -363,13 +364,11 @@ public class CuratorService extends AbstractService
   /**
    * Verify a path exists
    * @param path path of operation
-   * @throws FileNotFoundException if the path is absent
+   * @throws PathNotFoundException if the path is absent
    * @throws IOException
    */
   public String zkPathMustExist(String path) throws IOException {
-    if (!zkPathExists(path)) {
-      throw new FileNotFoundException(path);
-    }
+    zkPathExists(path);
     return path;
   }
 
@@ -379,7 +378,7 @@ public class CuratorService extends AbstractService
    * @param mode mode for path
    * @throws IOException
    */
-  public void zkMkpath(String path, CreateMode mode) throws IOException {
+  public void zkMkPath(String path, CreateMode mode) throws IOException {
     zkMkPath(path, mode, rootACL);
   }
 
@@ -518,7 +517,7 @@ public class CuratorService extends AbstractService
    * @return the children -or an empty list if the path does not exist
    * @throws IOException read failure
    */
-  public List<String> listChildren(String path) throws IOException {
+  public List<String> zKListChildren(String path) throws IOException {
     if (!zkPathExists(path)) {
       return Collections.emptyList();
     }
