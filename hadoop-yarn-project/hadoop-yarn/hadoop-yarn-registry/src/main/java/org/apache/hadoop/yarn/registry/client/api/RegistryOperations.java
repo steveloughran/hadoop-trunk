@@ -20,36 +20,34 @@ package org.apache.hadoop.yarn.registry.client.api;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 
 /**
  * Registry Operations
  */
-public interface RegistryOperations {
+public interface RegistryOperations extends Service {
 
   /**
-   * Create a directory.
-   * 
-   * Return true if the directory was created, false if it
-   * was already there.
+   * Create a path.
    * 
    * Any other failure raises an exception
-   * @param path
-   * @throws FileNotFoundException parent path is not in the registry.
+   * @param path path to create
+   * @throws PathNotFoundException parent path is not in the registry.
    * @throws NoChildrenForEphemeralsException the parent is ephemeral.
    * @throws AccessControlException access permission failure.
    * @throws InvalidPathnameException path name is invalid.
    * @throws IOException Any other IO Exception.
    */
   void mkdir(String path)
-      throws FileNotFoundException,
+      throws PathNotFoundException,
       NoChildrenForEphemeralsException,
       AccessControlException,
       InvalidPathnameException,
@@ -59,8 +57,8 @@ public interface RegistryOperations {
    * Set a service record to an entry
    * @param path path to service record
    * @param record service record service record to create/update
-   * @param createFlags
-   * @throws FileNotFoundException the parent path does not exist
+   * @param createFlags creation flags
+   * @throws PathNotFoundException the parent path does not exist
    * @throws NoChildrenForEphemeralsException the parent is ephemeral
    * @throws FileAlreadyExistsException path exists but create flags
    * do not include "overwrite"
@@ -69,7 +67,7 @@ public interface RegistryOperations {
    * @throws IOException Any other IO Exception.
    */
   void create(String path, ServiceRecord record, int createFlags)
-      throws FileNotFoundException,
+      throws PathNotFoundException,
       NoChildrenForEphemeralsException,
       FileAlreadyExistsException,
       AccessControlException,
@@ -81,13 +79,13 @@ public interface RegistryOperations {
    * Resolve the record at a path
    * @param path path to service record
    * @return the record
-   * @throws FileNotFoundException path is not in the registry.
+   * @throws PathNotFoundException path is not in the registry.
    * @throws AccessControlException security restriction.
    * @throws InvalidPathnameException the path is invalid.
    * @throws IOException Any other IO Exception
    */
   
-  ServiceRecord resolve(String path) throws FileNotFoundException,
+  ServiceRecord resolve(String path) throws PathNotFoundException,
       AccessControlException,
       InvalidPathnameException,
       IOException;
@@ -96,13 +94,13 @@ public interface RegistryOperations {
    * Get the status of a path
    * @param path
    * @return
-   * @throws FileNotFoundException path is not in the registry.
+   * @throws PathNotFoundException path is not in the registry.
    * @throws AccessControlException security restriction.
    * @throws InvalidPathnameException the path is invalid.
    * @throws IOException Any other IO Exception
    */
   RegistryPathStatus stat(String path)
-      throws FileNotFoundException,
+      throws PathNotFoundException,
       AccessControlException,
       InvalidPathnameException,
       IOException;
@@ -111,13 +109,13 @@ public interface RegistryOperations {
    * List children of a directory
    * @param path path
    * @return a possibly empty array of child entries
-   * @throws FileNotFoundException path is not in the registry.
+   * @throws PathNotFoundException path is not in the registry.
    * @throws AccessControlException security restriction.
    * @throws InvalidPathnameException the path is invalid.
    * @throws IOException Any other IO Exception
    */
   RegistryPathStatus[] listDir(String path)
-      throws FileNotFoundException,
+      throws PathNotFoundException,
       AccessControlException,
       InvalidPathnameException,
       IOException;
@@ -129,7 +127,7 @@ public interface RegistryOperations {
    * deleted.
    * @param path path delete recursively
    * @param recursive recursive flag
-   * @throws FileNotFoundException path is not in the registry.
+   * @throws PathNotFoundException path is not in the registry.
    * @throws AccessControlException security restriction.
    * @throws InvalidPathnameException the path is invalid.
    * @throws PathIsNotEmptyDirectoryException path has child entries, but
@@ -139,7 +137,7 @@ public interface RegistryOperations {
    * @throws IOException
    */
   void delete(String path, boolean recursive)
-      throws FileNotFoundException,
+      throws PathNotFoundException,
       PathIsNotEmptyDirectoryException,
       AccessControlException,
       InvalidPathnameException,

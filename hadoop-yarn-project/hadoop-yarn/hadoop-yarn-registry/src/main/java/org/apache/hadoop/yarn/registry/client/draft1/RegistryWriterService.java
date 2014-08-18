@@ -227,7 +227,7 @@ public class RegistryWriterService extends CuratorService
 
   @Override
   public List<String> listServiceClasses(String user) throws IOException {
-    return listChildren(userPath(user));
+    return zKListChildren(userPath(user));
   }
 
   @Override
@@ -239,7 +239,7 @@ public class RegistryWriterService extends CuratorService
   @Override
   public List<String> listServices(String user, String serviceClass) throws
       IOException {
-    return listChildren(serviceclassPath(user, serviceClass));
+    return zKListChildren(serviceclassPath(user, serviceClass));
   }
 
   @Override
@@ -261,7 +261,7 @@ public class RegistryWriterService extends CuratorService
   public List<String> listComponents(String user,
       String serviceClass,
       String serviceName) throws IOException {
-    return listChildren(componentListPath(user, serviceClass, serviceName));
+    return zKListChildren(componentListPath(user, serviceClass, serviceName));
   }
 
   @Override
