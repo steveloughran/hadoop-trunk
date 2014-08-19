@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.server.services;
+package org.apache.hadoop.yarn.registry.client.services;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
