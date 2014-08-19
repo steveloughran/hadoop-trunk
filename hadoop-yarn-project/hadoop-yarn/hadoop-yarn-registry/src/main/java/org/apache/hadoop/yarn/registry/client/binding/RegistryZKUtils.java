@@ -23,6 +23,8 @@ import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameExceptio
 import org.apache.zookeeper.common.PathUtils;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class RegistryZKUtils {
 
@@ -73,4 +75,20 @@ public class RegistryZKUtils {
     return validateZKPath(finalpath);
   }
 
+  /**
+   * split a path into elements, stripping empty elements
+   * @param path the path 
+   * @return the split path
+   */
+  public static List<String> split(String path) {
+    // 
+    String[] pathelements = path.split("/");
+    List<String> dirs = new ArrayList<String>(pathelements.length);
+    for (String pathelement : pathelements) {
+      if (!pathelement.isEmpty()) {
+        dirs.add(pathelement);
+      }
+    }
+    return dirs;
+  }
 }

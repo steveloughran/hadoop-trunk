@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
-import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
+import static org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils.*;
 import java.io.IOException;
+import java.util.List;
+
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -51,9 +53,31 @@ public class TestRegistryZKUtils extends Assert {
 
   private static void assertCreatedPathEquals(String expected, String base,
       String path) throws IOException {
-    String fullPath = RegistryZKUtils.createFullPath(base, path);
+    String fullPath = createFullPath(base, path);
     assertEquals("\"" + base + "\" + \"" + path + "\" =\"" + fullPath + "\"",
         expected, fullPath);
-
   }
+
+  @Test
+  public void testSplittingEmpty() throws Throwable {
+    assertEquals(0, split("").size());
+    assertEquals(0, split("/").size());
+    assertEquals(0, split("///").size());
+  }
+  
+  
+  @Test
+  public void testSplitting() throws Throwable {
+    assertEquals(3, split("/a/b/c/").size());
+    assertEquals(3, split("a/b/c").size());
+    assertEquals(3, split("/a/b/c").size());
+    assertEquals(3, split("/a/b//c").size());
+    assertEquals(3, split("//a/b/c/").size());
+    List<String> split = split("//a/b/c/");
+    assertEquals("a", split.get(0));
+    assertEquals("b", split.get(1));
+    assertEquals("c", split.get(2));
+  }
+  
+  
 }
