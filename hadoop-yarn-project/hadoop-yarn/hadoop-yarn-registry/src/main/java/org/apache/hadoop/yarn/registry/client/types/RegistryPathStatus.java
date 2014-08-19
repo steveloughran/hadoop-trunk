@@ -36,38 +36,6 @@ public final class RegistryPathStatus {
   public boolean hasRecord;
 
   @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
-    }
-
-    RegistryPathStatus status = (RegistryPathStatus) o;
-
-    if (hasRecord != status.hasRecord) {
-      return false;
-    }
-    if (size != status.size) {
-      return false;
-    }
-    if (time != status.time) {
-      return false;
-    }
-    if (path != null ? !path.equals(status.path) : status.path != null) {
-      return false;
-    }
-
-    return true;
-  }
-
-  @Override
-  public int hashCode() {
-    return path != null ? path.hashCode() : 0;
-  }
-
-  @Override
   public String toString() {
     final StringBuilder sb =
         new StringBuilder("RegistryPathStatus{");
