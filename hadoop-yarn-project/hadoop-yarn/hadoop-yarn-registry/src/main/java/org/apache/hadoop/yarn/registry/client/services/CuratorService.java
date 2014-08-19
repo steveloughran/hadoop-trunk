@@ -16,10 +16,9 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.server.services;
+package org.apache.hadoop.yarn.registry.client.services;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.apache.curator.RetrySleeper;
 import org.apache.curator.ensemble.EnsembleProvider;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
@@ -48,7 +47,6 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
