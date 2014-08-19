@@ -48,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -146,7 +147,7 @@ public class CuratorService extends AbstractService
    * @throws IOException
    * @throws ZKUtil.BadAclFormatException on a bad ACL parse
    */
-  protected List<ACL> parseACLs(String zkAclConf) throws IOException,
+  public List<ACL> parseACLs(String zkAclConf) throws IOException,
       ZKUtil.BadAclFormatException {
     return ZKUtil.parseACLs(ZKUtil.resolveConfIndirection(zkAclConf));
   }
@@ -385,16 +386,45 @@ public class CuratorService extends AbstractService
    * @param path path to create
    * @param mode mode for path
    * @param acl ACL for path
-   * @throws IOException
+   * @throws IOException any problem
    */
-  protected void zkMkPath(String path, CreateMode mode, List<ACL> acl) throws
-      IOException {
+  protected void zkMkPath(String path, CreateMode mode, List<ACL> acl) 
+      throws IOException {
     path = createFullPath(path);
     try {
       curator.create().withMode(mode).withACL(acl).forPath(path);
       LOG.debug("Created path {} with mode {} and ACL {}", path, mode, acl);
     } catch (Exception e) {
       throw operationFailure(path, "mkdir() ", e);
+    }
+  }
+
+  /**
+   * Recursively make a path
+   * @param path path to create
+   * @param acl ACL for path
+   * @param createFinalElement flag to indicate the final element should be
+   * created -if false only the parent path elements are created
+   * @throws IOException any problem
+   */
+  public void zkMkPathRecursive(String path,
+      List<ACL> acl, boolean createFinalElement) throws
+      IOException {
+    // split path into elements
+    StringBuilder dir = new StringBuilder(path.length());
+    List<String> elements = RegistryZKUtils.split(path);
+    int iterations = elements.size();
+    if (!createFinalElement) {
+      iterations--;
+    }
+    for (int i = 0; i < iterations; i++) {
+      String element = elements.get(i);
+      dir.append("/");
+      dir.append(element);
+      String parent = dir.toString();
+      if (!zkPathExists(parent)) {
+        zkMkPath(parent, CreateMode.PERSISTENT, acl);
+      }
     }
   }
 
