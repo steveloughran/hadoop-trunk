@@ -19,7 +19,7 @@
 package org.apache.hadoop.yarn.registry.client.binding;
 
 import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
-import org.apache.hadoop.yarn.registry.client.exceptions.RESTIOException;
+import java.io.IOException;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -50,7 +50,7 @@ public class TestRegistryZKUtils extends Assert {
 
 
   private static void assertCreatedPathEquals(String expected, String base,
-      String path) throws RESTIOException {
+      String path) throws IOException {
     String fullPath = RegistryZKUtils.createFullPath(base, path);
     assertEquals("\"" + base + "\" + \"" + path + "\" =\"" + fullPath + "\"",
         expected, fullPath);
