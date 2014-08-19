@@ -44,7 +44,6 @@ public class AbstractZKRegistryTest extends Assert {
   public final Timeout testTimeout = new Timeout(10000);
   @Rule
   public TestName methodName = new TestName();
-  protected CuratorService curatorService;
 
   @BeforeClass
   public static void createZKServer() throws Exception {
@@ -94,26 +93,9 @@ public class AbstractZKRegistryTest extends Assert {
     conf.setInt(RegistryConstants.REGISTRY_ZK_RETRY_INTERVAL, 500);
     conf.setInt(RegistryConstants.REGISTRY_ZK_RETRY_TIMES, 10);
     conf.setInt(RegistryConstants.REGISTRY_ZK_RETRY_CEILING, 10);
-    conf.set(RegistryConstants.REGISTRY_ZK_QUORUM, zookeeper.getConnectionString());
+    conf.set(RegistryConstants.REGISTRY_ZK_QUORUM,
+        zookeeper.getConnectionString());
     return conf;
   }
-
-  @Before
-  public void startCurator() {
-    createCuratorService();
-  }
-
-  @After
-  public void stopCurator() {
-    ServiceOperations.stop(curatorService);
-  }
-
-  /**
-   * Create an instance
-   */
-  protected void createCuratorService() {
-    curatorService = new CuratorService("curatorService");
-    curatorService.init(createRegistryConfiguration());
-    curatorService.start();
-  }
 }
+

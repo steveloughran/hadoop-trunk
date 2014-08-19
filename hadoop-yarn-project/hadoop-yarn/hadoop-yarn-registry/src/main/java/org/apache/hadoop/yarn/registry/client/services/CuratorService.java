@@ -36,6 +36,7 @@ import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
+import static org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils.*;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.ExceptionGenerator;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
@@ -259,10 +260,8 @@ public class CuratorService extends AbstractService
       ioe = new PathNotFoundException(path);
     } else if (exception instanceof KeeperException.NodeExistsException) {
       ioe = new FileAlreadyExistsException(path);
-      
     } else if (exception instanceof KeeperException.NotEmptyException) {
       ioe = new PathIsNotEmptyDirectoryException(path);
-      
     } else if (exception instanceof KeeperException.NoChildrenForEphemeralsException) {
       ioe = new NoChildrenForEphemeralsException(path + ": " + exception,
           exception);
@@ -326,12 +325,17 @@ public class CuratorService extends AbstractService
    */
   public Stat zkStat(String path) throws IOException {
     String fullpath = createFullPath(path);
+    Stat stat;
     try {
       LOG.debug("Stat {}", fullpath);
-      return curator.checkExists().forPath(fullpath);
+      stat = curator.checkExists().forPath(fullpath);
     } catch (Exception e) {
       throw operationFailure(fullpath, "read()", e);
     }
+    if (stat == null) {
+      throw new PathNotFoundException(path);
+    }
+    return stat;
   }
   
   /**

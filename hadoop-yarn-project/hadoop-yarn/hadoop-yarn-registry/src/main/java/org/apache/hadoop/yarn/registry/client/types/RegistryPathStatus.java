@@ -22,7 +22,7 @@ package org.apache.hadoop.yarn.registry.client.types;
 /**
  * Output of a stat() call
  */
-public class RegistryPathStatus {
+public final class RegistryPathStatus {
 
   /**
    * Path in the registry to this entry
@@ -34,4 +34,48 @@ public class RegistryPathStatus {
    * Does the entry have a record?
    */
   public boolean hasRecord;
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    RegistryPathStatus status = (RegistryPathStatus) o;
+
+    if (hasRecord != status.hasRecord) {
+      return false;
+    }
+    if (size != status.size) {
+      return false;
+    }
+    if (time != status.time) {
+      return false;
+    }
+    if (path != null ? !path.equals(status.path) : status.path != null) {
+      return false;
+    }
+
+    return true;
+  }
+
+  @Override
+  public int hashCode() {
+    return path != null ? path.hashCode() : 0;
+  }
+
+  @Override
+  public String toString() {
+    final StringBuilder sb =
+        new StringBuilder("RegistryPathStatus{");
+    sb.append("path='").append(path).append('\'');
+    sb.append(", time=").append(time);
+    sb.append(", size=").append(size);
+    sb.append(", hasRecord=").append(hasRecord);
+    sb.append('}');
+    return sb.toString();
+  }
 }

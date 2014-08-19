@@ -52,6 +52,11 @@ public class RegistryZKUtils {
  */
   public static String createFullPath(String base, String path) throws
       IOException {
+    String finalpath = join(base, path);
+    return validateZKPath(finalpath);
+  }
+
+  public static String join(String base, String path) {
     Preconditions.checkArgument(path != null, "null path");
     Preconditions.checkArgument(base != null, "null path");
     StringBuilder fullpath = new StringBuilder();
@@ -72,7 +77,7 @@ public class RegistryZKUtils {
       finalpath = finalpath.substring(0, finalpath.length() - 1);
 
     }
-    return validateZKPath(finalpath);
+    return finalpath;
   }
 
   /**
