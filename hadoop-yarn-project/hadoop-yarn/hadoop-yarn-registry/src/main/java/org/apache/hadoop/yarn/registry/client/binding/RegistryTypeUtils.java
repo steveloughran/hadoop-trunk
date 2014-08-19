@@ -23,6 +23,9 @@ import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Utils to work with registry types
@@ -32,21 +35,21 @@ public class RegistryTypeUtils {
   public static Endpoint urlEndpoint(String api,
       String protocolType,
       String description,
-      String... urls) {
-    return new Endpoint(api, AddressTypes.ADDRESS_URI,
+      URI... urls) {
+    return new Endpoint(api,
         protocolType, description, urls);
   }
 
   public static Endpoint restEndpoint(String api,
       String description,
-      String... urls) {
+      URI... urls) {
     return urlEndpoint(api, ProtocolTypes.PROTOCOL_REST,
         description, urls);
   }
 
   public static Endpoint webEndpoint(String api,
       String description,
-      String... urls) {
+      URI... urls) {
     return urlEndpoint(api, ProtocolTypes.PROTOCOL_WEBUI,
         description, urls);
   }
@@ -54,24 +57,28 @@ public class RegistryTypeUtils {
   public static Endpoint inetAddrEndpoint(String api,
       String protocolType,
       String description,
-      String... tuples) {
+      String hostname, int port) {
     return new Endpoint(api,
         AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
-        protocolType, description, tuples);
+        protocolType,
+        description,
+        RegistryTypeUtils.tuple(hostname, Integer.toString(port)));
   }
 
   public static Endpoint ipcEndpoint(String api,
       String description,
-      boolean protobuf,
-      String... addresses) {
+      boolean protobuf) {
     return new Endpoint(api,
         AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
         protobuf ? ProtocolTypes.PROTOCOL_HADOOP_IPC_PROTOBUF
                  : ProtocolTypes.PROTOCOL_HADOOP_IPC,
-        description,
-        addresses);
+        description);
   }
-
+  
+  public static List<String> tuple(String...t1) {
+    return Arrays.asList(t1);
+  }
+  
   public static String toWireFormat(InetSocketAddress address) {
     return String.format("%s/%d", address.getHostString(), address.getPort());
   }

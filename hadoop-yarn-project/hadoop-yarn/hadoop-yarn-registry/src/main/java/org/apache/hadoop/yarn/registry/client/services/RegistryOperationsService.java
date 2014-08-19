@@ -118,7 +118,8 @@ implements RegistryOperations{
     CreateMode mode = ((createFlags & CreateFlags.EPHEMERAL) != 0)
         ? CreateMode.EPHEMERAL : CreateMode.PERSISTENT;
 
-    zkSet(path, mode, bytes, getUserAcl());
+    zkSet(path, mode, bytes, getUserAcl(),
+        ((createFlags & CreateFlags.OVERWRITE) != 0));
   }
 
   @Override
@@ -136,12 +137,12 @@ implements RegistryOperations{
       AccessControlException,
       InvalidPathnameException,
       IOException {
-    RegistryPathStatus status = new RegistryPathStatus();
-    status.path = path;
     Stat stat = zkStat(path);
-    status.size = stat.getDataLength();
-    status.hasRecord = status.size != 0;
-    status.time = stat.getCtime();
+    RegistryPathStatus status = new RegistryPathStatus(
+        path,
+        stat.getCtime(),
+        stat.getDataLength(),
+        stat.getDataLength() != 0);
     return status;
   }
 

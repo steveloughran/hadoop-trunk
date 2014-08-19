@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.types;
 
+import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
 
@@ -37,7 +38,7 @@ public class Endpoint {
   public String addressType;
   public String protocolType;
   public String description;
-  public List<String> addresses;
+  public List<List<String>> addresses;
 
   public Endpoint() {
   }
@@ -49,17 +50,22 @@ public class Endpoint {
    * @param addressType address type
    * @param protocolType protocol type
    * @param description description text
-   * @param addresses addresses
+   * @param addrs addresses
    */
   public Endpoint(String api,
       String addressType,
       String protocolType,
-      String description, String... addresses) {
+      String description,
+      List<String>... addrs) {
     this.api = api;
     this.addressType = addressType;
     this.protocolType = protocolType;
     this.description = description;
-    this.addresses = Arrays.asList(addresses);
+    if (addrs != null) {
+      this.addresses = Arrays.asList(addrs);
+    } else {
+      this.addresses = new ArrayList<List<String>>();
+    }
   }
 
   /**
@@ -79,9 +85,11 @@ public class Endpoint {
     
     this.protocolType = protocolType;
     this.description = description;
-    ArrayList<String> addrs = new ArrayList<String>(uris.length);
+    List<List<String>> addrs = new ArrayList<List<String>>(uris.length);
     for (URI uri : uris) {
-      addrs.add(uri.toASCIIString());
+      ArrayList<String> elt  = new ArrayList<String>(1);
+      addrs.add(RegistryTypeUtils.tuple(uri.toASCIIString()));
     }
+    this.addresses = addrs;
   }
 }
