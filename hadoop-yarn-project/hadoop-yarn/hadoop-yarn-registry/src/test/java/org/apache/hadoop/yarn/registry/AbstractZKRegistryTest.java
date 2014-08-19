@@ -22,7 +22,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.draft1.InMemoryLocalhostZKService;
+import org.apache.hadoop.yarn.registry.server.services.InMemoryLocalhostZKService;
 import org.apache.hadoop.yarn.registry.server.services.CuratorService;
 import org.apache.zookeeper.common.PathUtils;
 import org.junit.After;

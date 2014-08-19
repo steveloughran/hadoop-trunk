@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.draft1;
+package org.apache.hadoop.yarn.registry.server.services;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.zookeeper.server.ServerCnxnFactory;
@@ -35,7 +36,7 @@ import java.net.UnknownHostException;
 
 /**
  * This is a Zookeeper service instance that is contained in a YARN
- * service...it's been derived from Apache Twill for testing purposes
+ * service...it's been derived from Apache Twill
  */
 public class InMemoryLocalhostZKService extends AbstractService {
 
@@ -95,11 +96,10 @@ public class InMemoryLocalhostZKService extends AbstractService {
     port = getConfig().getInt(KEY_PORT, 0);
     tickTime = getConfig().getInt(KEY_TICK_TIME,
         ZooKeeperServer.DEFAULT_TICK_TIME);
-    String datapathname = getConfig().getTrimmed(KEY_DATADIR,"");
-    if (datapathname.isEmpty()) {
-      throw new IllegalArgumentException("No data directory defined in "
-                                         + KEY_DATADIR);
-    }
+    String datapathname = getConfig().getTrimmed(KEY_DATADIR, "");
+    Preconditions.checkState(!datapathname.isEmpty(),
+        "No data directory defined in " + KEY_DATADIR);
+
     dataDir = new File(datapathname);
   }
 
@@ -115,7 +115,7 @@ public class InMemoryLocalhostZKService extends AbstractService {
     factory.configure(getAddress(port), -1);
     factory.startup(zkServer);
 
-    LOG.info("In memory ZK started: " + getConnectionString());
+    LOG.info("In memory ZK started: {}", getConnectionString());
     if (LOG.isDebugEnabled()) {
       StringWriter sw = new StringWriter();
       PrintWriter pw = new PrintWriter(sw);
