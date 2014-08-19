@@ -27,13 +27,55 @@ public final class RegistryPathStatus {
   /**
    * Path in the registry to this entry
    */
-  public String path; 
-  public long time;
-  public long size;
+  public final String path; 
+  public final long time;
+  public final long size;
   /**
    * Does the entry have a record?
    */
-  public boolean hasRecord;
+  public final boolean hasRecord;
+
+  public RegistryPathStatus(String path,
+      long time,
+      long size,
+      boolean hasRecord) {
+    this.path = path;
+    this.time = time;
+    this.size = size;
+    this.hasRecord = hasRecord;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    RegistryPathStatus status = (RegistryPathStatus) o;
+
+    if (hasRecord != status.hasRecord) {
+      return false;
+    }
+    if (size != status.size) {
+      return false;
+    }
+    if (time != status.time) {
+      return false;
+    }
+    if (path != null ? !path.equals(status.path) : status.path != null) {
+      return false;
+    }
+
+    return true;
+  }
+
+  @Override
+  public int hashCode() {
+    return path != null ? path.hashCode() : 0;
+  }
 
   @Override
   public String toString() {

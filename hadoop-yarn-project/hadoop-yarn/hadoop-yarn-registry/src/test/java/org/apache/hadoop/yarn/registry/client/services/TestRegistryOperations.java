@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.services;
 
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.service.ServiceOperations;
@@ -26,6 +27,7 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
+import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
@@ -38,6 +40,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 
@@ -82,17 +86,21 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
    * Add some endpoints
    * @param entry entry
    */
-  protected void addSampleEndpoints(ServiceRecord entry, String hostname) {
+  protected void addSampleEndpoints(ServiceRecord entry, String hostname) throws
+      URISyntaxException {
     entry.putExternalEndpoint("web",
         RegistryTypeUtils.webEndpoint("UI", "web UI",
-            "http://" + hostname + ":80"));
+            new URI("http", hostname + ":80", "/")));
     entry.putExternalEndpoint(WEBHDFS,
         RegistryTypeUtils.restEndpoint(API_WEBHDFS,
-            WEBHDFS, "http://" + hostname + ":8020"));
+            WEBHDFS,
+            new URI("http", hostname + ":8020", "/")));
 
+    Endpoint endpoint = RegistryTypeUtils.ipcEndpoint(API_HDFS,
+        "hdfs", true);
+    endpoint.addresses.add(RegistryTypeUtils.tuple(hostname, "8030"));
     entry.putInternalEndpoint(NNIPC,
-        RegistryTypeUtils.ipcEndpoint(API_HDFS,
-            "hdfs", true, hostname + "/8030"));
+        endpoint);
   }
 
   /**
@@ -116,9 +124,9 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
         ProtocolTypes.PROTOCOL_HADOOP_IPC_PROTOBUF,
         API_HDFS);
 
-    List<String> addresses = webhdfs.addresses;
+    List<List<String>> addresses = webhdfs.addresses;
     assertEquals(1, addresses.size());
-    String addr = addresses.get(0);
+    String addr = addresses.get(0).get(0);
     assertTrue(addr.contains("http"));
     assertTrue(addr.contains(":8020"));
   }
@@ -132,7 +140,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
    * @throws IOException on a failure
    */
   protected ServiceRecord putExampleServiceEntry(String path, int createFlags)
-      throws IOException {
+      throws IOException, URISyntaxException {
     List<ACL> acls = yarnRegistry.parseACLs("world:anyone:rwcda");
     ServiceRecord record = new ServiceRecord();
     record.id = "example-0001";
@@ -262,20 +270,50 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     } catch (PathNotFoundException e) {
       return;
     }
-    
+
     // trouble
     RegistryPathStatus stat = operations.stat(path);
     fail("Got a status " + stat);
-    
+
+  }
+
+  @Test(expected = PathNotFoundException.class)
+  public void testPutNoParent2() throws Throwable {
+    ServiceRecord record = new ServiceRecord();
+    record.id = "testPutNoParent";
+    String path = "/path/without/parent";
+    operations.create(path, record, 0);
   }
 
   @Test
   public void testResolvePathThatHasNoEntry() throws Throwable {
-    ServiceRecord written = putExampleServiceEntry(ENTRY_PATH, 0);
-    RegistryPathStatus stat = operations.stat(PARENT_PATH);
+    String empty = "/empty";
+    operations.mkdir(empty);
+    RegistryPathStatus stat = operations.stat(empty);
     assertEquals(0, stat.size);
-    ServiceRecord record = operations.resolve(PARENT_PATH);
+    ServiceRecord record = operations.resolve(empty);
   }
 
 
+  @Test
+  public void testOverwrite() throws Throwable {
+    ServiceRecord written = putExampleServiceEntry(ENTRY_PATH, 0);
+    ServiceRecord resolved1 = operations.resolve(ENTRY_PATH);
+    resolved1.description = "resolved1";
+    try {
+      operations.create(ENTRY_PATH, resolved1, 0);
+      fail("overwrite succeeded when it should have failed");
+    } catch (FileAlreadyExistsException e) {
+
+    }
+
+    // verify there's no changed
+    ServiceRecord resolved2 = operations.resolve(ENTRY_PATH);
+    assertMatches(written, resolved2);
+    operations.create(ENTRY_PATH, resolved1, CreateFlags.OVERWRITE);
+    ServiceRecord resolved3 = operations.resolve(ENTRY_PATH);
+    assertMatches(resolved1, resolved3);
+
+
+  }
 }

@@ -474,19 +474,24 @@ public class CuratorService extends AbstractService
    * @param path path
    * @param data data
    * @param acl ACL for path -used when creating a new entry
+   * @param overwrite enable overwrite
    * @throws IOException
    * @return true if the entry was created, false if it was simply updated.
    */
   public boolean zkSet(String path,
       CreateMode mode,
       byte[] data,
-      List<ACL> acl) throws IOException {
+      List<ACL> acl, boolean overwrite) throws IOException {
     if (!zkPathExists(path)) {
       zkCreate(path, mode, data, acl);
       return true;
     } else {
-      zkUpdate(path, data);
-      return false;
+      if (overwrite) {
+        zkUpdate(path, data);
+        return false;
+      } else {
+        throw new FileAlreadyExistsException(path);
+      }
     }
   }
 
