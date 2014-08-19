@@ -19,9 +19,12 @@
 package org.apache.hadoop.yarn.registry.client.services;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
 import org.apache.hadoop.yarn.registry.client.exceptions.RESTIOException;
 import org.apache.zookeeper.CreateMode;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
@@ -32,9 +35,28 @@ import java.util.List;
  * Test the curator service
  */
 public class TestCuratorService extends AbstractZKRegistryTest {
+  protected CuratorService curatorService;
 
   public static final String MISSING = "/missing";
 
+  @Before
+  public void startCurator() {
+    createCuratorService();
+  }
+
+  @After
+  public void stopCurator() {
+    ServiceOperations.stop(curatorService);
+  }
+
+  /**
+   * Create an instance
+   */
+  protected void createCuratorService() {
+    curatorService = new CuratorService("curatorService");
+    curatorService.init(createRegistryConfiguration());
+    curatorService.start();
+  }
   @Test
   public void testLs() throws Throwable {
     curatorService.zkList("/");

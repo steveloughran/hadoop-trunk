@@ -142,6 +142,9 @@ public class JsonSerDeser<T> {
    * @throws IOException
    */
   public T fromBytes(byte[] b) throws IOException {
+    if (b.length==0) {
+      throw new EOFException("No data");
+    }
     String json = new String(b, 0, b.length, UTF_8);
     return fromJson(json);
   }

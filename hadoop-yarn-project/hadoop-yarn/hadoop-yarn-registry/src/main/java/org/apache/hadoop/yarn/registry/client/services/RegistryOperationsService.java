@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
+import static org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils.*;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
@@ -141,7 +142,7 @@ implements RegistryOperations{
     status.size = stat.getDataLength();
     status.hasRecord = status.size != 0;
     status.time = stat.getCtime();
-    return null;
+    return status;
   }
 
   @Override
@@ -156,7 +157,7 @@ implements RegistryOperations{
     ArrayList<RegistryPathStatus> childList = new ArrayList<RegistryPathStatus>(
         size);
     for (String childName : childNames) {
-      childList.add(stat(path + "/" + childName));
+      childList.add(stat(join(path, childName)));
     }
     return childList.toArray(new RegistryPathStatus[size]);
   }
