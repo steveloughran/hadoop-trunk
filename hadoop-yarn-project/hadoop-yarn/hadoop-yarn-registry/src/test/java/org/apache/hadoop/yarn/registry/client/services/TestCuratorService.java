@@ -19,6 +19,8 @@
 package org.apache.hadoop.yarn.registry.client.services;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
 import org.apache.hadoop.yarn.registry.client.exceptions.RESTIOException;
@@ -62,7 +64,7 @@ public class TestCuratorService extends AbstractZKRegistryTest {
     curatorService.zkList("/");
   }
 
-  @Test(expected = FileNotFoundException.class)
+  @Test(expected = PathNotFoundException.class)
   public void testLsNotFound() throws Throwable {
     List<String> ls = curatorService.zkList(MISSING);
   }
@@ -82,7 +84,7 @@ public class TestCuratorService extends AbstractZKRegistryTest {
     curatorService.zkPathMustExist("/");
   }
 
-  @Test(expected = FileNotFoundException.class)
+  @Test(expected = PathNotFoundException.class)
   public void testVerifyExistsMissing() throws Throwable {
     curatorService.zkPathMustExist(MISSING);
   }
@@ -95,7 +97,7 @@ public class TestCuratorService extends AbstractZKRegistryTest {
     curatorService.zkPathMustExist("/p1/p2");
   }
 
-  @Test(expected = FileNotFoundException.class)
+  @Test(expected = PathNotFoundException.class)
   public void testMkdirChild() throws Throwable {
     curatorService.zkMkPath("/testMkdirChild/child", CreateMode.PERSISTENT);
   }
@@ -121,7 +123,7 @@ public class TestCuratorService extends AbstractZKRegistryTest {
     try {
       curatorService.zkDelete("/rm", false);
       fail("expected a failure");
-    } catch (RESTIOException expected) {
+    } catch (PathIsNotEmptyDirectoryException expected) {
 
     }
   }
@@ -172,7 +174,7 @@ public class TestCuratorService extends AbstractZKRegistryTest {
     curatorService.zkUpdate("/testCreateUpdate", buffer);
   }
 
-  @Test(expected = FileNotFoundException.class)
+  @Test(expected = PathNotFoundException.class)
   public void testUpdateMissing() throws Throwable {
     curatorService.zkUpdate("/testUpdateMissing", getTestBuffer());
   }

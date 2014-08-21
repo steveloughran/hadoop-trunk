@@ -19,12 +19,9 @@
 package org.apache.hadoop.yarn.registry.client.draft1;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
-import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
-import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
-import org.apache.hadoop.yarn.registry.client.types.Endpoint;
-import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.junit.After;
 import org.junit.Before;
@@ -34,8 +31,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
-import java.util.Map;
+
+import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.ipcEndpoint;
+import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.restEndpoint;
+import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.tuple;
+import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.webEndpoint;
 
 /**
  * Tests for the YARN registry
@@ -43,7 +46,6 @@ import java.util.Map;
 public class TestYARNRegistryService extends AbstractZKRegistryTest {
 
   public static final String SC_HADOOP = "org-apache-hadoop";
-  public static final String WEBHDFS = "webhdfs";
   public static final String USER = "yarn";
   public static final String CLUSTERNAME = "namenode1";
   public static final String DATANODE = "datanode";
@@ -51,7 +53,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
   public static final String API_HDFS = "org_apache_hadoop_namenode_dfs";
   private static final Logger LOG =
       LoggerFactory.getLogger(TestYARNRegistryService.class);
-  
+
   private RegistryWriterService yarnRegistry;
 
   @Before
@@ -85,7 +87,9 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
     assertTrue(yarnRegistry.serviceExists(USER, SC_HADOOP, CLUSTERNAME));
   }
 
-  protected ServiceRecord putExampleServiceEntry() throws IOException {
+  protected ServiceRecord putExampleServiceEntry() throws
+      IOException,
+      URISyntaxException {
     ServiceRecord se = new ServiceRecord();
     se.description = methodName.getMethodName();
     addSampleEndpoints(se, "namenode");
@@ -137,7 +141,8 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
     assertEquals(1, components.size());
 
     assertEquals(DATANODE, components.get(0));
-    assertTrue(yarnRegistry.componentExists(USER, SC_HADOOP, CLUSTERNAME, DATANODE));
+    assertTrue(
+        yarnRegistry.componentExists(USER, SC_HADOOP, CLUSTERNAME, DATANODE));
 
     yarnRegistry.deleteComponent(USER, SC_HADOOP, CLUSTERNAME, DATANODE);
     assertEquals(0, yarnRegistry.listComponents(USER, SC_HADOOP,
@@ -155,7 +160,8 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
     // verify that when the service is deleted, so go the components
     assertEquals(0, yarnRegistry.listComponents(USER, SC_HADOOP,
         CLUSTERNAME).size());
-    assertFalse(yarnRegistry.componentExists(USER, SC_HADOOP, CLUSTERNAME, DATANODE));
+    assertFalse(
+        yarnRegistry.componentExists(USER, SC_HADOOP, CLUSTERNAME, DATANODE));
 
   }
 
@@ -178,18 +184,18 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
   }
 
 
-  @Test(expected = FileNotFoundException.class)
+  @Test(expected = PathNotFoundException.class)
   public void testGetUndefinedComponent() throws Throwable {
     yarnRegistry.getComponent("user2", "hadoop0", "cluster-3", "dn-0");
   }
 
-  @Test(expected = FileNotFoundException.class)
+  @Test(expected = PathNotFoundException.class)
   public void testGetUndefinedService() throws Throwable {
     yarnRegistry.getServiceInstance("user2", "hadoop0", "cluster-3");
   }
 
 
-  @Test(expected = FileNotFoundException.class)
+  @Test(expected = PathNotFoundException.class)
   public void testPutComponentNoService() throws Throwable {
     deleteExampleServiceEntry();
 
@@ -293,7 +299,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
 
     deleteServiceLiveness();
     assertFalse("service is live", isServiceLive());
-    
+
     putServiceLiveness(false, true);
     assertTrue("service is not live", isServiceLive());
 
@@ -327,8 +333,9 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
       putServiceLiveness(true, true);
       // if this is reached then parent directories are being created
       // when they should not
-      fail("expected a failure, but the service liveness is " + isServiceLive());
-    } catch (FileNotFoundException e) {
+      fail(
+          "expected a failure, but the service liveness is " + isServiceLive());
+    } catch (PathNotFoundException e) {
 
     }
 
@@ -347,8 +354,9 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
     deleteServiceLiveness();
     deleteServiceLiveness();
   }
-  
-  protected void putServiceLiveness(boolean ephemeral, boolean forceDelete) throws
+
+  protected void putServiceLiveness(boolean ephemeral,
+      boolean forceDelete) throws
       IOException {
     yarnRegistry.putServiceLiveness(USER,
         SC_HADOOP,
@@ -356,7 +364,7 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
         ephemeral,
         forceDelete);
   }
-  
+
   protected void deleteServiceLiveness() throws
       IOException {
     yarnRegistry.deleteServiceLiveness(USER,
@@ -368,45 +376,26 @@ public class TestYARNRegistryService extends AbstractZKRegistryTest {
    * Add some endpoints
    * @param entry entry
    */
-  protected void addSampleEndpoints(ServiceRecord entry, String hostname) {
-    entry.putExternalEndpoint("web",
-        RegistryTypeUtils.webEndpoint("UI", "web UI",
-            "http://" + hostname + ":80"));
-    entry.putExternalEndpoint(WEBHDFS,
-        RegistryTypeUtils.restEndpoint(API_WEBHDFS,
-            WEBHDFS, "http://" + hostname + ":8020"));
+  protected void addSampleEndpoints(ServiceRecord entry, String hostname) throws
+      URISyntaxException {
+    entry.addExternalEndpoint(
+        webEndpoint("UI",
+            new URI("http://" + hostname + ":80")));
+    entry.addExternalEndpoint(
+        restEndpoint(API_WEBHDFS,
+            new URI("http://" + hostname + ":8020")));
 
-    entry.putInternalEndpoint("nnipc",
-        RegistryTypeUtils.ipcEndpoint(API_HDFS,
-            "hdfs", true, hostname + "/8030"));
+    entry.addInternalEndpoint(
+        ipcEndpoint(API_HDFS, true, tuple(hostname, 8030)));
   }
 
   /**
    * General code to validate bits of a component/service entry built iwth
    * {@link #addSampleEndpoints(ServiceRecord, String)}
-   * @param instance instance to check
+   * @param record instance to check
    */
-  protected void validateEntry(ServiceRecord instance) {
-    Map<String, Endpoint> externalEndpointMap = instance.external;
-    assertEquals(2, externalEndpointMap.size());
-
-    Endpoint webhdfs = externalEndpointMap.get(WEBHDFS);
-    assertNotNull(webhdfs);
-    assertEquals(API_WEBHDFS, webhdfs.api);
-    assertEquals(AddressTypes.ADDRESS_URI, webhdfs.addressType);
-    assertEquals(ProtocolTypes.PROTOCOL_REST, webhdfs.protocolType);
-    List<String> addresses = webhdfs.addresses;
-    assertEquals(1, addresses.size());
-    String addr = addresses.get(0);
-    assertTrue(addr.contains("http"));
-    assertTrue(addr.contains(":8020"));
-
-    Endpoint nnipc = instance.getInternalEndpoint("nnipc");
-    assertNotNull(nnipc);
-    assertEquals(ProtocolTypes.PROTOCOL_HADOOP_IPC_PROTOBUF,
-        nnipc.protocolType);
-    Endpoint web = instance.getExternalEndpoint("web");
-    assertNotNull(web);
+  protected void validateEntry(ServiceRecord record) {
+    assertNotNull(record);
   }
 
 

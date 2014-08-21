@@ -25,6 +25,8 @@ import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
+import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.*;
+
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
@@ -40,17 +42,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
-import java.util.Map;
 
 public class TestRegistryOperations extends AbstractZKRegistryTest {
   public static final String SC_HADOOP = "org-apache-hadoop";
-  public static final String WEBHDFS = "webhdfs";
   public static final String USER = "drwho/";
   public static final String NAME = "hdfs";
-  public static final String DATANODE = "datanode";
   public static final String API_WEBHDFS = "org_apache_hadoop_namenode_webhdfs";
   public static final String API_HDFS = "org_apache_hadoop_namenode_dfs";
 
@@ -59,6 +59,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
   public static final String PARENT_PATH = USERPATH + SC_HADOOP + "/";
   public static final String ENTRY_PATH = PARENT_PATH + NAME;
   public static final String NNIPC = "nnipc";
+  public static final String IPC2 = "IPC2";
 
   private RegistryOperationsService yarnRegistry;
 
@@ -88,48 +89,60 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
    */
   protected void addSampleEndpoints(ServiceRecord entry, String hostname) throws
       URISyntaxException {
-    entry.putExternalEndpoint("web",
-        RegistryTypeUtils.webEndpoint("UI", "web UI",
-            new URI("http", hostname + ":80", "/")));
-    entry.putExternalEndpoint(WEBHDFS,
-        RegistryTypeUtils.restEndpoint(API_WEBHDFS,
-            WEBHDFS,
+    entry.addExternalEndpoint(webEndpoint("web",
+        new URI("http", hostname + ":80", "/")));
+    entry.addExternalEndpoint(
+        restEndpoint(API_WEBHDFS,
             new URI("http", hostname + ":8020", "/")));
 
-    Endpoint endpoint = RegistryTypeUtils.ipcEndpoint(API_HDFS,
-        "hdfs", true);
-    endpoint.addresses.add(RegistryTypeUtils.tuple(hostname, "8030"));
-    entry.putInternalEndpoint(NNIPC,
-        endpoint);
+    Endpoint endpoint = ipcEndpoint(API_HDFS,
+        true, null);
+    endpoint.addresses.add(tuple(hostname, "8030"));
+    entry.addInternalEndpoint(endpoint);
+    InetSocketAddress localhost = new InetSocketAddress("localhost", 8050);
+    entry.addInternalEndpoint(
+        inetAddrEndpoint(NNIPC, ProtocolTypes.PROTOCOL_THRIFT, "localhost",
+            8050));
+    entry.addInternalEndpoint(
+        RegistryTypeUtils.ipcEndpoint(
+            IPC2,
+            true,
+            RegistryTypeUtils.marshall(localhost)));
+    
   }
 
   /**
    * General code to validate bits of a component/service entry built iwth
    * {@link #addSampleEndpoints(ServiceRecord, String)}
-   * @param resolved instance to check
+   * @param record instance to check
    */
-  protected void validateEntry(ServiceRecord written, ServiceRecord resolved) {
+  protected void validateEntry(ServiceRecord record) {
+    assertNotNull("null service record", record);
+    List<Endpoint> endpoints = record.external;
+    assertEquals(2, endpoints.size());
 
-    assertMatches(written, resolved);
-    Map<String, Endpoint> externalEndpointMap = resolved.external;
-    assertEquals(2, externalEndpointMap.size());
-    Endpoint webhdfs = externalEndpointMap.get(WEBHDFS);
-    assertMatches(webhdfs,
-        AddressTypes.ADDRESS_URI,
-        ProtocolTypes.PROTOCOL_REST,
-        API_WEBHDFS);
-
-    assertMatches(resolved.getInternalEndpoint(NNIPC),
-        AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
-        ProtocolTypes.PROTOCOL_HADOOP_IPC_PROTOBUF,
-        API_HDFS);
-
-    List<List<String>> addresses = webhdfs.addresses;
-    assertEquals(1, addresses.size());
-    String addr = addresses.get(0).get(0);
+    Endpoint webhdfs = findEndpoint(record, API_WEBHDFS, true, 1, 1);
+    assertEquals(API_WEBHDFS, webhdfs.api);
+    assertEquals(AddressTypes.ADDRESS_URI, webhdfs.addressType);
+    assertEquals(ProtocolTypes.PROTOCOL_REST, webhdfs.protocolType);
+    List<List<String>> addressList = webhdfs.addresses;
+    List<String> url = addressList.get(0);
+    String addr = url.get(0);
     assertTrue(addr.contains("http"));
     assertTrue(addr.contains(":8020"));
+
+    Endpoint nnipc = findEndpoint(record, NNIPC, false, 1,2);
+    assertEquals("wrong protocol in " + nnipc, ProtocolTypes.PROTOCOL_THRIFT,
+        nnipc.protocolType);
+
+    Endpoint ipc2 = findEndpoint(record, IPC2, false, 1,2);
+
+    Endpoint web = findEndpoint(record, "web", true, 1, 1);
+    assertEquals(1, web.addresses.size());
+    assertEquals(1, web.addresses.get(0).size());
+    
   }
+
 
   /**
    * Create a service entry with the sample endpoints, and put it
@@ -169,22 +182,35 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     assertEquals(written.description, resolved.description);
   }
 
+  public Endpoint findEndpoint(ServiceRecord record,
+      String api, boolean external, int addressElements, int elementSize) {
+    Endpoint epr = external ? record.getExternalEndpoint(api)
+                            : record.getInternalEndpoint(api);
+    if (epr != null) {
+      assertEquals("wrong # of addresses",
+          addressElements, epr.addresses.size());
+      assertEquals("wrong # of elements in an address",
+          elementSize, epr.addresses.get(0).size());
+      return epr;
+    }
+    List<Endpoint> endpoints = external ? record.external : record.internal;
+    StringBuilder builder = new StringBuilder();
+    for (Endpoint endpoint : endpoints) {
+      builder.append("\"").append(endpoint).append("\" ");
+    }
+    fail("Did not find " + api + " in endpoints " + builder);
+    return null;
+  }
+
+
   @Test
   public void testPutGetServiceEntry() throws Throwable {
 
     ServiceRecord written = putExampleServiceEntry(ENTRY_PATH, 0);
     ServiceRecord resolved = operations.resolve(ENTRY_PATH);
-    validateEntry(written, resolved);
+    validateEntry(resolved);
     assertMatches(written, resolved);
 
-    Endpoint endpoint = resolved.getExternalEndpoint(WEBHDFS);
-    assertMatches(endpoint, AddressTypes.ADDRESS_URI,
-        ProtocolTypes.PROTOCOL_REST,
-        API_WEBHDFS);
-    assertMatches(resolved.getInternalEndpoint(NNIPC),
-        AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
-        ProtocolTypes.PROTOCOL_HADOOP_IPC_PROTOBUF,
-        API_HDFS);
   }
 
   @Test
@@ -313,7 +339,5 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     operations.create(ENTRY_PATH, resolved1, CreateFlags.OVERWRITE);
     ServiceRecord resolved3 = operations.resolve(ENTRY_PATH);
     assertMatches(resolved1, resolved3);
-
-
   }
 }

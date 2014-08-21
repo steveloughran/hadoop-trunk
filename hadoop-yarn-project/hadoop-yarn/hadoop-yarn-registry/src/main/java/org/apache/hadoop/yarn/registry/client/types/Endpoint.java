@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.types;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
@@ -25,6 +26,7 @@ import org.codehaus.jackson.map.annotate.JsonSerialize;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -37,7 +39,6 @@ public class Endpoint {
   public String api;
   public String addressType;
   public String protocolType;
-  public String description;
   public List<List<String>> addresses;
 
   public Endpoint() {
@@ -49,22 +50,18 @@ public class Endpoint {
    * @param api API name
    * @param addressType address type
    * @param protocolType protocol type
-   * @param description description text
    * @param addrs addresses
    */
   public Endpoint(String api,
       String addressType,
       String protocolType,
-      String description,
       List<String>... addrs) {
     this.api = api;
     this.addressType = addressType;
     this.protocolType = protocolType;
-    this.description = description;
+    this.addresses = new ArrayList<List<String>>();
     if (addrs != null) {
-      this.addresses = Arrays.asList(addrs);
-    } else {
-      this.addresses = new ArrayList<List<String>>();
+      Collections.addAll(addresses, addrs);
     }
   }
 
@@ -73,23 +70,42 @@ public class Endpoint {
    * is ASCII-encoded and added to the list of addresses.
    * @param api API name
    * @param protocolType protocol type
-   * @param description description text
    * @param uris
    */
   public Endpoint(String api,
       String protocolType,
-      String description,
       URI... uris) {
     this.api = api;
     this.addressType = AddressTypes.ADDRESS_URI;
     
     this.protocolType = protocolType;
-    this.description = description;
     List<List<String>> addrs = new ArrayList<List<String>>(uris.length);
     for (URI uri : uris) {
       ArrayList<String> elt  = new ArrayList<String>(1);
       addrs.add(RegistryTypeUtils.tuple(uri.toASCIIString()));
     }
     this.addresses = addrs;
+  }
+
+  @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder("Endpoint{");
+    sb.append("api='").append(api).append('\'');
+    sb.append(", addressType='").append(addressType).append('\'');
+    sb.append(", protocolType='").append(protocolType).append('\'');
+    if (addresses != null) {
+      sb.append(", address count=").append(addresses.size());
+    } else {
+      sb.append(", null address list=");
+    }
+    sb.append('}');
+    return sb.toString();
+  }
+
+  public void validate() {
+    Preconditions.checkNotNull(api, "null API field");
+    Preconditions.checkNotNull(addressType, "null addressType field");
+    Preconditions.checkNotNull(protocolType, "null protocolType field");
+    Preconditions.checkNotNull(addresses, "null addresses field");
   }
 }

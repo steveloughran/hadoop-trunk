@@ -21,7 +21,9 @@ package org.apache.hadoop.yarn.registry.client.types;
 import com.google.common.base.Preconditions;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -44,29 +46,43 @@ public class ServiceRecord {
 
   public String description;
 
-  public Map<String, Endpoint> external = new HashMap<String, Endpoint>();
-  public Map<String, Endpoint> internal = new HashMap<String, Endpoint>();
+  public List<Endpoint> external = new ArrayList<Endpoint>();
+  public List<Endpoint> internal = new ArrayList<Endpoint>();
 
 
-  public void putExternalEndpoint(String name, Endpoint endpoint) {
-    Preconditions.checkArgument(name != null);
+  public void addExternalEndpoint(Endpoint endpoint) {
     Preconditions.checkArgument(endpoint != null);
-    external.put(name, endpoint);
+    endpoint.validate();
+    external.add(endpoint);
   }
 
-  public void putInternalEndpoint(String name, Endpoint endpoint) {
-    Preconditions.checkArgument(name != null);
+  public void addInternalEndpoint(Endpoint endpoint) {
     Preconditions.checkArgument(endpoint != null);
-    internal.put(name, endpoint);
+    endpoint.validate();
+    internal.add(endpoint);
   }
 
-  public Endpoint getInternalEndpoint(String name) {
-    return internal.get(name);
+  public Endpoint getInternalEndpoint(String api) {
+    return findByAPI(internal, api);
   }
 
-  public Endpoint getExternalEndpoint(String name) {
-    return external.get(name);
+  public Endpoint getExternalEndpoint(String api) {
+    return findByAPI(external, api);
   }
 
+  /**
+   * Find an endpoint by its API
+   * @param list list
+   * @param api api name
+   * @return
+   */
+  private Endpoint findByAPI(List<Endpoint> list,  String api) {
+    for (Endpoint endpoint : list) {
+      if (endpoint.api.equals(api)) {
+        return endpoint;
+      }
+    }
+    return null;
+  }
 
 }
