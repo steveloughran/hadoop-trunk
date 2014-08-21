@@ -88,4 +88,14 @@ public class RegistryTypeUtils {
   public static List<String> marshall(InetSocketAddress address) {
     return tuple(address.getHostString(), address.getPort());
   }
+
+  /**
+   * Perform whatever transforms are needed to get a YARN ID into a DNS-compatible
+   * name
+   * @param yarnId ID as string of YARN application, instance or container
+   * @return a string suitable for use in registry paths.
+   */
+  public static String yarnIdToDnsId(String yarnId) {
+    return yarnId.replace("_", "-");
+  }
 }

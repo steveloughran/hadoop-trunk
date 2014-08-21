@@ -36,7 +36,6 @@ import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
-import static org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils.*;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.ExceptionGenerator;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
@@ -49,7 +48,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -562,7 +560,7 @@ public class CuratorService extends AbstractService
   }
   
   @VisibleForTesting
-  public ZKPathDumper dumpPath(boolean verbose) {
-    return new ZKPathDumper(curator, registryRoot, verbose);
+  public ZKPathDumper dumpPath() {
+    return new ZKPathDumper(curator, registryRoot);
   }
 }

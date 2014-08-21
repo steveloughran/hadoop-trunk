@@ -79,7 +79,7 @@ public class BindingUtils {
   public static String componentListPath(String user,
       String serviceClass, String serviceName) {
 
-    return servicePath(user, serviceClass, serviceName) + PATH_COMPONENTS;
+    return servicePath(user, serviceClass, serviceName) + SUBPATH_COMPONENTS;
   }
 
   public static String componentPath(String user,

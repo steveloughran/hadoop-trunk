@@ -49,6 +49,24 @@ public class ServiceRecord {
   public List<Endpoint> external = new ArrayList<Endpoint>();
   public List<Endpoint> internal = new ArrayList<Endpoint>();
 
+  /**
+   * Create a service record with no ID, description or registration time.
+   * Endpoint lists are set to empty lists.
+   */
+  public ServiceRecord() {
+  }
+
+  /**
+   * Create a service record ... sets the registration time to the current
+   * system time.
+   * @param id service ID
+   * @param description description
+   */
+  public ServiceRecord(String id, String description) {
+    this.id = id;
+    this.description = description;
+    this.registrationTime = System.currentTimeMillis();
+  }
 
   public void addExternalEndpoint(Endpoint endpoint) {
     Preconditions.checkArgument(endpoint != null);
@@ -85,4 +103,13 @@ public class ServiceRecord {
     return null;
   }
 
+  @Override
+  public String toString() {
+    final StringBuilder sb =
+        new StringBuilder("ServiceRecord{");
+    sb.append("id='").append(id).append('\'');
+    sb.append(", description='").append(description).append('\'');
+    sb.append('}');
+    return sb.toString();
+  }
 }
