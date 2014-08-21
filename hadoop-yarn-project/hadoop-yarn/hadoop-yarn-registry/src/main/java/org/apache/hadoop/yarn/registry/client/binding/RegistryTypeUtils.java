@@ -24,6 +24,7 @@ import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -34,52 +35,57 @@ public class RegistryTypeUtils {
 
   public static Endpoint urlEndpoint(String api,
       String protocolType,
-      String description,
       URI... urls) {
-    return new Endpoint(api,
-        protocolType, description, urls);
+    return new Endpoint(api, protocolType, urls); 
   }
 
   public static Endpoint restEndpoint(String api,
-      String description,
       URI... urls) {
-    return urlEndpoint(api, ProtocolTypes.PROTOCOL_REST,
-        description, urls);
+    return urlEndpoint(api, ProtocolTypes.PROTOCOL_REST, urls);
   }
 
   public static Endpoint webEndpoint(String api,
-      String description,
       URI... urls) {
-    return urlEndpoint(api, ProtocolTypes.PROTOCOL_WEBUI,
-        description, urls);
+    return urlEndpoint(api, ProtocolTypes.PROTOCOL_WEBUI, urls);
   }
 
   public static Endpoint inetAddrEndpoint(String api,
       String protocolType,
-      String description,
-      String hostname, int port) {
+      String hostname,
+      int port) {
     return new Endpoint(api,
         AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
         protocolType,
-        description,
         RegistryTypeUtils.tuple(hostname, Integer.toString(port)));
   }
 
   public static Endpoint ipcEndpoint(String api,
-      String description,
-      boolean protobuf) {
+      boolean protobuf, List<String> address) {
     return new Endpoint(api,
         AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
         protobuf ? ProtocolTypes.PROTOCOL_HADOOP_IPC_PROTOBUF
                  : ProtocolTypes.PROTOCOL_HADOOP_IPC,
-        description);
+        address
+    );
   }
   
   public static List<String> tuple(String...t1) {
     return Arrays.asList(t1);
   }
-  
-  public static String toWireFormat(InetSocketAddress address) {
-    return String.format("%s/%d", address.getHostString(), address.getPort());
+  public static List<String> tuple(Object...t1) {
+    List<String> l = new ArrayList<String>(t1.length);
+    for (Object t : t1) {
+      l.add(t.toString());
+    }
+    return l;
+  }
+
+  /**
+   * Convert a socket address pair into a string tuple, (host, port)
+   * @param address an address
+   * @return an element for the address list
+   */
+  public static List<String> marshall(InetSocketAddress address) {
+    return tuple(address.getHostString(), address.getPort());
   }
 }
