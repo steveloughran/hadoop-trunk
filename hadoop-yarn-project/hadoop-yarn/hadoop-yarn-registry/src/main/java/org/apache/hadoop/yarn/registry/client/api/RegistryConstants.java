@@ -81,5 +81,5 @@ public interface RegistryConstants {
       "([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])";
   String PATH_USERS = "users/";
   String PATH_SYSTEM_SERVICES_PATH = "services/";
-  String PATH_COMPONENTS = "/components";
+  String SUBPATH_COMPONENTS = "/components";
 }

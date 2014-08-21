@@ -27,7 +27,9 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.*;
 
+import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
+import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
@@ -49,7 +51,7 @@ import java.util.List;
 
 public class TestRegistryOperations extends AbstractZKRegistryTest {
   public static final String SC_HADOOP = "org-apache-hadoop";
-  public static final String USER = "drwho/";
+  public static final String USER = "devteam/";
   public static final String NAME = "hdfs";
   public static final String API_WEBHDFS = "org_apache_hadoop_namenode_webhdfs";
   public static final String API_HDFS = "org_apache_hadoop_namenode_dfs";
@@ -66,6 +68,8 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRegistryOperations.class);
   private RegistryOperations operations;
+  private final JsonMarshal.ServiceRecordMarshal recordMarshal =
+      new JsonMarshal.ServiceRecordMarshal();
 
 
   @Before
@@ -339,5 +343,55 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     operations.create(ENTRY_PATH, resolved1, CreateFlags.OVERWRITE);
     ServiceRecord resolved3 = operations.resolve(ENTRY_PATH);
     assertMatches(resolved1, resolved3);
+  }
+
+  /**
+   * Create a complex example app
+   * @throws Throwable
+   */
+  @Test
+  public void testCreateComplexApplication() throws Throwable {
+    String appId = "application_1408631738011_0001";
+    String cid = "container_1408631738011_0001_01_";
+    String cid1 = cid +"000001";
+    String cid2 = cid +"000002";
+    String appPath = USERPATH + "tomcat";
+
+    ServiceRecord webapp = new ServiceRecord(appId,
+        "tomcat-based web application");
+    webapp.addExternalEndpoint(restEndpoint("www",
+        new URI("http","//loadbalancer/", null)));
+
+    ServiceRecord comp1 = new ServiceRecord(cid1, null);
+    comp1.addExternalEndpoint(restEndpoint("www",
+        new URI("http", "//rack4server3:43572", null)));
+    comp1.addInternalEndpoint(
+        inetAddrEndpoint("jmx", "JMX", "rack4server3", 43573));
+    ServiceRecord comp2 = new ServiceRecord(cid2, null);
+    comp2.addExternalEndpoint(restEndpoint("www",
+        new URI("http", "//rack1server28:35881",null)));
+    comp2.addInternalEndpoint(
+        inetAddrEndpoint("jmx", "JMX", "rack1server28", 35882));
+
+    operations.mkdir(USERPATH);
+    operations.create(appPath, webapp, CreateFlags.OVERWRITE);
+    String components = appPath + RegistryConstants.SUBPATH_COMPONENTS + "/";
+    operations.mkdir(components);
+    String dns1 = yarnIdToDnsId(cid1);
+    operations.create(components + dns1, comp1, CreateFlags.EPHEMERAL);
+    String dns2 = yarnIdToDnsId(cid2);
+    operations.create(components + dns2, comp2, CreateFlags.EPHEMERAL );
+
+    ZKPathDumper pathDumper = yarnRegistry.dumpPath();
+    LOG.info(pathDumper.toString());
+
+    log("tomcat", webapp);
+    log(dns1, comp1);
+    log(dns2, comp2);
+  }
+
+  public void log(String name, ServiceRecord record) throws
+      IOException {
+    LOG.info(" {} = \n{}\n", name, recordMarshal.toJson(record));
   }
 }

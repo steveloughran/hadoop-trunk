@@ -31,30 +31,21 @@ import java.util.List;
  * can be used in a log statement -the operation
  * will only take place if the method is evaluated.
  * 
- * It will also catch any exceptions raised in the operation,
- * so the log action will never fail.
- * 
- * The verbose flag includes the size of the data; this is calculated by
- * retrieving all the data, so scales <code>O(data)</code> -that is: not well
- * at all.
+
  */
 public class ZKPathDumper {
 
   private final CuratorFramework curator;
   private final String root;
-  private final boolean verbose;
+  private final boolean verbose = true;
 
   /**
    * Create a path dumper -but do not dump the path until asked
    * @param curator curator instance
    * @param root root
-   * @param verbose flag to ask for verbose details. This uses more network
-   * IO and does not scale well.
    */
   public ZKPathDumper(CuratorFramework curator,
-      String root,
-      boolean verbose) {
-    this.verbose = verbose;
+      String root) {
     Preconditions.checkArgument(curator != null);
     Preconditions.checkArgument(root != null);
     this.curator = curator;
@@ -77,25 +68,21 @@ public class ZKPathDumper {
       List<String> children = childrenBuilder.forPath(path);
       for (String child : children) {
         String childPath = path + "/" + child;
-        String verboseData = "";
-        if (verbose) {
-          Stat stat = new Stat();
-          byte[] bytes;
-          bytes = curator.getData().storingStatIn(stat).forPath(childPath);
-          StringBuilder verboseDataBuilder = new StringBuilder(64);
-          verboseDataBuilder.append("  [").append(bytes.length).append("]");
-          if (stat.getEphemeralOwner()>0) {
-            verboseDataBuilder.append("*");
-          }
-          verboseData = verboseDataBuilder.toString();
+        String body = "";
+        Stat stat = curator.checkExists().forPath(childPath);
+        StringBuilder verboseDataBuilder = new StringBuilder(64);
+        verboseDataBuilder.append("  [")
+                          .append(stat.getDataLength())
+                          .append("]");
+        if (stat.getEphemeralOwner() > 0) {
+          verboseDataBuilder.append("*");
         }
+        body = verboseDataBuilder.toString();
 
         // print each child
         append(builder, indent, ' ');
         builder.append('/').append(child);
-        if (verbose) {
-          builder.append(verboseData);
-        }
+        builder.append(body);
         builder.append('\n');
         // recurse
         expand(builder, childPath, indent + 1);

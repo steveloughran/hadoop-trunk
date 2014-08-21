@@ -105,7 +105,7 @@ public class RegistryWriterService extends CuratorService
     String servicePath = servicePath(user, serviceClass, serviceName);
     List<ACL> userAccess = fullUserAccess(user);
     if (zkSet(servicePath, CreateMode.PERSISTENT, bytes, userAccess, true)) {
-      maybeCreate(servicePath + RegistryConstants.PATH_COMPONENTS,
+      maybeCreate(servicePath + RegistryConstants.SUBPATH_COMPONENTS,
           CreateMode.PERSISTENT,
           userAccess);
     }
@@ -205,7 +205,7 @@ public class RegistryWriterService extends CuratorService
       boolean ephemeral) throws IOException {
     String servicePath = zkPathMustExist(
         servicePath(user, serviceClass, serviceName));
-    maybeCreate(servicePath + RegistryConstants.PATH_COMPONENTS,
+    maybeCreate(servicePath + RegistryConstants.SUBPATH_COMPONENTS,
         CreateMode.PERSISTENT,
         fullUserAccess(user));
     String componentPath =

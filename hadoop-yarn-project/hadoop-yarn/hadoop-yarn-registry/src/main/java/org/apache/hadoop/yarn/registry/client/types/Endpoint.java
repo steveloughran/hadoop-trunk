@@ -82,7 +82,7 @@ public class Endpoint {
     List<List<String>> addrs = new ArrayList<List<String>>(uris.length);
     for (URI uri : uris) {
       ArrayList<String> elt  = new ArrayList<String>(1);
-      addrs.add(RegistryTypeUtils.tuple(uri.toASCIIString()));
+      addrs.add(RegistryTypeUtils.tuple(uri.toString()));
     }
     this.addresses = addrs;
   }
