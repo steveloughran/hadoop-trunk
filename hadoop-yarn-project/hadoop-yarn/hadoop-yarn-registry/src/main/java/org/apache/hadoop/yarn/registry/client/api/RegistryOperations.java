@@ -36,17 +36,25 @@ import java.io.IOException;
 public interface RegistryOperations extends Service {
 
   /**
-   * Create a path.
+   * Create a path. 
    * 
-   * Any other failure raises an exception
+   * It is not an error if the path exists already, be it empty or not.
+   * 
+   * The createParents flag also requests creating the parents. 
+   * As entries in the registry can hold data while still having
+   * child entries, it is not an error if any of the parent path
+   * elements have service records.
+   * 
    * @param path path to create
+   * @param createParents also create the parents.
    * @throws PathNotFoundException parent path is not in the registry.
    * @throws NoChildrenForEphemeralsException the parent is ephemeral.
    * @throws AccessControlException access permission failure.
    * @throws InvalidPathnameException path name is invalid.
    * @throws IOException Any other IO Exception.
+   * @return true if the path was created, false if it existed.
    */
-  void mkdir(String path)
+  boolean mkdir(String path, boolean createParents)
       throws PathNotFoundException,
       NoChildrenForEphemeralsException,
       AccessControlException,

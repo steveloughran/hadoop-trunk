@@ -77,30 +77,19 @@ implements RegistryOperations{
     userAcl = parseACLs(PERMISSIONS_REGISTRY_USERS);
   }
 
-  @Override
-  protected void serviceStart() throws Exception {
-    super.serviceStart();
-    // create the root directories
-    maybeCreate(PATH_SYSTEM_SERVICES_PATH, CreateMode.PERSISTENT);
-    maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
-        parseACLs(PERMISSIONS_REGISTRY_USERS));
-    maybeCreate(PATH_SYSTEM_SERVICES_PATH, CreateMode.PERSISTENT,
-        parseACLs(PERMISSIONS_REGISTRY_SYSTEM));
-  }
-
   public List<ACL> getUserAcl() {
     return userAcl;
   }
 
   @Override
-  public void mkdir(String path) throws
+  public boolean mkdir(String path, boolean createParents) throws
       PathNotFoundException,
       NoChildrenForEphemeralsException,
       AccessControlException,
       InvalidPathnameException,
       IOException {
     
-    zkMkPath(path, CreateMode.PERSISTENT, getUserAcl());
+    return zkMkPath(path, CreateMode.PERSISTENT, createParents, getUserAcl());
   }
 
   @Override
@@ -128,7 +117,9 @@ implements RegistryOperations{
       AccessControlException,
       InvalidPathnameException,
       IOException {
-    return serviceRecordMarshal.fromBytes(zkRead(path));
+    byte[] bytes = zkRead(path);
+    
+    return serviceRecordMarshal.fromBytes(bytes, 0);
   }
 
   @Override
