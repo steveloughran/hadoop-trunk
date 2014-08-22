@@ -110,7 +110,7 @@ public class JsonSerDeser<T> {
   public synchronized T fromResource(String resource)
       throws IOException, JsonParseException, JsonMappingException {
     InputStream resStream = null;
-    try  {
+    try {
       resStream = this.getClass().getResourceAsStream(resource);
       if (resStream == null) {
         throw new FileNotFoundException(resource);
@@ -141,11 +141,12 @@ public class JsonSerDeser<T> {
    * @return
    * @throws IOException
    */
-  public T fromBytes(byte[] b) throws IOException {
-    if (b.length==0) {
+  public T fromBytes(byte[] b, int offset) throws IOException {
+    int data = b.length - offset;
+    if (data <= 0) {
       throw new EOFException("No data");
     }
-    String json = new String(b, 0, b.length, UTF_8);
+    String json = new String(b, offset, data, UTF_8);
     return fromJson(json);
   }
 
@@ -169,7 +170,7 @@ public class JsonSerDeser<T> {
     if (count != len) {
       throw new EOFException("Read finished prematurely");
     }
-    return fromBytes(b);
+    return fromBytes(b, 0);
   }
 
 

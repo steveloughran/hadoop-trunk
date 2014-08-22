@@ -24,11 +24,13 @@ import org.apache.curator.ensemble.EnsembleProvider;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.api.CreateBuilder;
 import org.apache.curator.framework.api.DeleteBuilder;
 import org.apache.curator.framework.api.GetChildrenBuilder;
 import org.apache.curator.retry.BoundedExponentialBackoffRetry;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.PathAccessDeniedException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.io.IOUtils;
@@ -85,11 +87,6 @@ public class CuratorService extends AbstractService
     super(name);
   }
 
-
-  public List<ACL> getRootACL() {
-    return rootACL;
-  }
-
   @Override
   protected void serviceStart() throws Exception {
     super.serviceStart();
@@ -99,20 +96,7 @@ public class CuratorService extends AbstractService
     LOG.debug("Creating Registry with root {}", registryRoot);
 
     rootACL = getACLs(REGISTRY_ZK_ACL, PERMISSIONS_REGISTRY_ROOT);
-/*
-    CuratorFramework rootCurator = newCurator("");
-    try {
-      if (rootCurator.checkExists().forPath(root) == null) {
-        rootCurator.create().withACL(rootACL).forPath(root);
-      }
-    } finally {
-      IOUtils.closeStream(rootCurator);
-    }
-    rootCurator.close();
-*/
-//    zk = newCurator(root);
     curator = newCurator();
-    maybeCreate("", CreateMode.PERSISTENT, rootACL);
   }
 
   /**
@@ -132,7 +116,7 @@ public class CuratorService extends AbstractService
    * @throws IOException
    * @throws ZKUtil.BadAclFormatException on a bad ACL parse
    */
-  protected List<ACL> getACLs(String confKey, String defaultPermissions) throws
+  public List<ACL> getACLs(String confKey, String defaultPermissions) throws
       IOException, ZKUtil.BadAclFormatException {
     String zkAclConf = getConfig().get(confKey, defaultPermissions);
     return parseACLs(zkAclConf);
@@ -150,11 +134,6 @@ public class CuratorService extends AbstractService
       ZKUtil.BadAclFormatException {
     return ZKUtil.parseACLs(ZKUtil.resolveConfIndirection(zkAclConf));
   }
-
-  private List<ACL> createAclForUser(String username) {
-    return rootACL;
-  }
-
 
   /**
    * Create a new curator instance off the root path; using configuration
@@ -258,6 +237,8 @@ public class CuratorService extends AbstractService
       ioe = new PathNotFoundException(path);
     } else if (exception instanceof KeeperException.NodeExistsException) {
       ioe = new FileAlreadyExistsException(path);
+    } else if (exception instanceof KeeperException.NoAuthException) {
+      ioe = new PathAccessDeniedException(path);
     } else if (exception instanceof KeeperException.NotEmptyException) {
       ioe = new PathIsNotEmptyDirectoryException(path);
     } else if (exception instanceof KeeperException.NoChildrenForEphemeralsException) {
@@ -290,7 +271,7 @@ public class CuratorService extends AbstractService
    */
   public boolean maybeCreate(String path, CreateMode mode) throws IOException {
     List<ACL> acl = rootACL;
-    return maybeCreate(path, mode, acl);
+    return maybeCreate(path, mode, acl, false);
   }
 
   /**
@@ -301,17 +282,14 @@ public class CuratorService extends AbstractService
    *
    * @param path path to create
    * @param acl ACL for path -used when creating a new entry
+   * @param createParents
    * @return true iff the path was created
    * @throws IOException
    */
   public boolean maybeCreate(String path,
       CreateMode mode,
-      List<ACL> acl) throws IOException {
-    if (!zkPathExists(path)) {
-      zkMkPath(path, mode, acl);
-      return true;
-    }
-    return false;
+      List<ACL> acl, boolean createParents) throws IOException {
+    return zkMkPath(path, mode, createParents, acl);
   }
 
 
@@ -369,7 +347,7 @@ public class CuratorService extends AbstractService
    * @throws IOException
    */
   public String zkPathMustExist(String path) throws IOException {
-    zkPathExists(path);
+    zkStat(path);
     return path;
   }
 
@@ -380,25 +358,37 @@ public class CuratorService extends AbstractService
    * @throws IOException
    */
   public void zkMkPath(String path, CreateMode mode) throws IOException {
-    zkMkPath(path, mode, rootACL);
+    zkMkPath(path, mode, false, rootACL);
   }
 
   /**
-   * Create a directory
+   * Create a directory. It is not an error if it already exists
    * @param path path to create
    * @param mode mode for path
-   * @param acl ACL for path
-   * @throws IOException any problem
+   * @param createParents
+   *@param acl ACL for path  @throws IOException any problem
    */
-  protected void zkMkPath(String path, CreateMode mode, List<ACL> acl) 
+  protected boolean zkMkPath(String path,
+      CreateMode mode,
+      boolean createParents,
+      List<ACL> acl) 
       throws IOException {
     path = createFullPath(path);
     try {
-      curator.create().withMode(mode).withACL(acl).forPath(path);
+      CreateBuilder createBuilder = curator.create();
+      createBuilder.withMode(mode).withACL(acl);
+      if (createParents) {
+        createBuilder.creatingParentsIfNeeded();
+      }
+      createBuilder.forPath(path);
       LOG.debug("Created path {} with mode {} and ACL {}", path, mode, acl);
+    } catch (KeeperException.NodeExistsException e) {
+      LOG.debug("path already present: {}", path, e);
+      return false;
     } catch (Exception e) {
       throw operationFailure(path, "mkdir() ", e);
     }
+    return true;
   }
 
   /**
@@ -425,7 +415,7 @@ public class CuratorService extends AbstractService
       dir.append(element);
       String parent = dir.toString();
       if (!zkPathExists(parent)) {
-        zkMkPath(parent, CreateMode.PERSISTENT, acl);
+        zkMkPath(parent, CreateMode.PERSISTENT, false, acl);
       }
     }
   }

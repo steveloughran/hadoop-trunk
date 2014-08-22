@@ -23,13 +23,14 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
-import org.apache.hadoop.yarn.registry.client.exceptions.RESTIOException;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import org.apache.hadoop.yarn.registry.server.ResourceManagerRegistryService;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.data.ACL;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
 
@@ -40,9 +41,10 @@ public class TestCuratorService extends AbstractZKRegistryTest {
   protected CuratorService curatorService;
 
   public static final String MISSING = "/missing";
+  private List<ACL> rootACL;
 
   @Before
-  public void startCurator() {
+  public void startCurator() throws IOException {
     createCuratorService();
   }
 
@@ -54,10 +56,16 @@ public class TestCuratorService extends AbstractZKRegistryTest {
   /**
    * Create an instance
    */
-  protected void createCuratorService() {
+  protected void createCuratorService() throws IOException {
     curatorService = new CuratorService("curatorService");
     curatorService.init(createRegistryConfiguration());
     curatorService.start();
+    rootACL = curatorService.getACLs(RegistryConstants.REGISTRY_ZK_ACL,
+        "world:anyone:rwcda");
+    List<ACL> rootACL = curatorService.getACLs(
+        RegistryConstants.REGISTRY_ZK_ACL, 
+        ResourceManagerRegistryService.PERMISSIONS_REGISTRY_ROOT);
+    curatorService.maybeCreate("", CreateMode.PERSISTENT, rootACL, true);
   }
   @Test
   public void testLs() throws Throwable {
@@ -81,25 +89,33 @@ public class TestCuratorService extends AbstractZKRegistryTest {
 
   @Test
   public void testVerifyExists() throws Throwable {
-    curatorService.zkPathMustExist("/");
+    pathMustExist("/");
   }
 
   @Test(expected = PathNotFoundException.class)
   public void testVerifyExistsMissing() throws Throwable {
-    curatorService.zkPathMustExist(MISSING);
+    pathMustExist("/file-not-found");
   }
 
   @Test
   public void testMkdirs() throws Throwable {
-    curatorService.zkMkPath("/p1", CreateMode.PERSISTENT);
-    curatorService.zkPathMustExist("/p1");
-    curatorService.zkMkPath("/p1/p2", CreateMode.EPHEMERAL);
-    curatorService.zkPathMustExist("/p1/p2");
+    mkPath("/p1", CreateMode.PERSISTENT);
+    pathMustExist("/p1");
+    mkPath("/p1/p2", CreateMode.EPHEMERAL);
+    pathMustExist("/p1/p2");
+  }
+
+  private void mkPath(String path, CreateMode mode) throws IOException {
+    curatorService.zkMkPath(path, mode);
+  }
+
+  public void pathMustExist(String path) throws IOException {
+    curatorService.zkPathMustExist(path);
   }
 
   @Test(expected = PathNotFoundException.class)
   public void testMkdirChild() throws Throwable {
-    curatorService.zkMkPath("/testMkdirChild/child", CreateMode.PERSISTENT);
+    mkPath("/testMkdirChild/child", CreateMode.PERSISTENT);
   }
 
   @Test
@@ -110,7 +126,7 @@ public class TestCuratorService extends AbstractZKRegistryTest {
 
   @Test
   public void testRM() throws Throwable {
-    curatorService.zkMkPath("/rm", CreateMode.PERSISTENT);
+    mkPath("/rm", CreateMode.PERSISTENT);
     curatorService.zkDelete("/rm", false);
     verifyNotExists("/rm");
     curatorService.zkDelete("/rm", false);
@@ -118,8 +134,8 @@ public class TestCuratorService extends AbstractZKRegistryTest {
 
   @Test
   public void testRMNonRf() throws Throwable {
-    curatorService.zkMkPath("/rm", CreateMode.PERSISTENT);
-    curatorService.zkMkPath("/rm/child", CreateMode.PERSISTENT);
+    mkPath("/rm", CreateMode.PERSISTENT);
+    mkPath("/rm/child", CreateMode.PERSISTENT);
     try {
       curatorService.zkDelete("/rm", false);
       fail("expected a failure");
@@ -130,8 +146,8 @@ public class TestCuratorService extends AbstractZKRegistryTest {
 
   @Test
   public void testRMNRf() throws Throwable {
-    curatorService.zkMkPath("/rm", CreateMode.PERSISTENT);
-    curatorService.zkMkPath("/rm/child", CreateMode.PERSISTENT);
+    mkPath("/rm", CreateMode.PERSISTENT);
+    mkPath("/rm/child", CreateMode.PERSISTENT);
     curatorService.zkDelete("/rm", true);
     verifyNotExists("/rm");
     curatorService.zkDelete("/rm", true);
@@ -139,11 +155,12 @@ public class TestCuratorService extends AbstractZKRegistryTest {
 
   @Test
   public void testCreate() throws Throwable {
+
     curatorService.zkCreate("/testCreate",
         CreateMode.PERSISTENT, getTestBuffer(),
-        curatorService.getRootACL()
+        rootACL
     );
-    curatorService.zkPathMustExist("/testCreate");
+    pathMustExist("/testCreate");
   }
 
   @Test
@@ -151,12 +168,12 @@ public class TestCuratorService extends AbstractZKRegistryTest {
     byte[] buffer = getTestBuffer();
     curatorService.zkCreate("/testCreateTwice",
         CreateMode.PERSISTENT, buffer,
-        curatorService.getRootACL()
+        rootACL
     );
     try {
       curatorService.zkCreate("/testCreateTwice",
           CreateMode.PERSISTENT, buffer,
-          curatorService.getRootACL()
+          rootACL
       );
       fail();
     } catch (FileAlreadyExistsException e) {
@@ -169,7 +186,7 @@ public class TestCuratorService extends AbstractZKRegistryTest {
     byte[] buffer = getTestBuffer();
     curatorService.zkCreate("/testCreateUpdate",
         CreateMode.PERSISTENT, buffer,
-        curatorService.getRootACL()
+        rootACL
     );
     curatorService.zkUpdate("/testCreateUpdate", buffer);
   }
@@ -181,16 +198,14 @@ public class TestCuratorService extends AbstractZKRegistryTest {
 
   @Test
   public void testUpdateDirectory() throws Throwable {
-    curatorService.zkMkPath("/testUpdateDirectory", CreateMode.PERSISTENT);
+    mkPath("/testUpdateDirectory", CreateMode.PERSISTENT);
     curatorService.zkUpdate("/testUpdateDirectory", getTestBuffer());
   }
 
   @Test
   public void testUpdateDirectorywithChild() throws Throwable {
-    curatorService.zkMkPath("/testUpdateDirectorywithChild",
-        CreateMode.PERSISTENT);
-    curatorService.zkMkPath("/testUpdateDirectorywithChild/child",
-        CreateMode.PERSISTENT);
+    mkPath("/testUpdateDirectorywithChild", CreateMode.PERSISTENT);
+    mkPath("/testUpdateDirectorywithChild/child", CreateMode.PERSISTENT);
     curatorService.zkUpdate("/testUpdateDirectorywithChild", getTestBuffer());
   }
 

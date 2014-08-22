@@ -82,4 +82,9 @@ public interface RegistryConstants {
   String PATH_USERS = "users/";
   String PATH_SYSTEM_SERVICES_PATH = "services/";
   String SUBPATH_COMPONENTS = "/components";
+
+  /**
+   * Header of a service record
+   */
+  byte[] RECORD_HEADER = {0x10, 0x20, 0x30, 0x40};
 }
