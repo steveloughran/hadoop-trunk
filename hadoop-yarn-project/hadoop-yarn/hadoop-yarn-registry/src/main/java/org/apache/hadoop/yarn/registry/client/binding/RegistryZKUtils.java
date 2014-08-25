@@ -20,15 +20,19 @@ package org.apache.hadoop.yarn.registry.client.binding;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.PathNotFoundException;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.zookeeper.common.PathUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public class RegistryZKUtils {
 
+
+  private static final Pattern HOSTNAME = Pattern.compile(RegistryConstants.HOSTNAME_PATTERN);
   /**
    * Validate ZK path with the path itself included in
    * the exception text
@@ -38,11 +42,31 @@ public class RegistryZKUtils {
       InvalidPathnameException {
     try {
       PathUtils.validatePath(path);
-      return path;
+
     } catch (IllegalArgumentException e) {
       throw new InvalidPathnameException(
           "Invalid Path \"" + path + "\" : " + e, e);
     }
+    return path;
+  }
+  
+  /**
+   * Validate ZK path with the path itself included in
+   * the exception text
+   * @param path path to validate
+   */
+  public static String validateElementsAsDNS(String path) throws
+      InvalidPathnameException {
+    List<String> splitpath = split(path);
+    for (String fragment : splitpath) {
+      if (!HOSTNAME.matcher(fragment).matches()) {
+        throw new InvalidPathnameException(
+            "Invalid Path element \"" + fragment + "\"");
+      }
+
+    }
+
+    return path;
   }
 
   /*
@@ -53,8 +77,9 @@ public class RegistryZKUtils {
  */
   public static String createFullPath(String base, String path) throws
       IOException {
-    String finalpath = join(base, path);
-    return validateZKPath(finalpath);
+    Preconditions.checkArgument(path != null, "null path");
+    Preconditions.checkArgument(base != null, "null path");
+    return validateZKPath(join(base, path));
   }
 
   public static String join(String base, String path) {

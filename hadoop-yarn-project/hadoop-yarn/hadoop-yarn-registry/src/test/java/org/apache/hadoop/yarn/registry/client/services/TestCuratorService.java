@@ -156,22 +156,22 @@ public class TestCuratorService extends AbstractZKRegistryTest {
   @Test
   public void testCreate() throws Throwable {
 
-    curatorService.zkCreate("/testCreate",
+    curatorService.zkCreate("/testcreate",
         CreateMode.PERSISTENT, getTestBuffer(),
         rootACL
     );
-    pathMustExist("/testCreate");
+    pathMustExist("/testcreate");
   }
 
   @Test
   public void testCreateTwice() throws Throwable {
     byte[] buffer = getTestBuffer();
-    curatorService.zkCreate("/testCreateTwice",
+    curatorService.zkCreate("/testcreatetwice",
         CreateMode.PERSISTENT, buffer,
         rootACL
     );
     try {
-      curatorService.zkCreate("/testCreateTwice",
+      curatorService.zkCreate("/testcreatetwice",
           CreateMode.PERSISTENT, buffer,
           rootACL
       );
@@ -184,29 +184,29 @@ public class TestCuratorService extends AbstractZKRegistryTest {
   @Test
   public void testCreateUpdate() throws Throwable {
     byte[] buffer = getTestBuffer();
-    curatorService.zkCreate("/testCreateUpdate",
+    curatorService.zkCreate("/testcreateupdate",
         CreateMode.PERSISTENT, buffer,
         rootACL
     );
-    curatorService.zkUpdate("/testCreateUpdate", buffer);
+    curatorService.zkUpdate("/testcreateupdate", buffer);
   }
 
   @Test(expected = PathNotFoundException.class)
   public void testUpdateMissing() throws Throwable {
-    curatorService.zkUpdate("/testUpdateMissing", getTestBuffer());
+    curatorService.zkUpdate("/testupdatemissing", getTestBuffer());
   }
 
   @Test
   public void testUpdateDirectory() throws Throwable {
-    mkPath("/testUpdateDirectory", CreateMode.PERSISTENT);
-    curatorService.zkUpdate("/testUpdateDirectory", getTestBuffer());
+    mkPath("/testupdatedirectory", CreateMode.PERSISTENT);
+    curatorService.zkUpdate("/testupdatedirectory", getTestBuffer());
   }
 
   @Test
   public void testUpdateDirectorywithChild() throws Throwable {
-    mkPath("/testUpdateDirectorywithChild", CreateMode.PERSISTENT);
-    mkPath("/testUpdateDirectorywithChild/child", CreateMode.PERSISTENT);
-    curatorService.zkUpdate("/testUpdateDirectorywithChild", getTestBuffer());
+    mkPath("/testupdatedirectorywithchild", CreateMode.PERSISTENT);
+    mkPath("/testupdatedirectorywithchild/child", CreateMode.PERSISTENT);
+    curatorService.zkUpdate("/testupdatedirectorywithchild", getTestBuffer());
   }
 
 
