@@ -44,7 +44,6 @@ public class BindingUtils {
       throw new IllegalArgumentException(role
                + " value of \"" + s + "\""
                + " does not match pattern " + pattern);
-
     }
     return s;
   }

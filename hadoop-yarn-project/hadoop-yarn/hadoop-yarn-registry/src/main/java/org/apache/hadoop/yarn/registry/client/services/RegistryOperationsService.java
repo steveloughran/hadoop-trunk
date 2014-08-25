@@ -26,6 +26,9 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils.*;
+
+import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
@@ -81,6 +84,10 @@ implements RegistryOperations{
     return userAcl;
   }
 
+  protected void validatePath(String path) throws InvalidPathnameException {
+    RegistryZKUtils.validateElementsAsDNS(path);
+  }
+  
   @Override
   public boolean mkdir(String path, boolean createParents) throws
       PathNotFoundException,
@@ -88,7 +95,7 @@ implements RegistryOperations{
       AccessControlException,
       InvalidPathnameException,
       IOException {
-    
+    validatePath(path);
     return zkMkPath(path, CreateMode.PERSISTENT, createParents, getUserAcl());
   }
 
@@ -102,6 +109,7 @@ implements RegistryOperations{
       AccessControlException,
       InvalidPathnameException,
       IOException {
+    validatePath(path);
     byte[] bytes = serviceRecordMarshal.toBytes(record);
 
     CreateMode mode = ((createFlags & CreateFlags.EPHEMERAL) != 0)
@@ -118,7 +126,6 @@ implements RegistryOperations{
       InvalidPathnameException,
       IOException {
     byte[] bytes = zkRead(path);
-    
     return serviceRecordMarshal.fromBytes(bytes, 0);
   }
 
@@ -128,6 +135,7 @@ implements RegistryOperations{
       AccessControlException,
       InvalidPathnameException,
       IOException {
+    validatePath(path);
     Stat stat = zkStat(path);
     RegistryPathStatus status = new RegistryPathStatus(
         path,
@@ -143,6 +151,7 @@ implements RegistryOperations{
       AccessControlException,
       InvalidPathnameException,
       IOException {
+    validatePath(path);
     List<String> childNames = zkList(path);
     RegistryPathStatus[] results = new RegistryPathStatus[0];
     int size = childNames.size();
@@ -161,7 +170,7 @@ implements RegistryOperations{
       AccessControlException,
       InvalidPathnameException,
       IOException {
+    validatePath(path);
     zkDelete(path, recursive);
-
   }
 }

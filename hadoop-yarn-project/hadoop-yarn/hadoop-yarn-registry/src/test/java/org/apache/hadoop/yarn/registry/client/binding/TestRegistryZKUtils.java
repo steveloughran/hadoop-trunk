@@ -24,6 +24,7 @@ import java.util.List;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathNotFoundException;
+import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -95,5 +96,36 @@ public class TestRegistryZKUtils extends Assert {
   public void testParentOfRoot() throws Throwable {
     parentOf("/");
   }
+
+  @Test
+  public void testValidPaths() throws Throwable {
+    assertValidPath("/");
+    assertValidPath("/a/b/c");
+    assertValidPath("/users/drwho/org-apache-hadoop/registry/appid-55-55");
+    assertValidPath("/a50");
+  }
+  
+  @Test
+  public void testInvalidPaths() throws Throwable {
+    assertInvalidPath("/a_b");
+    assertInvalidPath("/UpperAndLowerCase");
+    assertInvalidPath("/space in string");
+// Is this valid?    assertInvalidPath("/50");
+  }
+  
+  private void assertValidPath(String path) throws InvalidPathnameException {
+    validateZKPath(path);
+  }
+  
+  
+  private void assertInvalidPath(String path) throws InvalidPathnameException {
+    try {
+      validateElementsAsDNS(path);
+      fail("path considered valid: " + path);
+    } catch (InvalidPathnameException expected) {
+      // expected
+    }
+  }
+  
   
 }
