@@ -29,6 +29,7 @@ import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.*
 
 import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
@@ -36,7 +37,8 @@ import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
-import org.apache.hadoop.yarn.registry.server.ResourceManagerRegistryService;
+import org.apache.hadoop.yarn.registry.server.services.ResourceManagerRegistryService;
+import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.junit.After;
 import org.junit.Before;
@@ -167,7 +169,9 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     record.description = methodName.getMethodName();
     record.registrationTime = System.currentTimeMillis();
     addSampleEndpoints(record, "namenode");
-    yarnRegistry.zkMkPathRecursive(path, acls, false);
+    // split path into elements
+
+    yarnRegistry.mkdir(RegistryZKUtils.parentOf(path), true);
     operations.create(path, record, createFlags);
     return record;
   }

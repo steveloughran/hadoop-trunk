@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry.client.binding;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.zookeeper.common.PathUtils;
 
@@ -95,5 +96,30 @@ public class RegistryZKUtils {
       }
     }
     return dirs;
+  }
+
+  /**
+   * Get the parent of a path
+   * @param path
+   * @return the parent path
+   * @throws PathNotFoundException if the path was at root.
+   */
+  public static String parentOf(String path) throws PathNotFoundException {
+    List<String> elements = split(path);
+
+    int size = elements.size();
+    if (size == 0) {
+      throw new PathNotFoundException("No parent of " + path);
+    }
+    if (size == 1) {
+      return "/";
+    }
+    elements.remove(size - 1);
+    StringBuilder parent = new StringBuilder(path.length());
+    for (String element : elements) {
+      parent.append("/");
+      parent.append(element);
+    }
+    return parent.toString();
   }
 }

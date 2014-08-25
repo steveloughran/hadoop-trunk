@@ -33,5 +33,11 @@ public interface CreateFlags {
    * The entry should be created even if an existing entry is there.
    */
   int OVERWRITE = 2;
-  
+
+  /**
+   * The parent path must be created.
+   * This does not create the base registry/user paths, which must
+   * be created by the RM so as to ensure permissions are valid.
+   */
+  int CREATE_PARENT_PATH = 4;
 }

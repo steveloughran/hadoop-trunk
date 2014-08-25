@@ -22,6 +22,8 @@ import static org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils.*;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathNotFoundException;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -68,9 +70,11 @@ public class TestRegistryZKUtils extends Assert {
   
   @Test
   public void testSplitting() throws Throwable {
+    assertEquals(1, split("/a").size());
+    assertEquals(0, split("/").size());
+    assertEquals(3, split("/a/b/c").size());
     assertEquals(3, split("/a/b/c/").size());
     assertEquals(3, split("a/b/c").size());
-    assertEquals(3, split("/a/b/c").size());
     assertEquals(3, split("/a/b//c").size());
     assertEquals(3, split("//a/b/c/").size());
     List<String> split = split("//a/b/c/");
@@ -78,6 +82,18 @@ public class TestRegistryZKUtils extends Assert {
     assertEquals("b", split.get(1));
     assertEquals("c", split.get(2));
   }
-  
+
+  @Test
+  public void testParentOf() throws Throwable {
+    assertEquals("/", parentOf("/a"));
+    assertEquals("/", parentOf("/a/"));
+    assertEquals("/a", parentOf("/a/b"));
+    assertEquals("/a/b", parentOf("/a/b/c"));
+  }
+
+  @Test(expected = PathNotFoundException.class)
+  public void testParentOfRoot() throws Throwable {
+    parentOf("/");
+  }
   
 }
