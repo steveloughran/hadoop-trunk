@@ -18,15 +18,18 @@
 
 package org.apache.hadoop.yarn.registry.client.exceptions;
 
-import java.io.IOException;
-
-public class NoChildrenForEphemeralsException extends IOException {
-  public NoChildrenForEphemeralsException(String message) {
-    super(message);
+public class NoChildrenForEphemeralsException extends RegistryIOException {
+  public NoChildrenForEphemeralsException(String path, Throwable cause) {
+    super(path, cause);
   }
 
-  public NoChildrenForEphemeralsException(String message,
+  public NoChildrenForEphemeralsException(String path, String error) {
+    super(path, error);
+  }
+
+  public NoChildrenForEphemeralsException(String path,
+      String error,
       Throwable cause) {
-    super(message, cause);
+    super(path, error, cause);
   }
 }

@@ -39,8 +39,8 @@ import org.apache.hadoop.util.ZKUtil;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
-import org.apache.hadoop.yarn.registry.client.exceptions.ExceptionGenerator;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
+import org.apache.hadoop.yarn.registry.client.exceptions.RegistryIOException;
 import org.apache.http.HttpStatus;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -242,12 +242,11 @@ public class CuratorService extends AbstractService
     } else if (exception instanceof KeeperException.NotEmptyException) {
       ioe = new PathIsNotEmptyDirectoryException(path);
     } else if (exception instanceof KeeperException.NoChildrenForEphemeralsException) {
-      ioe = new NoChildrenForEphemeralsException(path + ": " + exception,
+      ioe = new NoChildrenForEphemeralsException(path, 
+          "Cannot create a path under an ephemeral node:" + exception.toString(),
           exception);
     } else {
-      ioe = ExceptionGenerator.generate(
-          HttpStatus.SC_INTERNAL_SERVER_ERROR,
-          path,
+      ioe = new RegistryIOException(path,
           "Failure of " + operation + " on " + path + ": " +
           exception.toString(),
           exception);

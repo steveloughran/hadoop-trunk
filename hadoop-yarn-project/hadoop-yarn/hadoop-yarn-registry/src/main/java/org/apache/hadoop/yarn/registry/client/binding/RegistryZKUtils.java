@@ -44,7 +44,7 @@ public class RegistryZKUtils {
       PathUtils.validatePath(path);
 
     } catch (IllegalArgumentException e) {
-      throw new InvalidPathnameException(
+      throw new InvalidPathnameException(path,
           "Invalid Path \"" + path + "\" : " + e, e);
     }
     return path;
@@ -60,7 +60,7 @@ public class RegistryZKUtils {
     List<String> splitpath = split(path);
     for (String fragment : splitpath) {
       if (!HOSTNAME.matcher(fragment).matches()) {
-        throw new InvalidPathnameException(
+        throw new InvalidPathnameException(path,
             "Invalid Path element \"" + fragment + "\"");
       }
 
