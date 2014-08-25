@@ -18,35 +18,12 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
-import java.util.regex.Pattern;
-
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
 /**
- * General utils for service bindings
+ * Methods for binding paths according to recommended layout
  */
 public class BindingUtils {
-
-
-  private static Pattern pathElementValidator = Pattern.compile(
-      HOSTNAME_PATTERN);
-
-
-  /**
-   * Validate a string against a pattern; 
-   * @param pattern pattern to check against
-   * @param role role to include in exception text
-   * @param s string to match
-   * @throws IllegalArgumentException on a mismatch
-   */
-  public static String validate(Pattern pattern, String role, String s) {
-    if (!pattern.matcher(s).matches()) {
-      throw new IllegalArgumentException(role
-               + " value of \"" + s + "\""
-               + " does not match pattern " + pattern);
-    }
-    return s;
-  }
 
   /**
    * Buld the user path -switches to the system path if the user is ""
@@ -57,14 +34,14 @@ public class BindingUtils {
     if (user.isEmpty()) {
       return PATH_SYSTEM_SERVICES_PATH;
     }
-    return PATH_USERS + validate(pathElementValidator, "Path Element", user);
+    return PATH_USERS + user;
   }
 
   public static String serviceclassPath(String user,
       String serviceClass) {
 
     return userPath(user) + "/" +
-           validate(pathElementValidator, "Path Element", serviceClass);
+           serviceClass;
   }
 
   public static String servicePath(String user,
@@ -72,7 +49,7 @@ public class BindingUtils {
       String serviceName) {
 
     return serviceclassPath(user, serviceClass)
-           + "/" + validate(pathElementValidator, "Path Element", serviceName);
+           + "/" + serviceName;
   }
 
   public static String componentListPath(String user,
@@ -86,7 +63,7 @@ public class BindingUtils {
 
     return componentListPath(user, serviceClass, serviceName)
            + "/" +
-           validate(pathElementValidator, "Path Element", componentName);
+           componentName;
   } 
 
 
