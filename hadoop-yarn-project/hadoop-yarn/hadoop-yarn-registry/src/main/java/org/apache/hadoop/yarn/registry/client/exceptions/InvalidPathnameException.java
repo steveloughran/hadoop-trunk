@@ -20,12 +20,12 @@ package org.apache.hadoop.yarn.registry.client.exceptions;
 
 import java.io.IOException;
 
-public class InvalidPathnameException extends IOException {
-  public InvalidPathnameException(String message) {
-    super(message);
+public class InvalidPathnameException extends RegistryIOException {
+  public InvalidPathnameException(String path, String message) {
+    super(path, message);
   }
 
-  public InvalidPathnameException(String message, Throwable cause) {
-    super(message, cause);
+  public InvalidPathnameException(String path, String message, Throwable cause) {
+    super(path, message, cause);
   }
 }

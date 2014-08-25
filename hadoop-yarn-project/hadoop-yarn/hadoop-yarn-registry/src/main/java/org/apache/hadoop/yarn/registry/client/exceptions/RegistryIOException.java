@@ -18,17 +18,22 @@
 
 package org.apache.hadoop.yarn.registry.client.exceptions;
 
+import org.apache.hadoop.fs.PathIOException;
+
 /**
- * An interface that can be offered by any Exception which serves up
- * HTTP error codes.
+ * Exception for registry operations
  */
-public interface HttpErrorProvider {
+public class RegistryIOException extends PathIOException {
 
-  int getStatusCode();
+  public RegistryIOException(String path, Throwable cause) {
+    super(path, cause);
+  }
 
-  /**
-   * Get the URI of this error. May be null or ""
-   * @return a URI or "". Null may be returned, but is discouraged
-   */
-  String getURI();
+  public RegistryIOException(String path, String error) {
+    super(path, error);
+  }
+
+  public RegistryIOException(String path, String error, Throwable cause) {
+    super(path, error, cause);
+  }
 }
