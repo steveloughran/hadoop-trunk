@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.server;
+package org.apache.hadoop.yarn.registry.server.services;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
@@ -86,13 +87,15 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
    * @param username
    * @throws IOException
    */
-  public void createUserBasePath(String username) throws IOException {
-    
+  public void createUserPath(String username) throws IOException {
+    String path = BindingUtils.userPath(username);
+    maybeCreate(path, CreateMode.PERSISTENT,
+        parseACLs(PERMISSIONS_REGISTRY_USER), false);
   }
 
 
-  private List<ACL> createAclForUser(String username) {
-    return rootRegistryACL;
+  private List<ACL> createAclForUser(String username) throws IOException {
+    return parseACLs(PERMISSIONS_REGISTRY_USER);
   }
 
 }

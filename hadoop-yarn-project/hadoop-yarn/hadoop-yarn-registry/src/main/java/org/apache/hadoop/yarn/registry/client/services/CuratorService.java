@@ -365,8 +365,9 @@ public class CuratorService extends AbstractService
    * Create a directory. It is not an error if it already exists
    * @param path path to create
    * @param mode mode for path
-   * @param createParents
-   *@param acl ACL for path  @throws IOException any problem
+   * @param createParents flag to trigger parent creation
+   * @param acl ACL for path 
+   * @throws IOException any problem
    */
   protected boolean zkMkPath(String path,
       CreateMode mode,
@@ -395,29 +396,14 @@ public class CuratorService extends AbstractService
    * Recursively make a path
    * @param path path to create
    * @param acl ACL for path
-   * @param createFinalElement flag to indicate the final element should be
-   * created -if false only the parent path elements are created
    * @throws IOException any problem
    */
-  public void zkMkPathRecursive(String path,
-      List<ACL> acl, boolean createFinalElement) throws
+  public void zkMkParentPath(String path,
+      List<ACL> acl) throws
       IOException {
     // split path into elements
-    StringBuilder dir = new StringBuilder(path.length());
-    List<String> elements = RegistryZKUtils.split(path);
-    int iterations = elements.size();
-    if (!createFinalElement) {
-      iterations--;
-    }
-    for (int i = 0; i < iterations; i++) {
-      String element = elements.get(i);
-      dir.append("/");
-      dir.append(element);
-      String parent = dir.toString();
-      if (!zkPathExists(parent)) {
-        zkMkPath(parent, CreateMode.PERSISTENT, false, acl);
-      }
-    }
+
+      zkMkPath(RegistryZKUtils.parentOf(path), CreateMode.PERSISTENT, true, acl);
   }
 
   /**
