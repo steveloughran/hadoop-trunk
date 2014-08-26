@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.services;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
@@ -60,13 +61,14 @@ public class TestCuratorService extends AbstractZKRegistryTest {
     curatorService = new CuratorService("curatorService");
     curatorService.init(createRegistryConfiguration());
     curatorService.start();
-    rootACL = curatorService.getACLs(RegistryConstants.REGISTRY_ZK_ACL,
+    rootACL = curatorService.getACLs(RegistryConstants.KEY_REGISTRY_ZK_ACL,
         "world:anyone:rwcda");
     List<ACL> rootACL = curatorService.getACLs(
-        RegistryConstants.REGISTRY_ZK_ACL, 
+        RegistryConstants.KEY_REGISTRY_ZK_ACL, 
         ResourceManagerRegistryService.PERMISSIONS_REGISTRY_ROOT);
     curatorService.maybeCreate("", CreateMode.PERSISTENT, rootACL, true);
   }
+  
   @Test
   public void testLs() throws Throwable {
     curatorService.zkList("/");
@@ -209,6 +211,12 @@ public class TestCuratorService extends AbstractZKRegistryTest {
     curatorService.zkUpdate("/testupdatedirectorywithchild", getTestBuffer());
   }
 
+  @Test
+  public void testUseZKServiceForBinding() throws Throwable {
+    CuratorService cs2 = new CuratorService("curator", zookeeper);
+    cs2.init(new Configuration());
+    cs2.start();
+  }
 
   protected byte[] getTestBuffer() {
     byte[] buffer = new byte[1];

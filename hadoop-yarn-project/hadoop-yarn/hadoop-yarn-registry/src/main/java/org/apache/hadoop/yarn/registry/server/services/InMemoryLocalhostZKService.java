@@ -19,8 +19,13 @@
 package org.apache.hadoop.yarn.registry.server.services;
 
 import com.google.common.base.Preconditions;
+import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import org.apache.hadoop.yarn.registry.client.services.BindingInformation;
+import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.zookeeper.server.ServerCnxnFactory;
 import org.apache.zookeeper.server.ZooKeeperServer;
 import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
@@ -36,31 +41,22 @@ import java.net.UnknownHostException;
 
 /**
  * This is a Zookeeper service instance that is contained in a YARN
- * service...it's been derived from Apache Twill
+ * service...it's been derived from Apache Twill.
+ * 
+ * It implements {@link RegistryBindingSource} and provides binding information,
+ * <i>once started</i>. Until <code>start()</code> is called, the hostname & 
+ * port may be undefined. Accordingly, the service raises an exception in this
+ * condition.
+ * 
+ * If you wish to chain together a registry service with this one under
+ * the same <code>CompositeService</code>, this service must be added
+ * as a child first.
  */
-public class InMemoryLocalhostZKService extends AbstractService {
+public class InMemoryLocalhostZKService
+    extends AbstractService
+    implements RegistryBindingSource, RegistryConstants {
 
 
-  /**
-   * Tick time{ {@value}}
-   */
-  public static final String KEY_TICK_TIME = "zkservice.ticktime";
-
-  /**
-   * port; 0 or below means "any" {@value}
-   */
-  public static final String KEY_PORT = "zkservice.port";
-
-  /**
-   * Directory containing data: {@value}
-   */
-  public static final String KEY_DATADIR = "zkservice.datadir";
-
-  /**
-   * Default directory containing data: {@value}
-   */
-  public static final String DEFAULT_DATADIR = "target/zookeeper";
-  
   private static final Logger
       LOG = LoggerFactory.getLogger(InMemoryLocalhostZKService.class);
 
@@ -69,6 +65,7 @@ public class InMemoryLocalhostZKService extends AbstractService {
   private int port;
 
   private ServerCnxnFactory factory;
+  private BindingInformation binding;
 
   public InMemoryLocalhostZKService(String name) {
     super(name);
@@ -78,29 +75,40 @@ public class InMemoryLocalhostZKService extends AbstractService {
     InetSocketAddress addr = factory.getLocalAddress();
     return String.format("%s:%d", addr.getHostName(), addr.getPort());
   }
+  
   public InetSocketAddress getConnectionAddress() {
     return factory.getLocalAddress();
   }
 
-  public InetSocketAddress getLocalAddress() {
-    return factory.getLocalAddress();
-  }
-
+  /**
+   * Create an inet socket addr from the local host+ port number
+   * @param port port to use 
+   * @return a (hostname, port) pair
+   * @throws UnknownHostException if the machine doesn't know its own address
+   */
   private InetSocketAddress getAddress(int port) throws UnknownHostException {
     return new InetSocketAddress(InetAddress.getLocalHost(),
         port < 0 ? 0 : port);
   }
 
+  /**
+   * Initialize the service
+   * @param conf configuration
+   * @throws Exception
+   */
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
-    port = getConfig().getInt(KEY_PORT, 0);
-    tickTime = getConfig().getInt(KEY_TICK_TIME,
+    port = getConfig().getInt(KEY_ZKSERVICE_PORT, 0);
+    tickTime = getConfig().getInt(KEY_ZKSERVICE_TICK_TIME,
         ZooKeeperServer.DEFAULT_TICK_TIME);
-    String datapathname = getConfig().getTrimmed(KEY_DATADIR, "");
-    Preconditions.checkState(!datapathname.isEmpty(),
-        "No data directory defined in " + KEY_DATADIR);
-
-    dataDir = new File(datapathname);
+    String datapathname = getConfig().getTrimmed(KEY_ZKSERVICE_DATADIR, "");
+    if (datapathname.isEmpty()) {
+      dataDir = File.createTempFile("zkservice", ".dir");
+    } else {
+      dataDir = new File(datapathname);
+      FileUtil.fullyDelete(dataDir);
+    }
+    dataDir.mkdirs();
   }
 
   @Override
@@ -115,7 +123,8 @@ public class InMemoryLocalhostZKService extends AbstractService {
     factory.configure(getAddress(port), -1);
     factory.startup(zkServer);
 
-    LOG.info("In memory ZK started: {}", getConnectionString());
+    String connectString = getConnectionString();
+    LOG.info("In memory ZK started: {}", connectString);
     if (LOG.isDebugEnabled()) {
       StringWriter sw = new StringWriter();
       PrintWriter pw = new PrintWriter(sw);
@@ -123,13 +132,27 @@ public class InMemoryLocalhostZKService extends AbstractService {
       pw.flush();
       LOG.debug(sw.toString());
     }
-
+    binding = new BindingInformation();
+    binding.ensembleProvider = new FixedEnsembleProvider(connectString);
+    binding.description =
+        getName() + " reachable at \"" + connectString + "\"";
   }
 
   @Override
   protected void serviceStop() throws Exception {
     if (factory != null) {
       factory.shutdown();
+      factory = null;
     }
+    if (dataDir != null) {
+      FileUtil.fullyDelete(dataDir);
+    }
+  }
+
+  @Override
+  public BindingInformation supplyBindingInformation() {
+    Preconditions.checkNotNull(binding,
+        "Service is not started: binding information undefined");
+    return binding;
   }
 }

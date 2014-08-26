@@ -27,7 +27,6 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils.*;
 
-import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
@@ -52,20 +51,11 @@ import java.util.List;
 public class RegistryOperationsService extends CuratorService 
 implements RegistryOperations{
 
-
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistryOperationsService.class);
 
   private final JsonMarshal.ServiceRecordMarshal serviceRecordMarshal
       = new JsonMarshal.ServiceRecordMarshal();
-
-  public RegistryOperationsService(String name) {
-    super(name);
-  }
-
-  public RegistryOperationsService() {
-    super("RegistryOperationsService");
-  }
 
   public static final String PERMISSIONS_REGISTRY_ROOT = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_SYSTEM = "world:anyone:rwcda";
@@ -73,6 +63,19 @@ implements RegistryOperations{
   public static final String PERMISSIONS_REGISTRY_USER = "world:anyone:rwcda";
   private static byte[] NO_DATA = new byte[0];
   private List<ACL> userAcl;
+
+  public RegistryOperationsService(String name) {
+    this(name, null);
+  }
+
+  public RegistryOperationsService() {
+    this("RegistryOperationsService");
+  }
+
+  public RegistryOperationsService(String name,
+      RegistryBindingSource bindingSource) {
+    super(name, bindingSource);
+  }
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {

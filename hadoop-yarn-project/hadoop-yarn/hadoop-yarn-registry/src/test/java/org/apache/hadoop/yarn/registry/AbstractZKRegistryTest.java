@@ -49,7 +49,7 @@ public class AbstractZKRegistryTest extends Assert {
     assertTrue(zkDir.mkdirs());
     zookeeper = new InMemoryLocalhostZKService("InMemoryZKService");
     YarnConfiguration conf = new YarnConfiguration();
-    conf.set(InMemoryLocalhostZKService.KEY_DATADIR, zkDir.getAbsolutePath());
+    conf.set(RegistryConstants.KEY_ZKSERVICE_DATADIR, zkDir.getAbsolutePath());
     zookeeper.init(conf);
     zookeeper.start();
   }
@@ -86,11 +86,11 @@ public class AbstractZKRegistryTest extends Assert {
 
   protected YarnConfiguration createRegistryConfiguration() {
     YarnConfiguration conf = new YarnConfiguration();
-    conf.setInt(RegistryConstants.REGISTRY_ZK_CONNECTION_TIMEOUT, 1000);
-    conf.setInt(RegistryConstants.REGISTRY_ZK_RETRY_INTERVAL, 500);
-    conf.setInt(RegistryConstants.REGISTRY_ZK_RETRY_TIMES, 10);
-    conf.setInt(RegistryConstants.REGISTRY_ZK_RETRY_CEILING, 10);
-    conf.set(RegistryConstants.REGISTRY_ZK_QUORUM,
+    conf.setInt(RegistryConstants.KEY_REGISTRY_ZK_CONNECTION_TIMEOUT, 1000);
+    conf.setInt(RegistryConstants.KEY_REGISTRY_ZK_RETRY_INTERVAL, 500);
+    conf.setInt(RegistryConstants.KEY_REGISTRY_ZK_RETRY_TIMES, 10);
+    conf.setInt(RegistryConstants.KEY_REGISTRY_ZK_RETRY_CEILING, 10);
+    conf.set(RegistryConstants.KEY_REGISTRY_ZK_QUORUM,
         zookeeper.getConnectionString());
     return conf;
   }
