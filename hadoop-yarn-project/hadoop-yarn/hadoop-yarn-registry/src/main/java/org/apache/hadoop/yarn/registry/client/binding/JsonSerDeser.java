@@ -18,12 +18,15 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
+import org.apache.hadoop.yarn.registry.client.exceptions.RegistryIOException;
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.DeserializationConfig;
@@ -39,6 +42,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 /**
  * Support for marshalling objects to and from JSON.
@@ -54,16 +59,25 @@ public class JsonSerDeser<T> {
 
   private final Class classType;
   private final ObjectMapper mapper;
+  private final byte[] header;
 
   /**
    * Create an instance bound to a specific type
    * @param classType class to marshall
+   * @param header byte array to use as header
    */
-  public JsonSerDeser(Class classType) {
+  public JsonSerDeser(Class classType, byte[] header) {
+    Preconditions.checkArgument(classType !=  null, "null classType");
+    Preconditions.checkArgument(header != null, "null header");
     this.classType = classType;
     this.mapper = new ObjectMapper();
     mapper.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES,
         false);
+    this.header = header;
+  }
+
+  public String getName() {
+    return classType.getSimpleName();
   }
 
   /**
@@ -136,21 +150,6 @@ public class JsonSerDeser<T> {
   }
 
   /**
-   * Deserialize from a byte array
-   * @param b
-   * @return
-   * @throws IOException
-   */
-  public T fromBytes(byte[] b, int offset) throws IOException {
-    int data = b.length - offset;
-    if (data <= 0) {
-      throw new EOFException("No data");
-    }
-    String json = new String(b, offset, data, UTF_8);
-    return fromJson(json);
-  }
-
-  /**
    * Load from a Hadoop filesystem
    * @param fs filesystem
    * @param path path
@@ -168,9 +167,9 @@ public class JsonSerDeser<T> {
     FSDataInputStream dataInputStream = fs.open(path);
     int count = dataInputStream.read(b);
     if (count != len) {
-      throw new EOFException("Read finished prematurely");
+      throw new EOFException(path.toString() + ": read finished prematurely");
     }
-    return fromBytes(b, 0);
+    return fromBytes(path.toString(), b, 0);
   }
 
 
@@ -215,6 +214,61 @@ public class JsonSerDeser<T> {
     return json.getBytes(UTF_8);
   }
 
+  /**
+   * Convert JSON To bytes, inserting the header
+   * @param instance instance to convert
+   * @return a byte array
+   * @throws IOException
+   */
+  public byte[] toByteswithHeader(T instance) throws IOException {
+    byte[] body = toBytes(instance);
+
+    ByteBuffer buffer = ByteBuffer.allocate(body.length + header.length);
+    buffer.put(header);
+    buffer.put(body);
+    return buffer.array();
+  }
+
+
+  /**
+   * Deserialize from a byte array
+   * @param path
+   * @param b
+   * @return
+   * @throws IOException
+   */
+  public T fromBytes(String path, byte[] b, int offset) throws IOException {
+    int data = b.length - offset;
+    if (data <= 0) {
+      throw new EOFException("No data at " + path);
+    }
+    String json = new String(b, offset, data, UTF_8);
+    return fromJson(json);
+  }
+
+  /**
+   * Read from a byte array to a type, checking the header first
+   * @param path source of data
+   * @param buffer buffer
+   * @return the parsed structure
+   * @throws IOException on a failure
+   */
+  public T fromBytesWithHeader(String path, byte[] buffer) throws IOException {
+    int hlen = header.length;
+    int blen = buffer.length;
+    if (hlen > 0) {
+      if (blen < hlen) {
+        throw new InvalidRecordException(path, 
+            "Record too short for header of " + getName());
+      }
+      byte[] magic = Arrays.copyOfRange(buffer, 0, hlen);
+      if (!Arrays.equals(header, magic)) {
+        throw new InvalidRecordException(path,
+            "Entry header does not match header of " + getName());
+      }
+    }
+    return fromBytes(path, buffer, hlen);
+  }
 
   /**
    * Convert an object to a JSON string

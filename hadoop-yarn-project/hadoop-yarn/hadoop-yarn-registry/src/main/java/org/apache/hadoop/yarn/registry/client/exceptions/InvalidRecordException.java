@@ -16,21 +16,20 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.binding;
-
-import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+package org.apache.hadoop.yarn.registry.client.exceptions;
 
 /**
- * JSON marshalling support
+ * Raised if the entry doesn't match what was expected at the path.
  */
-public class JsonMarshal {
+public class InvalidRecordException extends RegistryIOException {
 
-  public static class ServiceRecordMarshal extends JsonSerDeser<ServiceRecord> {
-    public ServiceRecordMarshal() {
-      super(ServiceRecord.class, RegistryConstants.RECORD_HEADER);
-    }
+  public InvalidRecordException(String path, String error) {
+    super(path, error);
   }
 
-
+  public InvalidRecordException(String path,
+      String error,
+      Throwable cause) {
+    super(path, error, cause);
+  }
 }
