@@ -31,6 +31,7 @@ import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
+import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
@@ -341,7 +342,6 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     String empty = "/empty";
     operations.mkdir(empty, false);
     RegistryPathStatus stat = operations.stat(empty);
-    assertEquals(0, stat.size);
   }
 
 
@@ -349,7 +349,12 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
   public void testResolvePathThatHasNoEntry() throws Throwable {
     String empty = "/empty2";
     operations.mkdir(empty, false);
-    ServiceRecord record = operations.resolve(empty);
+    try {
+      ServiceRecord record = operations.resolve(empty);
+      fail("expected an exception");
+    } catch (InvalidRecordException expected) {
+
+    }
   }
 
 

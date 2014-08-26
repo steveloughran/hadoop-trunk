@@ -113,7 +113,7 @@ implements RegistryOperations{
       InvalidPathnameException,
       IOException {
     validatePath(path);
-    byte[] bytes = serviceRecordMarshal.toBytes(record);
+    byte[] bytes = serviceRecordMarshal.toByteswithHeader(record);
 
     CreateMode mode = ((createFlags & CreateFlags.EPHEMERAL) != 0)
         ? CreateMode.EPHEMERAL : CreateMode.PERSISTENT;
@@ -129,7 +129,7 @@ implements RegistryOperations{
       InvalidPathnameException,
       IOException {
     byte[] bytes = zkRead(path);
-    return serviceRecordMarshal.fromBytes(bytes, 0);
+    return serviceRecordMarshal.fromBytesWithHeader(path, bytes);
   }
 
   @Override
