@@ -49,6 +49,7 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.server.api.ResourceTracker;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
@@ -242,6 +243,12 @@ public class MiniYARNCluster extends CompositeService {
       Collection<String> rmIdsCollection = HAUtil.getRMHAIds(conf);
       rmIds = rmIdsCollection.toArray(new String[rmIdsCollection.size()]);
     }
+    
+    // enable the in-memory ZK cluster if not explicitly set to true/false
+    conf.setBooleanIfUnset(RegistryConstants.KEY_ZKSERVICE_ENABLED, true);
+    conf.setBooleanIfUnset(RegistryConstants.KEY_REGISTRY_ENABLED, true);
+    conf.set(RegistryConstants.KEY_ZKSERVICE_DATADIR,
+        new File(testWorkDir, "zookeeper").getAbsolutePath());
 
     for (int i = 0; i < resourceManagers.length; i++) {
       resourceManagers[i] = createResourceManager();
