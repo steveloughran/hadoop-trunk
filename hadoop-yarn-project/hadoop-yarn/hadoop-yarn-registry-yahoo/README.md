@@ -1,4 +1,0 @@
-RegistryService
-===============
-
-A service registry
