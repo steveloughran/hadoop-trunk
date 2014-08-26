@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.yarn.registry.server.services;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
+import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
@@ -38,12 +40,13 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
 
   private List<ACL> userAcl;
 
-  public ResourceManagerRegistryService() {
-    super("ResourceManagerRegistryService");
+  public ResourceManagerRegistryService(String name) {
+    this(name, null);
   }
 
-  public ResourceManagerRegistryService(String name) {
-    super(name);
+  public ResourceManagerRegistryService(String name,
+      RegistryBindingSource bindingSource) {
+    super(name, bindingSource);
   }
 
   @Override
@@ -51,29 +54,27 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
     super.serviceInit(conf);
     userAcl = parseACLs(PERMISSIONS_REGISTRY_USERS);
   }
-  
+
+  /**
+   * Start the service, including creating base directories with permissions
+   * @throws Exception
+   */
   @Override
   protected void serviceStart() throws Exception {
     super.serviceStart();
 
     // create the root directories
-    List<ACL> rootACL = getACLs(REGISTRY_ZK_ACL, PERMISSIONS_REGISTRY_ROOT);
-    maybeCreate("", CreateMode.PERSISTENT, rootACL, false);
-    maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
-        parseACLs(PERMISSIONS_REGISTRY_USERS), false);
-    maybeCreate(PATH_SYSTEM_SERVICES_PATH, CreateMode.PERSISTENT,
-        parseACLs(PERMISSIONS_REGISTRY_SYSTEM), false);
-
+    createRegistryPaths();
   }
-
 
   /**
    * Create the initial registry paths
    * @throws IOException
    */
+  @VisibleForTesting
   public void createRegistryPaths() throws IOException {
     // create the root directories
-    rootRegistryACL = getACLs(REGISTRY_ZK_ACL, PERMISSIONS_REGISTRY_ROOT);
+    rootRegistryACL = getACLs(KEY_REGISTRY_ZK_ACL, PERMISSIONS_REGISTRY_ROOT);
     maybeCreate("", CreateMode.PERSISTENT, rootRegistryACL, false);
 
     maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
@@ -84,7 +85,7 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
 
   /**
    * Create the path for a user
-   * @param username
+   * @param username username
    * @throws IOException
    */
   public void createUserPath(String username) throws IOException {

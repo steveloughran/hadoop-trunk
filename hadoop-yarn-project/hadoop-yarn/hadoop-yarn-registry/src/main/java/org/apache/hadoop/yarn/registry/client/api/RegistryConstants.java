@@ -19,72 +19,138 @@
 package org.apache.hadoop.yarn.registry.client.api;
 
 public interface RegistryConstants {
+
+  /**
+   * prefix for registry configuration options: {@value}
+   */
   String REGISTRY_PREFIX = "yarn.registry";
 
   /**
-   * List of hostname:port pairs defining the ZK quorum
+   * flag to indicate whether or not the registry should
+   * be enabled: {@value}
    */
-  String REGISTRY_ZK_QUORUM = REGISTRY_PREFIX + ".zk.quorum";
+  String KEY_REGISTRY_ENABLED = REGISTRY_PREFIX + ".enabled";
 
-  /**
-   * Zookeeper session timeout in milliseconds
-   */
-  String REGISTRY_ZK_SESSION_TIMEOUT = REGISTRY_PREFIX + ".zk.session-timeout-ms";
-
-  /**
-   * Zookeeper connect retry count
-   */
-  String REGISTRY_ZK_RETRY_TIMES = REGISTRY_PREFIX + ".zk.retry.times";
-
-  /**
-   * Zookeeper connection timeout in milliseconds
-   */
-
-  String REGISTRY_ZK_CONNECTION_TIMEOUT = REGISTRY_PREFIX + ".zk.connection-timeout-ms";
+  boolean DEFAULT_REGISTRY_ENABLED = false;
   
   /**
-   * Zookeeper connect interval in milliseconds
+   * Flag to indicate whether the ZK service should be enabled {@value}
+   * in the RM
    */
-  String REGISTRY_ZK_RETRY_INTERVAL = REGISTRY_PREFIX + ".zk.retry.interval-ms";
+  String KEY_ZKSERVICE_ENABLED = REGISTRY_PREFIX + ".zkservice.enabled";
+  boolean DEFAULT_ZKSERVICE_ENABLED = false;
+
+
   /**
-   * Zookeeper retry limit in milliseconds
+   * List of hostname:port pairs defining the ZK quorum: {@value}
    */
-  String REGISTRY_ZK_RETRY_CEILING = REGISTRY_PREFIX + ".zk.retry.ceiling-ms";
-  String REGISTRY_ZK_ROOT = REGISTRY_PREFIX + ".zk.root";
-  String REGISTRY_ZK_ACL = REGISTRY_PREFIX + ".zk.acl";
+  String KEY_REGISTRY_ZK_QUORUM = REGISTRY_PREFIX + ".zk.quorum";
 
-  String REGISTRY_URI_CONF = REGISTRY_PREFIX + ".uri";
-  String REGISTRY_PROXY_ADDRESS_CONF = REGISTRY_PREFIX + ".proxy.address";
-/*
-  String REGISTRY_STORAGE_CLASS_CONF = REGISTRY_PREFIX + ".storage.class";
-  String REGISTRY_ENCRYPTOR_CLASS_CONF = REGISTRY_PREFIX + ".encryptor.class";
+  /**
+   * Zookeeper session timeout in milliseconds: {@value}
+   */
+  String KEY_REGISTRY_ZK_SESSION_TIMEOUT = REGISTRY_PREFIX + ".zk.session-timeout-ms";
 
-  String REGISTRY_STORAGE_ATTRIBUTE = REGISTRY_PREFIX + ".storage";
-  String REGISTRY_ENCRYPTOR_ATTRIBUTE = REGISTRY_PREFIX + ".encryptor";
+  /**
+   * Zookeeper connect retry count: {@value}
+   */
+  String KEY_REGISTRY_ZK_RETRY_TIMES = REGISTRY_PREFIX + ".zk.retry.times";
 
-  String REGISTRY_REGISTRY_HTTP_PLUGINS = REGISTRY_PREFIX + ".plugins";
+  /**
+   * Zookeeper connection timeout in milliseconds: {@value}
+   */
 
-  */
+  String KEY_REGISTRY_ZK_CONNECTION_TIMEOUT = REGISTRY_PREFIX + ".zk.connection-timeout-ms";
 
+  /**
+   * Zookeeper connect interval in milliseconds: {@value}
+   */
+  String KEY_REGISTRY_ZK_RETRY_INTERVAL = REGISTRY_PREFIX + ".zk.retry.interval-ms";
+
+  /**
+   * Zookeeper retry limit in milliseconds: {@value}
+   */
+  String KEY_REGISTRY_ZK_RETRY_CEILING = REGISTRY_PREFIX + ".zk.retry.ceiling-ms";
+
+  /**
+   * Root path in the ZK tree for the registry: {@value}
+   */
+  String KEY_REGISTRY_ZK_ROOT = REGISTRY_PREFIX + ".zk.root";
+ 
+  /**
+   * Root path in the ZK tree for the registry: {@value}
+   */
+  String KEY_REGISTRY_ZK_ACL = REGISTRY_PREFIX + ".zk.acl";
+
+  /**
+   * The default ZK quorum binding: {@value}
+   */
   String DEFAULT_ZK_HOSTS = "localhost:2181";
+
+  /**
+   * The default permissions for the registry root: {@value}
+   */
+  String DEFAULT_REGISTRY_ROOT_PERMISSIONS = "world:anyone:rwcda";
+
+  /**
+   * The default ZK session timeout: {@value}
+   */
   int DEFAULT_ZK_SESSION_TIMEOUT = 20000;
+  /**
+   * The default ZK session timeout: {@value}
+   */
   int DEFAULT_ZK_CONNECTION_TIMEOUT = 15000;
+  /**
+   * The default # of times to retry a ZK connection: {@value}
+   */
   int DEFAULT_ZK_RETRY_TIMES = 5;
+  /**
+   * The default interval between connection retries: {@value}
+   */
   int DEFAULT_ZK_RETRY_INTERVAL = 1000;
+  /**
+   * Default limit on retries: {@value}
+   */
   int DEFAULT_ZK_RETRY_CEILING = 20;
   String DEFAULT_REGISTRY_ROOT = "/yarnRegistry";
   
   /**
-   * Pattern of a hostname 
+   * Pattern of a hostname : {@value}
    */
   String HOSTNAME_PATTERN =
       "([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])";
+  /**
+   *  path to users off the root: {@value}
+   */
   String PATH_USERS = "users/";
+  /**
+   *  path to system services off the root : {@value}
+   */
   String PATH_SYSTEM_SERVICES_PATH = "services/";
+
+  /**
+   *  path under a service record to point to components of that service: {@value}
+   */
   String SUBPATH_COMPONENTS = "/components";
 
   /**
    * Header of a service record
    */
-  byte[] RECORD_HEADER = {0x10, 0x20, 0x30, 0x40};
+  byte[] RECORD_HEADER = {'j', 's', 'o', 'n', 's', 'v', 'c', 'r'};
+
+  /**
+   * ZK servertick time: {@value}
+   */
+  String KEY_ZKSERVICE_TICK_TIME = REGISTRY_PREFIX + ".zkservice.ticktime";
+  
+  /**
+   * port; 0 or below means "any": {@value}
+   */
+  
+  String KEY_ZKSERVICE_PORT = REGISTRY_PREFIX + ".zkservice.port";
+  
+  /**
+   * Directory containing data: {@value}
+   */
+  String KEY_ZKSERVICE_DATADIR = REGISTRY_PREFIX + ".zkservice.datadir";
 }

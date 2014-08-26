@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.registry.client.services;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.curator.RetrySleeper;
 import org.apache.curator.ensemble.EnsembleProvider;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
 import org.apache.curator.framework.CuratorFramework;
@@ -41,7 +40,6 @@ import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.hadoop.yarn.registry.client.exceptions.RegistryIOException;
-import org.apache.http.HttpStatus;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.ACL;
@@ -52,50 +50,74 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
- * This service binds to Zookeeper via Apache Curator
+ * This service binds to Zookeeper via Apache Curator. It is more 
+ * generic than just the YARN service registry; it does not implement
+ * any of the RegistryOperations API. 
  */
 public class CuratorService extends AbstractService
-    implements RegistryConstants {
-  public static final String PERMISSIONS_REGISTRY_ROOT = "world:anyone:rwcda";
+    implements RegistryConstants, RegistryBindingSource {
   private static final Logger LOG =
       LoggerFactory.getLogger(CuratorService.class);
-  private static final RetrySleeper sleeper = new RetrySleeper() {
-    @Override
-    public void sleepFor(long time, TimeUnit unit) throws InterruptedException {
-      unit.sleep(time);
-    }
-  };
-  private CuratorFramework curator;
-  private List<ACL> rootACL;
-  private String registryRoot;
+
   /**
-   * set the connection parameters
+   * the Curator binding
    */
-  private String connectionParameterDescription;
-  private String zookeeperQuorum;
+  private CuratorFramework curator;
+
+  /**
+   * Parsed root ACL
+   */
+  private List<ACL> rootACL;
+
+  /**
+   * Path to the registry root
+   */
+  private String registryRoot;
+
+  private final RegistryBindingSource bindingSource;
+
+  /**
+   * the connection binding text for messages
+   */
+  private String connectionDescription;
+  private EnsembleProvider ensembleProvider;
 
 
   /**
    * Construct the service.
+   * @param name service name
+   * @param bindingSource source of binding information.
+   * If null: use this instance
+   */
+  public CuratorService(String name, RegistryBindingSource bindingSource) {
+    super(name);
+    if (bindingSource != null) {
+      this.bindingSource = bindingSource;
+    } else {
+      this.bindingSource = this;     
+    }
+  }
 
+  /**
+   * Create an instance using this service as the binding source (i.e. read
+   * configuration options from the registry)
    * @param name service name
    */
   public CuratorService(String name) {
-    super(name);
+    this(name, null);
   }
 
   @Override
   protected void serviceStart() throws Exception {
     super.serviceStart();
 
-    registryRoot = getConfig().getTrimmed(REGISTRY_ZK_ROOT,
+    registryRoot = getConfig().getTrimmed(KEY_REGISTRY_ZK_ROOT,
         DEFAULT_REGISTRY_ROOT) ;
     LOG.debug("Creating Registry with root {}", registryRoot);
 
-    rootACL = getACLs(REGISTRY_ZK_ACL, PERMISSIONS_REGISTRY_ROOT);
+    rootACL = getACLs(KEY_REGISTRY_ZK_ACL, DEFAULT_REGISTRY_ROOT_PERMISSIONS);
     curator = newCurator();
   }
 
@@ -143,18 +165,19 @@ public class CuratorService extends AbstractService
    */
   private CuratorFramework newCurator() {
     Configuration conf = getConfig();
-    EnsembleProvider ensembleProvider = createEnsembleProvider();
-    int sessionTimeout = conf.getInt(REGISTRY_ZK_SESSION_TIMEOUT,
+    createEnsembleProvider();
+    int sessionTimeout = conf.getInt(KEY_REGISTRY_ZK_SESSION_TIMEOUT,
         DEFAULT_ZK_SESSION_TIMEOUT);
-    int connectionTimeout = conf.getInt(REGISTRY_ZK_CONNECTION_TIMEOUT,
+    int connectionTimeout = conf.getInt(KEY_REGISTRY_ZK_CONNECTION_TIMEOUT,
         DEFAULT_ZK_CONNECTION_TIMEOUT);
-    int retryTimes = conf.getInt(REGISTRY_ZK_RETRY_TIMES, DEFAULT_ZK_RETRY_TIMES);
-    int retryInterval = conf.getInt(REGISTRY_ZK_RETRY_INTERVAL,
+    int retryTimes = conf.getInt(KEY_REGISTRY_ZK_RETRY_TIMES, DEFAULT_ZK_RETRY_TIMES);
+    int retryInterval = conf.getInt(KEY_REGISTRY_ZK_RETRY_INTERVAL,
         DEFAULT_ZK_RETRY_INTERVAL);
-    int retryCeiling = conf.getInt(REGISTRY_ZK_RETRY_CEILING, DEFAULT_ZK_RETRY_CEILING);
+    int retryCeiling = conf.getInt(KEY_REGISTRY_ZK_RETRY_CEILING,
+        DEFAULT_ZK_RETRY_CEILING);
 
     LOG.debug("Creating CuratorService with connection {}",
-        connectionParameterDescription);
+        connectionDescription);
     CuratorFrameworkFactory.Builder b = CuratorFrameworkFactory.builder();
     b.ensembleProvider(ensembleProvider)
      .connectionTimeoutMs(connectionTimeout)
@@ -183,14 +206,9 @@ public class CuratorService extends AbstractService
   @Override
   public String toString() {
     return super.toString()
-           + " ZK quorum=\"" + getCurrentZookeeperQuorum() +"\""
+           + " ZK quorum=\"" + connectionDescription +"\""
            + " root=\"" + registryRoot + "\"";
 
-  }
-
-
-  public String getCurrentZookeeperQuorum() {
-    return zookeeperQuorum;
   }
 
   /*
@@ -203,23 +221,49 @@ public class CuratorService extends AbstractService
     return RegistryZKUtils.createFullPath(registryRoot, path);
   }
 
+
+
   /**
-   * Create the ensemble provider for this registry. 
-   * The initial implementation returns a fixed ensemble; an
-   * Exhibitor-bonded ensemble provider is a future enhancement.
-   * 
-   * This sets {@link #connectionParameterDescription} to the binding info
+   * Create the ensemble provider for this registry, by invoking
+   * {@link RegistryBindingSource#supplyBindingInformation()} on
+   * the provider stored in {@link #bindingSource}
+   * Sets {@link #ensembleProvider} to that value;
+   * sets {@link #connectionDescription} to the binding info
    * for use in toString and logging;
    * 
-   * @return the ensemble provider for this ZK service
    */
-  private EnsembleProvider createEnsembleProvider() {
-    String connectString = getConfig().getTrimmed(REGISTRY_ZK_QUORUM,
-        DEFAULT_ZK_HOSTS);
-    connectionParameterDescription =
+  protected void createEnsembleProvider() {
+    BindingInformation binding = bindingSource.supplyBindingInformation();
+    String connectString = buildConnectionString();
+    connectionDescription = binding.description;
+    ensembleProvider = binding.ensembleProvider;
+  }
+
+
+  /**
+   * Supply the binding information.
+   * This implementation returns a fixed ensemble bonded to
+   * the quorum supplied by {@link #buildConnectionString()}
+   * @return
+   */
+  @Override
+  public BindingInformation supplyBindingInformation() {
+    BindingInformation binding = new BindingInformation();
+    String connectString = buildConnectionString();
+    binding.ensembleProvider = new FixedEnsembleProvider(connectString);
+    binding.description =
         "fixed ZK quorum \"" + connectString + "\"";
-    zookeeperQuorum = connectString;
-    return new FixedEnsembleProvider(connectString);
+    return binding;
+  }
+  
+  /**
+   * Override point: get the connection string used to connect to
+   * the ZK service
+   * @return a registry quorum
+   */
+  protected String buildConnectionString() {
+    return getConfig().getTrimmed(KEY_REGISTRY_ZK_QUORUM,
+        DEFAULT_ZK_HOSTS);
   }
 
   /**
