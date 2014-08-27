@@ -30,19 +30,14 @@ public final class RegistryPathStatus {
   public final String path; 
   public final long time;
   public final long size;
-  /**
-   * Does the entry have a record?
-   */
-  public final boolean hasRecord;
+
 
   public RegistryPathStatus(String path,
       long time,
-      long size,
-      boolean hasRecord) {
+      long size) {
     this.path = path;
     this.time = time;
     this.size = size;
-    this.hasRecord = hasRecord;
   }
 
   @Override
@@ -56,9 +51,6 @@ public final class RegistryPathStatus {
 
     RegistryPathStatus status = (RegistryPathStatus) o;
 
-    if (hasRecord != status.hasRecord) {
-      return false;
-    }
     if (size != status.size) {
       return false;
     }
@@ -84,7 +76,6 @@ public final class RegistryPathStatus {
     sb.append("path='").append(path).append('\'');
     sb.append(", time=").append(time);
     sb.append(", size=").append(size);
-    sb.append(", hasRecord=").append(hasRecord);
     sb.append('}');
     return sb.toString();
   }
