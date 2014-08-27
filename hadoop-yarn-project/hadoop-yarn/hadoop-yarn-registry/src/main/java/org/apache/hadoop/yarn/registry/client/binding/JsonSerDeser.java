@@ -25,10 +25,14 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
-import org.apache.hadoop.yarn.registry.client.exceptions.RegistryIOException;
+import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.JsonProcessingException;
 import org.codehaus.jackson.map.DeserializationConfig;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -43,7 +47,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Support for marshalling objects to and from JSON.
@@ -54,7 +60,7 @@ import java.util.Arrays;
  */
 public class JsonSerDeser<T> {
 
-  private static final Logger log = LoggerFactory.getLogger(JsonSerDeser.class);
+  private static final Logger LOG = LoggerFactory.getLogger(JsonSerDeser.class);
   private static final String UTF_8 = "UTF-8";
 
   private final Class classType;
@@ -82,6 +88,7 @@ public class JsonSerDeser<T> {
 
   /**
    * Convert from JSON
+   *
    * @param json input
    * @return the parsed JSON
    * @throws IOException IO
@@ -92,7 +99,7 @@ public class JsonSerDeser<T> {
     try {
       return (T) (mapper.readValue(json, classType));
     } catch (IOException e) {
-      log.error("Exception while parsing json : " + e + "\n" + json, e);
+      LOG.error("Exception while parsing json : " + e + "\n" + json, e);
       throw e;
     }
   }
@@ -109,7 +116,7 @@ public class JsonSerDeser<T> {
     try {
       return (T) (mapper.readValue(jsonFile, classType));
     } catch (IOException e) {
-      log.error("Exception while parsing json file {}: {}", jsonFile, e);
+      LOG.error("Exception while parsing json file {}: {}", jsonFile, e);
       throw e;
     }
   }
@@ -131,7 +138,7 @@ public class JsonSerDeser<T> {
       }
       return (T) (mapper.readValue(resStream, classType));
     } catch (IOException e) {
-      log.error("Exception while parsing json resource {}: {}", resource, e);
+      LOG.error("Exception while parsing json resource {}: {}", resource, e);
       throw e;
     } finally {
       IOUtils.closeStream(resStream);
@@ -232,18 +239,25 @@ public class JsonSerDeser<T> {
 
   /**
    * Deserialize from a byte array
-   * @param path
-   * @param b
-   * @return
-   * @throws IOException
+   * @param path path the data came from
+   * @param bytes byte array
+   * @return offset in the array to read from
+   * @throws IOException all problems
+   * @throws EOFException not enough data
+   * @throws InvalidRecordException if the parsing failed -the record is invalid
    */
-  public T fromBytes(String path, byte[] b, int offset) throws IOException {
-    int data = b.length - offset;
+  public T fromBytes(String path, byte[] bytes, int offset) throws IOException,
+      InvalidRecordException {
+    int data = bytes.length - offset;
     if (data <= 0) {
       throw new EOFException("No data at " + path);
     }
-    String json = new String(b, offset, data, UTF_8);
-    return fromJson(json);
+    String json = new String(bytes, offset, data, UTF_8);
+    try {
+      return fromJson(json);
+    } catch (JsonProcessingException e) {
+      throw new InvalidRecordException(path, e.toString(), e);
+    }
   }
 
   /**
@@ -271,6 +285,23 @@ public class JsonSerDeser<T> {
   }
 
   /**
+   * Check if a buffer has a header which matches this record type
+   * @param buffer buffer 
+   * @return true if there is a match
+   * @throws IOException
+   */
+  public boolean headerMatches(byte[] buffer) throws IOException {
+    int hlen = header.length;
+    int blen = buffer.length;
+    boolean matches = false;
+    if (blen > hlen) {
+      byte[] magic = Arrays.copyOfRange(buffer, 0, hlen);
+      matches = Arrays.equals(header, magic);
+    }
+    return matches;
+  }
+  
+  /**
    * Convert an object to a JSON string
    * @param instance instance to convert
    * @return a JSON string description
@@ -283,4 +314,5 @@ public class JsonSerDeser<T> {
     mapper.configure(SerializationConfig.Feature.INDENT_OUTPUT, true);
     return mapper.writeValueAsString(instance);
   }
+
 }

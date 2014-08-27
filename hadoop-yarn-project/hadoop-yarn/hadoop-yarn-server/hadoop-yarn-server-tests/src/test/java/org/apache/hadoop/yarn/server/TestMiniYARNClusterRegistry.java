@@ -16,31 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.draft1.selectors;
+package org.apache.hadoop.yarn.server;
 
-import java.util.Iterator;
-import java.util.Map;
-
-/**
- * Select an entry by name
- * @param <T>
- */
-public class NameSelector<T> extends Selector<T> {
-
-  final String name;
-  private final SelectorEntry<T> entry;
-
-  public NameSelector(String name, Map<String, T> entries) {
-    super(entries);
-    this.name = name;
-    T lookup = entries.get(name);
-    entry = lookup != null ? new SelectorEntry<T>(name, lookup) : null;
-  }
-
-  @Override
-  public Iterator<Map.Entry<String, T>> iterator() {
-    return new SingleEntryIterator(entry);
-  }
-
-
+public class TestMiniYARNClusterRegistry {
 }

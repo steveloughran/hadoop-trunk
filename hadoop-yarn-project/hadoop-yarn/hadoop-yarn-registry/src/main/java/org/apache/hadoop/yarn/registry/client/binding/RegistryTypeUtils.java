@@ -18,12 +18,15 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
+import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 
 import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -97,5 +100,60 @@ public class RegistryTypeUtils {
    */
   public static String yarnIdToDnsId(String yarnId) {
     return yarnId.replace("_", "-");
+  }
+
+  /**
+   * Require a specific address type on an endpoint
+   * @param required required type
+   * @param epr endpoint
+   * @throws IllegalStateException if the type is wrong
+   */
+  public static void requireAddressType(String required, Endpoint epr) throws
+      InvalidRecordException {
+    if (!required.equals(epr.addressType)) {
+      throw new InvalidRecordException(
+          epr.toString(),
+          "Address type of " + epr.addressType
+          + " does not match required type of "
+          + required);
+    }
+
+  }
+
+  /**
+   * Get a single URI endpoint
+   * @param epr endpoint
+   * @return the uri of the first entry in the address list. Null if the endpoint
+   * itself is null
+   * @throws InvalidRecordException if the type is wrong or payload ill-formatted
+   */
+  public static String retrieveAddressUriType(Endpoint epr) throws InvalidRecordException {
+    if (epr == null) {
+      return null;
+    }
+    requireAddressType(AddressTypes.ADDRESS_URI, epr);
+    List<List<String>> addresses = epr.addresses;
+    if (addresses.size() < 1 || addresses.get(0).size() != 1) {
+      throw new InvalidRecordException(epr.toString(),
+          "Address payload invalid");
+    }
+    return addresses.get(0).get(0);
+  }
+
+  /**
+   * Get the address URL
+   * @param epr endpoint
+   * @return the address as a URL
+   * @throws InvalidRecordException if the type is wrong or payload ill-formatted
+   * @throws MalformedURLException address can't be turned into a URL
+   */
+  public static URL retrieveAddressURL(Endpoint epr) throws
+      InvalidRecordException,
+      MalformedURLException {
+    if (epr == null) {
+      throw new InvalidRecordException("","Null endpoint");
+    }
+    String uri = retrieveAddressUriType(epr);
+    return new URL(uri);
   }
 }

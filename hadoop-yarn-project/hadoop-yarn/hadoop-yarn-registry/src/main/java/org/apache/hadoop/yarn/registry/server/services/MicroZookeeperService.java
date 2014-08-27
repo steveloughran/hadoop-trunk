@@ -33,6 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetAddress;
@@ -40,8 +42,8 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 
 /**
- * This is a Zookeeper service instance that is contained in a YARN
- * service...it's been derived from Apache Twill.
+ * This is a small, localhost Zookeeper service instance that is contained
+ * in a YARN service...it's been derived from Apache Twill.
  * 
  * It implements {@link RegistryBindingSource} and provides binding information,
  * <i>once started</i>. Until <code>start()</code> is called, the hostname & 
@@ -51,14 +53,19 @@ import java.net.UnknownHostException;
  * If you wish to chain together a registry service with this one under
  * the same <code>CompositeService</code>, this service must be added
  * as a child first.
+ *
+ * It also sets the configuration parameter
+ * {@link RegistryConstants#KEY_REGISTRY_ZK_QUORUM}
+ * to its connection string. Any code with access to the service configuration
+ * can view it.
  */
-public class InMemoryLocalhostZKService
+public class MicroZookeeperService
     extends AbstractService
     implements RegistryBindingSource, RegistryConstants {
 
 
   private static final Logger
-      LOG = LoggerFactory.getLogger(InMemoryLocalhostZKService.class);
+      LOG = LoggerFactory.getLogger(MicroZookeeperService.class);
 
   private File dataDir;
   private int tickTime;
@@ -67,16 +74,18 @@ public class InMemoryLocalhostZKService
   private ServerCnxnFactory factory;
   private BindingInformation binding;
 
-  public InMemoryLocalhostZKService(String name) {
+  public MicroZookeeperService(String name) {
     super(name);
   }
 
   public String getConnectionString() {
+    Preconditions.checkState(factory != null, "service not started");
     InetSocketAddress addr = factory.getLocalAddress();
     return String.format("%s:%d", addr.getHostName(), addr.getPort());
   }
   
   public InetSocketAddress getConnectionAddress() {
+    Preconditions.checkState(factory !=null, "service not started");
     return factory.getLocalAddress();
   }
 
@@ -104,11 +113,25 @@ public class InMemoryLocalhostZKService
     String datapathname = getConfig().getTrimmed(KEY_ZKSERVICE_DATADIR, "");
     if (datapathname.isEmpty()) {
       dataDir = File.createTempFile("zkservice", ".dir");
+      dataDir.delete();
     } else {
       dataDir = new File(datapathname);
       FileUtil.fullyDelete(dataDir);
     }
+    LOG.debug("Data directory is {}", dataDir);
+    // the exit code here is ambigious
     dataDir.mkdirs();
+    // so: verify the path is there and a directory
+    if (!dataDir.exists()) {
+      throw new FileNotFoundException("failed to create directory " + dataDir);
+    }
+    if (!dataDir.isDirectory()) {
+      
+      throw new IOException("Path "+dataDir +" exists but is not a directory "
+        + " isDir()=" + dataDir.isDirectory() 
+        + " isFile()=" + dataDir.isFile());
+    }
+    super.serviceInit(conf);
   }
 
   @Override
@@ -136,6 +159,9 @@ public class InMemoryLocalhostZKService
     binding.ensembleProvider = new FixedEnsembleProvider(connectString);
     binding.description =
         getName() + " reachable at \"" + connectString + "\"";
+    
+    // finally: set the binding information in the config
+    getConfig().set(KEY_REGISTRY_ZK_QUORUM, connectString);
   }
 
   @Override

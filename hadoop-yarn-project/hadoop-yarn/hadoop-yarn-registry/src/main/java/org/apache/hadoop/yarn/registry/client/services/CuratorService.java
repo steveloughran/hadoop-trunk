@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry.client.services;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.curator.ensemble.EnsembleProvider;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
 import org.apache.curator.framework.CuratorFramework;
@@ -36,7 +37,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.hadoop.yarn.registry.client.exceptions.RegistryIOException;
@@ -218,10 +219,17 @@ public class CuratorService extends AbstractService
        * @throws IllegalArgumentException if the path is invalide
        */
   protected String createFullPath(String path) throws IOException {
-    return RegistryZKUtils.createFullPath(registryRoot, path);
+    return RegistryPathUtils.createFullPath(registryRoot, path);
   }
 
-
+  /**
+   * Get the registry binding source ... this can be used to 
+   * create new ensemble providers
+   * @return the registry binding source in use
+   */
+  public RegistryBindingSource getBindingSource() {
+    return bindingSource;
+  }
 
   /**
    * Create the ensemble provider for this registry, by invoking
@@ -446,7 +454,7 @@ public class CuratorService extends AbstractService
       IOException {
     // split path into elements
 
-      zkMkPath(RegistryZKUtils.parentOf(path), CreateMode.PERSISTENT, true, acl);
+      zkMkPath(RegistryPathUtils.parentOf(path), CreateMode.PERSISTENT, true, acl);
   }
 
   /**
@@ -461,6 +469,7 @@ public class CuratorService extends AbstractService
       CreateMode mode,
       byte[] data,
       List<ACL> acl) throws IOException {
+    Preconditions.checkArgument(data != null, "null data");
     String fullpath = createFullPath(path);
     try {
       LOG.debug("Creating {} with {} bytes", fullpath, data.length);
@@ -477,6 +486,7 @@ public class CuratorService extends AbstractService
    * @throws IOException
    */
   public void zkUpdate(String path, byte[] data) throws IOException {
+    Preconditions.checkArgument(data != null, "null data");
     path = createFullPath(path);
     try {
       LOG.debug("Updating {} with {} bytes", path, data.length);
@@ -499,6 +509,7 @@ public class CuratorService extends AbstractService
       CreateMode mode,
       byte[] data,
       List<ACL> acl, boolean overwrite) throws IOException {
+    Preconditions.checkArgument(data != null, "null data");
     if (!zkPathExists(path)) {
       zkCreate(path, mode, data, acl);
       return true;

@@ -27,9 +27,9 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.*;
 
-import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
+import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
-import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
@@ -39,7 +39,6 @@ import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.server.services.ResourceManagerRegistryService;
-import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.junit.After;
 import org.junit.Before;
@@ -72,8 +71,8 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRegistryOperations.class);
   private RegistryOperations operations;
-  private final JsonMarshal.ServiceRecordMarshal recordMarshal =
-      new JsonMarshal.ServiceRecordMarshal();
+  private final RecordOperations.ServiceRecordMarshal recordMarshal =
+      new RecordOperations.ServiceRecordMarshal();
 
 
   @Before
@@ -172,7 +171,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     addSampleEndpoints(record, "namenode");
     // split path into elements
 
-    yarnRegistry.mkdir(RegistryZKUtils.parentOf(path), true);
+    yarnRegistry.mkdir(RegistryPathUtils.parentOf(path), true);
     operations.create(path, record, createFlags);
     return record;
   }
@@ -180,7 +179,8 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
 
   public void assertMatches(Endpoint endpoint,
       String addressType,
-      String protocolType, String api) {
+      String protocolType,
+      String api) {
     assertNotNull(endpoint);
     assertEquals(addressType, endpoint.addressType);
     assertEquals(protocolType, endpoint.protocolType);
@@ -191,6 +191,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     assertEquals(written.id, resolved.id);
     assertEquals(written.registrationTime, resolved.registrationTime);
     assertEquals(written.description, resolved.description);
+    
   }
 
   public Endpoint findEndpoint(ServiceRecord record,
@@ -241,13 +242,12 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     ServiceRecord written = putExampleServiceEntry(ENTRY_PATH, 0);
     RegistryPathStatus stat = operations.stat(ENTRY_PATH);
     assertTrue(stat.size > 0);
-    assertTrue(stat.hasRecord);
     assertTrue(stat.time > 0);
     assertEquals(ENTRY_PATH, stat.path);
   }
 
   @Test
-  public void testTestLsParent() throws Throwable {
+  public void testLsParent() throws Throwable {
     ServiceRecord written = putExampleServiceEntry(ENTRY_PATH, 0);
     RegistryPathStatus stat = operations.stat(ENTRY_PATH);
 
@@ -255,6 +255,13 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
         operations.listDir(PARENT_PATH);
     assertEquals(1, statuses.length);
     assertEquals(stat, statuses[0]);
+
+    List<ServiceRecord> records =
+        RecordOperations.extractServiceRecords(operations, statuses);
+    assertEquals(1, records.size());
+    ServiceRecord record = records.get(0);
+    assertMatches(written, record);
+
 
   }
 
@@ -421,6 +428,21 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     log("tomcat", webapp);
     log(dns1, comp1);
     log(dns2, comp2);
+
+    RegistryPathStatus[] componentStats = operations.listDir(components);
+    assertEquals(2, componentStats.length);
+    List<ServiceRecord> records =
+        RecordOperations.extractServiceRecords(operations, componentStats);
+    assertEquals(2, records.size());
+    
+    // create a listing under components/
+    operations.mkdir(components + "subdir", false);
+    RegistryPathStatus[] componentStatsUpdated = operations.listDir(components);
+    assertEquals(3, componentStatsUpdated.length);
+    List<ServiceRecord> recordsUpdated =
+        RecordOperations.extractServiceRecords(operations, componentStats);
+    assertEquals(2, recordsUpdated.size());
+
   }
 
   public void log(String name, ServiceRecord record) throws

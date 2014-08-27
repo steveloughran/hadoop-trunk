@@ -25,11 +25,15 @@ import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameExceptio
 import org.apache.zookeeper.common.PathUtils;
 
 import java.io.IOException;
+import java.net.IDN;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-public class RegistryZKUtils {
+/**
+ * Low level zookeeper-related operations on paths
+ */
+public class RegistryPathUtils {
 
 
   private static final Pattern HOSTNAME = Pattern.compile(RegistryConstants.HOSTNAME_PATTERN);
@@ -146,5 +150,15 @@ public class RegistryZKUtils {
       parent.append(element);
     }
     return parent.toString();
+  }
+
+  /**
+   * Perform any formatting for the registry needed to convert
+   * non-simple-DNS elements 
+   * @param element
+   * @return
+   */
+  public static String encodeForRegistry(String element) {
+    return IDN.toASCII(element);
   }
 }

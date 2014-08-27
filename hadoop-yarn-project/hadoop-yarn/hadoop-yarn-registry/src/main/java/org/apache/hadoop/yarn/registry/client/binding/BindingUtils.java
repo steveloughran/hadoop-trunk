@@ -18,25 +18,40 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+
+import java.io.IOException;
+import java.util.List;
+
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
 /**
- * Methods for binding paths according to recommended layout
+ * Methods for binding paths according to recommended layout, and for
+ * extracting some of the content
  */
 public class BindingUtils {
 
   /**
-   * Buld the user path -switches to the system path if the user is ""
+   * Buld the user path -switches to the system path if the user is "".
+   * It also cross-converts the username to ascii via punycode
    * @param user username or ""
    * @return the path to the user
    */
   public static String userPath(String user) {
     if (user.isEmpty()) {
-      return PATH_SYSTEM_SERVICES_PATH;
+      return PATH_SYSTEM_SERVICES;
     }
-    return PATH_USERS + user;
+
+    return PATH_USERS + RegistryPathUtils.encodeForRegistry(user);
   }
 
+  /**
+   * Create a service classpath
+   * @param user username or ""
+   * @param serviceClass service name
+   * @return a full path
+   */
   public static String serviceclassPath(String user,
       String serviceClass) {
 
@@ -44,6 +59,23 @@ public class BindingUtils {
            serviceClass;
   }
 
+  /**
+   * Get the current user path formatted for the system
+   * @return
+   * @throws IOException
+   */
+  public static String currentUser() throws IOException {
+    return RegistryPathUtils.encodeForRegistry(
+        UserGroupInformation.getCurrentUser().getShortUserName());
+  }
+
+  /**
+   * Create a path to a service under a user & service class
+   * @param user username or ""
+   * @param serviceClass service name
+   * @param serviceName service name unique for that user & service class
+   * @return a full path
+   */
   public static String servicePath(String user,
       String serviceClass,
       String serviceName) {
@@ -52,12 +84,27 @@ public class BindingUtils {
            + "/" + serviceName;
   }
 
+  /**
+   * Create a path for listing components under a service
+   * @param user username or ""
+   * @param serviceClass service name
+   * @param serviceName service name unique for that user & service class
+   * @return a full path
+   */
   public static String componentListPath(String user,
       String serviceClass, String serviceName) {
 
     return servicePath(user, serviceClass, serviceName) + SUBPATH_COMPONENTS;
   }
 
+  /**
+   * Create the path to a service record for a component
+   * @param user username or ""
+   * @param serviceClass service name
+   * @param serviceName service name unique for that user & service class
+   * @param componentName unique name/ID of the component
+   * @return a full path
+   */
   public static String componentPath(String user,
       String serviceClass, String serviceName, String componentName) {
 
@@ -66,5 +113,6 @@ public class BindingUtils {
            componentName;
   } 
 
+  
 
 }
