@@ -109,6 +109,15 @@ public class ServiceRecord {
         new StringBuilder("ServiceRecord{");
     sb.append("id='").append(id).append('\'');
     sb.append(", description='").append(description).append('\'');
+    sb.append(", external endpoints: {");
+    for (Endpoint endpoint : external) {
+      sb.append(endpoint).append("; ");
+    }
+    sb.append("}, internal endpoints: {");
+    for (Endpoint endpoint : internal) {
+      sb.append(endpoint).append("; ");
+    }
+
     sb.append('}');
     return sb.toString();
   }

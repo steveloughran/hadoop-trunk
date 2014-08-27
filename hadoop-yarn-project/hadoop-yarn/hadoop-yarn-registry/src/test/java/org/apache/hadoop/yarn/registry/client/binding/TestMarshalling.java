@@ -29,18 +29,17 @@ import org.junit.rules.TestName;
 import org.junit.rules.Timeout;
 
 import java.io.EOFException;
-import java.io.IOException;
 
 public class TestMarshalling extends Assert {
   @Rule
   public final Timeout testTimeout = new Timeout(10000);
   @Rule
   public TestName methodName = new TestName();
-  private static JsonMarshal.ServiceRecordMarshal marshal;
+  private static RecordOperations.ServiceRecordMarshal marshal;
 
   @BeforeClass
   public static void setupClass() {
-    marshal = new JsonMarshal.ServiceRecordMarshal();
+    marshal = new RecordOperations.ServiceRecordMarshal();
   }
   @Test
   public void testRoundTrip() throws Throwable {

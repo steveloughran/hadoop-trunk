@@ -126,7 +126,7 @@ public interface RegistryConstants {
   /**
    *  path to system services off the root : {@value}
    */
-  String PATH_SYSTEM_SERVICES_PATH = "services/";
+  String PATH_SYSTEM_SERVICES = "services/";
 
   /**
    *  path under a service record to point to components of that service: {@value}
@@ -134,9 +134,13 @@ public interface RegistryConstants {
   String SUBPATH_COMPONENTS = "/components";
 
   /**
-   * Header of a service record
+   * Header of a service record.
+   * By making this >12 bytes long, we can auto-determine which entries
+   * in a listing are too short to contain a record without getting their data
    */
-  byte[] RECORD_HEADER = {'j', 's', 'o', 'n', 's', 'v', 'c', 'r'};
+  byte[] RECORD_HEADER = {'j', 's', 'o', 'n', 
+                          's', 'e','r','v','i', 'c', 'e',
+                          'r','e','c'};
 
   /**
    * ZK servertick time: {@value}

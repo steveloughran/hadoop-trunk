@@ -79,7 +79,7 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
 
     maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
         parseACLs(PERMISSIONS_REGISTRY_USERS), false);
-    maybeCreate(PATH_SYSTEM_SERVICES_PATH, CreateMode.PERSISTENT,
+    maybeCreate(PATH_SYSTEM_SERVICES, CreateMode.PERSISTENT,
         parseACLs(PERMISSIONS_REGISTRY_SYSTEM), false);
   }
 

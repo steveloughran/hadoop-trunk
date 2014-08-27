@@ -18,11 +18,10 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
-import static org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils.*;
+import static org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils.*;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.junit.Assert;

@@ -18,16 +18,18 @@
 
 package org.apache.hadoop.yarn.registry.client.services;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
-import org.apache.hadoop.yarn.registry.client.binding.JsonMarshal;
-import static org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils.*;
+import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
+import static org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils.*;
 
-import org.apache.hadoop.yarn.registry.client.binding.RegistryZKUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
@@ -54,8 +56,8 @@ implements RegistryOperations{
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistryOperationsService.class);
 
-  private final JsonMarshal.ServiceRecordMarshal serviceRecordMarshal
-      = new JsonMarshal.ServiceRecordMarshal();
+  private final RecordOperations.ServiceRecordMarshal serviceRecordMarshal
+      = new RecordOperations.ServiceRecordMarshal();
 
   public static final String PERMISSIONS_REGISTRY_ROOT = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_SYSTEM = "world:anyone:rwcda";
@@ -88,7 +90,7 @@ implements RegistryOperations{
   }
 
   protected void validatePath(String path) throws InvalidPathnameException {
-    RegistryZKUtils.validateElementsAsDNS(path);
+    RegistryPathUtils.validateElementsAsDNS(path);
   }
   
   @Override
@@ -112,7 +114,11 @@ implements RegistryOperations{
       AccessControlException,
       InvalidPathnameException,
       IOException {
+    Preconditions.checkArgument(record != null, "null record");
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(record.id), 
+        "empty record ID");
     validatePath(path);
+    LOG.debug("Create: {} <- {}", path, record);
     byte[] bytes = serviceRecordMarshal.toByteswithHeader(record);
 
     CreateMode mode = ((createFlags & CreateFlags.EPHEMERAL) != 0)
@@ -143,8 +149,9 @@ implements RegistryOperations{
     RegistryPathStatus status = new RegistryPathStatus(
         path,
         stat.getCtime(),
-        stat.getDataLength(),
-        stat.getDataLength() != 0);
+        stat.getDataLength()
+    );
+    LOG.debug("Stat {} = {}", path, status);
     return status;
   }
 
