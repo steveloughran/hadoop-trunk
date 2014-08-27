@@ -50,6 +50,7 @@ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperService;
 import org.apache.hadoop.yarn.server.api.ResourceTracker;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
@@ -107,7 +108,7 @@ public class MiniYARNCluster extends CompositeService {
   private String[] rmIds;
 
   private ApplicationHistoryServer appHistoryServer;
-
+  private MicroZookeeperService zookeeper;
   private boolean useFixedPorts;
   private boolean useRpc = false;
   private int failoverTimeout;
@@ -122,6 +123,7 @@ public class MiniYARNCluster extends CompositeService {
   // Number of nm-log-dirs per nodemanager
   private int numLogDirs;
   private boolean enableAHS;
+  private final boolean enableRegistry;
 
   /**
    * @param testName name of the test
@@ -133,11 +135,13 @@ public class MiniYARNCluster extends CompositeService {
    */
   public MiniYARNCluster(
       String testName, int numResourceManagers, int numNodeManagers,
-      int numLocalDirs, int numLogDirs, boolean enableAHS) {
+      int numLocalDirs, int numLogDirs, boolean enableAHS,
+      boolean enableRegistry) {
     super(testName.replace("$", ""));
     this.numLocalDirs = numLocalDirs;
     this.numLogDirs = numLogDirs;
     this.enableAHS = enableAHS;
+    this.enableRegistry = enableRegistry;
     String testSubDir = testName.replace("$", "");
     File targetWorkDir = new File("target", testSubDir);
     try {
@@ -187,6 +191,21 @@ public class MiniYARNCluster extends CompositeService {
     nodeManagers = new NodeManager[numNodeManagers];
   }
 
+  /**
+   * @param testName name of the test
+   * @param numResourceManagers the number of resource managers in the cluster
+   * @param numNodeManagers the number of node managers in the cluster
+   * @param numLocalDirs the number of nm-local-dirs per nodemanager
+   * @param numLogDirs the number of nm-log-dirs per nodemanager
+   * @param enableAHS enable ApplicationHistoryServer or not
+   */
+  public MiniYARNCluster(
+      String testName, int numResourceManagers, int numNodeManagers,
+      int numLocalDirs, int numLogDirs, boolean enableAHS) {
+    this(testName, numResourceManagers, numNodeManagers, numLocalDirs,
+        numLogDirs, enableAHS, false);
+  }
+  
   /**
    * @param testName name of the test
    * @param numResourceManagers the number of resource managers in the cluster
@@ -243,13 +262,16 @@ public class MiniYARNCluster extends CompositeService {
       Collection<String> rmIdsCollection = HAUtil.getRMHAIds(conf);
       rmIds = rmIdsCollection.toArray(new String[rmIdsCollection.size()]);
     }
-    
-    // enable the in-memory ZK cluster if not explicitly set to true/false
-    conf.setBooleanIfUnset(RegistryConstants.KEY_ZKSERVICE_ENABLED, true);
-    conf.setBooleanIfUnset(RegistryConstants.KEY_REGISTRY_ENABLED, true);
-    conf.set(RegistryConstants.KEY_ZKSERVICE_DATADIR,
-        new File(testWorkDir, "zookeeper").getAbsolutePath());
 
+    // enable the in-memory ZK cluster AHEAD of RMs to ensure it starts first
+    if (enableRegistry) {
+      zookeeper = new MicroZookeeperService("Local ZK service");
+      addService(zookeeper);
+      conf.setBooleanIfUnset(RegistryConstants.KEY_REGISTRY_ENABLED, true);
+      conf.set(RegistryConstants.KEY_ZKSERVICE_DATADIR,
+          new File(testWorkDir, "zookeeper").getAbsolutePath());
+    }
+    
     for (int i = 0; i < resourceManagers.length; i++) {
       resourceManagers[i] = createResourceManager();
       if (!useFixedPorts) {
@@ -748,5 +770,9 @@ public class MiniYARNCluster extends CompositeService {
 
   public int getNumOfResourceManager() {
     return this.resourceManagers.length;
+  }
+
+  public MicroZookeeperService getZookeeper() {
+    return zookeeper;
   }
 }

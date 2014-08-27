@@ -62,7 +62,6 @@ import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.server.services.InMemoryLocalhostZKService;
 import org.apache.hadoop.yarn.registry.server.services.ResourceManagerRegistryService;
 import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWriter;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEventType;
@@ -163,13 +162,6 @@ public class ResourceManager extends CompositeService implements Recoverable {
   private WebApp webApp;
   private AppReportFetcher fetcher = null;
   protected ResourceTrackerService resourceTracker;
-  
-  /**
-   * Optional localhost ZK service; expected to be created
-   * only on mini & pseudo clusters. If defined, the
-   * registry will be bonded to it
-   */
-  protected InMemoryLocalhostZKService localhostZKService;
 
   /**
    * Registry service
@@ -253,17 +245,11 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
     boolean registryEnabled = conf.getBoolean(RegistryConstants.KEY_REGISTRY_ENABLED,
         RegistryConstants.DEFAULT_REGISTRY_ENABLED);
-    if (conf.getBoolean(RegistryConstants.KEY_ZKSERVICE_ENABLED,
-        registryEnabled)) {
-      localhostZKService = new InMemoryLocalhostZKService("Local ZK service");
-      addService(localhostZKService);
-    }
     if (registryEnabled) {
-      // if the local service is null, the service falls back to 
-      // reading the binding info from its configuration file
       registry =
-          new ResourceManagerRegistryService("Registry", localhostZKService);
+          new ResourceManagerRegistryService("Registry");
       addService(registry);
+      rmContext.setRegistry(registry);
     }
 
     createAndInitActiveServices();

@@ -329,6 +329,11 @@ public class ApplicationMasterService extends AbstractService implements
       response.setSchedulerResourceTypes(rScheduler
         .getSchedulingResourceTypes());
 
+      
+      // Add the user name to the registry ... this allows the registered app
+      // to register itself beneath it
+      String user = app.getUser();
+      rmContext.getRegistry().createUserPath(user);
       return response;
     }
   }

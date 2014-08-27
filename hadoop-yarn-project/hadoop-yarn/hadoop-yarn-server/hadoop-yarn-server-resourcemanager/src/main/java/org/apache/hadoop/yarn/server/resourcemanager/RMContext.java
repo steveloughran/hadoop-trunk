@@ -25,6 +25,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.ConfigurationProvider;
 import org.apache.hadoop.yarn.event.Dispatcher;
+import org.apache.hadoop.yarn.registry.server.services.ResourceManagerRegistryService;
 import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWriter;
 import org.apache.hadoop.yarn.server.resourcemanager.metrics.SystemMetricsPublisher;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
@@ -113,4 +114,6 @@ public interface RMContext {
   ReservationSystem getReservationSystem();
 
   boolean isSchedulerReadyForAllocatingContainers();
+
+  ResourceManagerRegistryService getRegistry();
 }

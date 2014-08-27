@@ -32,6 +32,7 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.ConfigurationProvider;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
+import org.apache.hadoop.yarn.registry.server.services.ResourceManagerRegistryService;
 import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWriter;
 import org.apache.hadoop.yarn.server.resourcemanager.metrics.SystemMetricsPublisher;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.NullRMStateStore;
@@ -97,6 +98,7 @@ public class RMContextImpl implements RMContext {
   private long schedulerRecoveryWaitTime = 0;
   private boolean printLog = true;
   private boolean isSchedulerReady = false;
+  private ResourceManagerRegistryService registry;
 
   private static final Log LOG = LogFactory.getLog(RMContextImpl.class);
 
@@ -119,7 +121,8 @@ public class RMContextImpl implements RMContext {
       RMContainerTokenSecretManager containerTokenSecretManager,
       NMTokenSecretManagerInRM nmTokenSecretManager,
       ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager,
-      RMApplicationHistoryWriter rmApplicationHistoryWriter) {
+      RMApplicationHistoryWriter rmApplicationHistoryWriter,
+      ResourceManagerRegistryService registry) {
     this();
     this.setDispatcher(rmDispatcher);
     this.setContainerAllocationExpirer(containerAllocationExpirer);
@@ -131,6 +134,7 @@ public class RMContextImpl implements RMContext {
     this.setNMTokenSecretManager(nmTokenSecretManager);
     this.setClientToAMTokenSecretManager(clientToAMTokenSecretManager);
     this.setRMApplicationHistoryWriter(rmApplicationHistoryWriter);
+    this.setRegistry(registry);
 
     RMStateStore nullStore = new NullRMStateStore();
     nullStore.setRMDispatcher(rmDispatcher);
@@ -431,5 +435,14 @@ public class RMContextImpl implements RMContext {
   @VisibleForTesting
   public void setSystemClock(Clock clock) {
     this.systemClock = clock;
+  }
+
+  @Override
+  public ResourceManagerRegistryService getRegistry() {
+    return registry;
+  }
+
+  void setRegistry(ResourceManagerRegistryService registry) {
+    this.registry = registry;
   }
 }

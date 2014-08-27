@@ -82,7 +82,7 @@ public class TestQueueMappings {
     RMContextImpl rmContext = new RMContextImpl(null, null, null, null, null,
         null, new RMContainerTokenSecretManager(conf),
         new NMTokenSecretManagerInRM(conf),
-        new ClientToAMTokenSecretManagerInRM(), null);
+        new ClientToAMTokenSecretManagerInRM(), null, null);
     cs.setConf(conf);
     cs.setRMContext(rmContext);
     cs.init(conf);
