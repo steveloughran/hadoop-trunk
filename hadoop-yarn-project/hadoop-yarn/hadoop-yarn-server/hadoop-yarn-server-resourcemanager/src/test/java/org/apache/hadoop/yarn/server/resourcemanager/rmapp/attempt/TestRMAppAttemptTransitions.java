@@ -245,7 +245,7 @@ public class TestRMAppAttemptTransitions {
           new RMContainerTokenSecretManager(conf),
           nmTokenManager,
           clientToAMTokenManager,
-          writer);
+          writer, null);
     
     store = mock(RMStateStore.class);
     ((RMContextImpl) rmContext).setStateStore(store);

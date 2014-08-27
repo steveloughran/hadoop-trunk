@@ -92,7 +92,7 @@ public class TestUtils {
           new AMRMTokenSecretManager(conf, null),
           new RMContainerTokenSecretManager(conf),
           new NMTokenSecretManagerInRM(conf),
-          new ClientToAMTokenSecretManagerInRM(), writer);
+          new ClientToAMTokenSecretManagerInRM(), writer, null);
     rmContext.setSystemMetricsPublisher(mock(SystemMetricsPublisher.class));
     return rmContext;
   }
