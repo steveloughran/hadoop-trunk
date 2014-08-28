@@ -19,6 +19,8 @@
 package org.apache.hadoop.yarn.registry.client.types;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 import java.util.ArrayList;
@@ -26,11 +28,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
 
 /**
  * JSON-marshallable description of a single component
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class ServiceRecord {
 
   /**

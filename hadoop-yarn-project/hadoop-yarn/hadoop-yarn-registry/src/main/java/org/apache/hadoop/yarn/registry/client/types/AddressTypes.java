@@ -18,11 +18,16 @@
 
 package org.apache.hadoop.yarn.registry.client.types;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * Enum of address types -as integers. 
  * Why integers and not enums? Cross platform serialization as JSON
  */
-public class AddressTypes {
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
+public interface AddressTypes {
 
   /**
    * Any other address

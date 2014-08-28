@@ -19,9 +19,14 @@
 package org.apache.hadoop.yarn.registry.client.types;
 
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * Output of a stat() call
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public final class RegistryPathStatus {
 
   /**

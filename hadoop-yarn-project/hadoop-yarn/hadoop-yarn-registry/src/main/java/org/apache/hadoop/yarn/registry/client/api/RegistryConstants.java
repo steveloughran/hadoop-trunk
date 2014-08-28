@@ -18,6 +18,15 @@
 
 package org.apache.hadoop.yarn.registry.client.api;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
+/**
+ * Constants for the registry, including configuration keys and default
+ * values.
+ */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public interface RegistryConstants {
 
   /**
@@ -49,7 +58,8 @@ public interface RegistryConstants {
   /**
    * Zookeeper session timeout in milliseconds: {@value}
    */
-  String KEY_REGISTRY_ZK_SESSION_TIMEOUT = REGISTRY_PREFIX + ".zk.session-timeout-ms";
+  String KEY_REGISTRY_ZK_SESSION_TIMEOUT =
+      REGISTRY_PREFIX + ".zk.session-timeout-ms";
 
   /**
    * Zookeeper connect retry count: {@value}
@@ -60,17 +70,20 @@ public interface RegistryConstants {
    * Zookeeper connection timeout in milliseconds: {@value}
    */
 
-  String KEY_REGISTRY_ZK_CONNECTION_TIMEOUT = REGISTRY_PREFIX + ".zk.connection-timeout-ms";
+  String KEY_REGISTRY_ZK_CONNECTION_TIMEOUT =
+      REGISTRY_PREFIX + ".zk.connection-timeout-ms";
 
   /**
    * Zookeeper connect interval in milliseconds: {@value}
    */
-  String KEY_REGISTRY_ZK_RETRY_INTERVAL = REGISTRY_PREFIX + ".zk.retry.interval-ms";
+  String KEY_REGISTRY_ZK_RETRY_INTERVAL =
+      REGISTRY_PREFIX + ".zk.retry.interval-ms";
 
   /**
    * Zookeeper retry limit in milliseconds: {@value}
    */
-  String KEY_REGISTRY_ZK_RETRY_CEILING = REGISTRY_PREFIX + ".zk.retry.ceiling-ms";
+  String KEY_REGISTRY_ZK_RETRY_CEILING =
+      REGISTRY_PREFIX + ".zk.retry.ceiling-ms";
 
   /**
    * Root path in the ZK tree for the registry: {@value}
@@ -129,13 +142,14 @@ public interface RegistryConstants {
   String PATH_SYSTEM_SERVICES = "services/";
 
   /**
-   *  path under a service record to point to components of that service: {@value}
+   *  path under a service record to point to components of that service:
+   *  {@value}
    */
   String SUBPATH_COMPONENTS = "/components";
 
   /**
-   * Header of a service record.
-   * By making this >12 bytes long, we can auto-determine which entries
+   * Header of a service record: {@value}
+   * By making this over 12 bytes long, we can auto-determine which entries
    * in a listing are too short to contain a record without getting their data
    */
   byte[] RECORD_HEADER = {'j', 's', 'o', 'n', 
@@ -150,7 +164,6 @@ public interface RegistryConstants {
   /**
    * port; 0 or below means "any": {@value}
    */
-  
   String KEY_ZKSERVICE_PORT = REGISTRY_PREFIX + ".zkservice.port";
   
   /**

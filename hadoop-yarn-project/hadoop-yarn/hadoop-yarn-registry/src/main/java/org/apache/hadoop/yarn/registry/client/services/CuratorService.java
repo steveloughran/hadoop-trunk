@@ -28,6 +28,8 @@ import org.apache.curator.framework.api.CreateBuilder;
 import org.apache.curator.framework.api.DeleteBuilder;
 import org.apache.curator.framework.api.GetChildrenBuilder;
 import org.apache.curator.retry.BoundedExponentialBackoffRetry;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathAccessDeniedException;
@@ -57,6 +59,8 @@ import java.util.List;
  * generic than just the YARN service registry; it does not implement
  * any of the RegistryOperations API. 
  */
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
 public class CuratorService extends AbstractService
     implements RegistryConstants, RegistryBindingSource {
   private static final Logger LOG =
@@ -171,7 +175,8 @@ public class CuratorService extends AbstractService
         DEFAULT_ZK_SESSION_TIMEOUT);
     int connectionTimeout = conf.getInt(KEY_REGISTRY_ZK_CONNECTION_TIMEOUT,
         DEFAULT_ZK_CONNECTION_TIMEOUT);
-    int retryTimes = conf.getInt(KEY_REGISTRY_ZK_RETRY_TIMES, DEFAULT_ZK_RETRY_TIMES);
+    int retryTimes = conf.getInt(KEY_REGISTRY_ZK_RETRY_TIMES,
+        DEFAULT_ZK_RETRY_TIMES);
     int retryInterval = conf.getInt(KEY_REGISTRY_ZK_RETRY_INTERVAL,
         DEFAULT_ZK_RETRY_INTERVAL);
     int retryCeiling = conf.getInt(KEY_REGISTRY_ZK_RETRY_CEILING,
@@ -320,6 +325,7 @@ public class CuratorService extends AbstractService
    * @return true iff the path was created
    * @throws IOException
    */
+  @VisibleForTesting
   public boolean maybeCreate(String path, CreateMode mode) throws IOException {
     List<ACL> acl = rootACL;
     return maybeCreate(path, mode, acl, false);
@@ -337,6 +343,7 @@ public class CuratorService extends AbstractService
    * @return true iff the path was created
    * @throws IOException
    */
+  @VisibleForTesting
   public boolean maybeCreate(String path,
       CreateMode mode,
       List<ACL> acl, boolean createParents) throws IOException {
@@ -380,14 +387,6 @@ public class CuratorService extends AbstractService
       return false;
     } catch (Exception e) {
       throw operationFailure(path, "existence check", e);
-    }
-  }
-
-  protected boolean pathExistsRobust(String path) {
-    try {
-      return zkPathExists(path);
-    } catch (IOException e) {
-      return false;
     }
   }
 
@@ -546,6 +545,12 @@ public class CuratorService extends AbstractService
     }
   }
 
+  /**
+   * List all children of a path
+   * @param path path of operation
+   * @return a possibly empty list of children
+   * @throws IOException
+   */
   public List<String> zkList(String path) throws IOException {
     String fullpath = createFullPath(path);
     try {
@@ -558,7 +563,7 @@ public class CuratorService extends AbstractService
       throw operationFailure(path, "ls()", e);
     }
   }
-
+  
   /**
    * Read data on a path
    * @param path path of operation
@@ -575,20 +580,12 @@ public class CuratorService extends AbstractService
     }
   }
 
-
   /**
-   * List the children of a path
-   * @param path path of operation
-   * @return the children -or an empty list if the path does not exist
-   * @throws IOException read failure
+   * Return a path dumper instance which can do a full dump
+   * of the registry tree in its <code>toString()</code>
+   * operation
+   * @return a class to dump the registry
    */
-  public List<String> zKListChildren(String path) throws IOException {
-    if (!zkPathExists(path)) {
-      return Collections.emptyList();
-    }
-    return zkList(path);
-  }
-  
   @VisibleForTesting
   public ZKPathDumper dumpPath() {
     return new ZKPathDumper(curator, registryRoot);

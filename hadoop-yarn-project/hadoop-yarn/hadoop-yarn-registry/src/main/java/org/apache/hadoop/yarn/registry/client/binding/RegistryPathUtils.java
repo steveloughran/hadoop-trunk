@@ -19,6 +19,8 @@
 package org.apache.hadoop.yarn.registry.client.binding;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
@@ -33,10 +35,14 @@ import java.util.regex.Pattern;
 /**
  * Low level zookeeper-related operations on paths
  */
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
 public class RegistryPathUtils {
 
 
-  private static final Pattern HOSTNAME = Pattern.compile(RegistryConstants.HOSTNAME_PATTERN);
+  private static final Pattern HOSTNAME =
+      Pattern.compile(RegistryConstants.HOSTNAME_PATTERN);
+
   /**
    * Validate ZK path with the path itself included in
    * the exception text
@@ -53,7 +59,7 @@ public class RegistryPathUtils {
     }
     return path;
   }
-  
+
   /**
    * Validate ZK path with the path itself included in
    * the exception text

@@ -19,6 +19,8 @@
 package org.apache.hadoop.yarn.registry.client.types;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
@@ -33,6 +35,8 @@ import java.util.List;
  * Description of a single service/component endpoint.
  * It is designed to be marshalled as JSON
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
 public class Endpoint {

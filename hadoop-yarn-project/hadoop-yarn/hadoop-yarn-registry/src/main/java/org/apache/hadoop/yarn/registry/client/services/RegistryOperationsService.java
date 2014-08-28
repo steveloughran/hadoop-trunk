@@ -20,6 +20,8 @@ package org.apache.hadoop.yarn.registry.client.services;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
@@ -50,8 +52,10 @@ import java.util.List;
  *
  * It's a YARN service: ephemeral nodes last as long as the client exists
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class RegistryOperationsService extends CuratorService 
-implements RegistryOperations{
+  implements RegistryOperations{
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistryOperationsService.class);

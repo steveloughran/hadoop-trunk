@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 
 import java.io.IOException;
-import java.util.List;
 
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
@@ -30,6 +30,8 @@ import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
  * Methods for binding paths according to recommended layout, and for
  * extracting some of the content
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class BindingUtils {
 
   /**
@@ -111,8 +113,7 @@ public class BindingUtils {
     return componentListPath(user, serviceClass, serviceName)
            + "/" +
            componentName;
-  } 
+  }
 
-  
 
 }

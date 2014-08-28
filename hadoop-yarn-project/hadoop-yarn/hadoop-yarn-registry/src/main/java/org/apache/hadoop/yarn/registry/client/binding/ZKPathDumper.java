@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.api.GetChildrenBuilder;
@@ -30,14 +31,14 @@ import java.util.List;
  * It does this in the toString() method, so it
  * can be used in a log statement -the operation
  * will only take place if the method is evaluated.
- * 
-
+ *
  */
+@VisibleForTesting
 public class ZKPathDumper {
 
+  public static final int INDENT = 2;
   private final CuratorFramework curator;
   private final String root;
-  private final boolean verbose = true;
 
   /**
    * Create a path dumper -but do not dump the path until asked
@@ -60,6 +61,14 @@ public class ZKPathDumper {
     return builder.toString();
   }
 
+  /**
+   * Recursively expand the path into the supplied string builder, increasing
+   * the indentation by {@link #INDENT} as it proceeds (depth first) down
+   * the tree
+   * @param builder string build to append to
+   * @param path path to examine
+   * @param indent current indentation
+   */
   private void expand(StringBuilder builder,
       String path,
       int indent) {
@@ -85,7 +94,7 @@ public class ZKPathDumper {
         builder.append(body);
         builder.append('\n');
         // recurse
-        expand(builder, childPath, indent + 1);
+        expand(builder, childPath, indent + INDENT);
       }
     } catch (Exception e) {
       builder.append(e.toString()).append("\n");

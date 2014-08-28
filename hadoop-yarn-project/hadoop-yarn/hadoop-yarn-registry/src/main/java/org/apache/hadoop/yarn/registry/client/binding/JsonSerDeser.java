@@ -19,17 +19,15 @@
 package org.apache.hadoop.yarn.registry.client.binding;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
-import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
-import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.JsonProcessingException;
@@ -47,9 +45,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 /**
  * Support for marshalling objects to and from JSON.
@@ -58,6 +54,8 @@ import java.util.List;
  * which use the mapper
  * @param <T>
  */
+@InterfaceAudience.Private()
+@InterfaceStability.Evolving
 public class JsonSerDeser<T> {
 
   private static final Logger LOG = LoggerFactory.getLogger(JsonSerDeser.class);
@@ -73,7 +71,7 @@ public class JsonSerDeser<T> {
    * @param header byte array to use as header
    */
   public JsonSerDeser(Class classType, byte[] header) {
-    Preconditions.checkArgument(classType !=  null, "null classType");
+    Preconditions.checkArgument(classType != null, "null classType");
     Preconditions.checkArgument(header != null, "null header");
     this.classType = classType;
     this.mapper = new ObjectMapper();
@@ -272,7 +270,7 @@ public class JsonSerDeser<T> {
     int blen = buffer.length;
     if (hlen > 0) {
       if (blen < hlen) {
-        throw new InvalidRecordException(path, 
+        throw new InvalidRecordException(path,
             "Record too short for header of " + getName());
       }
       byte[] magic = Arrays.copyOfRange(buffer, 0, hlen);
@@ -300,7 +298,7 @@ public class JsonSerDeser<T> {
     }
     return matches;
   }
-  
+
   /**
    * Convert an object to a JSON string
    * @param instance instance to convert

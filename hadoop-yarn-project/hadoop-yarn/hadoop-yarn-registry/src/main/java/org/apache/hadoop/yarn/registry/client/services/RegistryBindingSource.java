@@ -18,14 +18,19 @@
 
 package org.apache.hadoop.yarn.registry.client.services;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * Interface which can be implemented by a registry binding source
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public interface RegistryBindingSource {
 
   /**
    * Supply the binding information for this registry
-   * @return
+   * @return the binding information data
    */
   BindingInformation supplyBindingInformation();
 }
