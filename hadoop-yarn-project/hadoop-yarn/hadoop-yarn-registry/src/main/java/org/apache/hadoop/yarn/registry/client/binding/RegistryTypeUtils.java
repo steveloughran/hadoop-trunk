@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
@@ -34,12 +36,14 @@ import java.util.List;
 /**
  * Utils to work with registry types
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class RegistryTypeUtils {
 
   public static Endpoint urlEndpoint(String api,
       String protocolType,
       URI... urls) {
-    return new Endpoint(api, protocolType, urls); 
+    return new Endpoint(api, protocolType, urls);
   }
 
   public static Endpoint restEndpoint(String api,
@@ -71,11 +75,12 @@ public class RegistryTypeUtils {
         address
     );
   }
-  
-  public static List<String> tuple(String...t1) {
+
+  public static List<String> tuple(String... t1) {
     return Arrays.asList(t1);
   }
-  public static List<String> tuple(Object...t1) {
+
+  public static List<String> tuple(Object... t1) {
     List<String> l = new ArrayList<String>(t1.length);
     for (Object t : t1) {
       l.add(t.toString());
@@ -93,8 +98,8 @@ public class RegistryTypeUtils {
   }
 
   /**
-   * Perform whatever transforms are needed to get a YARN ID into a DNS-compatible
-   * name
+   * Perform whatever transforms are needed to get a YARN ID into
+   * a DNS-compatible name
    * @param yarnId ID as string of YARN application, instance or container
    * @return a string suitable for use in registry paths.
    */
@@ -128,13 +133,14 @@ public class RegistryTypeUtils {
    * @throws InvalidRecordException if the type is wrong, there are no addresses
    * or the payload ill-formatted
    */
-  public static List<String> retrieveAddressesUriType(Endpoint epr) throws InvalidRecordException {
+  public static List<String> retrieveAddressesUriType(Endpoint epr) throws
+      InvalidRecordException {
     if (epr == null) {
       return null;
     }
     requireAddressType(AddressTypes.ADDRESS_URI, epr);
     List<List<String>> addresses = epr.addresses;
-    if (addresses.size() < 1 ) {
+    if (addresses.size() < 1) {
       throw new InvalidRecordException(epr.toString(),
           "No addresses in endpoint");
     }
@@ -142,7 +148,8 @@ public class RegistryTypeUtils {
     for (List<String> address : addresses) {
       if (address.size() != 1) {
         throw new InvalidRecordException(epr.toString(),
-            "Address payload invalid: wrong many element count: " + address.size());
+            "Address payload invalid: wrong many element count: " +
+            address.size());
       }
       results.add(address.get(0));
     }
@@ -161,7 +168,7 @@ public class RegistryTypeUtils {
       InvalidRecordException,
       MalformedURLException {
     if (epr == null) {
-      throw new InvalidRecordException("","Null endpoint");
+      throw new InvalidRecordException("", "Null endpoint");
     }
     List<String> addresses = retrieveAddressesUriType(epr);
     List<URL> results = new ArrayList<URL>(addresses.size());

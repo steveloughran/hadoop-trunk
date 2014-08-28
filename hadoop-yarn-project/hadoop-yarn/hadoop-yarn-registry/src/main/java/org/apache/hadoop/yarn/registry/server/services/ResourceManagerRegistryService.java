@@ -19,6 +19,8 @@
 package org.apache.hadoop.yarn.registry.server.services;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
@@ -34,6 +36,8 @@ import java.util.List;
  * operations, in particular setting up paths with the correct security
  * permissions.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
 public class ResourceManagerRegistryService extends RegistryOperationsService {
 
   private List<ACL> rootRegistryACL;

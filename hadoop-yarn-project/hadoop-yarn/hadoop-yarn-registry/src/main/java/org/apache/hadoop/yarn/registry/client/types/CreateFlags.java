@@ -18,9 +18,14 @@
 
 package org.apache.hadoop.yarn.registry.client.types;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
- * Flags to use when creating a service entry
+ * Combinable Flags to use when creating a service entry
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public interface CreateFlags {
 
   /**
@@ -34,10 +39,4 @@ public interface CreateFlags {
    */
   int OVERWRITE = 2;
 
-  /**
-   * The parent path must be created.
-   * This does not create the base registry/user paths, which must
-   * be created by the RM so as to ensure permissions are valid.
-   */
-  int CREATE_PARENT_PATH = 4;
 }

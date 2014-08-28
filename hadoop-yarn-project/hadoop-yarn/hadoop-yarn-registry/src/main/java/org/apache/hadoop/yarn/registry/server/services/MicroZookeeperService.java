@@ -44,12 +44,12 @@ import java.net.UnknownHostException;
 /**
  * This is a small, localhost Zookeeper service instance that is contained
  * in a YARN service...it's been derived from Apache Twill.
- * 
+ *
  * It implements {@link RegistryBindingSource} and provides binding information,
  * <i>once started</i>. Until <code>start()</code> is called, the hostname & 
  * port may be undefined. Accordingly, the service raises an exception in this
  * condition.
- * 
+ *
  * If you wish to chain together a registry service with this one under
  * the same <code>CompositeService</code>, this service must be added
  * as a child first.
@@ -74,18 +74,32 @@ public class MicroZookeeperService
   private ServerCnxnFactory factory;
   private BindingInformation binding;
 
+  /**
+   * Create an instance
+   * @param name service name
+   */
   public MicroZookeeperService(String name) {
     super(name);
   }
 
+  /**
+   * Get the connection string. 
+   * @return the string
+   * @throws IllegalStateException if the connection is not yet valid
+   */
   public String getConnectionString() {
     Preconditions.checkState(factory != null, "service not started");
     InetSocketAddress addr = factory.getLocalAddress();
     return String.format("%s:%d", addr.getHostName(), addr.getPort());
   }
-  
+
+  /**
+   * Get the connection address
+   * @return the connection as an address
+   * @throws IllegalStateException if the connection is not yet valid
+   */
   public InetSocketAddress getConnectionAddress() {
-    Preconditions.checkState(factory !=null, "service not started");
+    Preconditions.checkState(factory != null, "service not started");
     return factory.getLocalAddress();
   }
 
@@ -101,7 +115,7 @@ public class MicroZookeeperService
   }
 
   /**
-   * Initialize the service
+   * Initialize the service, including choosing a path for the data
    * @param conf configuration
    * @throws Exception
    */
@@ -126,14 +140,20 @@ public class MicroZookeeperService
       throw new FileNotFoundException("failed to create directory " + dataDir);
     }
     if (!dataDir.isDirectory()) {
-      
-      throw new IOException("Path "+dataDir +" exists but is not a directory "
-        + " isDir()=" + dataDir.isDirectory() 
-        + " isFile()=" + dataDir.isFile());
+
+      throw new IOException(
+          "Path " + dataDir + " exists but is not a directory "
+          + " isDir()=" + dataDir.isDirectory()
+          + " isFile()=" + dataDir.isFile());
     }
     super.serviceInit(conf);
   }
 
+  /**
+   * Startup: start ZK. It is only after this that
+   * the binding information is valid.
+   * @throws Exception
+   */
   @Override
   protected void serviceStart() throws Exception {
     ZooKeeperServer zkServer = new ZooKeeperServer();
@@ -159,11 +179,16 @@ public class MicroZookeeperService
     binding.ensembleProvider = new FixedEnsembleProvider(connectString);
     binding.description =
         getName() + " reachable at \"" + connectString + "\"";
-    
+
     // finally: set the binding information in the config
     getConfig().set(KEY_REGISTRY_ZK_QUORUM, connectString);
   }
 
+  /**
+   * When the service is stopped, it deletes the data directory
+   * and its contents
+   * @throws Exception
+   */
   @Override
   protected void serviceStop() throws Exception {
     if (factory != null) {

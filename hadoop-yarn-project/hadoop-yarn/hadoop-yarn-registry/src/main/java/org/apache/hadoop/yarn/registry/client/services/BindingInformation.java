@@ -19,10 +19,14 @@
 package org.apache.hadoop.yarn.registry.client.services;
 
 import org.apache.curator.ensemble.EnsembleProvider;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * Binding information provided by a {@link RegistryBindingSource}
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class BindingInformation {
   
   public EnsembleProvider ensembleProvider;

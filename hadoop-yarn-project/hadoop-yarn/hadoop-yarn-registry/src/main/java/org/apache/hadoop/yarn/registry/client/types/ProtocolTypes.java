@@ -18,9 +18,14 @@
 
 package org.apache.hadoop.yarn.registry.client.types;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * some common protocol types
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public interface ProtocolTypes {
 
   String PROTOCOL_HADOOP_IPC = "hadoop/IPC";

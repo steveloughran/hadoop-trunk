@@ -132,6 +132,7 @@ public class MiniYARNCluster extends CompositeService {
    * @param numLocalDirs the number of nm-local-dirs per nodemanager
    * @param numLogDirs the number of nm-log-dirs per nodemanager
    * @param enableAHS enable ApplicationHistoryServer or not
+   * @param enableRegistry enable the registry or not
    */
   public MiniYARNCluster(
       String testName, int numResourceManagers, int numNodeManagers,

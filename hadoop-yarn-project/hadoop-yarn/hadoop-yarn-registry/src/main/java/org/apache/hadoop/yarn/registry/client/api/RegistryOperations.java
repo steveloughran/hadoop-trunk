@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.registry.client.api;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
@@ -33,6 +35,8 @@ import java.io.IOException;
 /**
  * Registry Operations
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public interface RegistryOperations extends Service {
 
   /**

@@ -18,6 +18,14 @@
 
 package org.apache.hadoop.yarn.registry.client.exceptions;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
+/**
+ * Children are not allowed under ephemeral nodes
+ */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class NoChildrenForEphemeralsException extends RegistryIOException {
   public NoChildrenForEphemeralsException(String path, Throwable cause) {
     super(path, cause);

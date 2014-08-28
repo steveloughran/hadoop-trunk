@@ -18,14 +18,22 @@
 
 package org.apache.hadoop.yarn.registry.client.exceptions;
 
-import java.io.IOException;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 
+/**
+ * A path name was invalid
+ */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class InvalidPathnameException extends RegistryIOException {
   public InvalidPathnameException(String path, String message) {
     super(path, message);
   }
 
-  public InvalidPathnameException(String path, String message, Throwable cause) {
+  public InvalidPathnameException(String path,
+      String message,
+      Throwable cause) {
     super(path, message, cause);
   }
 }

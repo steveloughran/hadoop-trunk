@@ -18,11 +18,15 @@
 
 package org.apache.hadoop.yarn.registry.client.exceptions;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.PathIOException;
 
 /**
  * Exception for registry operations
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class RegistryIOException extends PathIOException {
 
   public RegistryIOException(String path, Throwable cause) {

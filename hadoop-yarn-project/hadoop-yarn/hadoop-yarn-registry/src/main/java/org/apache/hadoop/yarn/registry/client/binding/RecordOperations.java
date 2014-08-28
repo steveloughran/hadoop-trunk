@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
@@ -32,8 +34,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * JSON marshalling support
+ * Support for operations on records
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class RecordOperations {
   private static final Logger LOG = LoggerFactory.getLogger(JsonSerDeser.class);
 

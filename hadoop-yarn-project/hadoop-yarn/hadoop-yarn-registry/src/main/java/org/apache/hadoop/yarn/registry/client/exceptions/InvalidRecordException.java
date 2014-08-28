@@ -18,9 +18,14 @@
 
 package org.apache.hadoop.yarn.registry.client.exceptions;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * Raised if the entry doesn't match what was expected at the path.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class InvalidRecordException extends RegistryIOException {
 
   public InvalidRecordException(String path, String error) {
