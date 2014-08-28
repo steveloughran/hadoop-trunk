@@ -332,8 +332,10 @@ public class ApplicationMasterService extends AbstractService implements
       
       // Add the user name to the registry ... this allows the registered app
       // to register itself beneath it
-      String user = app.getUser();
-      rmContext.getRegistry().createUserPath(user);
+      if (rmContext.getRegistry() != null) {
+        String user = app.getUser();
+        rmContext.getRegistry().createUserPath(user);
+      }
       return response;
     }
   }
