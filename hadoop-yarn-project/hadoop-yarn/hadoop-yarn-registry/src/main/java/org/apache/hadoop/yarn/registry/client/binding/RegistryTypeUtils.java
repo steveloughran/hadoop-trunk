@@ -125,35 +125,49 @@ public class RegistryTypeUtils {
    * @param epr endpoint
    * @return the uri of the first entry in the address list. Null if the endpoint
    * itself is null
-   * @throws InvalidRecordException if the type is wrong or payload ill-formatted
+   * @throws InvalidRecordException if the type is wrong, there are no addresses
+   * or the payload ill-formatted
    */
-  public static String retrieveAddressUriType(Endpoint epr) throws InvalidRecordException {
+  public static List<String> retrieveAddressesUriType(Endpoint epr) throws InvalidRecordException {
     if (epr == null) {
       return null;
     }
     requireAddressType(AddressTypes.ADDRESS_URI, epr);
     List<List<String>> addresses = epr.addresses;
-    if (addresses.size() < 1 || addresses.get(0).size() != 1) {
+    if (addresses.size() < 1 ) {
       throw new InvalidRecordException(epr.toString(),
-          "Address payload invalid");
+          "No addresses in endpoint");
     }
-    return addresses.get(0).get(0);
+    List<String> results = new ArrayList<String>(addresses.size());
+    for (List<String> address : addresses) {
+      if (address.size() != 1) {
+        throw new InvalidRecordException(epr.toString(),
+            "Address payload invalid: wrong many element count: " + address.size());
+      }
+      results.add(address.get(0));
+    }
+    return results;
   }
 
   /**
-   * Get the address URL
+   * Get the address URLs. Guranteed to return at least one address.
    * @param epr endpoint
    * @return the address as a URL
-   * @throws InvalidRecordException if the type is wrong or payload ill-formatted
+   * @throws InvalidRecordException if the type is wrong, there are no addresses
+   * or the payload ill-formatted
    * @throws MalformedURLException address can't be turned into a URL
    */
-  public static URL retrieveAddressURL(Endpoint epr) throws
+  public static List<URL> retrieveAddressURLs(Endpoint epr) throws
       InvalidRecordException,
       MalformedURLException {
     if (epr == null) {
       throw new InvalidRecordException("","Null endpoint");
     }
-    String uri = retrieveAddressUriType(epr);
-    return new URL(uri);
+    List<String> addresses = retrieveAddressesUriType(epr);
+    List<URL> results = new ArrayList<URL>(addresses.size());
+    for (String address : addresses) {
+      results.add(new URL(address));
+    }
+    return results;
   }
 }
