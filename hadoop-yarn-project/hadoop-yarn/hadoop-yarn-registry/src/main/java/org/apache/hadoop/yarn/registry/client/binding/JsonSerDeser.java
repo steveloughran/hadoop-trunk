@@ -92,6 +92,7 @@ public class JsonSerDeser<T> {
    * @throws IOException IO
    * @throws JsonMappingException failure to map from the JSON to this class
    */
+  @SuppressWarnings("unchecked")
   public synchronized T fromJson(String json)
       throws IOException, JsonParseException, JsonMappingException {
     try {
@@ -109,6 +110,7 @@ public class JsonSerDeser<T> {
    * @throws IOException IO problems
    * @throws JsonMappingException failure to map from the JSON to this class
    */
+  @SuppressWarnings("unchecked")
   public synchronized T fromFile(File jsonFile)
       throws IOException, JsonParseException, JsonMappingException {
     try {
@@ -265,6 +267,7 @@ public class JsonSerDeser<T> {
    * @return the parsed structure
    * @throws IOException on a failure
    */
+  @SuppressWarnings("unchecked")
   public T fromBytesWithHeader(String path, byte[] buffer) throws IOException {
     int hlen = header.length;
     int blen = buffer.length;

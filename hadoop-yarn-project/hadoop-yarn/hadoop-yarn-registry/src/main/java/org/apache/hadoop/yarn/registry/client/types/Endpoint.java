@@ -40,9 +40,27 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
 public class Endpoint {
+
+  /**
+   * API implemented at the end of the binding
+   */
   public String api;
+
+  /**
+   * Type of address. The standard types are defined in
+   * {@link AddressTypes}
+   */
   public String addressType;
+
+  /**
+   * Protocol type. Some standard types are defined in
+   * {@link ProtocolTypes}
+   */
   public String protocolType;
+
+  /**
+   * a list of address tuples —tuples whose format depends on the address type
+   */
   public List<List<String>> addresses;
 
   public Endpoint() {
@@ -106,6 +124,9 @@ public class Endpoint {
     return sb.toString();
   }
 
+  /**
+   * Validate the record by checking for null fields
+   */
   public void validate() {
     Preconditions.checkNotNull(api, "null API field");
     Preconditions.checkNotNull(addressType, "null addressType field");
