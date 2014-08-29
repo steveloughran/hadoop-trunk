@@ -48,11 +48,29 @@ public class ServiceRecord {
    */
   public String id;
 
+  /**
+   * Description string
+   */
   public String description;
 
+  /**
+   *   The persistence attribute defines when a record and any child 
+   *   entries may be deleted.
+   *   {@link PersistencePolicies}
+   */
+  public int persistence = PersistencePolicies.MANUAL;
+  
+  /**
+   * List of endpoints intended to of use to external callers
+   */
   public List<Endpoint> external = new ArrayList<Endpoint>();
+
+  /**
+   * List of internal endpoints
+   */
   public List<Endpoint> internal = new ArrayList<Endpoint>();
 
+  
   /**
    * Create a service record with no ID, description or registration time.
    * Endpoint lists are set to empty lists.
@@ -65,10 +83,12 @@ public class ServiceRecord {
    * system time.
    * @param id service ID
    * @param description description
+   * @param persistence persistence policy
    */
-  public ServiceRecord(String id, String description) {
+  public ServiceRecord(String id, String description, int persistence) {
     this.id = id;
     this.description = description;
+    this.persistence = persistence;
     this.registrationTime = System.currentTimeMillis();
   }
 
@@ -122,6 +142,8 @@ public class ServiceRecord {
       sb.append(endpoint).append("; ");
     }
 
+    sb.append('}');
+    sb.append("persistence='").append(persistence).append('\'');
     sb.append('}');
     return sb.toString();
   }

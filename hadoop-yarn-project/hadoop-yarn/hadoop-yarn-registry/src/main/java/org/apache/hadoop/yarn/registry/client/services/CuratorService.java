@@ -63,6 +63,7 @@ import java.util.List;
 @InterfaceStability.Evolving
 public class CuratorService extends AbstractService
     implements RegistryConstants, RegistryBindingSource {
+  
   private static final Logger LOG =
       LoggerFactory.getLogger(CuratorService.class);
 

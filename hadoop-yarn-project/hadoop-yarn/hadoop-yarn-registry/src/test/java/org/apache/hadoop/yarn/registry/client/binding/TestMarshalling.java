@@ -43,25 +43,27 @@ public class TestMarshalling extends Assert {
   }
   @Test
   public void testRoundTrip() throws Throwable {
-    ServiceRecord record = new ServiceRecord("01", "description");
+    ServiceRecord record = new ServiceRecord("01", "description", 0);
     byte[] bytes = marshal.toBytes(record);
     ServiceRecord r2 = marshal.fromBytes("", bytes, 0);
     assertEquals(record.id, r2.id);
+    assertEquals(record.persistence, r2.persistence);
     assertEquals(record.description, r2.description);
   }
   
   @Test
   public void testRoundTripHeaders() throws Throwable {
-    ServiceRecord record = new ServiceRecord("01", "description");
+    ServiceRecord record = new ServiceRecord("01", "description", 1);
     byte[] bytes = marshal.toByteswithHeader(record);
     ServiceRecord r2 = marshal.fromBytesWithHeader("", bytes);
     assertEquals(record.id, r2.id);
+    assertEquals(record.persistence, r2.persistence);
     assertEquals(record.description, r2.description);
   }
   
   @Test
   public void testRoundTripBadHeaders() throws Throwable {
-    ServiceRecord record = new ServiceRecord("01", "description");
+    ServiceRecord record = new ServiceRecord("01", "description", 0);
     byte[] bytes = marshal.toByteswithHeader(record);
     bytes[1] = 0x01;
     try {

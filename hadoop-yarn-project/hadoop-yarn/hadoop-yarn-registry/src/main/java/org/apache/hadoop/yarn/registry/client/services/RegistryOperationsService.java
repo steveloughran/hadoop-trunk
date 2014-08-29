@@ -35,6 +35,7 @@ import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
+import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.zookeeper.CreateMode;
@@ -67,7 +68,6 @@ public class RegistryOperationsService extends CuratorService
   public static final String PERMISSIONS_REGISTRY_SYSTEM = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_USERS = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_USER = "world:anyone:rwcda";
-  private static byte[] NO_DATA = new byte[0];
   private List<ACL> userAcl;
 
   public RegistryOperationsService(String name) {
@@ -125,8 +125,21 @@ public class RegistryOperationsService extends CuratorService
     LOG.debug("Create: {} <- {}", path, record);
     byte[] bytes = serviceRecordMarshal.toByteswithHeader(record);
 
-    CreateMode mode = ((createFlags & CreateFlags.EPHEMERAL) != 0)
-        ? CreateMode.EPHEMERAL : CreateMode.PERSISTENT;
+    boolean ephemeral = (createFlags & CreateFlags.EPHEMERAL) != 0;
+    CreateMode mode;
+    if (ephemeral) {
+      mode = CreateMode.EPHEMERAL;
+      Preconditions.checkArgument(
+          record.persistence == PersistencePolicies.EPHEMERAL,
+          "Ephemeral records can only be created if the record's persistence" +
+          " policy field is set to Ephemeral");      
+    } else {
+      Preconditions.checkArgument(
+          record.persistence != PersistencePolicies.EPHEMERAL,
+          "The record's persistence field can only be set to Ephemeral if the" +
+          " create() operation requests an ephemeral entry");
+      mode = CreateMode.PERSISTENT;
+    }
 
     zkSet(path, mode, bytes, getUserAcl(),
         ((createFlags & CreateFlags.OVERWRITE) != 0));

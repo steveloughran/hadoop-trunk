@@ -32,9 +32,11 @@ import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
+import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
+import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
@@ -160,19 +162,47 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
    * @return the record
    * @throws IOException on a failure
    */
-  protected ServiceRecord putExampleServiceEntry(String path, int createFlags)
+  protected ServiceRecord putExampleServiceEntry(String path, int createFlags) throws
+      IOException,
+      URISyntaxException {
+    return putExampleServiceEntry(path, createFlags, PersistencePolicies.MANUAL);
+  }
+  
+  /**
+   * Create a service entry with the sample endpoints, and put it
+   * at the destination
+   * @param path path
+   * @param createFlags flags
+   * @return the record
+   * @throws IOException on a failure
+   */
+  protected ServiceRecord putExampleServiceEntry(String path,
+      int createFlags,
+      int persistence)
       throws IOException, URISyntaxException {
-    List<ACL> acls = yarnRegistry.parseACLs("world:anyone:rwcda");
-    ServiceRecord record = new ServiceRecord();
-    record.id = "example-0001";
-    record.description = "example service entry";
-    record.description = methodName.getMethodName();
-    record.registrationTime = System.currentTimeMillis();
-    addSampleEndpoints(record, "namenode");
-    // split path into elements
+    ServiceRecord record = buildExampleServiceEntry(persistence);
 
     yarnRegistry.mkdir(RegistryPathUtils.parentOf(path), true);
     operations.create(path, record, createFlags);
+    return record;
+  }
+
+  /**
+   * Create a service entry with the sample endpoints
+   * @param persistence persistence policy
+   * @return the record
+   * @throws IOException on a failure
+   */
+  private ServiceRecord buildExampleServiceEntry(int persistence) throws
+      IOException,
+      URISyntaxException {
+    List<ACL> acls = yarnRegistry.parseACLs("world:anyone:rwcda");
+    ServiceRecord record = new ServiceRecord();
+    record.id = "example-0001";
+    record.persistence = persistence;
+    record.description = methodName.getMethodName();
+    record.registrationTime = System.currentTimeMillis();
+    addSampleEndpoints(record, "namenode");
     return record;
   }
 
@@ -191,6 +221,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     assertEquals(written.id, resolved.id);
     assertEquals(written.registrationTime, resolved.registrationTime);
     assertEquals(written.description, resolved.description);
+    assertEquals(written.persistence, resolved.persistence);
     
   }
 
@@ -215,14 +246,18 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
   }
 
 
+  public void log(String name, ServiceRecord record) throws
+      IOException {
+    LOG.info(" {} = \n{}\n", name, recordMarshal.toJson(record));
+  }
+
   @Test
   public void testPutGetServiceEntry() throws Throwable {
-
-    ServiceRecord written = putExampleServiceEntry(ENTRY_PATH, 0);
+    ServiceRecord written = putExampleServiceEntry(ENTRY_PATH, 0,
+        PersistencePolicies.APPLICATION);
     ServiceRecord resolved = operations.resolve(ENTRY_PATH);
     validateEntry(resolved);
     assertMatches(written, resolved);
-
   }
 
   @Test
@@ -261,8 +296,6 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     assertEquals(1, records.size());
     ServiceRecord record = records.get(0);
     assertMatches(written, record);
-
-
   }
 
   @Test
@@ -302,7 +335,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
       operations.mkdir(path, false);
       RegistryPathStatus stat = operations.stat(path);
       fail("Got a status " + stat);
-    } catch (PathNotFoundException e) {
+    } catch (PathNotFoundException expected) {
 
     }
   }
@@ -317,7 +350,6 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     assertFalse(operations.mkdir(path, false));
   }
 
-  //  @Test(expected = PathNotFoundException.class)
   @Test
   public void testPutNoParent() throws Throwable {
     ServiceRecord record = new ServiceRecord();
@@ -326,14 +358,11 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     try {
       operations.create(path, record, 0);
       // didn't get a failure
-    } catch (PathNotFoundException e) {
-      return;
+      // trouble
+      RegistryPathStatus stat = operations.stat(path);
+      fail("Got a status " + stat);
+    } catch (PathNotFoundException expected) {
     }
-
-    // trouble
-    RegistryPathStatus stat = operations.stat(path);
-    fail("Got a status " + stat);
-
   }
 
   @Test(expected = PathNotFoundException.class)
@@ -373,7 +402,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     try {
       operations.create(ENTRY_PATH, resolved1, 0);
       fail("overwrite succeeded when it should have failed");
-    } catch (FileAlreadyExistsException e) {
+    } catch (FileAlreadyExistsException expected) {
 
     }
 
@@ -398,16 +427,20 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     String appPath = USERPATH + "tomcat";
 
     ServiceRecord webapp = new ServiceRecord(appId,
-        "tomcat-based web application");
+        "tomcat-based web application", 0);
     webapp.addExternalEndpoint(restEndpoint("www",
         new URI("http","//loadbalancer/", null)));
 
-    ServiceRecord comp1 = new ServiceRecord(cid1, null);
+    ServiceRecord comp1 = new ServiceRecord(cid1, null,
+        PersistencePolicies.EPHEMERAL);
     comp1.addExternalEndpoint(restEndpoint("www",
         new URI("http", "//rack4server3:43572", null)));
     comp1.addInternalEndpoint(
         inetAddrEndpoint("jmx", "JMX", "rack4server3", 43573));
-    ServiceRecord comp2 = new ServiceRecord(cid2, null);
+    
+    ServiceRecord comp2 = new ServiceRecord(cid2, null,
+        PersistencePolicies.EPHEMERAL);
+    comp2.persistence = PersistencePolicies.EPHEMERAL;
     comp2.addExternalEndpoint(restEndpoint("www",
         new URI("http", "//rack1server28:35881",null)));
     comp2.addInternalEndpoint(
@@ -418,9 +451,11 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     String components = appPath + RegistryConstants.SUBPATH_COMPONENTS + "/";
     operations.mkdir(components, false);
     String dns1 = yarnIdToDnsId(cid1);
-    operations.create(components + dns1, comp1, CreateFlags.EPHEMERAL);
+    String dns1path = components + dns1;
+    operations.create(dns1path, comp1, CreateFlags.EPHEMERAL);
     String dns2 = yarnIdToDnsId(cid2);
-    operations.create(components + dns2, comp2, CreateFlags.EPHEMERAL );
+    String dns2path = components + dns2;
+    operations.create(dns2path, comp2, CreateFlags.EPHEMERAL );
 
     ZKPathDumper pathDumper = yarnRegistry.dumpPath();
     LOG.info(pathDumper.toString());
@@ -429,12 +464,20 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     log(dns1, comp1);
     log(dns2, comp2);
 
+    ServiceRecord dns1resolved = operations.resolve(dns1path);
+    assertEquals("Persistence policies on resolved entry",
+        PersistencePolicies.EPHEMERAL, dns1resolved.persistence);
+
+
     RegistryPathStatus[] componentStats = operations.listDir(components);
     assertEquals(2, componentStats.length);
     List<ServiceRecord> records =
         RecordOperations.extractServiceRecords(operations, componentStats);
     assertEquals(2, records.size());
-    
+    ServiceRecord retrieved1 = records.get(0);
+    log(retrieved1.id, retrieved1);
+    assertEquals(PersistencePolicies.EPHEMERAL, retrieved1.persistence);
+
     // create a listing under components/
     operations.mkdir(components + "subdir", false);
     RegistryPathStatus[] componentStatsUpdated = operations.listDir(components);
@@ -445,8 +488,61 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
 
   }
 
-  public void log(String name, ServiceRecord record) throws
-      IOException {
-    LOG.info(" {} = \n{}\n", name, recordMarshal.toJson(record));
+
+  @Test
+  public void testPutGetEphemeralServiceEntry() throws Throwable {
+
+    String path = ENTRY_PATH;
+    ServiceRecord written = buildExampleServiceEntry(
+        PersistencePolicies.EPHEMERAL);
+
+    yarnRegistry.mkdir(RegistryPathUtils.parentOf(path), true);
+    operations.create(path, written, CreateFlags.EPHEMERAL);
+    ServiceRecord resolved = operations.resolve(path);
+    validateEntry(resolved);
+    assertMatches(written, resolved);
   }
+  
+  @Test(expected = IllegalArgumentException.class)
+  public void testPutGetEphemeralServiceEntryWrongPolicy() throws Throwable {
+    String path = ENTRY_PATH;
+    ServiceRecord written = buildExampleServiceEntry(
+        PersistencePolicies.APPLICATION_ATTEMPT);
+
+    yarnRegistry.mkdir(RegistryPathUtils.parentOf(path), true);
+    operations.create(path, written, CreateFlags.EPHEMERAL);
+  }
+  
+  @Test
+  public void testEphemeralNoChildren() throws Throwable {
+    ServiceRecord webapp = new ServiceRecord("1",
+        "tomcat-based web application", PersistencePolicies.EPHEMERAL);
+    operations.mkdir(USERPATH, false);
+    String appPath = USERPATH + "tomcat2";
+
+    operations.create(appPath, webapp, CreateFlags.EPHEMERAL);
+    String components = appPath + RegistryConstants.SUBPATH_COMPONENTS + "/";
+    try {
+      operations.mkdir(components, false);
+      fail("expected an error");
+    } catch (NoChildrenForEphemeralsException expected) {
+
+    }
+    try {
+      operations.create(appPath + "/subdir", webapp, CreateFlags.EPHEMERAL);
+      fail("expected an error");
+    } catch (NoChildrenForEphemeralsException expected) {
+
+    }
+
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testPolicyConflict() throws Throwable {
+    ServiceRecord rec = buildExampleServiceEntry(PersistencePolicies.EPHEMERAL);
+    operations.mkdir(USERPATH, false);
+    String appPath = USERPATH + "ex";
+    operations.create(appPath, rec, 0);
+  }
+  
 }
