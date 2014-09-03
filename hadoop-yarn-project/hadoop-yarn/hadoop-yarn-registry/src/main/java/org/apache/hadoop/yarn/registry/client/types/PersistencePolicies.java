@@ -25,27 +25,28 @@ package org.apache.hadoop.yarn.registry.client.types;
 public interface PersistencePolicies {
 
   /**
-   * The record persists until removed manually.
+   * The record persists until removed manually: {@value}.
    */
   int MANUAL = 0;
 
   /**
-   * Automatic deletion when the session is closed/times ou
+   * Automatic deletion when the session is closed/times out: {@value}.
    */
   int EPHEMERAL = 1;
 
   /**
-   * Remove when the YARN application defined in the id field terminates.
+   * Remove when the YARN application defined in the id field
+   * terminates: {@value}.
    */
   int APPLICATION = 2;
 
   /**
-   * Remove when the current YARN application attempt finishes.
+   * Remove when the current YARN application attempt finishes: {@value}.
    */
   int APPLICATION_ATTEMPT = 3;
 
   /**
-   * Remove when the YARN cluster is restarted. 
+   * Remove when the YARN cluster is restarted: {@value}.
    * This does not mean on HA failover; it means after a cluster stop/start.
    */
   int CLUSTER_RESTART = 4;
