@@ -92,6 +92,15 @@ public class RegistryPathUtils {
     return validateZKPath(join(base, path));
   }
 
+  /**
+   * Join two paths, guaranteeing that there will not be exactly
+   * one separator between the two, and exactly one at the front
+   * of the path. There will be no trailing "/" except for the special
+   * case that this is the root path
+   * @param base base path
+   * @param path second path to add
+   * @return a combined path.
+   */
   public static String join(String base, String path) {
     Preconditions.checkArgument(path != null, "null path");
     Preconditions.checkArgument(base != null, "null path");
@@ -102,7 +111,7 @@ public class RegistryPathUtils {
     }
     fullpath.append(base);
 
-    if (!fullpath.toString().endsWith("/") && !path.startsWith("/")) {
+    if (!path.startsWith("/") && !fullpath.toString().endsWith("/")) {
       fullpath.append("/");
     }
     fullpath.append(path);

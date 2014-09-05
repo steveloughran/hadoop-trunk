@@ -37,8 +37,10 @@ import java.io.IOException;
 public class AbstractZKRegistryTest extends Assert {
 
   protected static MicroZookeeperService zookeeper;
+
   @Rule
   public final Timeout testTimeout = new Timeout(10000);
+
   @Rule
   public TestName methodName = new TestName();
 
