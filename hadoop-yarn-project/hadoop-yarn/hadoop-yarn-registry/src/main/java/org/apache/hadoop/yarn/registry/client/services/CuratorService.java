@@ -530,7 +530,8 @@ public class CuratorService extends AbstractService
    * It is not an error to delete a path that does not exist
    * @param path path of operation
    * @param recursive flag to trigger recursive deletion
-   * @param backgroundCallback callback -triggers the operation as a background
+   * @param backgroundCallback callback; this being set converts the operation
+   * into an async/background operation.
    * task
    * @throws IOException on problems other than no-such-path
    */

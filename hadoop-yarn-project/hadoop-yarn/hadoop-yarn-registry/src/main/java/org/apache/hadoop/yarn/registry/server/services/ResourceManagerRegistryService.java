@@ -27,9 +27,8 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
-import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
+import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
@@ -39,10 +38,9 @@ import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.EOFException;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Extends the registry operations with extra support for resource management
@@ -88,7 +86,7 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
 
   /**
    * Create the initial registry paths
-   * @throws IOException
+   * @throws IOException any failure
    */
   @VisibleForTesting
   public void createRegistryPaths() throws IOException {
@@ -105,7 +103,7 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
   /**
    * Create the path for a user
    * @param username username
-   * @throws IOException
+   * @throws IOException any failure
    */
   public void createUserPath(String username) throws IOException {
     String path = BindingUtils.userPath(username);
@@ -162,81 +160,81 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
    */
   public enum PurgePolicy {
     PurgeAll,
-    PurgeFailOnChildren,
-    PurgeSkipOnChildren
+    FailOnChildren,
+    SkipOnChildren
   }
   
   /**
-   * Look under a base path and purge all records -recursively.
+   * Look under a base path and purge all records —recursively.
    * <ol>
    *   <li>Uses a depth first search</li>
    *   <li>If a record matches then it is deleted without any child searches</li>
    *   <li>Deletions will be asynchronous if a callback is provided</li>
    * </ol>
    * 
-   * @param basepath base path
+   * @param path base path
    * @param id ID for service record.id
    * @param purgePolicy what to do if there is a matching record with children
+   * @return the number of calls to the zkDelete() operation. This is purely for
+   * testing.
    * @throws IOException problems
    * @throws PathIsNotEmptyDirectoryException if an attempt is made to 
    */
   @VisibleForTesting
-  public void purgeRecordsWithID(String basepath, String id,
+  public int purgeRecordsWithID(String path, String id,
       PurgePolicy purgePolicy,
       BackgroundCallback callback) throws IOException {
-    Preconditions.checkArgument(StringUtils.isNotEmpty(basepath),
-        "Empty 'basepath' argument");
+    Preconditions.checkArgument(StringUtils.isNotEmpty(path),
+        "Empty 'path' argument");
     Preconditions.checkArgument(StringUtils.isNotEmpty(id),
         "Empty 'id' argument");
-    
-    // list this directory
-    RegistryPathStatus[] entries = listDir(basepath);
-    Map<String, RegistryPathStatus> subDirs =
-        new HashMap<String, RegistryPathStatus>(entries.length);
-    for (RegistryPathStatus status : entries) {
-      if (status.children> 0) {
-        subDirs.put(status.path, status);
+
+    // list this path's children
+    RegistryPathStatus[] entries = listDir(path);
+
+    boolean toDelete = false;
+    // look at self to see if it has a service record
+    try {
+      ServiceRecord serviceRecord = resolve(path);
+      // there is now an entry here.
+      toDelete = serviceRecord.id.equals(id); 
+    } catch (EOFException ignored) {
+      // ignore
+    } catch (InvalidRecordException ignored) {
+      // ignore
+    }
+
+    if (toDelete && entries.length > 0) {
+      LOG.debug("Match on record @ {} with children ", path);
+      // there's children
+      switch (purgePolicy) {
+        case SkipOnChildren:
+          // don't do the deletion... continue to next record
+          toDelete = false;
+          break;
+        case PurgeAll:
+          // mark for deletion
+          toDelete = true;
+          entries = new RegistryPathStatus[0];
+          break;
+        case FailOnChildren:
+          throw new PathIsNotEmptyDirectoryException(path);
       }
     }
 
-    Map<String, ServiceRecord> recordMap =
-        RecordOperations.extractServiceRecords(this, entries);
-
-    for (Map.Entry<String, ServiceRecord> recordEntry : recordMap.entrySet()) {
-      ServiceRecord serviceRecord = recordEntry.getValue();
-      String recordPath = recordEntry.getKey();
-      if (serviceRecord.id.equals(id)) {
-        // to purge
-        LOG.debug("Match for entry at {}", recordPath);
-        boolean toDelete = true;
-        // see if it has children, and act on that
-        if (subDirs.containsKey(recordPath)) {
-          // it does have children, so decide what to do
-          switch (purgePolicy) {
-            case PurgeSkipOnChildren:
-              // don't do the deletion... continue to next record
-              toDelete = false;
-              break;
-            case PurgeAll:
-              // mark for deletion
-              toDelete = true;
-              // remove the record from the subdir scan path as it is
-              // obsolete
-              subDirs.remove(recordPath);
-              break;
-            case PurgeFailOnChildren:
-              throw new PathIsNotEmptyDirectoryException(recordPath);
-          }
-        }
-        if (toDelete) {
-          zkDelete(recordPath, true, callback);
-        }
-      }
-    }
+    int deleteOps = 0;
     
+    if(toDelete) {
+      zkDelete(path, true, callback);
+      deleteOps++;
+    }
+
     // now go through the children
+    for (RegistryPathStatus status : entries) {
+      deleteOps += purgeRecordsWithID(status.path, id, purgePolicy, callback);
+    }
 
+    return deleteOps;
   }
-
 
 }

@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.registry.client.services;
 
-import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.curator.framework.api.CuratorEvent;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -39,10 +37,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Test the curator service
@@ -173,29 +167,13 @@ public class TestCuratorService extends AbstractZKRegistryTest {
   public void testBackgroundDelete() throws Throwable {
     mkPath("/rm", CreateMode.PERSISTENT);
     mkPath("/rm/child", CreateMode.PERSISTENT);
-    Events events = new Events();
+    CuratorEventCatcher events = new CuratorEventCatcher();
     curatorService.zkDelete("/rm", true, events);
     CuratorEvent taken = events.take();
     LOG.info("took {}", taken);
-    
+    assertEquals(1, events.getCount());
   }
-  
-  private static class Events implements BackgroundCallback {
 
-    private final BlockingQueue<CuratorEvent> events = new LinkedBlockingQueue<CuratorEvent>(1);
-    
-    @Override
-    public void processResult(CuratorFramework client,
-        CuratorEvent event) throws
-        Exception {
-      events.put(event);
-    }
-    
-    CuratorEvent take() throws InterruptedException {
-      return events.take();
-    }
-  }
-  
   @Test
   public void testCreate() throws Throwable {
 
@@ -211,13 +189,11 @@ public class TestCuratorService extends AbstractZKRegistryTest {
     byte[] buffer = getTestBuffer();
     curatorService.zkCreate("/testcreatetwice",
         CreateMode.PERSISTENT, buffer,
-        rootACL
-    );
+        rootACL);
     try {
       curatorService.zkCreate("/testcreatetwice",
           CreateMode.PERSISTENT, buffer,
-          rootACL
-      );
+          rootACL);
       fail();
     } catch (FileAlreadyExistsException e) {
 
