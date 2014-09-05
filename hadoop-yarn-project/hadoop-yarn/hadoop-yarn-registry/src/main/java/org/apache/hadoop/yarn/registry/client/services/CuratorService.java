@@ -51,7 +51,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -218,12 +217,12 @@ public class CuratorService extends AbstractService
 
   }
 
-  /*
-       * Create a full path from the registry root and the supplied subdir
-       * @param path path of operation
-       * @return an absolute path
-       * @throws IllegalArgumentException if the path is invalide
-       */
+  /**
+   * Create a full path from the registry root and the supplied subdir
+   * @param path path of operation
+   * @return an absolute path
+   * @throws IllegalArgumentException if the path is invalide
+   */
   protected String createFullPath(String path) throws IOException {
     return RegistryPathUtils.createFullPath(registryRoot, path);
   }
@@ -340,23 +339,25 @@ public class CuratorService extends AbstractService
    *
    * @param path path to create
    * @param acl ACL for path -used when creating a new entry
-   * @param createParents
+   * @param createParents flag to trigger parent creation
    * @return true iff the path was created
    * @throws IOException
    */
   @VisibleForTesting
   public boolean maybeCreate(String path,
       CreateMode mode,
-      List<ACL> acl, boolean createParents) throws IOException {
+      List<ACL> acl,
+      boolean createParents) throws IOException {
     return zkMkPath(path, mode, createParents, acl);
   }
 
 
   /**
    * Stat the file
-   * @param path
-   * @return
-   * @throws IOException
+   * @param path path of operation
+   * @return a curator stat entry
+   * @throws IOException on a failure
+   * @throws PathNotFoundException if the path was not found
    */
   public Stat zkStat(String path) throws IOException {
     String fullpath = createFullPath(path);
@@ -559,7 +560,6 @@ public class CuratorService extends AbstractService
       GetChildrenBuilder builder = curator.getChildren();
       List<String> children = builder.forPath(fullpath);
       return children;
-
     } catch (Exception e) {
       throw operationFailure(path, "ls()", e);
     }
