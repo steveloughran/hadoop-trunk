@@ -32,11 +32,11 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.ConfigurationProvider;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
-import org.apache.hadoop.yarn.registry.server.services.ResourceManagerRegistryService;
 import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWriter;
 import org.apache.hadoop.yarn.server.resourcemanager.metrics.SystemMetricsPublisher;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.NullRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
+import org.apache.hadoop.yarn.server.resourcemanager.registry.RMRegistryService;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.ReservationSystem;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.AMLivelinessMonitor;
@@ -98,7 +98,7 @@ public class RMContextImpl implements RMContext {
   private long schedulerRecoveryWaitTime = 0;
   private boolean printLog = true;
   private boolean isSchedulerReady = false;
-  private ResourceManagerRegistryService registry;
+  private RMRegistryService registry;
 
   private static final Log LOG = LogFactory.getLog(RMContextImpl.class);
 
@@ -122,7 +122,7 @@ public class RMContextImpl implements RMContext {
       NMTokenSecretManagerInRM nmTokenSecretManager,
       ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager,
       RMApplicationHistoryWriter rmApplicationHistoryWriter,
-      ResourceManagerRegistryService registry) {
+      RMRegistryService registry) {
     this();
     this.setDispatcher(rmDispatcher);
     this.setContainerAllocationExpirer(containerAllocationExpirer);
@@ -438,11 +438,11 @@ public class RMContextImpl implements RMContext {
   }
 
   @Override
-  public ResourceManagerRegistryService getRegistry() {
+  public RMRegistryService getRegistry() {
     return registry;
   }
 
-  void setRegistry(ResourceManagerRegistryService registry) {
+  void setRegistry(RMRegistryService registry) {
     this.registry = registry;
   }
 }

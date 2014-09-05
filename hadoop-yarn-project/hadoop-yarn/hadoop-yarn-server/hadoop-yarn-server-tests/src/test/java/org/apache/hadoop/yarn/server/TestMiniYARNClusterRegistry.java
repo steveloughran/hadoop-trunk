@@ -23,8 +23,9 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
 import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperService;
-import org.apache.hadoop.yarn.registry.server.services.ResourceManagerRegistryService;
+import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
+import org.apache.hadoop.yarn.server.resourcemanager.registry.RMRegistryService;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -89,7 +90,7 @@ public class TestMiniYARNClusterRegistry extends Assert {
     String connectionString = zookeeper.getConnectionString();
     String confConnection = conf.get(RegistryConstants.KEY_REGISTRY_ZK_QUORUM);
     ResourceManager rm = cluster.getResourceManager(0);
-    ResourceManagerRegistryService registry = rm.getRMContext().getRegistry();
+    RMRegistryService registry = rm.getRMContext().getRegistry();
     assertNotNull("null registry", registry);
   }
 

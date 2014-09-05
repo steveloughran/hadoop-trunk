@@ -29,6 +29,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
@@ -50,14 +51,17 @@ import java.util.List;
  * Extends the registry operations with extra support for resource management
  * operations, including creating and cleaning up the registry. 
  * 
+ * These actions are all implemented as event handlers to operations
+ * which come from the RM.
+ * 
  * This service is expected to be executed by a user with the permissions
  * to manipulate the entire registry,
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class ResourceManagerRegistryService extends RegistryOperationsService {
+public class RMRegistryOperationsService extends RegistryOperationsService {
   private static final Logger LOG =
-      LoggerFactory.getLogger(ResourceManagerRegistryService.class);
+      LoggerFactory.getLogger(RMRegistryOperationsService.class);
   
   private List<ACL> rootRegistryACL;
 
@@ -65,11 +69,11 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
 
   private PurgePolicy purgeOnCompletionPolicy = PurgePolicy.PurgeAll;
   
-  public ResourceManagerRegistryService(String name) {
+  public RMRegistryOperationsService(String name) {
     this(name, null);
   }
 
-  public ResourceManagerRegistryService(String name,
+  public RMRegistryOperationsService(String name,
       RegistryBindingSource bindingSource) {
     super(name, bindingSource);
   }
@@ -146,63 +150,95 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
     this.purgeOnCompletionPolicy = purgeOnCompletionPolicy;
   }
 
-  public void onApplicationAccepted() throws IOException {
+  public void onApplicationAttemptRegistered(ApplicationAttemptId id,
+      String host,int rpcport, String trackingurl) throws IOException {
     
   }
 
-  public void onApplicationLaunched() throws IOException {
+  public void onApplicationLaunched(ApplicationAttemptId id) throws IOException {
     
   }
 
   /**
    * Actions to take as an AM registers itself with the RM. 
-   * @param user user owning the application
    * @param id attempt ID
    * @throws IOException problems
    */
-  public void onApplicationMasterRegistered(String user,
-      ApplicationAttemptId id) throws IOException {
-    createHomeDirectory(user);
+  public void onApplicationMasterRegistered(ApplicationAttemptId id) throws IOException {
   }
 
   /**
    * Actions to take when a container is completed
-   * @param user user owning the application
    * @param id  container ID
    * @throws IOException problems
    */
-  public void onContainerCompleted(String user, ContainerId id) throws IOException {
-    purgeRecordsQuietly(homeDir(user), 
+  public void onAMContainerFinished(ApplicationId id) throws IOException {
+    purgeRecordsQuietly("/",
+        id.toString(),
+        PersistencePolicies.APPLICATION);
+  }
+
+  /**
+   * Actions to take when a container is completed
+   * @param id  container ID
+   * @throws IOException problems
+   */
+  public void onContainerFinished(ContainerId id) throws IOException {
+    purgeRecordsQuietly("/", 
         id.toString(),
         PersistencePolicies.CONTAINER);
   }
 
   /**
    * Actions to take when an application attempt is completed
-   * @param user user owning the application
    * @param id  application attempt ID
    * @throws IOException problems
    */
-  public void onApplicationAttemptCompleted(String user, ApplicationAttemptId id) 
+  public void onApplicationAttemptCompleted(ApplicationAttemptId id) 
       throws IOException {
-    purgeRecordsQuietly(homeDir(user),
+    purgeRecordsQuietly("/",
         id.toString(),
         PersistencePolicies.APPLICATION_ATTEMPT);
   }
 
   /**
    * Actions to take when an application is completed
-   * @param user user owning the application
    * @param id  application  ID
    * @throws IOException problems
    */
-  public void onApplicationCompleted(String  user, ApplicationAttemptId id)
+  public void onApplicationUnregistered(ApplicationAttemptId id)
       throws IOException {
-    purgeRecordsQuietly(homeDir(user),
+    purgeRecordsQuietly("/",
+        id.toString(),
+        PersistencePolicies.APPLICATION);
+  }
+/**
+   * Actions to take when an application is completed
+   * @param id  application  ID
+   * @throws IOException problems
+   */
+  public void onApplicationCompleted(ApplicationId id)
+      throws IOException {
+    purgeRecordsQuietly("/",
         id.toString(),
         PersistencePolicies.APPLICATION);
   }
 
+  public void onApplicationAttemptAdded(ApplicationAttemptId appAttemptId) {
+  }
+
+  /**
+   * This is the event where the user is known, so the user directory
+   * can be created
+   * @param id application  ID
+   * @param user username
+   * @throws IOException problems
+   */
+  public void onStateStoreEvent(ApplicationId id, String user) throws
+      IOException {
+    createHomeDirectory(user);
+
+  }
 
   /**
    * Policy to purge entries
