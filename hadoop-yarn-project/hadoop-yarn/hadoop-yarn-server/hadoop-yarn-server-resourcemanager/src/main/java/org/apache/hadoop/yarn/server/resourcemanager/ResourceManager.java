@@ -62,7 +62,6 @@ import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.server.services.ResourceManagerRegistryService;
 import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWriter;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.ApplicationMasterLauncher;
@@ -74,6 +73,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.RMState;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStoreFactory;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
+import org.apache.hadoop.yarn.server.resourcemanager.registry.RMRegistryService;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
@@ -163,7 +163,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   /**
    * Registry service
    */
-  protected ResourceManagerRegistryService registry;
+  protected RMRegistryService registry;
 
   @VisibleForTesting
   protected String webAppAddress;
@@ -243,8 +243,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     boolean registryEnabled = conf.getBoolean(RegistryConstants.KEY_REGISTRY_ENABLED,
         RegistryConstants.DEFAULT_REGISTRY_ENABLED);
     if (registryEnabled) {
-      registry =
-          new ResourceManagerRegistryService("Registry");
+      registry = new RMRegistryService(rmContext);
       addService(registry);
       rmContext.setRegistry(registry);
     }

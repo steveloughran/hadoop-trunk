@@ -40,7 +40,7 @@ import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
-import org.apache.hadoop.yarn.registry.server.services.ResourceManagerRegistryService;
+import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
 import org.apache.zookeeper.data.ACL;
 import org.junit.After;
 import org.junit.Before;
@@ -75,14 +75,14 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
   private final RecordOperations.ServiceRecordMarshal recordMarshal =
       new RecordOperations.ServiceRecordMarshal();
 
-  private ResourceManagerRegistryService registry;
+  private RMRegistryOperationsService registry;
   
   private RegistryOperations operations;
 
 
   @Before
   public void setupClient() throws IOException {
-    registry = new ResourceManagerRegistryService("yarnRegistry");
+    registry = new RMRegistryOperationsService("yarnRegistry");
     registry.init(createRegistryConfiguration());
     registry.start();
     registry.createRegistryPaths();
@@ -522,12 +522,12 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     // fail if the app policy is chosen
     assertEquals(0, registry.purgeRecords("/", cid2,
         PersistencePolicies.APPLICATION,
-        ResourceManagerRegistryService.PurgePolicy.FailOnChildren,
+        RMRegistryOperationsService.PurgePolicy.FailOnChildren,
         null));
     // succeed for container
     assertEquals(1, registry.purgeRecords("/", cid2,
         PersistencePolicies.CONTAINER,
-        ResourceManagerRegistryService.PurgePolicy.FailOnChildren,
+        RMRegistryOperationsService.PurgePolicy.FailOnChildren,
         null));
     assertPathNotFound(dns2path);
     assertPathExists(dns1path);
@@ -537,7 +537,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
       registry.purgeRecords("/",
           appId,
           PersistencePolicies.APPLICATION,
-          ResourceManagerRegistryService.PurgePolicy.FailOnChildren, null);
+          RMRegistryOperationsService.PurgePolicy.FailOnChildren, null);
       fail("expected a failure");
     } catch (PathIsNotEmptyDirectoryException expected) {
      // expected
@@ -549,7 +549,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     assertEquals(0,
         registry.purgeRecords("/", appId,
             PersistencePolicies.APPLICATION,
-            ResourceManagerRegistryService.PurgePolicy.SkipOnChildren,
+            RMRegistryOperationsService.PurgePolicy.SkipOnChildren,
             null));
     assertPathExists(appPath);
     assertPathExists(dns1path);
@@ -559,7 +559,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
         registry.purgeRecords("/",
             appId,
             PersistencePolicies.APPLICATION,
-            ResourceManagerRegistryService.PurgePolicy.PurgeAll,
+            RMRegistryOperationsService.PurgePolicy.PurgeAll,
             null));
     assertPathNotFound(appPath);
     assertPathNotFound(dns1path);
@@ -587,7 +587,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     int opcount = registry.purgeRecords("/",
         written.id,
         PersistencePolicies.CONTAINER,
-        ResourceManagerRegistryService.PurgePolicy.PurgeAll,
+        RMRegistryOperationsService.PurgePolicy.PurgeAll,
         events);
     assertPathExists(path);
     assertEquals(0, opcount);
@@ -599,7 +599,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
         written.id,
         -1,
 //        PersistencePolicies.APPLICATION_ATTEMPT,
-        ResourceManagerRegistryService.PurgePolicy.PurgeAll,
+        RMRegistryOperationsService.PurgePolicy.PurgeAll,
         events);
 
     LOG.info("Final state {}", dump);
