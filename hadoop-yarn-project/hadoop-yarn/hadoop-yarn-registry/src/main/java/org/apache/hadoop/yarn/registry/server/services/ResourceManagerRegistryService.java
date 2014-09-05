@@ -174,6 +174,8 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
    * 
    * @param path base path
    * @param id ID for service record.id
+   * @param persistencePolicyMatch ID for the persistence policy to match: no match, no delete.
+   * If set to to -1 or below, " don't check"
    * @param purgePolicy what to do if there is a matching record with children
    * @return the number of calls to the zkDelete() operation. This is purely for
    * testing.
@@ -181,7 +183,9 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
    * @throws PathIsNotEmptyDirectoryException if an attempt is made to 
    */
   @VisibleForTesting
-  public int purgeRecordsWithID(String path, String id,
+  public int purgeRecordsWithID(String path,
+      String id,
+      int persistencePolicyMatch,
       PurgePolicy purgePolicy,
       BackgroundCallback callback) throws IOException {
     Preconditions.checkArgument(StringUtils.isNotEmpty(path),
@@ -197,7 +201,9 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
     try {
       ServiceRecord serviceRecord = resolve(path);
       // there is now an entry here.
-      toDelete = serviceRecord.id.equals(id); 
+      toDelete = serviceRecord.id.equals(id) 
+                 && (persistencePolicyMatch < 0 
+                     || serviceRecord.persistence == persistencePolicyMatch); 
     } catch (EOFException ignored) {
       // ignore
     } catch (InvalidRecordException ignored) {
@@ -225,13 +231,17 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
     int deleteOps = 0;
     
     if(toDelete) {
-      zkDelete(path, true, callback);
       deleteOps++;
+      zkDelete(path, true, callback);
     }
 
     // now go through the children
     for (RegistryPathStatus status : entries) {
-      deleteOps += purgeRecordsWithID(status.path, id, purgePolicy, callback);
+      deleteOps += purgeRecordsWithID(status.path,
+          id,
+          persistencePolicyMatch,
+          purgePolicy,
+          callback);
     }
 
     return deleteOps;

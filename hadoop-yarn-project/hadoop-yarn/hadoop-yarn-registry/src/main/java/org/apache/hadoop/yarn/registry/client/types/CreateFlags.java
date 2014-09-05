@@ -29,6 +29,11 @@ import org.apache.hadoop.classification.InterfaceStability;
 public interface CreateFlags {
 
   /**
+   * Create the entry.. This is just "0" and can be "or"ed with anything
+   */
+  int CREATE = 0;
+  
+  /**
    * The entry is ephemeral, when this session is closed the entry
    * will be deleted.
    */
