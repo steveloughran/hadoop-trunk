@@ -21,16 +21,20 @@ package org.apache.hadoop.yarn.registry.server.services;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
+import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.api.BackgroundCallback;
+import org.apache.curator.framework.api.CuratorEvent;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
+import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.zookeeper.CreateMode;
@@ -44,8 +48,10 @@ import java.util.List;
 
 /**
  * Extends the registry operations with extra support for resource management
- * operations, in particular setting up paths with the correct security
- * permissions.
+ * operations, including creating and cleaning up the registry. 
+ * 
+ * This service is expected to be executed by a user with the permissions
+ * to manipulate the entire registry,
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -57,6 +63,8 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
 
   private List<ACL> userAcl;
 
+  private PurgePolicy purgeOnCompletionPolicy = PurgePolicy.PurgeAll;
+  
   public ResourceManagerRegistryService(String name) {
     this(name, null);
   }
@@ -105,12 +113,20 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
    * @param username username
    * @throws IOException any failure
    */
-  public void createUserPath(String username) throws IOException {
-    String path = BindingUtils.userPath(username);
+  public void createHomeDirectory(String username) throws IOException {
+    String path = homeDir(username);
     maybeCreate(path, CreateMode.PERSISTENT,
         createAclForUser(username), false);
   }
 
+  /**
+   * Get the path to a user's home dir
+   * @param username username
+   * @return a path for services underneath
+   */
+  protected String homeDir(String username) {
+    return BindingUtils.userPath(username);
+  }
 
   /**
    * Set up the ACL for the user.
@@ -122,6 +138,13 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
     return userAcl;
   }
 
+  public PurgePolicy getPurgeOnCompletionPolicy() {
+    return purgeOnCompletionPolicy;
+  }
+
+  public void setPurgeOnCompletionPolicy(PurgePolicy purgeOnCompletionPolicy) {
+    this.purgeOnCompletionPolicy = purgeOnCompletionPolicy;
+  }
 
   public void onApplicationAccepted() throws IOException {
     
@@ -134,24 +157,50 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
   /**
    * Actions to take as an AM registers itself with the RM. 
    * @param user user owning the application
-   * @param attemptId attempt ID
-   * @throws IOException
+   * @param id attempt ID
+   * @throws IOException problems
    */
   public void onApplicationMasterRegistered(String user,
-      ApplicationAttemptId attemptId) throws IOException {
-    createUserPath(user);
-  }
-  
-  public void onContainerCompleted() throws IOException {
-    
+      ApplicationAttemptId id) throws IOException {
+    createHomeDirectory(user);
   }
 
-  public void onApplicationAttemptCompleted() throws IOException {
-    
+  /**
+   * Actions to take when a container is completed
+   * @param user user owning the application
+   * @param id  container ID
+   * @throws IOException problems
+   */
+  public void onContainerCompleted(String user, ContainerId id) throws IOException {
+    purgeRecordsQuietly(homeDir(user), 
+        id.toString(),
+        PersistencePolicies.CONTAINER);
   }
 
-  public void onApplicationCompleted() throws IOException {
-    
+  /**
+   * Actions to take when an application attempt is completed
+   * @param user user owning the application
+   * @param id  application attempt ID
+   * @throws IOException problems
+   */
+  public void onApplicationAttemptCompleted(String user, ApplicationAttemptId id) 
+      throws IOException {
+    purgeRecordsQuietly(homeDir(user),
+        id.toString(),
+        PersistencePolicies.APPLICATION_ATTEMPT);
+  }
+
+  /**
+   * Actions to take when an application is completed
+   * @param user user owning the application
+   * @param id  application  ID
+   * @throws IOException problems
+   */
+  public void onApplicationCompleted(String  user, ApplicationAttemptId id)
+      throws IOException {
+    purgeRecordsQuietly(homeDir(user),
+        id.toString(),
+        PersistencePolicies.APPLICATION);
   }
 
 
@@ -163,11 +212,39 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
     FailOnChildren,
     SkipOnChildren
   }
+
+
   
   /**
-   * Look under a base path and purge all records —recursively.
+   * Purge all matching records under a base path -logging problems at INFO.
    * <ol>
    *   <li>Uses a depth first search</li>
+   *   <li>A match is on ID and persistence policy, or, if policy==-1, any match</li>
+   *   <li>If a record matches then it is deleted without any child searches</li>
+   *   <li>Deletions will be asynchronous if a callback is provided</li>
+   * </ol>
+   *  @param path base path
+   * @param id ID for service record.id
+   * @param persistencePolicyMatch ID for the persistence policy to match: no match, no delete.
+ * If set to to -1 or below, " don't check"
+   */
+  private void purgeRecordsQuietly(String path,
+      String id,
+      int persistencePolicyMatch) {
+    try {
+      purgeRecords(path, id, persistencePolicyMatch, purgeOnCompletionPolicy,
+          new DeleteCompletionCallback());
+    } catch (IOException e) {
+      LOG.info("Purging records under {} with ID {} and policy {}: {}",
+          path, id, persistencePolicyMatch, e, e);
+    }
+  }
+
+  /**
+   * Purge all matching records under a base path.
+   * <ol>
+   *   <li>Uses a depth first search</li>
+   *   <li>A match is on ID and persistence policy, or, if policy==-1, any match</li>
    *   <li>If a record matches then it is deleted without any child searches</li>
    *   <li>Deletions will be asynchronous if a callback is provided</li>
    * </ol>
@@ -180,10 +257,11 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
    * @return the number of calls to the zkDelete() operation. This is purely for
    * testing.
    * @throws IOException problems
-   * @throws PathIsNotEmptyDirectoryException if an attempt is made to 
+   * @throws PathIsNotEmptyDirectoryException if an entry cannot be deleted
+   * as his children and the purge policy is FailOnChildren
    */
   @VisibleForTesting
-  public int purgeRecordsWithID(String path,
+  public int purgeRecords(String path,
       String id,
       int persistencePolicyMatch,
       PurgePolicy purgePolicy,
@@ -237,7 +315,7 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
 
     // now go through the children
     for (RegistryPathStatus status : entries) {
-      deleteOps += purgeRecordsWithID(status.path,
+      deleteOps += purgeRecords(status.path,
           id,
           persistencePolicyMatch,
           purgePolicy,
@@ -247,4 +325,17 @@ public class ResourceManagerRegistryService extends RegistryOperationsService {
     return deleteOps;
   }
 
+
+  /**
+   * Callback for delete operations completing
+   */
+  protected static class DeleteCompletionCallback implements BackgroundCallback {
+    @Override
+    public void processResult(CuratorFramework client,
+        CuratorEvent event) throws
+        Exception {
+      LOG.debug("Delete event "+ event.toString());
+    }
+  }
+  
 }

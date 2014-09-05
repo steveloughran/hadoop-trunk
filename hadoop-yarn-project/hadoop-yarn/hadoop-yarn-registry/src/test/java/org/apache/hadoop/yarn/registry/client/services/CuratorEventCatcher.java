@@ -21,6 +21,8 @@ package org.apache.hadoop.yarn.registry.client.services;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.curator.framework.api.CuratorEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -32,6 +34,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 class CuratorEventCatcher implements BackgroundCallback {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(CuratorEventCatcher.class);
+  
   public final BlockingQueue<CuratorEvent>
       events = new LinkedBlockingQueue<CuratorEvent>(1);
 
@@ -42,6 +47,7 @@ class CuratorEventCatcher implements BackgroundCallback {
   public void processResult(CuratorFramework client,
       CuratorEvent event) throws
       Exception {
+    LOG.info("received {}", event);
     eventCounter.incrementAndGet();
     events.put(event);
   }
@@ -50,6 +56,12 @@ class CuratorEventCatcher implements BackgroundCallback {
   public int getCount() {
     return eventCounter.get();
   }
+
+  /**
+   * Blocking operation to take the first event off the queue
+   * @return the first event on the queue, when it arrives
+   * @throws InterruptedException if interrupted
+   */
   public CuratorEvent take() throws InterruptedException {
     return events.take();
   }
