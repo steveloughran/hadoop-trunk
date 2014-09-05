@@ -35,14 +35,16 @@ public final class RegistryPathStatus {
   public final String path; 
   public final long time;
   public final long size;
+  public final int children;
 
 
   public RegistryPathStatus(String path,
       long time,
-      long size) {
+      long size, int children) {
     this.path = path;
     this.time = time;
     this.size = size;
+    this.children = children;
   }
 
   @Override
@@ -81,6 +83,7 @@ public final class RegistryPathStatus {
     sb.append("path='").append(path).append('\'');
     sb.append(", time=").append(time);
     sb.append(", size=").append(size);
+    sb.append(", children=").append(children);
     sb.append('}');
     return sb.toString();
   }

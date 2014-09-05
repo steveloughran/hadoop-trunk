@@ -166,9 +166,9 @@ public class RegistryOperationsService extends CuratorService
     RegistryPathStatus status = new RegistryPathStatus(
         path,
         stat.getCtime(),
-        stat.getDataLength()
-    );
-    LOG.debug("Stat {} = {}", path, status);
+        stat.getDataLength(),
+        stat.getNumChildren());
+    LOG.debug("Stat {} => {}", path, status);
     return status;
   }
 
