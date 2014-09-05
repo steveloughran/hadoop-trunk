@@ -30,6 +30,9 @@ import org.junit.rules.Timeout;
 
 import java.io.EOFException;
 
+/**
+ * Test record marshalling
+ */
 public class TestMarshalling extends Assert {
   @Rule
   public final Timeout testTimeout = new Timeout(10000);
@@ -41,6 +44,7 @@ public class TestMarshalling extends Assert {
   public static void setupClass() {
     marshal = new RecordOperations.ServiceRecordMarshal();
   }
+
   @Test
   public void testRoundTrip() throws Throwable {
     ServiceRecord record = new ServiceRecord("01", "description", 0);
@@ -50,7 +54,7 @@ public class TestMarshalling extends Assert {
     assertEquals(record.persistence, r2.persistence);
     assertEquals(record.description, r2.description);
   }
-  
+
   @Test
   public void testRoundTripHeaders() throws Throwable {
     ServiceRecord record = new ServiceRecord("01", "description", 1);
@@ -60,41 +64,25 @@ public class TestMarshalling extends Assert {
     assertEquals(record.persistence, r2.persistence);
     assertEquals(record.description, r2.description);
   }
-  
-  @Test
+
+  @Test(expected = InvalidRecordException.class)
   public void testRoundTripBadHeaders() throws Throwable {
     ServiceRecord record = new ServiceRecord("01", "description", 0);
     byte[] bytes = marshal.toByteswithHeader(record);
     bytes[1] = 0x01;
-    try {
-      marshal.fromBytesWithHeader("src", bytes);
-      fail("expected an exception");
-    } catch (InvalidRecordException expected) {
-
-    }
+    marshal.fromBytesWithHeader("src", bytes);
   }
 
-  @Test
+  @Test(expected = InvalidRecordException.class)
   public void testUnmarshallHeaderTooShort() throws Throwable {
-    byte[] bytes = {'a'};
-    try {
-      marshal.fromBytesWithHeader("src", bytes);
-      fail("expected an exception");
-    } catch (InvalidRecordException expected) {
-
-    }
+    marshal.fromBytesWithHeader("src", new byte[]{'a'});
   }
-  
-  @Test
+
+  @Test(expected = EOFException.class)
   public void testUnmarshallNoBody() throws Throwable {
     byte[] bytes = RegistryConstants.RECORD_HEADER;
-    try {
-      marshal.fromBytesWithHeader("src", bytes);
-      fail("expected an exception");
-    } catch (EOFException expected) {
-
-    }
+    marshal.fromBytesWithHeader("src", bytes);
   }
-  
-  
+
+
 }

@@ -27,13 +27,48 @@ import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameExceptio
 import org.junit.Assert;
 import org.junit.Test;
 
-public class TestRegistryZKUtils extends Assert {
-  
+public class TestRegistryPathUtils extends Assert {
+
+
+  public static final String EURO = "\u20AC";
+
+  @Test
+  public void testFormatAscii() throws Throwable {
+
+    String in = "hostname01101101-1";
+    assertConverted(in, in);
+  }
+
+  /*
+  * Euro symbol
+   */
+  @Test
+  public void testFormatEuroSymbol() throws Throwable {
+    assertConverted("xn--lzg", EURO);
+  }
+
+  @Test
+  public void testFormatIdempotent() throws Throwable {
+    assertConverted("xn--lzg", RegistryPathUtils.encodeForRegistry(EURO));
+  }
+
+  @Test
+  public void testFormatCyrillicSpaced() throws Throwable {
+    assertConverted("xn--pa 3-k4di", "\u0413PA\u0414 3");
+  }
+
+  protected void assertConverted(String expected, String in) {
+    String out = RegistryPathUtils.encodeForRegistry(in);
+    assertEquals("Conversion of " + in, expected, out);
+  }
+
+
   @Test
   public void testPaths() throws Throwable {
     assertCreatedPathEquals("/", "/", "");
     assertCreatedPathEquals("/", "", "");
     assertCreatedPathEquals("/", "", "/");
+    assertCreatedPathEquals("/", "/", "/");
 
     assertCreatedPathEquals("/a", "/a", "");
     assertCreatedPathEquals("/a", "/", "a");
