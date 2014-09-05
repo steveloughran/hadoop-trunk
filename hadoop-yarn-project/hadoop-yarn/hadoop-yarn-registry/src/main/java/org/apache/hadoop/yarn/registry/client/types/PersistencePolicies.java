@@ -41,14 +41,19 @@ public interface PersistencePolicies {
   int APPLICATION = 2;
 
   /**
-   * Remove when the current YARN application attempt finishes: {@value}.
+   * Remove when the current YARN application attempt ID finishes: {@value}.
    */
   int APPLICATION_ATTEMPT = 3;
+
+  /**
+   * Remove when the YARN container in the ID field finishes.
+   */
+  int CONTAINER = 4;
 
   /**
    * Remove when the YARN cluster is restarted: {@value}.
    * This does not mean on HA failover; it means after a cluster stop/start.
    */
-  int CLUSTER_RESTART = 4;
+  int CLUSTER_RESTART = 5;
       
 }
