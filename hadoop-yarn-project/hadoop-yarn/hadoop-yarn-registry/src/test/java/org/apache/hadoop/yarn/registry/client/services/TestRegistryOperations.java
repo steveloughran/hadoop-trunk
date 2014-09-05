@@ -53,6 +53,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
+import java.util.Map;
 
 public class TestRegistryOperations extends AbstractZKRegistryTest {
   public static final String SC_HADOOP = "org-apache-hadoop";
@@ -291,10 +292,10 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     assertEquals(1, statuses.length);
     assertEquals(stat, statuses[0]);
 
-    List<ServiceRecord> records =
+    Map<String, ServiceRecord> records =
         RecordOperations.extractServiceRecords(operations, statuses);
     assertEquals(1, records.size());
-    ServiceRecord record = records.get(0);
+    ServiceRecord record = records.get(ENTRY_PATH);
     assertMatches(written, record);
   }
 
@@ -471,18 +472,19 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
 
     RegistryPathStatus[] componentStats = operations.listDir(components);
     assertEquals(2, componentStats.length);
-    List<ServiceRecord> records =
+    Map<String, ServiceRecord> records =
         RecordOperations.extractServiceRecords(operations, componentStats);
     assertEquals(2, records.size());
-    ServiceRecord retrieved1 = records.get(0);
+    ServiceRecord retrieved1 = records.get(dns1path);
     log(retrieved1.id, retrieved1);
+    assertMatches(dns1resolved, retrieved1);
     assertEquals(PersistencePolicies.EPHEMERAL, retrieved1.persistence);
 
     // create a listing under components/
     operations.mkdir(components + "subdir", false);
     RegistryPathStatus[] componentStatsUpdated = operations.listDir(components);
     assertEquals(3, componentStatsUpdated.length);
-    List<ServiceRecord> recordsUpdated =
+    Map<String, ServiceRecord> recordsUpdated =
         RecordOperations.extractServiceRecords(operations, componentStats);
     assertEquals(2, recordsUpdated.size());
 
