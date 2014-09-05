@@ -198,6 +198,6 @@ public class RegistryOperationsService extends CuratorService
       InvalidPathnameException,
       IOException {
     validatePath(path);
-    zkDelete(path, recursive);
+    zkDelete(path, recursive, null);
   }
 }

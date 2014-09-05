@@ -24,6 +24,7 @@ import org.apache.curator.ensemble.EnsembleProvider;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.curator.framework.api.CreateBuilder;
 import org.apache.curator.framework.api.DeleteBuilder;
 import org.apache.curator.framework.api.GetChildrenBuilder;
@@ -529,15 +530,22 @@ public class CuratorService extends AbstractService
    * It is not an error to delete a path that does not exist
    * @param path path of operation
    * @param recursive flag to trigger recursive deletion
-   * @throws IOException
+   * @param backgroundCallback callback -triggers the operation as a background
+   * task
+   * @throws IOException on problems other than no-such-path
    */
-  public void zkDelete(String path, boolean recursive) throws IOException {
+  public void zkDelete(String path,
+      boolean recursive,
+      BackgroundCallback backgroundCallback) throws IOException {
     String fullpath = createFullPath(path);
     try {
       LOG.debug("Deleting {}", fullpath);
       DeleteBuilder delete = curator.delete();
       if (recursive) {
         delete.deletingChildrenIfNeeded();
+      }
+      if (backgroundCallback != null) {
+        delete.inBackground(backgroundCallback);
       }
       delete.forPath(fullpath);
     } catch (KeeperException.NoNodeException e) {

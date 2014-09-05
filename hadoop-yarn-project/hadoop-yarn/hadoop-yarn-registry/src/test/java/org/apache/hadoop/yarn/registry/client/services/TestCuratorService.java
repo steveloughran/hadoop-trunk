@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.registry.client.services;
 
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.api.BackgroundCallback;
+import org.apache.curator.framework.api.CuratorEvent;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
@@ -31,14 +34,24 @@ import org.apache.zookeeper.data.ACL;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Test the curator service
  */
 public class TestCuratorService extends AbstractZKRegistryTest {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestCuratorService.class);
+
+
   protected CuratorService curatorService;
 
   public static final String MISSING = "/missing";
@@ -129,9 +142,9 @@ public class TestCuratorService extends AbstractZKRegistryTest {
   @Test
   public void testRM() throws Throwable {
     mkPath("/rm", CreateMode.PERSISTENT);
-    curatorService.zkDelete("/rm", false);
+    curatorService.zkDelete("/rm", false, null);
     verifyNotExists("/rm");
-    curatorService.zkDelete("/rm", false);
+    curatorService.zkDelete("/rm", false, null);
   }
 
   @Test
@@ -139,7 +152,7 @@ public class TestCuratorService extends AbstractZKRegistryTest {
     mkPath("/rm", CreateMode.PERSISTENT);
     mkPath("/rm/child", CreateMode.PERSISTENT);
     try {
-      curatorService.zkDelete("/rm", false);
+      curatorService.zkDelete("/rm", false, null);
       fail("expected a failure");
     } catch (PathIsNotEmptyDirectoryException expected) {
 
@@ -147,14 +160,42 @@ public class TestCuratorService extends AbstractZKRegistryTest {
   }
 
   @Test
-  public void testRMNRf() throws Throwable {
+  public void testRMRf() throws Throwable {
     mkPath("/rm", CreateMode.PERSISTENT);
     mkPath("/rm/child", CreateMode.PERSISTENT);
-    curatorService.zkDelete("/rm", true);
+    curatorService.zkDelete("/rm", true, null);
     verifyNotExists("/rm");
-    curatorService.zkDelete("/rm", true);
+    curatorService.zkDelete("/rm", true, null);
   }
 
+
+  @Test
+  public void testBackgroundDelete() throws Throwable {
+    mkPath("/rm", CreateMode.PERSISTENT);
+    mkPath("/rm/child", CreateMode.PERSISTENT);
+    Events events = new Events();
+    curatorService.zkDelete("/rm", true, events);
+    CuratorEvent taken = events.take();
+    LOG.info("took {}", taken);
+    
+  }
+  
+  private static class Events implements BackgroundCallback {
+
+    private final BlockingQueue<CuratorEvent> events = new LinkedBlockingQueue<CuratorEvent>(1);
+    
+    @Override
+    public void processResult(CuratorFramework client,
+        CuratorEvent event) throws
+        Exception {
+      events.put(event);
+    }
+    
+    CuratorEvent take() throws InterruptedException {
+      return events.take();
+    }
+  }
+  
   @Test
   public void testCreate() throws Throwable {
 
