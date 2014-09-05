@@ -31,7 +31,9 @@ import org.slf4j.LoggerFactory;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Support for operations on records
@@ -55,15 +57,15 @@ public class RecordOperations {
    * @return a possibly empty list
    * @throws IOException for any IO Operation that wasn't ignored.
    */
-  public static List<ServiceRecord> extractServiceRecords(RegistryOperations operations,
+  public static Map<String, ServiceRecord> extractServiceRecords(RegistryOperations operations,
       RegistryPathStatus[] stats) throws IOException {
-    List<ServiceRecord> results = new ArrayList<ServiceRecord>(stats.length);
+    Map<String, ServiceRecord> results = new HashMap<String, ServiceRecord>(stats.length);
     for (RegistryPathStatus stat : stats) {
       if (stat.size > RegistryConstants.RECORD_HEADER.length) {
         // maybe has data
         try {
           ServiceRecord serviceRecord = operations.resolve(stat.path);
-          results.add(serviceRecord);
+          results.put(stat.path,  serviceRecord);
         } catch (EOFException ignored) {
           LOG.debug("data too short for {}", stat.path);
         } catch (InvalidRecordException record) {
