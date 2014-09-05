@@ -69,7 +69,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
   public static final String NNIPC = "nnipc";
   public static final String IPC2 = "IPC2";
 
-  private ResourceManagerRegistryService yarnRegistry;
+  private ResourceManagerRegistryService registry;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRegistryOperations.class);
@@ -80,18 +80,17 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
 
   @Before
   public void setupClient() throws IOException {
-    yarnRegistry = new ResourceManagerRegistryService("yarnRegistry");
-    yarnRegistry.init(createRegistryConfiguration());
-    yarnRegistry.start();
-    yarnRegistry.createRegistryPaths();
-    operations = yarnRegistry;
+    registry = new ResourceManagerRegistryService("yarnRegistry");
+    registry.init(createRegistryConfiguration());
+    registry.start();
+    registry.createRegistryPaths();
+    operations = registry;
     operations.delete(ENTRY_PATH, true);
-
   }
 
   @After
   public void teardownClient() {
-    ServiceOperations.stop(yarnRegistry);
+    ServiceOperations.stop(registry);
   }
 
   /**
@@ -183,7 +182,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
       throws IOException, URISyntaxException {
     ServiceRecord record = buildExampleServiceEntry(persistence);
 
-    yarnRegistry.mkdir(RegistryPathUtils.parentOf(path), true);
+    registry.mkdir(RegistryPathUtils.parentOf(path), true);
     operations.create(path, record, createFlags);
     return record;
   }
@@ -197,7 +196,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
   private ServiceRecord buildExampleServiceEntry(int persistence) throws
       IOException,
       URISyntaxException {
-    List<ACL> acls = yarnRegistry.parseACLs("world:anyone:rwcda");
+    List<ACL> acls = registry.parseACLs("world:anyone:rwcda");
     ServiceRecord record = new ServiceRecord();
     record.id = "example-0001";
     record.persistence = persistence;
@@ -223,9 +222,31 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     assertEquals(written.registrationTime, resolved.registrationTime);
     assertEquals(written.description, resolved.description);
     assertEquals(written.persistence, resolved.persistence);
-    
   }
 
+
+  /**
+   * Assert a path exists
+   * @param path
+   * @throws IOException
+   */
+  public void assertPathExists(String path) throws IOException {
+    operations.stat(path);
+  }
+  
+  public void assertPathNotFound(String path) throws IOException {
+    try {
+      operations.stat(path);
+    } catch (PathNotFoundException e) {
+
+    }
+  }
+
+  public void assertResolves(String path) throws IOException {
+    operations.resolve(path);
+  }
+  
+  
   public Endpoint findEndpoint(ServiceRecord record,
       String api, boolean external, int addressElements, int elementSize) {
     Endpoint epr = external ? record.getExternalEndpoint(api)
@@ -458,7 +479,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     String dns2path = components + dns2;
     operations.create(dns2path, comp2, CreateFlags.EPHEMERAL );
 
-    ZKPathDumper pathDumper = yarnRegistry.dumpPath();
+    ZKPathDumper pathDumper = registry.dumpPath();
     LOG.info(pathDumper.toString());
 
     log("tomcat", webapp);
@@ -488,8 +509,68 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
         RecordOperations.extractServiceRecords(operations, componentStats);
     assertEquals(2, recordsUpdated.size());
 
+    
+    
+    // now do some deletions.
+    
+    // synchronous delete container ID 2
+    assertEquals(1, registry.purgeRecordsWithID("/", cid2,
+        ResourceManagerRegistryService.PurgePolicy.FailOnChildren,
+        null));
+    assertPathNotFound(dns2path);
+    assertPathExists(dns1path);
+    
+    // attempt to delete root with policy of fail on children
+    try {
+      registry.purgeRecordsWithID("/", appId,
+          ResourceManagerRegistryService.PurgePolicy.FailOnChildren, null);
+      fail("expected a failure");
+    } catch (PathIsNotEmptyDirectoryException expected) {
+     // expected
+    }
+    assertPathExists(appPath);
+    assertPathExists(dns1path);
+
+    // downgrade to a skip on children
+    assertEquals(0, registry.purgeRecordsWithID("/", appId,
+        ResourceManagerRegistryService.PurgePolicy.SkipOnChildren,
+        null));
+    assertPathExists(appPath);
+    assertPathExists(dns1path);
+
+    // now trigger recursive delete
+    assertEquals(1, registry.purgeRecordsWithID("/", appId,
+        ResourceManagerRegistryService.PurgePolicy.PurgeAll,
+        null));
+    assertPathNotFound(appPath);
+    assertPathNotFound(dns1path);
+
   }
 
+
+  @Test
+  public void testAsyncPurgeEntry() throws Throwable {
+
+    String path = ENTRY_PATH;
+    ServiceRecord written = buildExampleServiceEntry(
+        PersistencePolicies.APPLICATION_ATTEMPT);
+    written.id = "testAsyncPurgeEntry";
+
+    operations.mkdir(RegistryPathUtils.parentOf(path), true);
+    operations.create(path, written, 0);
+    CuratorEventCatcher events = new CuratorEventCatcher();
+    int opcount = registry.purgeRecordsWithID("/",
+        written.id,
+        ResourceManagerRegistryService.PurgePolicy.PurgeAll,
+        events);
+
+    assertPathNotFound(path);
+    assertEquals(1, opcount);
+    // and validate the callback event
+    assertEquals("Event counter", 1, events.getCount());
+
+  }
+  
 
   @Test
   public void testPutGetEphemeralServiceEntry() throws Throwable {
@@ -498,7 +579,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     ServiceRecord written = buildExampleServiceEntry(
         PersistencePolicies.EPHEMERAL);
 
-    yarnRegistry.mkdir(RegistryPathUtils.parentOf(path), true);
+    operations.mkdir(RegistryPathUtils.parentOf(path), true);
     operations.create(path, written, CreateFlags.EPHEMERAL);
     ServiceRecord resolved = operations.resolve(path);
     validateEntry(resolved);
@@ -511,7 +592,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     ServiceRecord written = buildExampleServiceEntry(
         PersistencePolicies.APPLICATION_ATTEMPT);
 
-    yarnRegistry.mkdir(RegistryPathUtils.parentOf(path), true);
+    operations.mkdir(RegistryPathUtils.parentOf(path), true);
     operations.create(path, written, CreateFlags.EPHEMERAL);
   }
   
@@ -528,13 +609,13 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
       operations.mkdir(components, false);
       fail("expected an error");
     } catch (NoChildrenForEphemeralsException expected) {
-
+      // expected
     }
     try {
       operations.create(appPath + "/subdir", webapp, CreateFlags.EPHEMERAL);
       fail("expected an error");
     } catch (NoChildrenForEphemeralsException expected) {
-
+      // expected
     }
 
   }

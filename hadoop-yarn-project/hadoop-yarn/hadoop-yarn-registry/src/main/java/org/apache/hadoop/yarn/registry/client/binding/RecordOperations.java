@@ -65,7 +65,7 @@ public class RecordOperations {
         // maybe has data
         try {
           ServiceRecord serviceRecord = operations.resolve(stat.path);
-          results.put(stat.path,  serviceRecord);
+          results.put(stat.path, serviceRecord);
         } catch (EOFException ignored) {
           LOG.debug("data too short for {}", stat.path);
         } catch (InvalidRecordException record) {
