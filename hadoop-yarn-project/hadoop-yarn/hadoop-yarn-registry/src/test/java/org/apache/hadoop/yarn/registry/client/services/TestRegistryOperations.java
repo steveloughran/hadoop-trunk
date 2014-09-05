@@ -69,13 +69,15 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
   public static final String NNIPC = "nnipc";
   public static final String IPC2 = "IPC2";
 
-  private ResourceManagerRegistryService registry;
-
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRegistryOperations.class);
-  private RegistryOperations operations;
+
   private final RecordOperations.ServiceRecordMarshal recordMarshal =
       new RecordOperations.ServiceRecordMarshal();
+
+  private ResourceManagerRegistryService registry;
+  
+  private RegistryOperations operations;
 
 
   @Before
@@ -518,12 +520,12 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     // synchronous delete container ID 2
     
     // fail if the app policy is chosen
-    assertEquals(0, registry.purgeRecordsWithID("/", cid2,
+    assertEquals(0, registry.purgeRecords("/", cid2,
         PersistencePolicies.APPLICATION,
         ResourceManagerRegistryService.PurgePolicy.FailOnChildren,
         null));
     // succeed for container
-    assertEquals(1, registry.purgeRecordsWithID("/", cid2,
+    assertEquals(1, registry.purgeRecords("/", cid2,
         PersistencePolicies.CONTAINER,
         ResourceManagerRegistryService.PurgePolicy.FailOnChildren,
         null));
@@ -532,7 +534,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     
     // attempt to delete root with policy of fail on children
     try {
-      registry.purgeRecordsWithID("/",
+      registry.purgeRecords("/",
           appId,
           PersistencePolicies.APPLICATION,
           ResourceManagerRegistryService.PurgePolicy.FailOnChildren, null);
@@ -545,7 +547,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
 
     // downgrade to a skip on children
     assertEquals(0,
-        registry.purgeRecordsWithID("/", appId,
+        registry.purgeRecords("/", appId,
             PersistencePolicies.APPLICATION,
             ResourceManagerRegistryService.PurgePolicy.SkipOnChildren,
             null));
@@ -554,7 +556,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
 
     // now trigger recursive delete
     assertEquals(1,
-        registry.purgeRecordsWithID("/",
+        registry.purgeRecords("/",
             appId,
             PersistencePolicies.APPLICATION,
             ResourceManagerRegistryService.PurgePolicy.PurgeAll,
@@ -582,7 +584,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     LOG.info("Initial state {}", dump);
 
     // container query
-    int opcount = registry.purgeRecordsWithID("/",
+    int opcount = registry.purgeRecords("/",
         written.id,
         PersistencePolicies.CONTAINER,
         ResourceManagerRegistryService.PurgePolicy.PurgeAll,
@@ -593,7 +595,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
 
 
     // now the application attempt
-    opcount = registry.purgeRecordsWithID("/",
+    opcount = registry.purgeRecords("/",
         written.id,
         -1,
 //        PersistencePolicies.APPLICATION_ATTEMPT,

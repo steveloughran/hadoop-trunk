@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -41,6 +42,7 @@ public class BindingUtils {
    * @return the path to the user
    */
   public static String userPath(String user) {
+    Preconditions.checkArgument(user != null, "null user");
     if (user.isEmpty()) {
       return PATH_SYSTEM_SERVICES;
     }
