@@ -32,6 +32,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.hadoop.fs.PathNotFoundException;
+import org.apache.hadoop.service.ServiceOperations;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
+import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.junit.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -75,8 +84,9 @@ public class TestDistributedShell {
     conf.set("yarn.log.dir", "target");
     conf.setBoolean(YarnConfiguration.TIMELINE_SERVICE_ENABLED, true);
     if (yarnCluster == null) {
+      // create a minicluster with the registry enabled
       yarnCluster = new MiniYARNCluster(
-        TestDistributedShell.class.getSimpleName(), 1, 1, 1, 1, true);
+        TestDistributedShell.class.getSimpleName(), 1, 1, 1, 1, true, true);
       yarnCluster.init(conf);
       yarnCluster.start();
       NodeManager  nm = yarnCluster.getNodeManager(0);
@@ -846,5 +856,255 @@ public class TestDistributedShell {
     }
     return numOfWords;
   }
+  
+  @Test(timeout = 90000)
+  public void testRegistryOperations() throws Exception {
+    
+    // create a client config with an aggressive timeout policy
+    Configuration clientConf = new Configuration(yarnCluster.getConfig());
+    clientConf.setInt(RegistryConstants.KEY_REGISTRY_ZK_CONNECTION_TIMEOUT, 1000);
+    clientConf.setInt(RegistryConstants.KEY_REGISTRY_ZK_RETRY_TIMES, 1);
+    clientConf.setInt(RegistryConstants.KEY_REGISTRY_ZK_RETRY_CEILING, 1);
+    clientConf.setInt(RegistryConstants.KEY_REGISTRY_ZK_RETRY_INTERVAL, 500);
+    clientConf.setInt(RegistryConstants.KEY_REGISTRY_ZK_SESSION_TIMEOUT, 2000);
+    
+    // create a registry operations instance
+    RegistryOperationsService regOps = new RegistryOperationsService();
+    regOps.init(clientConf);
+    regOps.start();
+    LOG.info("Registry Binding: " + regOps);
+    
+    // do a simple registry operation to verify that it is live
+    regOps.listDir("/");
+
+    try {
+      String[] args = {
+          "--jar",
+          APPMASTER_JAR,
+          "--num_containers",
+          "1",
+          "--shell_command",
+          "sleep 15",
+          "--master_memory",
+          "512",
+          "--container_memory",
+          "128",
+      };
+
+      LOG.info("Initializing DS Client");
+      RegistryMonitoringClient client =
+          new RegistryMonitoringClient(clientConf);
+
+      client.init(args);
+      LOG.info("Running DS Client");
+      boolean result;
+      try {
+        result = client.run();
+      } finally {
+        client.stop();
+      }
+
+      LOG.info("Client run completed. Result=" + result);
+      
+      // application should have found service records
+      ServiceRecord serviceRecord = client.appAttemptRecord;
+      LOG.info("Service record = " + serviceRecord);
+      IOException lookupException =
+          client.lookupException;
+      if (serviceRecord == null && lookupException != null) {
+        LOG.error("Lookup of " + client.servicePath
+                  + " failed with " + lookupException, lookupException);
+        throw lookupException;
+      }
+      
+      // the app should have succeeded or returned a failure message
+      if (!result) {
+        Assert.fail("run returned false: " + client.failureText);
+      }
+
+      // the app-level record must have been retrieved
+      Assert.assertNotNull("No application record at " + client.appRecordPath,
+          client.appRecord);
+      
+      // sleep to let some async operations in the RM continue
+      Thread.sleep(10000);
+      // after the app finishes its records should have been purged
+      assertDeleted(regOps, client.appRecordPath);
+      assertDeleted(regOps, client.servicePath);
+    } finally {
+      regOps.stop();
+    }
+  }
+
+  protected void assertDeleted(RegistryOperationsService regOps,
+      String path) throws IOException {
+    try {
+      ServiceRecord record = regOps.resolve(path);
+      Assert.fail("Expected the record at " + path + " to have been purged,"
+                  + " but found " + record);
+    } catch (PathNotFoundException expected) {
+      // expected
+    }
+  }
+
+
+  /**
+   * This is a subclass of the distributed shell client which
+   * monitors the registry as well as the YARN app status
+   */
+  private class RegistryMonitoringClient extends Client {
+    private String servicePath;
+    private ServiceRecord permanentRecord;
+    private String permanentPath;
+    private IOException lookupException;
+    private ServiceRecord appAttemptRecord;
+    private String appAttemptPath;
+
+    private ServiceRecord ephemeralRecord;
+    private String ephemeralPath;
+    
+    private ServiceRecord appRecord;
+    private String appRecordPath;
+    
+    
+    private String failureText;
+    private ApplicationReport report;
+    private final RegistryOperationsService regOps;
+
+    private RegistryMonitoringClient(Configuration conf) throws Exception {
+      super(conf);
+      // client timeout of 30s for the test runs
+      setClientTimeout(30000);
+      regOps = new RegistryOperationsService();
+      regOps.init(getConf());
+      regOps.start();
+    }
+
+    public void stop() {
+      ServiceOperations.stopQuietly(regOps);
+    }
+  
+    
+    @Override
+    protected boolean monitorApplication(ApplicationId appId)
+        throws YarnException, IOException {
+
+      String username = BindingUtils.currentUser();
+      String serviceClass = DSConstants.SERVICE_CLASS_DISTRIBUTED_SHELL;
+      String serviceName = RegistryPathUtils.encodeYarnID(appId.toString());
+      servicePath =
+          BindingUtils.servicePath(username, serviceClass, serviceName);
+      appAttemptPath = servicePath + "-attempt";
+      ephemeralPath = servicePath + "-ephemeral";
+      appRecordPath = servicePath + "-app";
+      permanentPath = servicePath + "-permanent";
+
+      YarnClient yarnClient = getYarnClient();
+
+      while (!timedOut()) {
+
+        // Check app status every 1 second.
+        try {
+          Thread.sleep(500);
+        } catch (InterruptedException e) {
+          LOG.debug("Thread sleep in monitoring loop interrupted");
+        }
+
+        // Get application report for the appId we are interested in 
+        report = yarnClient.getApplicationReport(appId);
+
+        YarnApplicationState state =
+            report.getYarnApplicationState();
+        switch (state) {
+
+          case NEW:
+          case NEW_SAVING:
+          case SUBMITTED:
+          case ACCEPTED:
+            continue;
+
+            // running, extract service records if not already done
+          case RUNNING:
+            try {
+              permanentRecord = maybeResolve(permanentRecord, permanentPath);
+              // succesfull lookup, so discard any failure
+              lookupException = null;
+            } catch (PathNotFoundException e) {
+              lookupException = e;
+            }
+            appRecord = maybeResolveQuietly(appRecord, appRecordPath);
+            appAttemptRecord = maybeResolveQuietly(appAttemptRecord,
+                appAttemptPath);
+            ephemeralRecord = maybeResolveQuietly(ephemeralRecord,
+                ephemeralPath);
+            continue;
+
+          case FINISHED:
+            // completed
+            boolean read = permanentRecord != null;
+            if (!read) {
+              failureText = "Permanent record was not resolved";
+            }
+            return read;
+
+          case KILLED:
+            failureText = "Application Killed: " + report.getDiagnostics();
+            return false;
+          
+          case FAILED:
+            failureText = "Application Failed: " + report.getDiagnostics();
+            return false;
+
+          default:
+            break;
+        }
+
+      }
+
+      if (timedOut()) {
+        failureText = "Timed out: Killing application";
+        forceKillApplication(appId);
+      }
+      return false;
+    }
+
+    /**
+     * Resolve a record if it has not been resolved already
+     * @param r record
+     * @param path path
+     * @return r if it was non null, else the resolved record
+     * @throws IOException on any failure
+     */
+    ServiceRecord maybeResolve(ServiceRecord r, String path) throws IOException {
+      if (r == null) {
+        ServiceRecord record = regOps.resolve(path);
+        LOG.info("Resolved at " + r +": " + record);
+        return record;
+      }
+      return r;
+    }
+
+    /**
+     * Resolve a record if it has not been resolved already —ignoring
+     * any PathNotFoundException exceptions.
+     * @param r record
+     * @param path path
+     * @return r if it was non null, a resolved record if it was found, 
+     * or null if the resolution failed with a <code>PathNotFoundException</code>
+     * @throws IOException on any failure
+     */
+    ServiceRecord maybeResolveQuietly(ServiceRecord r, String path) throws
+        IOException {
+      try {
+        return maybeResolve(r, path);
+      } catch (PathNotFoundException ignored) {
+        // ignored
+      }
+      return r;
+    }
+
+  } // end of class RegistryMonitoringClient
+  
+
 }
 

@@ -213,8 +213,8 @@ public class Client {
    */
   public Client(Configuration conf) throws Exception  {
     this(
-      "org.apache.hadoop.yarn.applications.distributedshell.ApplicationMaster",
-      conf);
+        "org.apache.hadoop.yarn.applications.distributedshell.ApplicationMaster",
+        conf);
   }
 
   Client(String appMasterMainClass, Configuration conf) {
@@ -670,7 +670,7 @@ public class Client {
    * @throws YarnException
    * @throws IOException
    */
-  private boolean monitorApplication(ApplicationId appId)
+  protected boolean monitorApplication(ApplicationId appId)
       throws YarnException, IOException {
 
     while (true) {
@@ -720,7 +720,7 @@ public class Client {
         return false;
       }			
 
-      if (System.currentTimeMillis() > (clientStartTime + clientTimeout)) {
+      if (timedOut()) {
         LOG.info("Reached client specified timeout for application. Killing application");
         forceKillApplication(appId);
         return false;				
@@ -730,12 +730,46 @@ public class Client {
   }
 
   /**
+   * Get the YARN client
+   * @return the client 
+   */
+  public YarnClient getYarnClient() {
+    return yarnClient;
+  }
+
+  /**
+   * Get the client's configuration
+   * @return the configuration
+   */
+  public Configuration getConf() {
+    return conf;
+  }
+
+  public long getClientTimeout() {
+    return clientTimeout;
+  }
+
+  public void setClientTimeout(long clientTimeout) {
+    this.clientTimeout = clientTimeout;
+  }
+
+  /**
+   * Query the clock and timeout settings to decide
+   * whether or not the current run has timed ut
+   * @return true if the client's monitorApplication() operation
+   * has taken too long.
+   */
+  protected boolean timedOut() {
+    return System.currentTimeMillis() > (clientStartTime + clientTimeout);
+  }
+
+  /**
    * Kill a submitted application by sending a call to the ASM
    * @param appId Application Id to be killed. 
    * @throws YarnException
    * @throws IOException
    */
-  private void forceKillApplication(ApplicationId appId)
+  protected void forceKillApplication(ApplicationId appId)
       throws YarnException, IOException {
     // TODO clarify whether multiple jobs with the same app id can be submitted and be running at 
     // the same time. 

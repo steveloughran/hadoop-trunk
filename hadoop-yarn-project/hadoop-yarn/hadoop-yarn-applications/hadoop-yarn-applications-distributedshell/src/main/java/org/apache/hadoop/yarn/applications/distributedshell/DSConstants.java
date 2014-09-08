@@ -44,4 +44,10 @@ public class DSConstants {
    * Used to validate the local resource. 
    */
   public static final String DISTRIBUTEDSHELLSCRIPTLEN = "DISTRIBUTEDSHELLSCRIPTLEN";
+
+  /**
+   * Service class used when registering the service
+   */
+  public static final String SERVICE_CLASS_DISTRIBUTED_SHELL =
+      "org-apache-hadoop-distributedshell";
 }

@@ -38,6 +38,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptE
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event.RMAppAttemptContainerFinishedEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event.RMAppAttemptRegistrationEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,27 +70,23 @@ public class RMRegistryService extends CompositeService {
     addService(registryOperations);
   }
 
-  @Override
-  protected void serviceInit(Configuration conf) throws Exception {
-
-    //init the child services
-    super.serviceInit(conf);
-
-  }
 
   @Override
   protected void serviceStart() throws Exception {
     super.serviceStart();
-    // Register self as event handler for RmAppAttemptEvents
+    LOG.info("RM registry service started : {}", 
+        registryOperations.bindingDiagnosticDetails());
+    // Register self as event handler for RM Events
     register(RMAppAttemptEventType.class, new AppEventHandler());
     register(RMAppManagerEventType.class, new AppManagerEventHandler());
     register(RMStateStoreEventType.class, new StateStoreEventHandler());
+    register(RMContainerEventType.class,  new ContainerEventHandler());
   }
 
   /**
    * register a handler
-   * @param eventType
-   * @param handler
+   * @param eventType event type
+   * @param handler handler
    */
   private void register(Class<? extends Enum> eventType,
       EventHandler handler) {
@@ -123,7 +121,7 @@ public class RMRegistryService extends CompositeService {
         RMStateStoreAppEvent storeAppEvent = (RMStateStoreAppEvent) event;
         RMStateStore.ApplicationState appState = storeAppEvent.getAppState();
         ApplicationId appId = appState.getAppId();
-        appState.getUser();
+        registryOperations.onStateStoreEvent(appId, appState.getUser());
         break;
 
       default:
@@ -163,12 +161,26 @@ public class RMRegistryService extends CompositeService {
         RMAppAttemptContainerFinishedEvent cfe =
             (RMAppAttemptContainerFinishedEvent) event;
         ContainerId containerId = cfe.getContainerStatus().getContainerId();
-        registryOperations.onContainerFinished(containerId);
+        registryOperations.onAMContainerFinished(containerId);
         break;
 
 
       default:
         // do nothing
+    }
+  }
+
+  @SuppressWarnings("EnumSwitchStatementWhichMissesCases")
+  private void handleContainerEvent(RMContainerEvent event)
+      throws IOException {
+    RMContainerEventType eventType = event.getType();
+    switch (eventType) {
+      case FINISHED:
+        ContainerId containerId = event.getContainerId();
+        registryOperations.onContainerFinished(containerId);
+
+      default:
+        break;
     }
   }
 
@@ -178,7 +190,6 @@ public class RMRegistryService extends CompositeService {
    */
   private class AppEventHandler implements
       EventHandler<RMAppAttemptEvent> {
-
 
     /**
      * Handle an application event
@@ -194,6 +205,10 @@ public class RMRegistryService extends CompositeService {
     }
   }
 
+  /**
+   * Handler for RM-side App manager events
+   */
+
   private class AppManagerEventHandler
       implements EventHandler<RMAppManagerEvent> {
     @Override
@@ -206,11 +221,32 @@ public class RMRegistryService extends CompositeService {
     }
   }
 
+  /**
+   * Handler for RM-side state store events.
+   * This happens early on, and as the data contains the user details,
+   * it is where paths can be set up in advance of being used.
+   */
+
   private class StateStoreEventHandler implements EventHandler<RMStateStoreEvent> {
     @Override
     public void handle(RMStateStoreEvent event) {
       try {
         handleStateStoreEvent(event);
+      } catch (IOException e) {
+        LOG.warn("handling {}: {}", event, e, e);
+      }
+    }
+  }
+
+  /**
+   * Handler for RM-side container events
+   */
+  private class ContainerEventHandler implements EventHandler<RMContainerEvent> {
+
+    @Override
+    public void handle(RMContainerEvent event) {
+      try {
+        handleContainerEvent(event);
       } catch (IOException e) {
         LOG.warn("handling {}: {}", event, e, e);
       }

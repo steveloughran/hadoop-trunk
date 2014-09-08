@@ -24,9 +24,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 
 /**
@@ -58,7 +56,7 @@ public class ServiceRecord {
    *   entries may be deleted.
    *   {@link PersistencePolicies}
    */
-  public int persistence = PersistencePolicies.MANUAL;
+  public int persistence = PersistencePolicies.PERMANENT;
   
   /**
    * List of endpoints intended to of use to external callers
@@ -132,6 +130,7 @@ public class ServiceRecord {
     final StringBuilder sb =
         new StringBuilder("ServiceRecord{");
     sb.append("id='").append(id).append('\'');
+    sb.append(", persistence='").append(persistence).append('\'');
     sb.append(", description='").append(description).append('\'');
     sb.append(", external endpoints: {");
     for (Endpoint endpoint : external) {
@@ -143,7 +142,6 @@ public class ServiceRecord {
     }
 
     sb.append('}');
-    sb.append("persistence='").append(persistence).append('\'');
     sb.append('}');
     return sb.toString();
   }

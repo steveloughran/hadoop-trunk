@@ -73,9 +73,7 @@ public class RegistryPathUtils {
         throw new InvalidPathnameException(path,
             "Invalid Path element \"" + fragment + "\"");
       }
-
     }
-
     return path;
   }
 
@@ -170,10 +168,20 @@ public class RegistryPathUtils {
   /**
    * Perform any formatting for the registry needed to convert
    * non-simple-DNS elements 
-   * @param element
-   * @return
+   * @param element element to encode
+   * @return an encoded string
    */
   public static String encodeForRegistry(String element) {
     return IDN.toASCII(element);
+  }
+
+  /**
+   * Perform whatever transforms are needed to get a YARN ID into
+   * a DNS-compatible name
+   * @param yarnId ID as string of YARN application, instance or container
+   * @return a string suitable for use in registry paths.
+   */
+  public static String encodeYarnID(String yarnId) {
+    return yarnId.replace("_", "-");
   }
 }

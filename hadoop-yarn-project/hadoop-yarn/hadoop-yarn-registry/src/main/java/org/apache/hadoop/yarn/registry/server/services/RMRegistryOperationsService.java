@@ -150,7 +150,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     this.purgeOnCompletionPolicy = purgeOnCompletionPolicy;
   }
 
-  public void onApplicationAttemptRegistered(ApplicationAttemptId id,
+  public void onApplicationAttemptRegistered(ApplicationAttemptId attemptId,
       String host,int rpcport, String trackingurl) throws IOException {
     
   }
@@ -161,56 +161,40 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
 
   /**
    * Actions to take as an AM registers itself with the RM. 
-   * @param id attempt ID
+   * @param attemptId attempt ID
    * @throws IOException problems
    */
-  public void onApplicationMasterRegistered(ApplicationAttemptId id) throws IOException {
-  }
-
-  /**
-   * Actions to take when a container is completed
-   * @param id  container ID
-   * @throws IOException problems
-   */
-  public void onAMContainerFinished(ApplicationId id) throws IOException {
-    purgeRecordsQuietly("/",
-        id.toString(),
-        PersistencePolicies.APPLICATION);
-  }
-
-  /**
-   * Actions to take when a container is completed
-   * @param id  container ID
-   * @throws IOException problems
-   */
-  public void onContainerFinished(ContainerId id) throws IOException {
-    purgeRecordsQuietly("/", 
-        id.toString(),
-        PersistencePolicies.CONTAINER);
+  public void onApplicationMasterRegistered(ApplicationAttemptId attemptId) throws IOException {
   }
 
   /**
    * Actions to take when an application attempt is completed
-   * @param id  application attempt ID
+   * @param attemptId  application attempt ID
    * @throws IOException problems
    */
-  public void onApplicationAttemptCompleted(ApplicationAttemptId id) 
+  public void onApplicationAttemptCompleted(ApplicationAttemptId attemptId) 
       throws IOException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Application Attempt {} completed, purging application-level records",
+          attemptId);
+    }
     purgeRecordsQuietly("/",
-        id.toString(),
+        attemptId.toString(),
         PersistencePolicies.APPLICATION_ATTEMPT);
   }
 
   /**
-   * Actions to take when an application is completed
-   * @param id  application  ID
+   * Actions to take when an application attempt is completed
+   * @param attemptId  application  ID
    * @throws IOException problems
    */
-  public void onApplicationUnregistered(ApplicationAttemptId id)
+  public void onApplicationUnregistered(ApplicationAttemptId attemptId)
       throws IOException {
+    LOG.info("Application attempt {} unregistered, purging app attempt records",
+        attemptId);
     purgeRecordsQuietly("/",
-        id.toString(),
-        PersistencePolicies.APPLICATION);
+        attemptId.toString(),
+        PersistencePolicies.APPLICATION_ATTEMPT);
   }
 /**
    * Actions to take when an application is completed
@@ -219,6 +203,8 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
    */
   public void onApplicationCompleted(ApplicationId id)
       throws IOException {
+    LOG.info("Application {} completed, purging application-level records",
+        id);
     purgeRecordsQuietly("/",
         id.toString(),
         PersistencePolicies.APPLICATION);
@@ -230,16 +216,47 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   /**
    * This is the event where the user is known, so the user directory
    * can be created
-   * @param id application  ID
+   * @param applicationId application  ID
    * @param user username
    * @throws IOException problems
    */
-  public void onStateStoreEvent(ApplicationId id, String user) throws
+  public void onStateStoreEvent(ApplicationId applicationId, String user) throws
       IOException {
     createHomeDirectory(user);
-
   }
 
+  /**
+   * Actions to take when the AM container is completed
+   * @param containerId  container ID
+   * @throws IOException problems
+   */
+  public void onAMContainerFinished(ContainerId containerId) throws IOException {
+    LOG.info("AM Container {} finished, purging application attempt records",
+        containerId);
+
+    // remove all application attempt entries
+    purgeRecordsQuietly("/",
+        containerId.getApplicationAttemptId().toString(),
+        PersistencePolicies.APPLICATION_ATTEMPT);
+    
+    // also treat as a container finish to remove container
+    // level records for the AM container
+    onContainerFinished(containerId);
+  }
+
+
+  /**
+   * Actions to take when the AM container is completed
+   * @param id  container ID
+   * @throws IOException problems
+   */
+  public void onContainerFinished(ContainerId id) throws IOException {
+    LOG.info("Container {} finished, purging container-level records",
+        id);
+    purgeRecordsQuietly("/",
+        id.toString(),
+        PersistencePolicies.CONTAINER);
+  }
   /**
    * Policy to purge entries
    */
@@ -248,8 +265,6 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     FailOnChildren,
     SkipOnChildren
   }
-
-
   
   /**
    * Purge all matching records under a base path -logging problems at INFO.
@@ -268,16 +283,18 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
       String id,
       int persistencePolicyMatch) {
     try {
+      LOG.info("Purging records under {} with ID {} and policy {}: {}",
+          path, id, persistencePolicyMatch);
       purgeRecords(path, id, persistencePolicyMatch, purgeOnCompletionPolicy,
           new DeleteCompletionCallback());
     } catch (IOException e) {
-      LOG.info("Purging records under {} with ID {} and policy {}: {}",
+      LOG.info("Error while purging records under {} with ID {} and policy {}: {}",
           path, id, persistencePolicyMatch, e, e);
     }
   }
 
   /**
-   * Purge all matching records under a base path.
+   * Recursive operation to purge all matching records under a base path.
    * <ol>
    *   <li>Uses a depth first search</li>
    *   <li>A match is on ID and persistence policy, or, if policy==-1, any match</li>
@@ -325,7 +342,9 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     }
 
     if (toDelete && entries.length > 0) {
-      LOG.debug("Match on record @ {} with children ", path);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Match on record @ {} with children ", path);
+      }
       // there's children
       switch (purgePolicy) {
         case SkipOnChildren:
@@ -370,7 +389,9 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     public void processResult(CuratorFramework client,
         CuratorEvent event) throws
         Exception {
-      LOG.debug("Delete event "+ event.toString());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Delete event "+ event.toString());
+      }
     }
   }
   

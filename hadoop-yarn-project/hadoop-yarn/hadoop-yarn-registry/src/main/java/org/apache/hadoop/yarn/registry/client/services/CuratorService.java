@@ -213,9 +213,13 @@ public class CuratorService extends AbstractService
   @Override
   public String toString() {
     return super.toString()
-           + " ZK quorum=\"" + connectionDescription +"\""
-           + " root=\"" + registryRoot + "\"";
+           + bindingDiagnosticDetails();
 
+  }
+
+  public String bindingDiagnosticDetails() {
+    return " ZK quorum=\"" + connectionDescription + "\""
+           + " root=\"" + registryRoot + "\"";
   }
 
   /**
@@ -364,7 +368,9 @@ public class CuratorService extends AbstractService
     String fullpath = createFullPath(path);
     Stat stat;
     try {
-      LOG.debug("Stat {}", fullpath);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Stat {}", fullpath);
+      }
       stat = curator.checkExists().forPath(fullpath);
     } catch (Exception e) {
       throw operationFailure(fullpath, "read()", e);
@@ -385,7 +391,6 @@ public class CuratorService extends AbstractService
   public boolean zkPathExists(String path) throws IOException {
     try {
       return zkStat(path) != null;
-
     } catch (PathNotFoundException e) {
       return false;
     } catch (Exception e) {
@@ -435,9 +440,13 @@ public class CuratorService extends AbstractService
         createBuilder.creatingParentsIfNeeded();
       }
       createBuilder.forPath(path);
-      LOG.debug("Created path {} with mode {} and ACL {}", path, mode, acl);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Created path {} with mode {} and ACL {}", path, mode, acl);
+      }
     } catch (KeeperException.NodeExistsException e) {
-      LOG.debug("path already present: {}", path, e);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("path already present: {}", path, e);
+      }
       return false;
     } catch (Exception e) {
       throw operationFailure(path, "mkdir() ", e);
