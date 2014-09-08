@@ -122,8 +122,7 @@ public class RegistryOperationsService extends CuratorService
     Preconditions.checkArgument(!Strings.isNullOrEmpty(record.id), 
         "empty record ID");
     validatePath(path);
-    LOG.debug("Create: {} <- {}", path, record);
-    byte[] bytes = serviceRecordMarshal.toByteswithHeader(record);
+    LOG.info("Registered at {} : {}", path, record);
 
     boolean ephemeral = (createFlags & CreateFlags.EPHEMERAL) != 0;
     CreateMode mode;
@@ -140,7 +139,8 @@ public class RegistryOperationsService extends CuratorService
           " create() operation requests an ephemeral entry");
       mode = CreateMode.PERSISTENT;
     }
-
+    
+    byte[] bytes = serviceRecordMarshal.toByteswithHeader(record);
     zkSet(path, mode, bytes, getUserAcl(),
         ((createFlags & CreateFlags.OVERWRITE) != 0));
   }

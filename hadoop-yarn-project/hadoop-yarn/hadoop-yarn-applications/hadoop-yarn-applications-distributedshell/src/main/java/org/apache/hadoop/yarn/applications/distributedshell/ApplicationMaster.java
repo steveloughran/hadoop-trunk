@@ -57,6 +57,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
@@ -93,6 +94,13 @@ import org.apache.hadoop.yarn.client.api.async.NMClientAsync;
 import org.apache.hadoop.yarn.client.api.async.impl.NMClientAsyncImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
+import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
+import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
+import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.log4j.LogManager;
@@ -270,6 +278,9 @@ public class ApplicationMaster {
   private final String linux_bash_command = "bash";
   private final String windows_command = "cmd /c";
 
+  @VisibleForTesting
+  RegistryOperationsService registryOperations;
+  
   /**
    * @param args Command line args
    */
@@ -570,6 +581,63 @@ public class ApplicationMaster {
     RegisterApplicationMasterResponse response = amRMClient
         .registerApplicationMaster(appMasterHostname, appMasterRpcPort,
             appMasterTrackingUrl);
+    
+    // Register with the YARN registry if it is enabled
+    boolean registryEnabled =
+        conf.getBoolean(RegistryConstants.KEY_REGISTRY_ENABLED,
+            RegistryConstants.DEFAULT_REGISTRY_ENABLED);
+    if (registryEnabled) {
+      LOG.info("Registering Service");
+      registryOperations = new RegistryOperationsService();
+      registryOperations.init(conf);
+      registryOperations.start();
+      ServiceRecord serviceRecord = new ServiceRecord();
+      String attemptID = this.appAttemptID.toString();
+      String appId = this.appAttemptID.getApplicationId().toString();
+
+      serviceRecord.id = attemptID;
+      serviceRecord.persistence = PersistencePolicies.APPLICATION_ATTEMPT;
+      serviceRecord.description = "Distributed Shell";
+      // if this service offered external RPC/Web access, they
+      // can be added to the service record
+
+      String username = BindingUtils.currentUser();
+      String serviceClass = DSConstants.SERVICE_CLASS_DISTRIBUTED_SHELL;
+      String serviceName = RegistryPathUtils.encodeYarnID(appId);
+      String path =
+          BindingUtils.servicePath(username, serviceClass, serviceName);
+      registryOperations.mkdir(RegistryPathUtils.parentOf(path), true);
+      // app attempt entry
+      registryOperations.create(path + "-attempt", serviceRecord,
+          CreateFlags.OVERWRITE);
+      LOG.info("Registered " + serviceRecord + " at " + path );
+
+      serviceRecord.id = appId;
+      serviceRecord.persistence = PersistencePolicies.APPLICATION;
+      registryOperations.create(path + "-app", serviceRecord,
+          CreateFlags.OVERWRITE);
+
+      // register one that is not deleted
+//      serviceRecord.id = appId;
+      serviceRecord.id = "persisting";
+      serviceRecord.persistence = PersistencePolicies.PERMANENT;
+      registryOperations.create(path + "-permanent", serviceRecord,
+          CreateFlags.OVERWRITE);
+
+      // ephemeral entry to show how its lifespan is automatically that
+      // of the registry session, hence no-need to set the ID to match
+      serviceRecord.id = "distributed shell ephemeral";
+      
+      serviceRecord.persistence = PersistencePolicies.EPHEMERAL;
+      String path2 = path + "-ephemeral";
+      registryOperations.create(path2, serviceRecord, 
+          CreateFlags.EPHEMERAL );
+      LOG.info("Registered ephemeral entry at " + path2);
+
+    }
+
+
+
     // Dump out information about cluster capability as seen by the
     // resource manager
     int maxMem = response.getMaximumResourceCapability().getMemory();
@@ -679,6 +747,8 @@ public class ApplicationMaster {
     }
     
     amRMClient.stop();
+    ServiceOperations.stop(registryOperations);
+    ServiceOperations.stop(timelineClient);
 
     return success;
   }

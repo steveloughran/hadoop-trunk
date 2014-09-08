@@ -47,7 +47,8 @@ public class BindingUtils {
       return PATH_SYSTEM_SERVICES;
     }
 
-    return PATH_USERS + RegistryPathUtils.encodeForRegistry(user);
+    return RegistryPathUtils.join(PATH_USERS,
+        RegistryPathUtils.encodeForRegistry(user));
   }
 
   /**
@@ -59,9 +60,10 @@ public class BindingUtils {
   public static String serviceclassPath(String user,
       String serviceClass) {
 
-    return userPath(user) + "/" +
-           serviceClass;
+    return RegistryPathUtils.join(userPath(user),
+        serviceClass);
   }
+  
 
   /**
    * Get the current user path formatted for the system
@@ -84,8 +86,9 @@ public class BindingUtils {
       String serviceClass,
       String serviceName) {
 
-    return serviceclassPath(user, serviceClass)
-           + "/" + serviceName;
+    return RegistryPathUtils.join(
+        serviceclassPath(user, serviceClass),
+        serviceName);
   }
 
   /**
@@ -98,7 +101,8 @@ public class BindingUtils {
   public static String componentListPath(String user,
       String serviceClass, String serviceName) {
 
-    return servicePath(user, serviceClass, serviceName) + SUBPATH_COMPONENTS;
+    return RegistryPathUtils.join(servicePath(user, serviceClass, serviceName),
+                                  SUBPATH_COMPONENTS);
   }
 
   /**
@@ -112,9 +116,9 @@ public class BindingUtils {
   public static String componentPath(String user,
       String serviceClass, String serviceName, String componentName) {
 
-    return componentListPath(user, serviceClass, serviceName)
-           + "/" +
-           componentName;
+    return RegistryPathUtils.join(
+        componentListPath(user, serviceClass, serviceName),
+        componentName);
   }
 
 

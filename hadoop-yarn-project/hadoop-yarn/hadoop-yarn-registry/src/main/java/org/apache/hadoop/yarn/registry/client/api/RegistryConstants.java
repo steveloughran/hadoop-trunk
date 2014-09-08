@@ -124,7 +124,7 @@ public interface RegistryConstants {
   /**
    * Default limit on retries: {@value}
    */
-  int DEFAULT_ZK_RETRY_CEILING = 20;
+  int DEFAULT_ZK_RETRY_CEILING = 5;
   String DEFAULT_REGISTRY_ROOT = "/yarnRegistry";
   
   /**

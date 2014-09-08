@@ -27,12 +27,13 @@ public interface PersistencePolicies {
   /**
    * The record persists until removed manually: {@value}.
    */
-  int MANUAL = 0;
+  int PERMANENT = 0;
 
   /**
-   * Automatic deletion when the session is closed/times out: {@value}.
+   * Remove when the YARN cluster is restarted: {@value}.
+   * This does not mean on HA failover; it means after a cluster stop/start.
    */
-  int EPHEMERAL = 1;
+  int CLUSTER_RESTART = 1;
 
   /**
    * Remove when the YARN application defined in the id field
@@ -51,9 +52,9 @@ public interface PersistencePolicies {
   int CONTAINER = 4;
 
   /**
-   * Remove when the YARN cluster is restarted: {@value}.
-   * This does not mean on HA failover; it means after a cluster stop/start.
+   * Automatic deletion when the session is closed/times out: {@value}.
+   * This is implemented at the ZK layer, not in the RM.
    */
-  int CLUSTER_RESTART = 5;
-      
+  int EPHEMERAL = 5;
+
 }

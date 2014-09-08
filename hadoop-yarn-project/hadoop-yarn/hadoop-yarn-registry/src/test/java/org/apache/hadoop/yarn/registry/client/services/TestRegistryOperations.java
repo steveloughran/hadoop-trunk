@@ -167,7 +167,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
   protected ServiceRecord putExampleServiceEntry(String path, int createFlags) throws
       IOException,
       URISyntaxException {
-    return putExampleServiceEntry(path, createFlags, PersistencePolicies.MANUAL);
+    return putExampleServiceEntry(path, createFlags, PersistencePolicies.PERMANENT);
   }
   
   /**
@@ -476,10 +476,10 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     operations.create(appPath, webapp, CreateFlags.OVERWRITE);
     String components = appPath + RegistryConstants.SUBPATH_COMPONENTS + "/";
     operations.mkdir(components, false);
-    String dns1 = yarnIdToDnsId(cid1);
+    String dns1 = RegistryPathUtils.encodeYarnID(cid1);
     String dns1path = components + dns1;
     operations.create(dns1path, comp1, CreateFlags.EPHEMERAL);
-    String dns2 = yarnIdToDnsId(cid2);
+    String dns2 = RegistryPathUtils.encodeYarnID(cid2);
     String dns2path = components + dns2;
     operations.create(dns2path, comp2, CreateFlags.CREATE );
 
