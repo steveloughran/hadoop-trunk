@@ -315,7 +315,7 @@ public class TestDistributedShell {
 
       LOG.info("Client run completed. Result=" + result);
       // application should succeed
-      Assert.assertTrue(result);
+      Assert.assertTrue("client failed", result);
     }
 
   /*
