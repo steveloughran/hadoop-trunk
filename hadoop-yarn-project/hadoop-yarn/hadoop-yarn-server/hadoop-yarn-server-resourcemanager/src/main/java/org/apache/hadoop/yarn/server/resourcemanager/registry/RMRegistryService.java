@@ -20,10 +20,13 @@ package org.apache.hadoop.yarn.server.resourcemanager.registry;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.DataInputByteBuffer;
+import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
@@ -34,6 +37,11 @@ import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStoreAppEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStoreEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStoreEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppRejectedEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event.RMAppAttemptContainerFinishedEvent;
@@ -44,6 +52,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
  * This is the RM service which translates from RM events
@@ -65,6 +74,7 @@ public class RMRegistryService extends CompositeService {
   public RMRegistryService(RMContext rmContext) {
     super(RMRegistryService.class.getName());
     this.rmContext = rmContext;
+
     registryOperations =
         new RMRegistryOperationsService("Registry");
     addService(registryOperations);
@@ -74,6 +84,7 @@ public class RMRegistryService extends CompositeService {
   @Override
   protected void serviceStart() throws Exception {
     super.serviceStart();
+    
     LOG.info("RM registry service started : {}", 
         registryOperations.bindingDiagnosticDetails());
     // Register self as event handler for RM Events
@@ -92,7 +103,6 @@ public class RMRegistryService extends CompositeService {
       EventHandler handler) {
     rmContext.getDispatcher().register(eventType, handler);
   }
-
 
   @SuppressWarnings(
       {"EnumSwitchStatementWhichMissesCases", "UnnecessaryDefault"})
@@ -136,6 +146,7 @@ public class RMRegistryService extends CompositeService {
     RMAppAttemptEventType eventType = event.getType();
     ApplicationAttemptId appAttemptId =
         event.getApplicationAttemptId();
+    
     ApplicationId appId = appAttemptId.getApplicationId();
     switch (eventType) {
 
@@ -153,7 +164,7 @@ public class RMRegistryService extends CompositeService {
         break;
 
       case UNREGISTERED:
-        registryOperations.onApplicationUnregistered(appAttemptId);
+        registryOperations.onApplicationAttemptUnregistered(appAttemptId);
         break;
 
       case ATTEMPT_ADDED:
@@ -171,6 +182,46 @@ public class RMRegistryService extends CompositeService {
 
       default:
         // do nothing
+    }
+  }
+
+  /**
+   * Lifted from RMAppManager
+   * @param application
+   * @return
+   * @throws IOException
+   */
+  private Credentials parseCredentials(ApplicationSubmissionContext application)
+      throws IOException {
+    Credentials credentials = new Credentials();
+    DataInputByteBuffer dibb = new DataInputByteBuffer();
+    ByteBuffer tokens = application.getAMContainerSpec().getTokens();
+    if (tokens != null) {
+      dibb.reset(tokens);
+      credentials.readTokenStorageStream(dibb);
+      tokens.rewind();
+    }
+    return credentials;
+  }
+
+  /**
+   * Extract the information from the submission to set up the 
+   * registry permissions for a user
+   * @param applicationId app in question
+   * @return the credentials in the submission
+   * @throws IOException problems parsing the credential
+   */
+  private Credentials extractCredentials(ApplicationId applicationId) throws
+      IOException {
+    RMStateStore rmStore = rmContext.getStateStore();
+    RMApp rmApp = rmContext.getRMApps().get(applicationId);
+    ApplicationSubmissionContext applicationSubmissionContext =
+        rmApp.getApplicationSubmissionContext();
+
+    if (UserGroupInformation.isSecurityEnabled()) {
+      return parseCredentials(applicationSubmissionContext);
+    } else {
+      return null;
     }
   }
 

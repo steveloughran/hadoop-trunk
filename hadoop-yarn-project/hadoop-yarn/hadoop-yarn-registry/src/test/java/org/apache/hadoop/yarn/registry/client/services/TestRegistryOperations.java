@@ -32,9 +32,8 @@ import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
-import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
-import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
+import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
@@ -454,12 +453,12 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
 
     ServiceRecord webapp = new ServiceRecord(appId,
         "tomcat-based web application", 
-        PersistencePolicies.APPLICATION);
+        PersistencePolicies.APPLICATION, null);
     webapp.addExternalEndpoint(restEndpoint("www",
         new URI("http","//loadbalancer/", null)));
 
     ServiceRecord comp1 = new ServiceRecord(cid1, null,
-        PersistencePolicies.CONTAINER);
+        PersistencePolicies.CONTAINER, null);
     comp1.addExternalEndpoint(restEndpoint("www",
         new URI("http", "//rack4server3:43572", null)));
     comp1.addInternalEndpoint(
@@ -467,7 +466,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     
     // Component 2 has a container lifespan
     ServiceRecord comp2 = new ServiceRecord(cid2, null,
-        PersistencePolicies.CONTAINER);
+        PersistencePolicies.CONTAINER, null);
     comp2.addExternalEndpoint(restEndpoint("www",
         new URI("http", "//rack1server28:35881",null)));
     comp2.addInternalEndpoint(

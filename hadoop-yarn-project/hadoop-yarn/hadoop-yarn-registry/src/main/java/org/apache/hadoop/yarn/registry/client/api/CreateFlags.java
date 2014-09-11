@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.types;
+package org.apache.hadoop.yarn.registry.client.api;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Combinable Flags to use when creating a service entry
+ * Combinable Flags to use when creating a service entry.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -34,14 +34,16 @@ public interface CreateFlags {
   int CREATE = 0;
   
   /**
+   * The entry should be created even if an existing entry is there.
+   */
+  int OVERWRITE = 1;
+
+
+  /**
    * The entry is ephemeral, when this session is closed the entry
    * will be deleted.
    */
-  int EPHEMERAL = 1;
-
-  /**
-   * The entry should be created even if an existing entry is there.
-   */
-  int OVERWRITE = 2;
+  // this is not currently in use, so commented out.
+  //int EPHEMERAL = 2;
 
 }

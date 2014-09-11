@@ -20,6 +20,8 @@ package org.apache.hadoop.yarn.registry.client.api;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
+import org.apache.zookeeper.ZooDefs;
 
 /**
  * Constants for the registry, including configuration keys and default
@@ -106,6 +108,34 @@ public interface RegistryConstants {
   String DEFAULT_REGISTRY_ROOT_PERMISSIONS = "world:anyone:rwcda";
 
   /**
+   * System accounts for the registry: {@value}. 
+   */
+  String KEY_REGISTRY_SYSTEM_ACCESS = REGISTRY_PREFIX + ".system.access";
+
+  /**
+   * trimmable comma separated list of system accounts: {@value}.
+   * If there is an "@" at the end of an entry it 
+   * instructs the registry to append the kerberos domain.
+   */
+  String DEFAULT_REGISTRY_SYSTEM_ACCESS = "hadoop,yarn,mapred";
+
+  /**
+   * IPv4 address permissions for world readability
+   */
+  String SCHEME_IP_WORLD_READABLE = "ip:0.0.0.0/32";
+
+  /**
+   * System accounts for the registry: {@value}. 
+   */
+  String KEY_REGISTRY_PUBLIC_ACCESS = REGISTRY_PREFIX + ".public.access";
+
+  /**
+   * default accounts for the public access to the registry: {@value}. 
+   */
+  String DEFAULT_REGISTRY_PUBLIC_ACCESS = SCHEME_IP_WORLD_READABLE;
+
+
+  /**
    * The default ZK session timeout: {@value}
    */
   int DEFAULT_ZK_SESSION_TIMEOUT = 20000;
@@ -170,4 +200,27 @@ public interface RegistryConstants {
    * Directory containing data: {@value}
    */
   String KEY_ZKSERVICE_DATADIR = REGISTRY_PREFIX + ".zkservice.datadir";
+
+
+  /**
+   * Permissions for readers: {@value}.
+   */
+  int PERMISSIONS_REGISTRY_READERS = ZooDefs.Perms.READ;
+  /**
+   * Permissions for system services: {@value}
+   */
+
+  int PERMISSIONS_REGISTRY_SYSTEM_SERVICES =
+      ZooDefs.Perms.ALL;
+  /**
+   * Permissions for a user's root entry: {@value}.
+   * All except the admin permissions (ACL access) on a node
+   */
+  int PERMISSIONS_REGISTRY_USER_ROOT =
+      ZooDefs.Perms.READ | ZooDefs.Perms.WRITE | ZooDefs.Perms.CREATE |
+      ZooDefs.Perms.DELETE;
+  /**
+   * Permissions for any other user entry. Full access
+   */
+  int PERMISSIONS_REGISTRY_USER = ZooDefs.Perms.ALL;
 }

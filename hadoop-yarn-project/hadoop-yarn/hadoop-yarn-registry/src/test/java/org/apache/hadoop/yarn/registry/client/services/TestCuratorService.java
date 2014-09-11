@@ -26,7 +26,8 @@ import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
+import org.apache.hadoop.yarn.registry.client.services.zk.CuratorService;
+import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.junit.After;
@@ -72,7 +73,7 @@ public class TestCuratorService extends AbstractZKRegistryTest {
         "world:anyone:rwcda");
     List<ACL> rootACL = curatorService.getACLs(
         RegistryConstants.KEY_REGISTRY_ZK_ACL, 
-        RMRegistryOperationsService.PERMISSIONS_REGISTRY_ROOT);
+        RegistrySecurity.PERMISSIONS_REGISTRY_ROOT);
     curatorService.maybeCreate("", CreateMode.PERSISTENT, rootACL, true);
   }
   

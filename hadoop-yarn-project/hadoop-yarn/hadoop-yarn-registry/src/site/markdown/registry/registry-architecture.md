@@ -15,7 +15,7 @@
 # Registry Architecture
 
 ZK is used as the underlying system of record. Writes update entries in the
-ZK namespace, reads query it
+ZK namespace, reads query it.
 
 1. all writes are asynchronous and eventually consistent across the ZK quorum.
 All that is guaranteed is that updates from a single client are processed in

@@ -67,7 +67,14 @@ public class ServiceRecord {
    * List of internal endpoints
    */
   public List<Endpoint> internal = new ArrayList<Endpoint>();
-  
+
+  /**
+   * A string of arbitrary data. This should only be used for small amounts of
+   * data related to the binding ... any large amounts of data
+   * should be published by registered service endpoints.
+   */
+  public String data;
+
   /**
    * Create a service record with no ID, description or registration time.
    * Endpoint lists are set to empty lists.
@@ -81,12 +88,17 @@ public class ServiceRecord {
    * @param id service ID
    * @param description description
    * @param persistence persistence policy
+   * @param data a small amount of data to be associated with the record
    */
-  public ServiceRecord(String id, String description, int persistence) {
+  public ServiceRecord(String id,
+      String description,
+      int persistence,
+      String data) {
     this.id = id;
     this.description = description;
     this.persistence = persistence;
     this.registrationTime = System.currentTimeMillis();
+    this.data = data;
   }
 
   public void addExternalEndpoint(Endpoint endpoint) {
