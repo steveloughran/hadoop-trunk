@@ -139,6 +139,10 @@ public class RMRegistryService extends CompositeService {
     ApplicationId appId = appAttemptId.getApplicationId();
     switch (eventType) {
 
+      case LAUNCHED:
+        registryOperations.onApplicationLaunched(appId);
+        break;  
+      
       case REGISTERED:
         RMAppAttemptRegistrationEvent evt =
             (RMAppAttemptRegistrationEvent) event;
@@ -191,10 +195,6 @@ public class RMRegistryService extends CompositeService {
   private class AppEventHandler implements
       EventHandler<RMAppAttemptEvent> {
 
-    /**
-     * Handle an application event
-     * @param event
-     */
     @Override
     public void handle(RMAppAttemptEvent event) {
       try {

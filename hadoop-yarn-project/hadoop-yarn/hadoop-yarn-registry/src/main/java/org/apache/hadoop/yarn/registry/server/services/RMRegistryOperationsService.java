@@ -158,16 +158,36 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
         parseACLs(PERMISSIONS_REGISTRY_SYSTEM), false);
   }
 
+
   /**
    * Create the path for a user
    * @param username username
    * @throws IOException any failure
    */
-  public void createHomeDirectory(String username) throws IOException {
+  @VisibleForTesting
+  public void initUserRegistryAsync(final String username) throws IOException {
+    submit(new Callable<Object>() {
+      @Override
+      public Object call() throws Exception {
+        initUserRegistry(username);
+        return null;
+      }
+    });
+  }
+
+  /**
+   * Perform the actual initialization actions
+   * @param username
+   * @throws IOException
+   */
+  public void initUserRegistry(String username) throws IOException {
     String path = homeDir(username);
     maybeCreate(path, CreateMode.PERSISTENT,
         createAclForUser(username), false);
   }
+  
+
+  
 
   /**
    * Get the path to a user's home dir
@@ -201,7 +221,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     
   }
 
-  public void onApplicationLaunched(ApplicationAttemptId id) throws IOException {
+  public void onApplicationLaunched(ApplicationId id) throws IOException {
     
   }
 
@@ -268,7 +288,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
    */
   public void onStateStoreEvent(ApplicationId applicationId, String user) throws
       IOException {
-    createHomeDirectory(user);
+    initUserRegistryAsync(user);
   }
 
   /**
@@ -303,6 +323,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
         id.toString(),
         PersistencePolicies.CONTAINER);
   }
+  
   /**
    * Policy to purge entries
    */
