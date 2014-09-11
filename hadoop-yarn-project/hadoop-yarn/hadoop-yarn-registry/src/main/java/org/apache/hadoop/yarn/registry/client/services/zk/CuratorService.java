@@ -38,6 +38,7 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
@@ -63,7 +64,7 @@ import java.util.List;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class CuratorService extends AbstractService
+public class CuratorService extends CompositeService
     implements RegistryConstants, RegistryBindingSource {
   
   private static final Logger LOG =
@@ -119,14 +120,15 @@ public class CuratorService extends AbstractService
 
   @Override
   protected void serviceStart() throws Exception {
-    super.serviceStart();
+ 
 
     registryRoot = getConfig().getTrimmed(KEY_REGISTRY_ZK_ROOT,
         DEFAULT_REGISTRY_ROOT) ;
     LOG.debug("Creating Registry with root {}", registryRoot);
 
-    rootACL = getACLs(KEY_REGISTRY_ZK_ACL, DEFAULT_REGISTRY_ROOT_PERMISSIONS);
+    rootACL = buildRootACL();
     curator = newCurator();
+    super.serviceStart();
   }
 
   /**
@@ -135,6 +137,26 @@ public class CuratorService extends AbstractService
   @Override
   protected void serviceStop() throws Exception {
     IOUtils.closeStream(curator);
+    super.serviceStop();
+  }
+
+
+  /**
+   * Override point: build the root acl
+   *
+   * @return the ACL
+   * @throws IOException any bind/parse problem
+   */
+  protected List<ACL> buildRootACL() throws IOException {
+    return getACLs(KEY_REGISTRY_ZK_ACL, DEFAULT_REGISTRY_ROOT_PERMISSIONS);
+  }
+
+  protected List<ACL> getRootACL() {
+    return rootACL;
+  }
+
+  public void setRootACL(List<ACL> rootACL) {
+    this.rootACL = rootACL;
   }
 
   /**
