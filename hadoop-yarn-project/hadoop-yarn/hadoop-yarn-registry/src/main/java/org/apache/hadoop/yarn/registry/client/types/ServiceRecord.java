@@ -67,7 +67,6 @@ public class ServiceRecord {
    * List of internal endpoints
    */
   public List<Endpoint> internal = new ArrayList<Endpoint>();
-
   
   /**
    * Create a service record with no ID, description or registration time.

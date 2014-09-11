@@ -459,7 +459,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
         new URI("http","//loadbalancer/", null)));
 
     ServiceRecord comp1 = new ServiceRecord(cid1, null,
-        PersistencePolicies.EPHEMERAL);
+        PersistencePolicies.CONTAINER);
     comp1.addExternalEndpoint(restEndpoint("www",
         new URI("http", "//rack4server3:43572", null)));
     comp1.addInternalEndpoint(
@@ -479,7 +479,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     operations.mkdir(components, false);
     String dns1 = RegistryPathUtils.encodeYarnID(cid1);
     String dns1path = components + dns1;
-    operations.create(dns1path, comp1, CreateFlags.EPHEMERAL);
+    operations.create(dns1path, comp1, CreateFlags.CREATE);
     String dns2 = RegistryPathUtils.encodeYarnID(cid2);
     String dns2path = components + dns2;
     operations.create(dns2path, comp2, CreateFlags.CREATE );
@@ -493,7 +493,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
 
     ServiceRecord dns1resolved = operations.resolve(dns1path);
     assertEquals("Persistence policies on resolved entry",
-        PersistencePolicies.EPHEMERAL, dns1resolved.persistence);
+        PersistencePolicies.CONTAINER, dns1resolved.persistence);
 
 
     RegistryPathStatus[] componentStats = operations.listDir(components);
@@ -504,7 +504,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     ServiceRecord retrieved1 = records.get(dns1path);
     log(retrieved1.id, retrieved1);
     assertMatches(dns1resolved, retrieved1);
-    assertEquals(PersistencePolicies.EPHEMERAL, retrieved1.persistence);
+    assertEquals(PersistencePolicies.CONTAINER, retrieved1.persistence);
 
     // create a listing under components/
     operations.mkdir(components + "subdir", false);
@@ -654,55 +654,13 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
 
     String path = ENTRY_PATH;
     ServiceRecord written = buildExampleServiceEntry(
-        PersistencePolicies.EPHEMERAL);
+        PersistencePolicies.CONTAINER);
 
     operations.mkdir(RegistryPathUtils.parentOf(path), true);
-    operations.create(path, written, CreateFlags.EPHEMERAL);
+    operations.create(path, written, CreateFlags.CREATE);
     ServiceRecord resolved = operations.resolve(path);
     validateEntry(resolved);
     assertMatches(written, resolved);
-  }
-  
-  @Test(expected = IllegalArgumentException.class)
-  public void testPutGetEphemeralServiceEntryWrongPolicy() throws Throwable {
-    String path = ENTRY_PATH;
-    ServiceRecord written = buildExampleServiceEntry(
-        PersistencePolicies.APPLICATION_ATTEMPT);
-
-    operations.mkdir(RegistryPathUtils.parentOf(path), true);
-    operations.create(path, written, CreateFlags.EPHEMERAL);
-  }
-  
-  @Test
-  public void testEphemeralNoChildren() throws Throwable {
-    ServiceRecord webapp = new ServiceRecord("1",
-        "tomcat-based web application", PersistencePolicies.EPHEMERAL);
-    operations.mkdir(USERPATH, false);
-    String appPath = USERPATH + "tomcat2";
-
-    operations.create(appPath, webapp, CreateFlags.EPHEMERAL);
-    String components = appPath + RegistryConstants.SUBPATH_COMPONENTS + "/";
-    try {
-      operations.mkdir(components, false);
-      fail("expected an error");
-    } catch (NoChildrenForEphemeralsException expected) {
-      // expected
-    }
-    try {
-      operations.create(appPath + "/subdir", webapp, CreateFlags.EPHEMERAL);
-      fail("expected an error");
-    } catch (NoChildrenForEphemeralsException expected) {
-      // expected
-    }
-
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void testPolicyConflict() throws Throwable {
-    ServiceRecord rec = buildExampleServiceEntry(PersistencePolicies.EPHEMERAL);
-    operations.mkdir(USERPATH, false);
-    String appPath = USERPATH + "ex";
-    operations.create(appPath, rec, 0);
   }
   
 }

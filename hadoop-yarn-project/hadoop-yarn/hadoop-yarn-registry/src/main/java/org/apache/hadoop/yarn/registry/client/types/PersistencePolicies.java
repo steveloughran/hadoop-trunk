@@ -51,10 +51,4 @@ public interface PersistencePolicies {
    */
   int CONTAINER = 4;
 
-  /**
-   * Automatic deletion when the session is closed/times out: {@value}.
-   * This is implemented at the ZK layer, not in the RM.
-   */
-  int EPHEMERAL = 5;
-
 }

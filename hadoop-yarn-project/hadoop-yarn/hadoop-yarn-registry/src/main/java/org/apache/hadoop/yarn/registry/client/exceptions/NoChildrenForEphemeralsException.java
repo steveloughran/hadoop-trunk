@@ -22,7 +22,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Children are not allowed under ephemeral nodes
+ * Children are not allowed under ephemeral nodes. This is an aspect
+ * of ZK which isn't exposed to the registry API -ephemeral ZK nodes
+ * do not support children.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving

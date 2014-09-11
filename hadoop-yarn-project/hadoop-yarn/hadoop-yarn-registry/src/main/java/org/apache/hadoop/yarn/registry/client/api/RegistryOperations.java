@@ -52,7 +52,6 @@ public interface RegistryOperations extends Service {
    * @param path path to create
    * @param createParents also create the parents.
    * @throws PathNotFoundException parent path is not in the registry.
-   * @throws NoChildrenForEphemeralsException the parent is ephemeral.
    * @throws AccessControlException access permission failure.
    * @throws InvalidPathnameException path name is invalid.
    * @throws IOException Any other IO Exception.
@@ -60,7 +59,6 @@ public interface RegistryOperations extends Service {
    */
   boolean mkdir(String path, boolean createParents)
       throws PathNotFoundException,
-      NoChildrenForEphemeralsException,
       AccessControlException,
       InvalidPathnameException,
       IOException;
@@ -71,7 +69,6 @@ public interface RegistryOperations extends Service {
    * @param record service record service record to create/update
    * @param createFlags creation flags
    * @throws PathNotFoundException the parent path does not exist
-   * @throws NoChildrenForEphemeralsException the parent is ephemeral
    * @throws FileAlreadyExistsException path exists but create flags
    * do not include "overwrite"
    * @throws AccessControlException access permission failure.
@@ -80,7 +77,6 @@ public interface RegistryOperations extends Service {
    */
   void create(String path, ServiceRecord record, int createFlags)
       throws PathNotFoundException,
-      NoChildrenForEphemeralsException,
       FileAlreadyExistsException,
       AccessControlException,
       InvalidPathnameException,
