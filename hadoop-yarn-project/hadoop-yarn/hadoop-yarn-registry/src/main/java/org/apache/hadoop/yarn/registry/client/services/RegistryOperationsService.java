@@ -33,12 +33,12 @@ import static org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils.*
 
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
-import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
-import org.apache.hadoop.yarn.registry.client.types.CreateFlags;
-import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
+import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
+import org.apache.hadoop.yarn.registry.client.services.zk.CuratorService;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -64,10 +64,6 @@ public class RegistryOperationsService extends CuratorService
   private final RecordOperations.ServiceRecordMarshal serviceRecordMarshal
       = new RecordOperations.ServiceRecordMarshal();
 
-  public static final String PERMISSIONS_REGISTRY_ROOT = "world:anyone:rwcda";
-  public static final String PERMISSIONS_REGISTRY_SYSTEM = "world:anyone:rwcda";
-  public static final String PERMISSIONS_REGISTRY_USERS = "world:anyone:rwcda";
-  public static final String PERMISSIONS_REGISTRY_USER = "world:anyone:rwcda";
   private List<ACL> userAcl;
 
   public RegistryOperationsService(String name) {
@@ -86,7 +82,9 @@ public class RegistryOperationsService extends CuratorService
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
-    userAcl = parseACLs(PERMISSIONS_REGISTRY_USERS);
+    userAcl = new ArrayList<ACL>();
+    userAcl.add(new ACL(PERMISSIONS_REGISTRY_USER, ZooDefs.Ids.AUTH_IDS));
+    userAcl.add(new ACL(ZooDefs.Perms.READ, ZooDefs.Ids.ANYONE_ID_UNSAFE));
   }
 
   public List<ACL> getUserAcl() {

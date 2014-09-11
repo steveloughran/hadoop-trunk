@@ -28,6 +28,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -35,6 +36,7 @@ import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
+import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
@@ -89,7 +91,11 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
-    userAcl = parseACLs(PERMISSIONS_REGISTRY_USERS);
+
+    UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
+    String yarnUserName = currentUser.getUserName();
+    
+    userAcl = parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_USERS);
     executor = Executors.newCachedThreadPool(
         new ThreadFactory() {
           AtomicInteger counter = new AtomicInteger(1);
@@ -149,13 +155,13 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   @VisibleForTesting
   public void createRegistryPaths() throws IOException {
     // create the root directories
-    rootRegistryACL = getACLs(KEY_REGISTRY_ZK_ACL, PERMISSIONS_REGISTRY_ROOT);
+    rootRegistryACL = getACLs(KEY_REGISTRY_ZK_ACL, RegistrySecurity.PERMISSIONS_REGISTRY_ROOT);
     maybeCreate("", CreateMode.PERSISTENT, rootRegistryACL, false);
 
     maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
-        parseACLs(PERMISSIONS_REGISTRY_USERS), false);
+        parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_USERS), false);
     maybeCreate(PATH_SYSTEM_SERVICES, CreateMode.PERSISTENT,
-        parseACLs(PERMISSIONS_REGISTRY_SYSTEM), false);
+        parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_SYSTEM), false);
   }
 
 
@@ -234,16 +240,28 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   }
 
   /**
-   * Actions to take when an application attempt is completed
-   * @param attemptId  application attempt ID
+   * Actions to take when the AM container is completed
+   * @param containerId  container ID
    * @throws IOException problems
    */
-  public void onApplicationAttemptCompleted(ApplicationAttemptId attemptId) 
-      throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Application Attempt {} completed, purging application-level records",
-          attemptId);
-    }
+  public void onAMContainerFinished(ContainerId containerId) throws
+      IOException {
+    LOG.info("AM Container {} finished, purging application attempt records",
+        containerId);
+
+    // remove all application attempt entries
+    purgeAppAttemptRecords(containerId.getApplicationAttemptId());
+
+    // also treat as a container finish to remove container
+    // level records for the AM container
+    onContainerFinished(containerId);
+  }
+
+  /**
+   * remove all application attempt entries
+   * @param attemptId attempt ID
+   */
+  protected void purgeAppAttemptRecords(ApplicationAttemptId attemptId) {
     purgeRecordsAsync("/",
         attemptId.toString(),
         PersistencePolicies.APPLICATION_ATTEMPT);
@@ -254,15 +272,17 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
    * @param attemptId  application  ID
    * @throws IOException problems
    */
-  public void onApplicationUnregistered(ApplicationAttemptId attemptId)
+  public void onApplicationAttemptUnregistered(ApplicationAttemptId attemptId)
       throws IOException {
     LOG.info("Application attempt {} unregistered, purging app attempt records",
         attemptId);
-    purgeRecordsAsync("/",
-        attemptId.toString(),
-        PersistencePolicies.APPLICATION_ATTEMPT);
+    purgeAppAttemptRecords(attemptId);
+
   }
-/**
+
+
+
+  /**
    * Actions to take when an application is completed
    * @param id  application  ID
    * @throws IOException problems
@@ -289,25 +309,6 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   public void onStateStoreEvent(ApplicationId applicationId, String user) throws
       IOException {
     initUserRegistryAsync(user);
-  }
-
-  /**
-   * Actions to take when the AM container is completed
-   * @param containerId  container ID
-   * @throws IOException problems
-   */
-  public void onAMContainerFinished(ContainerId containerId) throws IOException {
-    LOG.info("AM Container {} finished, purging application attempt records",
-        containerId);
-
-    // remove all application attempt entries
-    purgeRecordsAsync("/",
-        containerId.getApplicationAttemptId().toString(),
-        PersistencePolicies.APPLICATION_ATTEMPT);
-    
-    // also treat as a container finish to remove container
-    // level records for the AM container
-    onContainerFinished(containerId);
   }
 
 
