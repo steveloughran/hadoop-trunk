@@ -32,6 +32,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
@@ -44,7 +46,6 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.List;
@@ -79,6 +80,8 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   
   private PurgePolicy purgeOnCompletionPolicy = PurgePolicy.PurgeAll;
   
+  protected RegistrySecurity security;
+  
   public RMRegistryOperationsService(String name) {
     this(name, null);
   }
@@ -91,17 +94,23 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
+    security = new RegistrySecurity(conf);
 
     UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
     String yarnUserName = currentUser.getUserName();
-    
-    userAcl = parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_USERS);
+    String publicUsers =
+        conf.get(KEY_REGISTRY_PUBLIC_ACCESS, DEFAULT_REGISTRY_PUBLIC_ACCESS);
+    userAcl = security.parseIds(publicUsers,"", PERMISSIONS_REGISTRY_USER);
+        
+        parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_USERS);
     executor = Executors.newCachedThreadPool(
         new ThreadFactory() {
           AtomicInteger counter = new AtomicInteger(1);
+
           @Override
           public Thread newThread(Runnable r) {
-            return new Thread(r, "RegistryOperations "+counter.getAndIncrement());
+            return new Thread(r,
+                "RegistryOperations " + counter.getAndIncrement());
           }
         });
   }

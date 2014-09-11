@@ -28,6 +28,9 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
+
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
+
 import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils.*;
 
