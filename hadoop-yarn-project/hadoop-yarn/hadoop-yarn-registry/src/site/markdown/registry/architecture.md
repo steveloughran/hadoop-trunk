@@ -12,7 +12,7 @@
   limitations under the License. See accompanying LICENSE file.
 -->
   
-# Architecture
+# Registry Architecture
 
 ZK is used as the underlying system of record. Writes update entries in the
 ZK namespace, reads query it
