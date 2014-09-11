@@ -100,7 +100,6 @@ public class RegistryOperationsService extends CuratorService
   @Override
   public boolean mkdir(String path, boolean createParents) throws
       PathNotFoundException,
-      NoChildrenForEphemeralsException,
       AccessControlException,
       InvalidPathnameException,
       IOException {
@@ -113,7 +112,6 @@ public class RegistryOperationsService extends CuratorService
       ServiceRecord record,
       int createFlags) throws
       PathNotFoundException,
-      NoChildrenForEphemeralsException,
       FileAlreadyExistsException,
       AccessControlException,
       InvalidPathnameException,
@@ -124,22 +122,7 @@ public class RegistryOperationsService extends CuratorService
     validatePath(path);
     LOG.info("Registered at {} : {}", path, record);
 
-    boolean ephemeral = (createFlags & CreateFlags.EPHEMERAL) != 0;
-    CreateMode mode;
-    if (ephemeral) {
-      mode = CreateMode.EPHEMERAL;
-      Preconditions.checkArgument(
-          record.persistence == PersistencePolicies.EPHEMERAL,
-          "Ephemeral records can only be created if the record's persistence" +
-          " policy field is set to Ephemeral");      
-    } else {
-      Preconditions.checkArgument(
-          record.persistence != PersistencePolicies.EPHEMERAL,
-          "The record's persistence field can only be set to Ephemeral if the" +
-          " create() operation requests an ephemeral entry");
-      mode = CreateMode.PERSISTENT;
-    }
-    
+    CreateMode mode = CreateMode.PERSISTENT;
     byte[] bytes = serviceRecordMarshal.toByteswithHeader(record);
     zkSet(path, mode, bytes, getUserAcl(),
         ((createFlags & CreateFlags.OVERWRITE) != 0));

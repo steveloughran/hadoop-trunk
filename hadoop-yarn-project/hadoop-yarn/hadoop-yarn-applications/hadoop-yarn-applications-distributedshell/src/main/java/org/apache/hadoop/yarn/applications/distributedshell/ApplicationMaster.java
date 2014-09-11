@@ -623,17 +623,6 @@ public class ApplicationMaster {
       serviceRecord.persistence = PersistencePolicies.PERMANENT;
       registryOperations.create(path + "-permanent", serviceRecord,
           CreateFlags.OVERWRITE);
-
-      // ephemeral entry to show how its lifespan is automatically that
-      // of the registry session, hence no-need to set the ID to match
-      serviceRecord.id = "distributed shell ephemeral";
-      
-      serviceRecord.persistence = PersistencePolicies.EPHEMERAL;
-      String path2 = path + "-ephemeral";
-      registryOperations.create(path2, serviceRecord, 
-          CreateFlags.EPHEMERAL );
-      LOG.info("Registered ephemeral entry at " + path2);
-
     }
 
 
