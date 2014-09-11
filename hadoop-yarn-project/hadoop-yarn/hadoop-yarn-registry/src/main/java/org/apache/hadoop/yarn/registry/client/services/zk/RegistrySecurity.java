@@ -18,14 +18,19 @@
 
 package org.apache.hadoop.yarn.registry.client.services.zk;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Id;
 import org.apache.zookeeper.server.auth.DigestAuthenticationProvider;
 
+import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -39,20 +44,29 @@ public class RegistrySecurity {
   public static final String PERMISSIONS_REGISTRY_ROOT = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_SYSTEM = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_USERS = "world:anyone:rwcda";
+  private final Configuration conf;
+  private String domain;
 
 
   /**
    * Create an instance
    */
-  public RegistrySecurity() {
+  public RegistrySecurity(Configuration conf) {
+    this.conf = conf;
     try {
       MessageDigest.getInstance("SHA1");
     } catch (NoSuchAlgorithmException e) {
       throw new RuntimeException(e.toString(), e);
     }
-
   }
-
+/*
+  public String extractCurrentDomain() throws IOException {
+    UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
+    UserGroupInformation realUser = currentUser.getRealUser();
+    realUser.g
+  }
+  */
+  
   /**
    * Generate a base-64 encoded digest of the password
    * @param password pass
@@ -90,6 +104,9 @@ public class RegistrySecurity {
     String scheme = a.substring(0, firstColon);
     String id = a.substring(firstColon + 1);
     if (id.endsWith("@")) {
+      Preconditions.checkArgument(
+          StringUtils.isNotEmpty(domain),
+          "@ suffixed account but no domain %s", id);
       id = id + domain;
     }
     return new Id(scheme, id);
