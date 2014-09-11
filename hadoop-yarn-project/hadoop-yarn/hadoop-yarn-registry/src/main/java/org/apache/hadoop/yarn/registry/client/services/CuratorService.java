@@ -131,7 +131,7 @@ public class CuratorService extends AbstractService
    * Close the ZK connection if it is open
    */
   @Override
-  public void serviceStop() throws Exception {
+  protected void serviceStop() throws Exception {
     IOUtils.closeStream(curator);
   }
 

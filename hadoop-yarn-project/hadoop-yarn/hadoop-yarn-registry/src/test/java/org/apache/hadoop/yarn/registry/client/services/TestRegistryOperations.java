@@ -54,6 +54,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 
 public class TestRegistryOperations extends AbstractZKRegistryTest {
   public static final String SC_HADOOP = "org-apache-hadoop";
@@ -568,7 +569,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
 
 
   @Test
-  public void testAsyncPurgeEntry() throws Throwable {
+  public void testPurgeEntryCuratorCallback() throws Throwable {
 
     String path = "/users/example/hbase/hbase1/";
     ServiceRecord written = buildExampleServiceEntry(
@@ -598,7 +599,6 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     opcount = registry.purgeRecords("/",
         written.id,
         -1,
-//        PersistencePolicies.APPLICATION_ATTEMPT,
         RMRegistryOperationsService.PurgePolicy.PurgeAll,
         events);
 
@@ -608,6 +608,43 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     assertEquals("wrong no of delete operations in " + dump, 1, opcount);
     // and validate the callback event
     assertEquals("Event counter", 1, events.getCount());
+
+  }
+  
+  @Test
+  public void testAsyncPurgeEntry() throws Throwable {
+
+    String path = "/users/example/hbase/hbase1/";
+    ServiceRecord written = buildExampleServiceEntry(
+        PersistencePolicies.APPLICATION_ATTEMPT);
+    written.id = "testAsyncPurgeEntry_attempt_001";
+
+    operations.mkdir(RegistryPathUtils.parentOf(path), true);
+    operations.create(path, written, 0);
+
+    ZKPathDumper dump = registry.dumpPath();
+
+    LOG.info("Initial state {}", dump);
+
+    Future<Integer> future = registry.purgeRecordsAsync("/",
+        written.id,
+        PersistencePolicies.CONTAINER);
+
+    int opcount = future.get();
+    assertPathExists(path);
+    assertEquals(0, opcount);
+
+
+    // now all matching entries
+    future = registry.purgeRecordsAsync("/",
+        written.id,
+        -1);
+    opcount = future.get();
+    LOG.info("Final state {}", dump);
+
+    assertPathNotFound(path);
+    assertEquals("wrong no of delete operations in " + dump, 1, opcount);
+    // and validate the callback event
 
   }
   

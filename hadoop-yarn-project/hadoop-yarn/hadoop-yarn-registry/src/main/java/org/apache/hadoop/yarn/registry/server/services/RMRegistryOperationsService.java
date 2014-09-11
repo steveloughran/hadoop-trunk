@@ -46,6 +46,12 @@ import org.slf4j.LoggerFactory;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Extends the registry operations with extra support for resource management
@@ -67,6 +73,8 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
 
   private List<ACL> userAcl;
 
+  private ExecutorService executor;
+  
   private PurgePolicy purgeOnCompletionPolicy = PurgePolicy.PurgeAll;
   
   public RMRegistryOperationsService(String name) {
@@ -82,6 +90,14 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
     userAcl = parseACLs(PERMISSIONS_REGISTRY_USERS);
+    executor = Executors.newCachedThreadPool(
+        new ThreadFactory() {
+          AtomicInteger counter = new AtomicInteger(1);
+          @Override
+          public Thread newThread(Runnable r) {
+            return new Thread(r, "RegistryOperations "+counter.getAndIncrement());
+          }
+        });
   }
 
   /**
@@ -94,6 +110,36 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
 
     // create the root directories
     createRegistryPaths();
+  }
+
+  /**
+   * Stop the service: halt the executor. 
+   * @throws Exception exception.
+   */
+  @Override
+  protected void serviceStop() throws Exception {
+    stopExecutor();
+    super.serviceStop();
+  }
+
+  /**
+   * Stop the executor if it is not null.
+   * This uses {@link ExecutorService#shutdownNow()}
+   * and so does not block until they have completed.
+   */
+  protected synchronized void stopExecutor() {
+    if (executor != null) {
+      executor.shutdownNow();
+    }
+  }
+
+
+  /**
+   * Get the executor
+   * @return the executor
+   */
+  protected synchronized ExecutorService getExecutor() {
+    return executor;
   }
 
   /**
@@ -178,7 +224,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
       LOG.debug("Application Attempt {} completed, purging application-level records",
           attemptId);
     }
-    purgeRecordsQuietly("/",
+    purgeRecordsAsync("/",
         attemptId.toString(),
         PersistencePolicies.APPLICATION_ATTEMPT);
   }
@@ -192,7 +238,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
       throws IOException {
     LOG.info("Application attempt {} unregistered, purging app attempt records",
         attemptId);
-    purgeRecordsQuietly("/",
+    purgeRecordsAsync("/",
         attemptId.toString(),
         PersistencePolicies.APPLICATION_ATTEMPT);
   }
@@ -205,7 +251,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
       throws IOException {
     LOG.info("Application {} completed, purging application-level records",
         id);
-    purgeRecordsQuietly("/",
+    purgeRecordsAsync("/",
         id.toString(),
         PersistencePolicies.APPLICATION);
   }
@@ -235,7 +281,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
         containerId);
 
     // remove all application attempt entries
-    purgeRecordsQuietly("/",
+    purgeRecordsAsync("/",
         containerId.getApplicationAttemptId().toString(),
         PersistencePolicies.APPLICATION_ATTEMPT);
     
@@ -253,7 +299,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   public void onContainerFinished(ContainerId id) throws IOException {
     LOG.info("Container {} finished, purging container-level records",
         id);
-    purgeRecordsQuietly("/",
+    purgeRecordsAsync("/",
         id.toString(),
         PersistencePolicies.CONTAINER);
   }
@@ -267,30 +313,28 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   }
   
   /**
-   * Purge all matching records under a base path -logging problems at INFO.
+   * Queue an async operation to purge all matching records under a base path.
    * <ol>
    *   <li>Uses a depth first search</li>
    *   <li>A match is on ID and persistence policy, or, if policy==-1, any match</li>
    *   <li>If a record matches then it is deleted without any child searches</li>
    *   <li>Deletions will be asynchronous if a callback is provided</li>
    * </ol>
-   *  @param path base path
+   * @param path base path
    * @param id ID for service record.id
-   * @param persistencePolicyMatch ID for the persistence policy to match: no match, no delete.
- * If set to to -1 or below, " don't check"
+   * @param persistencePolicyMatch ID for the persistence policy to match: 
+   * no match, no delete.
+   * @return a future that returns the #of records deleted
    */
-  private void purgeRecordsQuietly(String path,
+  @VisibleForTesting
+  public Future<Integer> purgeRecordsAsync(String path,
       String id,
       int persistencePolicyMatch) {
-    try {
-      LOG.info("Purging records under {} with ID {} and policy {}: {}",
-          path, id, persistencePolicyMatch);
-      purgeRecords(path, id, persistencePolicyMatch, purgeOnCompletionPolicy,
-          new DeleteCompletionCallback());
-    } catch (IOException e) {
-      LOG.info("Error while purging records under {} with ID {} and policy {}: {}",
-          path, id, persistencePolicyMatch, e, e);
-    }
+
+    LOG.info(" records under {} with ID {} and policy {}: {}",
+        path, id, persistencePolicyMatch);
+    return submit(new AsyncPurgeRegistry(path, id, persistencePolicyMatch,
+        new DeleteCompletionCallback()));
   }
 
   /**
@@ -390,8 +434,64 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
         CuratorEvent event) throws
         Exception {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Delete event "+ event.toString());
+        LOG.debug("Delete event {}", event);
       }
+    }
+  }
+
+  /**
+   * Submit a callable
+   * @param callable callable
+   * @param <V> type of the final get
+   * @return a future to wait on
+   */
+  public <V> Future<V> submit(Callable<V> callable) {
+    LOG.debug("Submitting {}", callable);
+    return getExecutor().submit(callable);
+  }
+
+  /**
+   * An async registry action
+   */
+  private class AsyncPurgeRegistry implements Callable<Integer> {
+
+    final BackgroundCallback callback;
+    private final String path;
+    private final String id;
+    private final int persistencePolicyMatch;
+
+    private AsyncPurgeRegistry(String path,
+        String id,
+        int persistencePolicyMatch,
+        BackgroundCallback callback) {
+      this.path = path;
+      this.id = id;
+      this.persistencePolicyMatch = persistencePolicyMatch;
+      this.callback = callback;
+    }
+
+    @Override
+    public Integer call() throws Exception {
+      try {
+        LOG.info("executing {}", this);
+        return purgeRecords(path,
+            id,
+            persistencePolicyMatch,
+            purgeOnCompletionPolicy,
+            callback);
+      } catch (IOException e) {
+        LOG.info("Error during {}: {}", this, e, e);
+        return 0;
+      }
+    }
+
+    @Override
+    public String toString() {
+
+      return String.format(
+          "record purge under %s with ID %s and policy %d: {}",
+          path, id, persistencePolicyMatch);
+
     }
   }
   
