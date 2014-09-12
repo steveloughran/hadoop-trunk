@@ -18,10 +18,17 @@
 
 package org.apache.hadoop.yarn.registry.secure;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.minikdc.MiniKdc;
+import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.registry.AbstractRegistryTest;
+import org.apache.hadoop.yarn.registry.RegistryTestHelper;
+import org.apache.hadoop.yarn.registry.server.services.AddingCompositeService;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.rules.TestName;
+import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,6 +36,7 @@ import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.login.LoginContext;
 import java.io.File;
+import java.io.IOException;
 import java.security.Principal;
 import java.util.HashSet;
 import java.util.Properties;
@@ -38,13 +46,41 @@ import java.util.Set;
  * Add kerberos tests. This is based on the (JUnit3) KerberosSecurityTestcase
  * and its test case, <code>TestMiniKdc</code>
  */
-public class AbstractSecureRegistryTest extends AbstractRegistryTest {
+public class AbstractSecureRegistryTest extends RegistryTestHelper {
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractSecureRegistryTest.class);
+
+
+  private static final AddingCompositeService servicesToTeardown =
+      new AddingCompositeService("teardown");
+
+  // static initializer guarantees it is always started
+  // ahead of any @BeforeClass methods
+  static {
+    servicesToTeardown.init(new Configuration());
+    servicesToTeardown.start();
+  }
+
   protected static MiniKdc kdc;
   private static File kdcWorkDir;
   private static Properties kdcConf;
-  
+
+  @Rule
+  public final Timeout testTimeout = new Timeout(10000);
+
+  @Rule
+  public TestName methodName = new TestName();
+
+  protected static void addToTeardown(Service svc) {
+    servicesToTeardown.addService(svc);
+  }
+
+  @AfterClass
+  public static void teardownServices() throws IOException {
+    servicesToTeardown.close();
+  }
+
+
   @BeforeClass
   public static void setupKDC() throws Exception {
     // set up the KDC

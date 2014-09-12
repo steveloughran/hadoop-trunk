@@ -28,16 +28,13 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.services.BindingInformation;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
-import org.apache.zookeeper.Environment;
 import org.apache.zookeeper.server.ServerCnxnFactory;
-import org.apache.zookeeper.server.ZooKeeperSaslServer;
 import org.apache.zookeeper.server.ZooKeeperServer;
 import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -79,6 +76,7 @@ public class MicroZookeeperService
   private ServerCnxnFactory factory;
   private BindingInformation binding;
   private File confDir;
+  private StringBuilder diagnostics = new StringBuilder();
 
   /**
    * Create an instance
@@ -144,47 +142,42 @@ public class MicroZookeeperService
     confDir = new File(instanceDir, "conf");
     dataDir.mkdirs();
     confDir.mkdirs();
+    setupSecurity();
     super.serviceInit(conf);
   }
 
+  protected void addDiagnostics(String text, Object ... args) {
+    diagnostics.append(String.format(text, args)).append('\n');
+  }
 
   /**
-   * set up security. this must be done immediately prior to creating
+   * Get the diagnostics info
+   * @return
+   */
+  public String getDiagnostics() {
+    return diagnostics.toString();
+  }
+
+  /**
+   * set up security. this must be done prior to creating
    * the ZK instance, as it sets up JAAS if that has not been done already.
-   * 
-   * This is not done automatically, as while it is convenient for
-   * testing, as it sets system properties and JAAS configurations, it
-   * doesn't mix with production configurations. To support a secure
-   * cluster in a production system, follow the ZK documentation.
+   *
    * @param conf configuration
    */
-  public boolean setupSecurity(Configuration conf) throws IOException {
-    // 
-    String zkPrincipal = conf.getTrimmed(KEY_REGISTRY_ZK_PRINCIPAL);
-    boolean secure = StringUtils.isNotEmpty(zkPrincipal);
+  protected boolean setupSecurity() throws IOException {
+    Configuration conf = getConfig();
+    RegistrySecurity security = new RegistrySecurity(conf);
+    boolean secure = security.isSecurityEnabled();
     if (!secure) {
       return false;
     }
+    String zkPrincipal = security.getPrincipalConfOption();
     String zkKeytab = conf.getTrimmed(KEY_REGISTRY_ZK_KEYTAB);
-    File keytabFile = new File(zkKeytab);
-    if (!keytabFile.exists()) {
-      throw new FileNotFoundException("Missing zookeeper keytab "
-                                      + keytabFile.getAbsolutePath());
-    }
-    System.setProperty(ZooKeeperSaslServer.LOGIN_CONTEXT_NAME_KEY,
-        ZooKeeperSaslServer.DEFAULT_LOGIN_CONTEXT_NAME);
-    String jaasFilename = System.getProperty(Environment.JAAS_CONF_KEY);
-
-    if (StringUtils.isEmpty(jaasFilename)) {
-      // set up jaas.
-      RegistrySecurity security = new RegistrySecurity(conf);
-      File jaasFile = new File(confDir, "server.jaas");
-      jaasFilename = jaasFile.getAbsolutePath();
-      security.buildJAASFile(jaasFile, zkPrincipal, new File(zkKeytab));
-      // 
-    }
-    // here the JAAS file is set up
-    System.setProperty(Environment.JAAS_CONF_KEY, jaasFilename);
+    File keytabFile = security.getKeytabConffile();
+    File jaasFile =
+        security.prepareJAASAuth(zkPrincipal, keytabFile,
+            File.createTempFile("zookeeper", ".jaas", confDir));
+    addDiagnostics("principal=%s keytab=%s", zkPrincipal, keytabFile); 
     return true;
   }
 
@@ -220,6 +213,7 @@ public class MicroZookeeperService
     binding.description =
         getName() + " reachable at \"" + connectString + "\"";
 
+    addDiagnostics(binding.description);
     // finally: set the binding information in the config
     getConfig().set(KEY_REGISTRY_ZK_QUORUM, connectString);
   }

@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.registry.client.services.zk;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang.StringUtils;
 import org.apache.curator.ensemble.EnsembleProvider;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
 import org.apache.curator.framework.CuratorFramework;
@@ -37,12 +38,12 @@ import org.apache.hadoop.fs.PathAccessDeniedException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
+import org.apache.hadoop.yarn.registry.client.exceptions.AuthenticationFailedException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.hadoop.yarn.registry.client.exceptions.RegistryIOException;
 import org.apache.hadoop.yarn.registry.client.services.BindingInformation;
@@ -54,6 +55,7 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
@@ -66,9 +68,10 @@ import java.util.List;
 @InterfaceStability.Evolving
 public class CuratorService extends CompositeService
     implements RegistryConstants, RegistryBindingSource {
-  
+
   private static final Logger LOG =
       LoggerFactory.getLogger(CuratorService.class);
+  public static final String SASL = "sasl";
 
   /**
    * the Curator binding
@@ -91,6 +94,8 @@ public class CuratorService extends CompositeService
    * the connection binding text for messages
    */
   private String connectionDescription;
+  private String securityConnectionDiagnostics = "";
+  
   private EnsembleProvider ensembleProvider;
 
 
@@ -193,7 +198,7 @@ public class CuratorService extends CompositeService
    * retry policy.
    * @return the newly created creator
    */
-  private CuratorFramework newCurator() {
+  private CuratorFramework newCurator() throws IOException {
     Configuration conf = getConfig();
     createEnsembleProvider();
     int sessionTimeout = conf.getInt(KEY_REGISTRY_ZK_SESSION_TIMEOUT,
@@ -217,6 +222,8 @@ public class CuratorService extends CompositeService
          retryTimes,
          retryCeiling));
 
+    addSecurityBinding(b);
+       
 
 /*
     if (!root.isEmpty()) {
@@ -234,6 +241,36 @@ public class CuratorService extends CompositeService
     return framework;
   }
 
+
+  public CuratorFrameworkFactory.Builder addSecurityBinding(
+      CuratorFrameworkFactory.Builder builder) throws
+      IOException {
+    Configuration conf = getConfig();
+    RegistrySecurity security = new RegistrySecurity(conf);
+
+    String principal = conf.get(KEY_REGISTRY_ZK_PRINCIPAL);
+
+
+    if (StringUtils.isEmpty(principal)) {
+      return builder;
+    }
+    String zkKeytab = conf.getTrimmed(KEY_REGISTRY_ZK_KEYTAB);
+    File keytabFile = new File(zkKeytab);
+    File jaasFile =
+        security.prepareJAASAuth(principal, keytabFile,
+            File.createTempFile("curator-", ".jaas"));
+    String authScheme = SASL;
+    securityConnectionDiagnostics =
+        String.format(
+            " Secured as \"%s:%s\" keytab=%s jaasfile=%s",
+            authScheme, principal, keytabFile, jaasFile);
+    LOG.debug(securityConnectionDiagnostics);
+    byte[] data = principal.getBytes("UTF-8");
+
+    builder.authorization(authScheme, data);
+    return builder;
+  }
+  
   @Override
   public String toString() {
     return super.toString()
@@ -242,8 +279,9 @@ public class CuratorService extends CompositeService
   }
 
   public String bindingDiagnosticDetails() {
-    return " ZK quorum=\"" + connectionDescription + "\""
-           + " root=\"" + registryRoot + "\"";
+    return " Connection=\"" + connectionDescription + "\""
+           + " root=\"" + registryRoot + "\""
+           + " "+ securityConnectionDiagnostics;
   }
 
   /**
@@ -277,7 +315,8 @@ public class CuratorService extends CompositeService
   protected void createEnsembleProvider() {
     BindingInformation binding = bindingSource.supplyBindingInformation();
     String connectString = buildConnectionString();
-    connectionDescription = binding.description;
+    connectionDescription = binding.description
+                            + " " + securityConnectionDiagnostics;
     ensembleProvider = binding.ensembleProvider;
   }
 
@@ -327,9 +366,12 @@ public class CuratorService extends CompositeService
       ioe = new PathAccessDeniedException(path);
     } else if (exception instanceof KeeperException.NotEmptyException) {
       ioe = new PathIsNotEmptyDirectoryException(path);
+    } else if (exception instanceof KeeperException.AuthFailedException) {
+      ioe = new AuthenticationFailedException(path,
+          "Authentication Failed: " + exception, exception);
     } else if (exception instanceof KeeperException.NoChildrenForEphemeralsException) {
       ioe = new NoChildrenForEphemeralsException(path, 
-          "Cannot create a path under an ephemeral node:" + exception.toString(),
+          "Cannot create a path under an ephemeral node: " + exception,
           exception);
     } else {
       ioe = new RegistryIOException(path,
@@ -451,7 +493,7 @@ public class CuratorService extends CompositeService
    * @param acl ACL for path 
    * @throws IOException any problem
    */
-  protected boolean zkMkPath(String path,
+  public boolean zkMkPath(String path,
       CreateMode mode,
       boolean createParents,
       List<ACL> acl) 

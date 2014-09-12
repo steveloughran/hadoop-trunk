@@ -128,6 +128,7 @@ public class JsonSerDeser<T> {
    * @throws IOException IO problems
    * @throws JsonMappingException failure to map from the JSON to this class
    */
+  @SuppressWarnings("IOResourceOpenedButNotSafelyClosed")
   public synchronized T fromResource(String resource)
       throws IOException, JsonParseException, JsonMappingException {
     InputStream resStream = null;
