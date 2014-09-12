@@ -37,7 +37,7 @@ import org.junit.rules.Timeout;
 import java.io.File;
 import java.io.IOException;
 
-public class AbstractZKRegistryTest extends Assert {
+public class AbstractZKRegistryTest extends RegistryTestHelper {
 
   private static final AddingCompositeService servicesToTeardown =
       new AddingCompositeService("teardown");
@@ -48,8 +48,6 @@ public class AbstractZKRegistryTest extends Assert {
     servicesToTeardown.start();
   }
   
-  protected static MicroZookeeperService zookeeper;
-
   @Rule
   public final Timeout testTimeout = new Timeout(10000);
 
@@ -65,6 +63,8 @@ public class AbstractZKRegistryTest extends Assert {
     servicesToTeardown.close();
   }
 
+  protected static MicroZookeeperService zookeeper;
+
 
   @BeforeClass
   public static void createZKServer() throws Exception {
@@ -77,14 +77,6 @@ public class AbstractZKRegistryTest extends Assert {
     zookeeper.init(conf);
     zookeeper.start();
     addToTeardown(zookeeper);
-  }
-
-  public static void assertValidZKPath(String path) {
-    try {
-      PathUtils.validatePath(path);
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("Invalid Path " + path + ": " + e, e);
-    }
   }
 
   /**
@@ -104,7 +96,7 @@ public class AbstractZKRegistryTest extends Assert {
     return zookeeper.getConnectionString();
   }
 
-  protected YarnConfiguration createRegistryConfiguration() {
+  public YarnConfiguration createRegistryConfiguration() {
     YarnConfiguration conf = new YarnConfiguration();
     conf.setInt(RegistryConstants.KEY_REGISTRY_ZK_CONNECTION_TIMEOUT, 1000);
     conf.setInt(RegistryConstants.KEY_REGISTRY_ZK_RETRY_INTERVAL, 500);
