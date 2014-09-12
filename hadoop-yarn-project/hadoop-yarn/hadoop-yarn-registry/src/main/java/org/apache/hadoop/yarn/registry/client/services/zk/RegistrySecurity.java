@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.yarn.registry.client.services.zk;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -30,11 +32,14 @@ import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Id;
 import org.apache.zookeeper.server.auth.DigestAuthenticationProvider;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Implement the registry security ... standalone for easier testing
@@ -115,18 +120,18 @@ public class RegistrySecurity {
 
 
   /**
-   * Parse the IDs, adding a domain if needed, setting the permissions
+   * Parse the IDs, adding a realm if needed, setting the permissions
    * @param idString id string
-   * @param domain domain to add
+   * @param realm realm to add
    * @param perms permissions
    * @return the relevant ACLs
    */
-  public List<ACL> parseIds(String idString, String domain, int perms) {
+  public List<ACL> parseIds(String idString, String realm, int perms) {
     List<String> aclPairs = splitAclPairs(idString);
     List<ACL> ids = new ArrayList<ACL>(aclPairs.size());
     for (String aclPair : aclPairs) {
       ACL newAcl = new ACL();
-      newAcl.setId(parse(aclPair, domain));
+      newAcl.setId(parse(aclPair, realm));
       newAcl.setPerms(perms);
       ids.add(newAcl);
     }
@@ -134,6 +139,56 @@ public class RegistrySecurity {
   }
 
 
+  /*
+  Server {
+  com.sun.security.auth.module.Krb5LoginModule required
+  useKeyTab=true
+  keyTab="/etc/zookeeper/conf/zookeeper.keytab"
+  storeKey=true
+  useTicketCache=false
+  principal="zookeeper/fully.qualified.domain.name@<YOUR-REALM>";
+};
+   */
+  /**
+   * Printf string for the JAAS entry
+   */
+  private static final String JAAS_ENTRY =
+      "Server { \n"
+      + " com.sun.security.auth.module.Krb5LoginModule required\n"  // kerberos module
+      + " keyTab=\"%s\"\n"
+      + " principal=\"%s\"\n"
+      + " useKeyTab=true\n"
+      + " useTicketCache=false\n"
+      + " storeKey=true\n"
+      + "}; \n";
 
+
+  public String createJAASEntry(
+      String principal, File keytab) {
+    return String.format(
+        Locale.ENGLISH,
+        JAAS_ENTRY,
+        keytab.getAbsolutePath(),
+        principal);
+  }
+
+  /**
+   * Create and save a JAAS config file
+   * @param dest destination
+   * @param principal kerberos principal
+   * @param keytab  keytab
+   * @throws IOException trouble
+   */
+  public void buildJAASFile(File dest, String principal, File keytab) throws
+      IOException {
+    Preconditions.checkArgument(StringUtils.isNotEmpty(principal),
+        "invalid principal");
+    
+    if (!keytab.isFile()) {
+      throw new FileNotFoundException("Keytab not found: " + keytab);
+    }
+    String entry = createJAASEntry(principal, keytab);
+    FileUtils.write(dest, entry);
+  }
 
 }

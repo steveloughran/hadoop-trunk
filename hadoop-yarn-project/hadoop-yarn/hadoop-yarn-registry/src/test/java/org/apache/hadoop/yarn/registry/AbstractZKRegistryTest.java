@@ -19,8 +19,11 @@
 package org.apache.hadoop.yarn.registry;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import org.apache.hadoop.yarn.registry.server.services.AddingCompositeService;
 import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperService;
 import org.apache.zookeeper.common.PathUtils;
 import org.junit.AfterClass;
@@ -36,6 +39,15 @@ import java.io.IOException;
 
 public class AbstractZKRegistryTest extends Assert {
 
+  private static final AddingCompositeService servicesToTeardown =
+      new AddingCompositeService("teardown");
+  // static initializer guarantees it is always started
+  // ahead of any @BeforeClass methods
+  static {
+    servicesToTeardown.init(new Configuration());
+    servicesToTeardown.start();
+  }
+  
   protected static MicroZookeeperService zookeeper;
 
   @Rule
@@ -44,6 +56,16 @@ public class AbstractZKRegistryTest extends Assert {
   @Rule
   public TestName methodName = new TestName();
 
+  protected static void addToTeardown(Service svc) {
+    servicesToTeardown.addService(svc);
+  }
+
+  @AfterClass
+  public static void teardownServices() throws IOException {
+    servicesToTeardown.close();
+  }
+
+
   @BeforeClass
   public static void createZKServer() throws Exception {
     File zkDir = new File("target/zookeeper");
@@ -51,14 +73,10 @@ public class AbstractZKRegistryTest extends Assert {
     assertTrue(zkDir.mkdirs());
     zookeeper = new MicroZookeeperService("InMemoryZKService");
     YarnConfiguration conf = new YarnConfiguration();
-    conf.set(RegistryConstants.KEY_ZKSERVICE_DATADIR, zkDir.getAbsolutePath());
+    conf.set(RegistryConstants.KEY_ZKSERVICE_DIR, zkDir.getAbsolutePath());
     zookeeper.init(conf);
     zookeeper.start();
-  }
-
-  @AfterClass
-  public static void destroyZKServer() throws IOException {
-    zookeeper.close();
+    addToTeardown(zookeeper);
   }
 
   public static void assertValidZKPath(String path) {

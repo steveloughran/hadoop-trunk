@@ -145,6 +145,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   protected synchronized void stopExecutor() {
     if (executor != null) {
       executor.shutdownNow();
+      executor = null;
     }
   }
 

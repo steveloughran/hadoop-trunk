@@ -57,6 +57,13 @@
       <scope>test</scope>
     </dependency>
     
+    <!-- Mini KDC is used for testing -->
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-minikdc</artifactId>
+      <scope>test</scope>
+    </dependency>
+    
     <dependency>
       <groupId>com.sun.jersey</groupId>
       <artifactId>jersey-core</artifactId>

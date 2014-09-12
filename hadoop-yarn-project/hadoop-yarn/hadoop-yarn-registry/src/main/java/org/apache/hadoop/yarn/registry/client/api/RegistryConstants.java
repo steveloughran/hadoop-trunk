@@ -34,73 +34,16 @@ public interface RegistryConstants {
   /**
    * prefix for registry configuration options: {@value}
    */
-  String REGISTRY_PREFIX = "yarn.registry";
+  String REGISTRY_PREFIX = "yarn.registry.";
 
   /**
    * flag to indicate whether or not the registry should
    * be enabled: {@value}
    */
-  String KEY_REGISTRY_ENABLED = REGISTRY_PREFIX + ".enabled";
+  String KEY_REGISTRY_ENABLED = REGISTRY_PREFIX + "enabled";
 
   boolean DEFAULT_REGISTRY_ENABLED = false;
-  
-  /**
-   * Flag to indicate whether the ZK service should be enabled {@value}
-   * in the RM
-   */
-  String KEY_ZKSERVICE_ENABLED = REGISTRY_PREFIX + ".zkservice.enabled";
-  boolean DEFAULT_ZKSERVICE_ENABLED = false;
 
-
-  /**
-   * List of hostname:port pairs defining the ZK quorum: {@value}
-   */
-  String KEY_REGISTRY_ZK_QUORUM = REGISTRY_PREFIX + ".zk.quorum";
-
-  /**
-   * Zookeeper session timeout in milliseconds: {@value}
-   */
-  String KEY_REGISTRY_ZK_SESSION_TIMEOUT =
-      REGISTRY_PREFIX + ".zk.session-timeout-ms";
-
-  /**
-   * Zookeeper connect retry count: {@value}
-   */
-  String KEY_REGISTRY_ZK_RETRY_TIMES = REGISTRY_PREFIX + ".zk.retry.times";
-
-  /**
-   * Zookeeper connection timeout in milliseconds: {@value}
-   */
-
-  String KEY_REGISTRY_ZK_CONNECTION_TIMEOUT =
-      REGISTRY_PREFIX + ".zk.connection-timeout-ms";
-
-  /**
-   * Zookeeper connect interval in milliseconds: {@value}
-   */
-  String KEY_REGISTRY_ZK_RETRY_INTERVAL =
-      REGISTRY_PREFIX + ".zk.retry.interval-ms";
-
-  /**
-   * Zookeeper retry limit in milliseconds: {@value}
-   */
-  String KEY_REGISTRY_ZK_RETRY_CEILING =
-      REGISTRY_PREFIX + ".zk.retry.ceiling-ms";
-
-  /**
-   * Root path in the ZK tree for the registry: {@value}
-   */
-  String KEY_REGISTRY_ZK_ROOT = REGISTRY_PREFIX + ".zk.root";
- 
-  /**
-   * Root path in the ZK tree for the registry: {@value}
-   */
-  String KEY_REGISTRY_ZK_ACL = REGISTRY_PREFIX + ".zk.acl";
-
-  /**
-   * The default ZK quorum binding: {@value}
-   */
-  String DEFAULT_ZK_HOSTS = "localhost:2181";
 
   /**
    * The default permissions for the registry root: {@value}
@@ -110,7 +53,7 @@ public interface RegistryConstants {
   /**
    * System accounts for the registry: {@value}. 
    */
-  String KEY_REGISTRY_SYSTEM_ACCESS = REGISTRY_PREFIX + ".system.access";
+  String KEY_REGISTRY_SYSTEM_ACCESS = REGISTRY_PREFIX + "system.access";
 
   /**
    * trimmable comma separated list of system accounts: {@value}.
@@ -127,7 +70,7 @@ public interface RegistryConstants {
   /**
    * System accounts for the registry: {@value}. 
    */
-  String KEY_REGISTRY_PUBLIC_ACCESS = REGISTRY_PREFIX + ".public.access";
+  String KEY_REGISTRY_PUBLIC_ACCESS = REGISTRY_PREFIX + "public.access";
 
   /**
    * default accounts for the public access to the registry: {@value}. 
@@ -186,20 +129,90 @@ public interface RegistryConstants {
                           's', 'e','r','v','i', 'c', 'e',
                           'r','e','c'};
 
+
+  String ZK_PREFIX = REGISTRY_PREFIX + "zk.";
+  /**
+   * Flag to indicate whether the ZK service should be enabled {@value}
+   * in the RM
+   */
+  String KEY_ZKSERVICE_ENABLED = ZK_PREFIX + "service.enabled";
+  boolean DEFAULT_ZKSERVICE_ENABLED = false;
+
+
+  /**
+   * List of hostname:port pairs defining the ZK quorum: {@value}
+   */
+  String KEY_REGISTRY_ZK_QUORUM = ZK_PREFIX + "quorum";
+
+  /**
+   * Zookeeper session timeout in milliseconds: {@value}
+   */
+  String KEY_REGISTRY_ZK_SESSION_TIMEOUT =
+      ZK_PREFIX + "session-timeout-ms";
+
+  /**
+   * Zookeeper connect retry count: {@value}
+   */
+  String KEY_REGISTRY_ZK_RETRY_TIMES = ZK_PREFIX + "retry.times";
+
+  /**
+   * Zookeeper connection timeout in milliseconds: {@value}
+   */
+
+  String KEY_REGISTRY_ZK_CONNECTION_TIMEOUT =
+      ZK_PREFIX + "connection-timeout-ms";
+
+  /**
+   * Zookeeper connect interval in milliseconds: {@value}
+   */
+  String KEY_REGISTRY_ZK_RETRY_INTERVAL =
+      ZK_PREFIX + "retry.interval-ms";
+
+  /**
+   * Zookeeper retry limit in milliseconds: {@value}
+   */
+  String KEY_REGISTRY_ZK_RETRY_CEILING =
+      ZK_PREFIX + "retry.ceiling-ms";
+
+  /**
+   * Root path in the ZK tree for the registry: {@value}
+   */
+  String KEY_REGISTRY_ZK_ROOT = ZK_PREFIX + "root";
+
+  /**
+   * principal. If set, secure mode is expected
+   */
+  String KEY_REGISTRY_ZK_PRINCIPAL = ZK_PREFIX + "principal";
+
+  /**
+   * keytab for secure mode. No default
+   */
+  String KEY_REGISTRY_ZK_KEYTAB = ZK_PREFIX + "keytab";
+
+  /**
+   * ACL: {@value} for the registry root
+   */
+  String KEY_REGISTRY_ZK_ACL = ZK_PREFIX + "acl";
+
+  /**
+   * The default ZK quorum binding: {@value}
+   */
+  String DEFAULT_ZK_HOSTS = "localhost:2181";
+
   /**
    * ZK servertick time: {@value}
    */
-  String KEY_ZKSERVICE_TICK_TIME = REGISTRY_PREFIX + ".zkservice.ticktime";
+  String KEY_ZKSERVICE_TICK_TIME = ZK_PREFIX + "ticktime";
   
   /**
    * port; 0 or below means "any": {@value}
    */
-  String KEY_ZKSERVICE_PORT = REGISTRY_PREFIX + ".zkservice.port";
+  String KEY_ZKSERVICE_PORT = ZK_PREFIX + "port";
   
   /**
    * Directory containing data: {@value}
    */
-  String KEY_ZKSERVICE_DATADIR = REGISTRY_PREFIX + ".zkservice.datadir";
+  String KEY_ZKSERVICE_DIR = ZK_PREFIX + ".dir";
 
 
   /**
