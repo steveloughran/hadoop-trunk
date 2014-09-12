@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry.server.services;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang.StringUtils;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
@@ -26,7 +27,10 @@ import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.services.BindingInformation;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
+import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
+import org.apache.zookeeper.Environment;
 import org.apache.zookeeper.server.ServerCnxnFactory;
+import org.apache.zookeeper.server.ZooKeeperSaslServer;
 import org.apache.zookeeper.server.ZooKeeperServer;
 import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
 import org.slf4j.Logger;
@@ -67,12 +71,14 @@ public class MicroZookeeperService
   private static final Logger
       LOG = LoggerFactory.getLogger(MicroZookeeperService.class);
 
+  private File instanceDir;
   private File dataDir;
   private int tickTime;
   private int port;
 
   private ServerCnxnFactory factory;
   private BindingInformation binding;
+  private File confDir;
 
   /**
    * Create an instance
@@ -124,29 +130,62 @@ public class MicroZookeeperService
     port = getConfig().getInt(KEY_ZKSERVICE_PORT, 0);
     tickTime = getConfig().getInt(KEY_ZKSERVICE_TICK_TIME,
         ZooKeeperServer.DEFAULT_TICK_TIME);
-    String datapathname = getConfig().getTrimmed(KEY_ZKSERVICE_DATADIR, "");
-    if (datapathname.isEmpty()) {
-      dataDir = File.createTempFile("zkservice", ".dir");
-      dataDir.delete();
+    String instancedirname = getConfig().getTrimmed(KEY_ZKSERVICE_DIR, "");
+    if (instancedirname.isEmpty()) {
+      File testdir = new File(System.getProperty("test.dir", "target"));
+      instanceDir = new File(testdir, "zookeeper" + getName());
     } else {
-      dataDir = new File(datapathname);
-      FileUtil.fullyDelete(dataDir);
+      instanceDir = new File(instancedirname);
+      FileUtil.fullyDelete(instanceDir);
     }
-    LOG.debug("Data directory is {}", dataDir);
-    // the exit code here is ambigious
+    LOG.debug("Instance directory is {}", instanceDir);
+    instanceDir.mkdirs();
+    dataDir = new File(instanceDir, "data");
+    confDir = new File(instanceDir, "conf");
     dataDir.mkdirs();
-    // so: verify the path is there and a directory
-    if (!dataDir.exists()) {
-      throw new FileNotFoundException("failed to create directory " + dataDir);
-    }
-    if (!dataDir.isDirectory()) {
-
-      throw new IOException(
-          "Path " + dataDir + " exists but is not a directory "
-          + " isDir()=" + dataDir.isDirectory()
-          + " isFile()=" + dataDir.isFile());
-    }
+    confDir.mkdirs();
     super.serviceInit(conf);
+  }
+
+
+  /**
+   * set up security. this must be done immediately prior to creating
+   * the ZK instance, as it sets up JAAS if that has not been done already.
+   * 
+   * This is not done automatically, as while it is convenient for
+   * testing, as it sets system properties and JAAS configurations, it
+   * doesn't mix with production configurations. To support a secure
+   * cluster in a production system, follow the ZK documentation.
+   * @param conf configuration
+   */
+  public boolean setupSecurity(Configuration conf) throws IOException {
+    // 
+    String zkPrincipal = conf.getTrimmed(KEY_REGISTRY_ZK_PRINCIPAL);
+    boolean secure = StringUtils.isNotEmpty(zkPrincipal);
+    if (!secure) {
+      return false;
+    }
+    String zkKeytab = conf.getTrimmed(KEY_REGISTRY_ZK_KEYTAB);
+    File keytabFile = new File(zkKeytab);
+    if (!keytabFile.exists()) {
+      throw new FileNotFoundException("Missing zookeeper keytab "
+                                      + keytabFile.getAbsolutePath());
+    }
+    System.setProperty(ZooKeeperSaslServer.LOGIN_CONTEXT_NAME_KEY,
+        ZooKeeperSaslServer.DEFAULT_LOGIN_CONTEXT_NAME);
+    String jaasFilename = System.getProperty(Environment.JAAS_CONF_KEY);
+
+    if (StringUtils.isEmpty(jaasFilename)) {
+      // set up jaas.
+      RegistrySecurity security = new RegistrySecurity(conf);
+      File jaasFile = new File(confDir, "server.jaas");
+      jaasFilename = jaasFile.getAbsolutePath();
+      security.buildJAASFile(jaasFile, zkPrincipal, new File(zkKeytab));
+      // 
+    }
+    // here the JAAS file is set up
+    System.setProperty(Environment.JAAS_CONF_KEY, jaasFilename);
+    return true;
   }
 
   /**
@@ -156,6 +195,7 @@ public class MicroZookeeperService
    */
   @Override
   protected void serviceStart() throws Exception {
+
     ZooKeeperServer zkServer = new ZooKeeperServer();
     FileTxnSnapLog ftxn = new FileTxnSnapLog(dataDir, dataDir);
     zkServer.setTxnLogFactory(ftxn);

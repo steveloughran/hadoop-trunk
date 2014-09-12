@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * This is a little event catcher for curator asynchronous
  * operations.
  */
-class CuratorEventCatcher implements BackgroundCallback {
+public class CuratorEventCatcher implements BackgroundCallback {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CuratorEventCatcher.class);

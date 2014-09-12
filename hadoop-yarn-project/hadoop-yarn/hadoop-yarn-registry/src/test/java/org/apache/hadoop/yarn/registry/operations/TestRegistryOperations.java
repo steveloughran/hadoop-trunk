@@ -16,265 +16,37 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.services;
+package org.apache.hadoop.yarn.registry.operations;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
-import org.apache.hadoop.service.ServiceOperations;
-import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
+import org.apache.hadoop.yarn.registry.AbstractRegistryTest;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
+
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.*;
 
 import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
-import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
-import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
-import org.apache.hadoop.yarn.registry.client.types.Endpoint;
+import org.apache.hadoop.yarn.registry.client.services.CuratorEventCatcher;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
-import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
-import org.apache.zookeeper.data.ACL;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 
-public class TestRegistryOperations extends AbstractZKRegistryTest {
-  public static final String SC_HADOOP = "org-apache-hadoop";
-  public static final String USER = "devteam/";
-  public static final String NAME = "hdfs";
-  public static final String API_WEBHDFS = "org_apache_hadoop_namenode_webhdfs";
-  public static final String API_HDFS = "org_apache_hadoop_namenode_dfs";
-
-  public static final String USERPATH =
-      "/" + RegistryConstants.PATH_USERS + USER;
-  public static final String PARENT_PATH = USERPATH + SC_HADOOP + "/";
-  public static final String ENTRY_PATH = PARENT_PATH + NAME;
-  public static final String NNIPC = "nnipc";
-  public static final String IPC2 = "IPC2";
-
-  private static final Logger LOG =
+public class TestRegistryOperations extends AbstractRegistryTest {
+  protected static final Logger LOG =
       LoggerFactory.getLogger(TestRegistryOperations.class);
-
-  private final RecordOperations.ServiceRecordMarshal recordMarshal =
-      new RecordOperations.ServiceRecordMarshal();
-
-  private RMRegistryOperationsService registry;
-  
-  private RegistryOperations operations;
-
-
-  @Before
-  public void setupClient() throws IOException {
-    registry = new RMRegistryOperationsService("yarnRegistry");
-    registry.init(createRegistryConfiguration());
-    registry.start();
-    registry.createRegistryPaths();
-    operations = registry;
-    operations.delete(ENTRY_PATH, true);
-  }
-
-  @After
-  public void teardownClient() {
-    ServiceOperations.stop(registry);
-  }
-
-  /**
-   * Add some endpoints
-   * @param entry entry
-   */
-  protected void addSampleEndpoints(ServiceRecord entry, String hostname) throws
-      URISyntaxException {
-    entry.addExternalEndpoint(webEndpoint("web",
-        new URI("http", hostname + ":80", "/")));
-    entry.addExternalEndpoint(
-        restEndpoint(API_WEBHDFS,
-            new URI("http", hostname + ":8020", "/")));
-
-    Endpoint endpoint = ipcEndpoint(API_HDFS,
-        true, null);
-    endpoint.addresses.add(tuple(hostname, "8030"));
-    entry.addInternalEndpoint(endpoint);
-    InetSocketAddress localhost = new InetSocketAddress("localhost", 8050);
-    entry.addInternalEndpoint(
-        inetAddrEndpoint(NNIPC, ProtocolTypes.PROTOCOL_THRIFT, "localhost",
-            8050));
-    entry.addInternalEndpoint(
-        RegistryTypeUtils.ipcEndpoint(
-            IPC2,
-            true,
-            RegistryTypeUtils.marshall(localhost)));
-    
-  }
-
-  /**
-   * General code to validate bits of a component/service entry built iwth
-   * {@link #addSampleEndpoints(ServiceRecord, String)}
-   * @param record instance to check
-   */
-  protected void validateEntry(ServiceRecord record) {
-    assertNotNull("null service record", record);
-    List<Endpoint> endpoints = record.external;
-    assertEquals(2, endpoints.size());
-
-    Endpoint webhdfs = findEndpoint(record, API_WEBHDFS, true, 1, 1);
-    assertEquals(API_WEBHDFS, webhdfs.api);
-    assertEquals(AddressTypes.ADDRESS_URI, webhdfs.addressType);
-    assertEquals(ProtocolTypes.PROTOCOL_REST, webhdfs.protocolType);
-    List<List<String>> addressList = webhdfs.addresses;
-    List<String> url = addressList.get(0);
-    String addr = url.get(0);
-    assertTrue(addr.contains("http"));
-    assertTrue(addr.contains(":8020"));
-
-    Endpoint nnipc = findEndpoint(record, NNIPC, false, 1,2);
-    assertEquals("wrong protocol in " + nnipc, ProtocolTypes.PROTOCOL_THRIFT,
-        nnipc.protocolType);
-
-    Endpoint ipc2 = findEndpoint(record, IPC2, false, 1,2);
-
-    Endpoint web = findEndpoint(record, "web", true, 1, 1);
-    assertEquals(1, web.addresses.size());
-    assertEquals(1, web.addresses.get(0).size());
-    
-  }
-
-
-  /**
-   * Create a service entry with the sample endpoints, and put it
-   * at the destination
-   * @param path path
-   * @param createFlags flags
-   * @return the record
-   * @throws IOException on a failure
-   */
-  protected ServiceRecord putExampleServiceEntry(String path, int createFlags) throws
-      IOException,
-      URISyntaxException {
-    return putExampleServiceEntry(path, createFlags, PersistencePolicies.PERMANENT);
-  }
-  
-  /**
-   * Create a service entry with the sample endpoints, and put it
-   * at the destination
-   * @param path path
-   * @param createFlags flags
-   * @return the record
-   * @throws IOException on a failure
-   */
-  protected ServiceRecord putExampleServiceEntry(String path,
-      int createFlags,
-      int persistence)
-      throws IOException, URISyntaxException {
-    ServiceRecord record = buildExampleServiceEntry(persistence);
-
-    registry.mkdir(RegistryPathUtils.parentOf(path), true);
-    operations.create(path, record, createFlags);
-    return record;
-  }
-
-  /**
-   * Create a service entry with the sample endpoints
-   * @param persistence persistence policy
-   * @return the record
-   * @throws IOException on a failure
-   */
-  private ServiceRecord buildExampleServiceEntry(int persistence) throws
-      IOException,
-      URISyntaxException {
-    List<ACL> acls = registry.parseACLs("world:anyone:rwcda");
-    ServiceRecord record = new ServiceRecord();
-    record.id = "example-0001";
-    record.persistence = persistence;
-    record.description = methodName.getMethodName();
-    record.registrationTime = System.currentTimeMillis();
-    addSampleEndpoints(record, "namenode");
-    return record;
-  }
-
-
-  public void assertMatches(Endpoint endpoint,
-      String addressType,
-      String protocolType,
-      String api) {
-    assertNotNull(endpoint);
-    assertEquals(addressType, endpoint.addressType);
-    assertEquals(protocolType, endpoint.protocolType);
-    assertEquals(api, endpoint.api);
-  }
-
-  public void assertMatches(ServiceRecord written, ServiceRecord resolved) {
-    assertEquals(written.id, resolved.id);
-    assertEquals(written.registrationTime, resolved.registrationTime);
-    assertEquals(written.description, resolved.description);
-    assertEquals(written.persistence, resolved.persistence);
-  }
-
-
-  /**
-   * Assert a path exists
-   * @param path
-   * @throws IOException
-   */
-  public void assertPathExists(String path) throws IOException {
-    operations.stat(path);
-  }
-  
-  public void assertPathNotFound(String path) throws IOException {
-    try {
-      operations.stat(path);
-      fail("Path unexpectedly found: " + path);
-    } catch (PathNotFoundException e) {
-
-    }
-  }
-
-  public void assertResolves(String path) throws IOException {
-    operations.resolve(path);
-  }
-  
-  
-  public Endpoint findEndpoint(ServiceRecord record,
-      String api, boolean external, int addressElements, int elementSize) {
-    Endpoint epr = external ? record.getExternalEndpoint(api)
-                            : record.getInternalEndpoint(api);
-    if (epr != null) {
-      assertEquals("wrong # of addresses",
-          addressElements, epr.addresses.size());
-      assertEquals("wrong # of elements in an address",
-          elementSize, epr.addresses.get(0).size());
-      return epr;
-    }
-    List<Endpoint> endpoints = external ? record.external : record.internal;
-    StringBuilder builder = new StringBuilder();
-    for (Endpoint endpoint : endpoints) {
-      builder.append("\"").append(endpoint).append("\" ");
-    }
-    fail("Did not find " + api + " in endpoints " + builder);
-    return null;
-  }
-
-
-  public void log(String name, ServiceRecord record) throws
-      IOException {
-    LOG.info(" {} = \n{}\n", name, recordMarshal.toJson(record));
-  }
 
   @Test
   public void testPutGetServiceEntry() throws Throwable {
@@ -486,9 +258,9 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
     ZKPathDumper pathDumper = registry.dumpPath();
     LOG.info(pathDumper.toString());
 
-    log("tomcat", webapp);
-    log(dns1, comp1);
-    log(dns2, comp2);
+    logRecord("tomcat", webapp);
+    logRecord(dns1, comp1);
+    logRecord(dns2, comp2);
 
     ServiceRecord dns1resolved = operations.resolve(dns1path);
     assertEquals("Persistence policies on resolved entry",
@@ -501,7 +273,7 @@ public class TestRegistryOperations extends AbstractZKRegistryTest {
         RecordOperations.extractServiceRecords(operations, componentStats);
     assertEquals(2, records.size());
     ServiceRecord retrieved1 = records.get(dns1path);
-    log(retrieved1.id, retrieved1);
+    logRecord(retrieved1.id, retrieved1);
     assertMatches(dns1resolved, retrieved1);
     assertEquals(PersistencePolicies.CONTAINER, retrieved1.persistence);
 
