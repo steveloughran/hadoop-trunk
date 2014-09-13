@@ -33,12 +33,16 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.rules.TestName;
 import org.junit.rules.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 
 public class AbstractZKRegistryTest extends RegistryTestHelper {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(AbstractZKRegistryTest.class);
+  
   private static final AddingCompositeService servicesToTeardown =
       new AddingCompositeService("teardown");
   // static initializer guarantees it is always started
@@ -60,6 +64,7 @@ public class AbstractZKRegistryTest extends RegistryTestHelper {
 
   @AfterClass
   public static void teardownServices() throws IOException {
+    describe(LOG, "teardown of static services");
     servicesToTeardown.close();
   }
 

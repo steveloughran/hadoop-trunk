@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.secure;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.service.Service;
@@ -25,6 +26,7 @@ import org.apache.hadoop.yarn.registry.AbstractRegistryTest;
 import org.apache.hadoop.yarn.registry.RegistryTestHelper;
 import org.apache.hadoop.yarn.registry.server.services.AddingCompositeService;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.rules.TestName;
@@ -71,6 +73,14 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   @Rule
   public TestName methodName = new TestName();
 
+  /**
+   * give our thread a name
+   */
+  @Before
+  public void nameThread() {
+    Thread.currentThread().setName("JUnit");
+  }
+
   protected static void addToTeardown(Service svc) {
     servicesToTeardown.addService(svc);
   }
@@ -111,9 +121,13 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   public static Properties getKdcConf() {
     return kdcConf;
   }
-  
-  public static File createPrincipalAndKeytab(String principal) throws Exception {
-    File keytab = new File(kdcWorkDir, principal + ".keytab");
+
+
+  public static File createPrincipalAndKeytab(String principal,
+      String filename) throws Exception {
+    assertNotEmpty("empty principal", principal);
+    assertNotEmpty("empty host", filename);
+    File keytab = new File(kdcWorkDir, filename );
     kdc.createPrincipal(keytab, principal);
     return keytab;
   }

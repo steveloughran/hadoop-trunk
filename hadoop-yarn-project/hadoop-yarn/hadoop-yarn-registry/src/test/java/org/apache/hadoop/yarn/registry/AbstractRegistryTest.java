@@ -40,14 +40,19 @@ import java.util.List;
 
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.*;
 
+/**
+ * Abstract registry tests .. inits the field {@link #registry}
+ * before the test with an instance of {@link RMRegistryOperationsService};
+ * and {@link #operations} with the same instance cast purely
+ * to the type {@link RegistryOperations}.
+ *
+ */
 public class AbstractRegistryTest extends AbstractZKRegistryTest {
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractRegistryTest.class);
   protected RMRegistryOperationsService registry;
   protected RegistryOperations operations;
   
-
-
   @Before
   public void setupRegistry() throws IOException {
     registry = new RMRegistryOperationsService("yarnRegistry");
@@ -95,13 +100,18 @@ public class AbstractRegistryTest extends AbstractZKRegistryTest {
 
   /**
    * Assert a path exists
-   * @param path
+   * @param path path in the registry
    * @throws IOException
    */
   public void assertPathExists(String path) throws IOException {
     operations.stat(path);
   }
 
+  /**
+   * assert that a path does not exist
+   * @param path path in the registry
+   * @throws IOException
+   */
   public void assertPathNotFound(String path) throws IOException {
     try {
       operations.stat(path);
@@ -111,6 +121,11 @@ public class AbstractRegistryTest extends AbstractZKRegistryTest {
     }
   }
 
+  /**
+   * Assert that a path resolves to a service record
+   * @param path path in the registry
+   * @throws IOException
+   */
   public void assertResolves(String path) throws IOException {
     operations.resolve(path);
   }

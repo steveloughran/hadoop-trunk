@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.registry.secure;
 
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
@@ -44,6 +45,7 @@ import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
 import java.io.File;
 import java.security.Principal;
+import java.security.PrivilegedExceptionAction;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -53,20 +55,27 @@ import java.util.Set;
 public class TestSecureZKService extends AbstractSecureRegistryTest {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestSecureZKService.class);
-  public static final String ZOOKEEPER = "zookeeper";
+  public static final String ZOOKEEPER = "zookeeper/localhost";
   private MicroZookeeperService secureZK;
   private static File keytab;
   private LoginContext loginContext;
 
   @BeforeClass
   public static void createPrincipal() throws Exception {
-    keytab = createPrincipalAndKeytab(ZOOKEEPER);
+    keytab = createPrincipalAndKeytab(ZOOKEEPER, "zookeeper.keytab");
   }
   
   
   @Before
   public void resetJaasConfKeys() {
     RegistrySecurity.resetJaasSystemProperties();
+  }
+
+  @Before
+  public void initHadoopSecurity() {
+    // resetting kerberos security
+    Configuration conf = new Configuration();
+    UserGroupInformation.setConfiguration(conf);
   }
   
   @After
@@ -135,25 +144,35 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
   public void testAuthedSecureClientToZK() throws Throwable {
     startSecureZK();
     resetJaasConfKeys();
-    loginAsClient("");
-
-    // need to pass the keytab details down
-
-//    kdc.
+    LoginContext login = loginAsClient("");
+    
     RegistrySecurity security = new RegistrySecurity(new Configuration());
     security.setZKSaslClientProperties(null);
-    Configuration clientConf = secureZK.getConfig();
-    //new root per test, avoids conflict
-    clientConf.set(KEY_REGISTRY_ZK_ROOT, methodName.getMethodName());
+    final Configuration clientConf = secureZK.getConfig();
+    // sets root to /
+    clientConf.set(KEY_REGISTRY_ZK_ROOT, "/");
+    Subject subject = loginContext.getSubject();
+    UserGroupInformation ugi =
+        UserGroupInformation.getUGIFromSubject(subject);
+    ugi.doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
+      public Void run() throws Exception {
+        describe(LOG, "Starting Curator service");
+        CuratorService curatorService = new CuratorService("client", secureZK);
+        try {
+          curatorService.init(clientConf);
+          curatorService.start();
+          LOG.info("Curator Binding {}",
+              curatorService.bindingDiagnosticDetails());
+          curatorService.zkList("/");
+        } finally {
+          describe(LOG, "shutdown curator");
+          ServiceOperations.stop(curatorService);
+        }
+        return null;
+      }
+    });
 
-    LOG.info(" ============= Starting Curator ==========");
-    CuratorService curatorService = new CuratorService("client", secureZK);
-    curatorService.init(clientConf);
-    curatorService.start();
-    LOG.info("Curator Binding {}", curatorService.bindingDiagnosticDetails());
-    curatorService.zkMkPath("", CreateMode.PERSISTENT);
-
-    curatorService.zkList("/");
   }
 
   @Test
@@ -161,7 +180,7 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
     loginAsClient("");
   }
 
-  protected void loginAsClient(String name) throws LoginException {
+  protected LoginContext loginAsClient(String name) throws LoginException {
     assertNull("already logged in", loginContext);
     loginContext = null;
     String principalAndRealm = getPrincipalAndRealm(ZOOKEEPER);
@@ -172,6 +191,7 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
     loginContext = new LoginContext(name, subject, null,
         KerberosConfiguration.createClientConfig(ZOOKEEPER, keytab));
     loginContext.login();
+    return loginContext;
   }
 
   @Test

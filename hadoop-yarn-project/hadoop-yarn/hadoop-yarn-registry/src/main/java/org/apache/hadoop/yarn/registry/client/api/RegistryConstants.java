@@ -205,6 +205,18 @@ public interface RegistryConstants {
   String KEY_ZKSERVICE_TICK_TIME = ZK_PREFIX + "ticktime";
   
   /**
+   * host to register on
+   */
+  String KEY_ZKSERVICE_HOST = ZK_PREFIX + "host";
+
+
+  /**
+   * Default host to serve on -this is "localhost" as it
+   * is the only one guaranteed to be available.
+   */
+  String DEFAULT_ZKSERVICE_HOST = "localhost";
+
+  /**
    * port; 0 or below means "any": {@value}
    */
   String KEY_ZKSERVICE_PORT = ZK_PREFIX + "port";
