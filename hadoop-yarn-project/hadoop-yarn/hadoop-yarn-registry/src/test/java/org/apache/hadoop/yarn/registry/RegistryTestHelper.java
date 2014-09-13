@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
@@ -42,6 +43,11 @@ import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.r
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.tuple;
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.webEndpoint;
 
+/**
+ * This is a set of static methods to aid testing the registry operations.
+ * The methods can be imported statically —or the class used as a base
+ * class for tests. 
+ */
 public class RegistryTestHelper extends Assert {
   public static final String SC_HADOOP = "org-apache-hadoop";
   public static final String USER = "devteam/";
@@ -55,15 +61,31 @@ public class RegistryTestHelper extends Assert {
   public static final String NNIPC = "nnipc";
   public static final String IPC2 = "IPC2";
   private static final Logger LOG =
-      LoggerFactory.getLogger(AbstractRegistryTest.class);
+      LoggerFactory.getLogger(RegistryTestHelper.class);
   private final RecordOperations.ServiceRecordMarshal recordMarshal =
       new RecordOperations.ServiceRecordMarshal();
 
+  /**
+   * Assert the path is valid by ZK rules
+   * @param path
+   */
   public static void assertValidZKPath(String path) {
     try {
       PathUtils.validatePath(path);
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException("Invalid Path " + path + ": " + e, e);
+    }
+  }
+
+  public static void assertNotEmpty(String message, String check) {
+    if (StringUtils.isEmpty(check)) {
+      fail(message);
+    }
+  }
+
+  public static void assertNotEmpty(String check) {
+    if (StringUtils.isEmpty(check)) {
+      fail("Empty string");
     }
   }
 
@@ -99,6 +121,13 @@ public class RegistryTestHelper extends Assert {
     
   }
 
+  /**
+   * Assert that an endpoint matches the criteria
+   * @param endpoint
+   * @param addressType
+   * @param protocolType
+   * @param api
+   */
   public void assertMatches(Endpoint endpoint,
       String addressType,
       String protocolType,
@@ -109,21 +138,29 @@ public class RegistryTestHelper extends Assert {
     assertEquals(api, endpoint.api);
   }
 
-  public void assertMatches(ServiceRecord written, ServiceRecord resolved) {
-    assertEquals(written.id, resolved.id);
-    assertEquals(written.registrationTime, resolved.registrationTime);
-    assertEquals(written.description, resolved.description);
-    assertEquals(written.persistence, resolved.persistence);
+  /**
+   * Assert the records match. Only the ID, registration time,
+   * description and persistence are checked —not endpoints.
+   * @param source record that was written
+   * @param resolved the one that resolved.
+   */
+  public void assertMatches(ServiceRecord source, ServiceRecord resolved) {
+    assertNotNull("Null source record ", source);
+    assertNotNull("Null resolved record ", resolved);
+    assertEquals(source.id, resolved.id);
+    assertEquals(source.registrationTime, resolved.registrationTime);
+    assertEquals(source.description, resolved.description);
+    assertEquals(source.persistence, resolved.persistence);
   }
 
   /**
-   * Find an endpoint in a record
+   * Find an endpoint in a record or fail,
    * @param record   record
    * @param api API
    * @param external external?
    * @param addressElements expected # of address elements?
    * @param addressTupleSize expected size of a type
-   * @return
+   * @return the endpoint.
    */
   public Endpoint findEndpoint(ServiceRecord record,
       String api, boolean external, int addressElements, int addressTupleSize) {
@@ -142,6 +179,7 @@ public class RegistryTestHelper extends Assert {
       builder.append("\"").append(endpoint).append("\" ");
     }
     fail("Did not find " + api + " in endpoints " + builder);
+    // never reached; here to keep the compiler happy
     return null;
   }
 
@@ -200,6 +238,18 @@ public class RegistryTestHelper extends Assert {
             IPC2,
             true,
             RegistryTypeUtils.marshall(localhost)));
+  }
 
+  /**
+   * Describe the stage in the process with a box around it -so as
+   * to highlight it in test logs
+   * @param log log to use
+   * @param text text
+   * @param args logger args
+   */
+  public static void describe(Logger log, String text, Object...args) {
+    log.info("\n=======================================");
+    log.info(text, args);
+    log.info("=======================================\n");
   }
 }

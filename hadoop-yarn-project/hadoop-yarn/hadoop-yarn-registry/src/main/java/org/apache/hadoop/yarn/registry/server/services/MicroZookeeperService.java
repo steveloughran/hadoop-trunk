@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.registry.server.services;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.lang.StringUtils;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
@@ -67,11 +66,15 @@ public class MicroZookeeperService
 
   private static final Logger
       LOG = LoggerFactory.getLogger(MicroZookeeperService.class);
+  public static final String SASL_AUTH_PROVIDER =
+      "org.apache.zookeeper.server.auth.SASLAuthenticationProvider";
 
   private File instanceDir;
   private File dataDir;
   private int tickTime;
   private int port;
+  private String host;
+  private boolean secureServer;
 
   private ServerCnxnFactory factory;
   private BindingInformation binding;
@@ -108,14 +111,13 @@ public class MicroZookeeperService
   }
 
   /**
-   * Create an inet socket addr from the local host+ port number
+   * Create an inet socket addr from the local host + port number
    * @param port port to use 
    * @return a (hostname, port) pair
-   * @throws UnknownHostException if the machine doesn't know its own address
+   * @throws UnknownHostException if the server cannot resolve the host
    */
   private InetSocketAddress getAddress(int port) throws UnknownHostException {
-    return new InetSocketAddress(InetAddress.getLocalHost(),
-        port < 0 ? 0 : port);
+    return new InetSocketAddress(host, port < 0 ? 0 : port);
   }
 
   /**
@@ -125,10 +127,11 @@ public class MicroZookeeperService
    */
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
-    port = getConfig().getInt(KEY_ZKSERVICE_PORT, 0);
-    tickTime = getConfig().getInt(KEY_ZKSERVICE_TICK_TIME,
+    port = conf.getInt(KEY_ZKSERVICE_PORT, 0);
+    tickTime = conf.getInt(KEY_ZKSERVICE_TICK_TIME,
         ZooKeeperServer.DEFAULT_TICK_TIME);
-    String instancedirname = getConfig().getTrimmed(KEY_ZKSERVICE_DIR, "");
+    String instancedirname = conf.getTrimmed(KEY_ZKSERVICE_DIR, "");
+    host = conf.getTrimmed(KEY_ZKSERVICE_HOST, DEFAULT_ZKSERVICE_HOST);
     if (instancedirname.isEmpty()) {
       File testdir = new File(System.getProperty("test.dir", "target"));
       instanceDir = new File(testdir, "zookeeper" + getName());
@@ -167,13 +170,13 @@ public class MicroZookeeperService
   protected boolean setupSecurity() throws IOException {
     Configuration conf = getConfig();
     RegistrySecurity security = new RegistrySecurity(conf);
-    boolean secure = security.isSecurityEnabled();
-    if (!secure) {
+    secureServer = security.isSecurityEnabled();
+    if (!secureServer) {
       return false;
     }
     String zkPrincipal = security.getPrincipalConfOption();
     String zkKeytab = conf.getTrimmed(KEY_REGISTRY_ZK_KEYTAB);
-    File keytabFile = security.getKeytabConffile();
+    File keytabFile = security.getKeytabConfFile();
     File jaasFile =
         security.prepareJAASAuth(zkPrincipal, keytabFile,
             File.createTempFile("zookeeper", ".jaas", confDir));
@@ -189,6 +192,10 @@ public class MicroZookeeperService
   @Override
   protected void serviceStart() throws Exception {
 
+    if (secureServer) {
+      LOG.debug("Setting auth provider " + SASL_AUTH_PROVIDER);
+      System.setProperty("zookeeper.authProvider.1", SASL_AUTH_PROVIDER);
+    }
     ZooKeeperServer zkServer = new ZooKeeperServer();
     FileTxnSnapLog ftxn = new FileTxnSnapLog(dataDir, dataDir);
     zkServer.setTxnLogFactory(ftxn);

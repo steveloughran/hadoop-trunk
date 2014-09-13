@@ -286,7 +286,7 @@ public class RegistrySecurity {
    * Get the keytab file referred to in a configuration
    * @return the keytab or  null
    */
-  public File getKeytabConffile() throws FileNotFoundException {
+  public File getKeytabConfFile() throws FileNotFoundException {
     String zkKeytab = getKeytabConfOption();
     if (StringUtils.isNotEmpty(zkKeytab)) {
       return new File(zkKeytab);
