@@ -222,7 +222,8 @@ public class CuratorService extends CompositeService
          retryTimes,
          retryCeiling));
 
-    addSecurityBinding(b);
+    // not actually needed for SASL, that works "differently"
+//    addSecurityBinding(b);
        
 
 /*
@@ -258,15 +259,15 @@ public class CuratorService extends CompositeService
     String zkKeytab = conf.getTrimmed(KEY_REGISTRY_ZK_KEYTAB);
     File keytabFile = new File(zkKeytab);
     File jaasFile =
-        security.prepareJAASAuth(principal, keytabFile,
+        security.bindJVMToJAASAuth(principal, keytabFile,
             File.createTempFile("curator-", ".jaas"));
     String authScheme = SASL;
+    byte[] data = principal.getBytes("UTF-8");
     securityConnectionDiagnostics =
         String.format(
-            " Secured as \"%s:%s\" keytab=%s jaasfile=%s",
-            authScheme, principal, keytabFile, jaasFile);
+            " Secured as \"%s:%s\" keytab=%s jaasfile=%s (auth data len=%d)",
+            authScheme, principal, keytabFile, jaasFile, data.length);
     LOG.debug(securityConnectionDiagnostics);
-    byte[] data = principal.getBytes("UTF-8");
 
     builder.authorization(authScheme, data);
     return builder;

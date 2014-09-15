@@ -49,6 +49,7 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
   @Test
   public void testClientLogin() throws Throwable {
     LoginContext client = login(ALICE, "", keytab_alice);
+    logLoginDetails(ALICE, client);
     client.logout();
   }
 
