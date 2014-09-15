@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.yarn.registry.secure;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.service.ServiceOperations;
+import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.registry.RegistryTestHelper;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
@@ -39,9 +41,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.security.auth.Subject;
-import javax.security.auth.callback.Callback;
-import javax.security.auth.callback.CallbackHandler;
-import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
@@ -57,75 +56,74 @@ import java.util.Set;
  * and its test case, <code>TestMiniKdc</code>
  */
 public class AbstractSecureRegistryTest extends RegistryTestHelper {
-  public static final String ZOOKEEPER = "zookeeper/localhost";
-  public static final String ALICE = "alice/localhost";
-  public static final String BOB = "bob/localhost";
+  public static final String ZOOKEEPER = "zookeeper";
+  public static final String ZOOKEEPER_LOCALHOST = "zookeeper/localhost";
+  public static final String ALICE = "alice";
+  public static final String ALICE_LOCALHOST = "alice/localhost";
+  public static final String BOB = "bob";
+  public static final String BOB_LOCALHOST = "bob/localhost";
   public static final String SASL_AUTH_PROVIDER =
       "org.apache.hadoop.yarn.registry.secure.ExtendedSASLAuthenticationProvider";
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractSecureRegistryTest.class);
 
-
-  private static final AddingCompositeService servicesToTeardown =
-      new AddingCompositeService("teardown");
-
   public static final Configuration CONF = new Configuration();
+
+  private static final AddingCompositeService classTeardown =
+      new AddingCompositeService("classTeardown");
 
   // static initializer guarantees it is always started
   // ahead of any @BeforeClass methods
   static {
-    servicesToTeardown.init(CONF);
-    servicesToTeardown.start();
+    classTeardown.init(CONF);
+    classTeardown.start();
   }
 
+
+  private final AddingCompositeService teardown =
+      new AddingCompositeService("teardown");
+  
   protected static MiniKdc kdc;
   protected static File keytab_zk;
   protected static File keytab_bob;
   protected static File keytab_alice;
-  private static File kdcWorkDir;
-  private static Properties kdcConf;
-  protected RegistrySecurity registrySecurity = new RegistrySecurity(CONF); 
+  protected static File kdcWorkDir;
+  protected static Properties kdcConf;
+  protected static final RegistrySecurity registrySecurity =
+      new RegistrySecurity(CONF); 
   
 
 
   @Rule
-  public final Timeout testTimeout = new Timeout(10000);
+  public final Timeout testTimeout = new Timeout(900000);
 
   @Rule
   public TestName methodName = new TestName();
   protected MicroZookeeperService secureZK;
+  protected static File jaasFile;
 
   /**
-   * set the ZK registy parameters to bind the mini cluster to a ZK principal
-   * @param conf config
-   * @param principal principal
-   * @param keytab keytab
+   * Create a secure instance
+   * @param name
+   * @return
+   * @throws Exception
    */
-  protected static void bindZKPrincipal(Configuration conf,
-      String principal, File keytab)  {
-    conf.set(RegistryConstants.KEY_REGISTRY_ZK_KEYTAB,
-        keytab.getAbsolutePath());
-    conf.set(RegistryConstants.KEY_REGISTRY_ZK_PRINCIPAL,
-        getPrincipalAndRealm(principal) );
-  }
-
-  protected static void clearZKPrincipal(Configuration conf) {
-    conf.unset(RegistryConstants.KEY_REGISTRY_ZK_KEYTAB);
-    conf.unset(RegistryConstants.KEY_REGISTRY_ZK_PRINCIPAL);
-  }
-
-  protected static MicroZookeeperService createSecureZKInstance(String name) throws Exception {
+  protected static MicroZookeeperService createSecureZKInstance(String name)
+      throws Exception {
+    String context = ZOOKEEPER;
     Configuration conf = new Configuration();
 
     File testdir = new File(System.getProperty("test.dir", "target"));
     File workDir = new File(testdir, name);
     workDir.mkdirs();
-    bindZKPrincipal(conf, ZOOKEEPER, keytab_zk);
+    System.setProperty(
+        RegistryConstants.ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE,
+        "false");
+    RegistrySecurity.validateContext(context);
+    conf.set(RegistryConstants.KEY_ZKSERVICE_JAAS_CONTEXT, context);
     MicroZookeeperService secureZK = new MicroZookeeperService(name);
     secureZK.init(conf);
     LOG.info(secureZK.getDiagnostics());
-    LOG.debug("Setting auth provider " + SASL_AUTH_PROVIDER);
-    System.setProperty("zookeeper.authProvider.1", SASL_AUTH_PROVIDER);
     return secureZK;
   }
 
@@ -137,19 +135,32 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     Thread.currentThread().setName("JUnit");
   }
 
-  protected static void addToTeardown(Service svc) {
-    servicesToTeardown.addService(svc);
-  }
-
   @AfterClass
-  public static void teardownServices() throws IOException {
-    servicesToTeardown.close();
+  public static void teardownClassServices() throws IOException {
+    classTeardown.close();
   }
 
+  protected static void addToClassTeardown(Service svc) {
+    classTeardown.addService(svc);
+  }
 
+  protected void addToTeardown(Service svc) {
+    teardown.addService(svc);
+  }
+
+  @After
+  public void teardown() throws IOException {
+    teardown.close();
+  }
+  /**
+   * Sets up the KDC and a set of principals in the JAAS file
+   * 
+   * @throws Exception
+   */
   @BeforeClass
   public static void setupKDCAndPrincipals() throws Exception {
     // set up the KDC
+    System.setProperty("sun.security.krb5.debug", "true");
     File target = new File(System.getProperty("test.dir", "target"));
     kdcWorkDir = new File(target, "kdc");
     kdcWorkDir.mkdirs();
@@ -157,11 +168,44 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     kdc = new MiniKdc(kdcConf, kdcWorkDir);
     kdc.start();
 
-    keytab_zk = createPrincipalAndKeytab(ZOOKEEPER, "zookeeper.keytab");
-    keytab_alice = createPrincipalAndKeytab(ALICE, "alice.keytab");
-    keytab_bob = createPrincipalAndKeytab(BOB, "bob.keytab");
+    keytab_zk = createPrincipalAndKeytab(ZOOKEEPER_LOCALHOST, "zookeeper.keytab");
+    keytab_alice = createPrincipalAndKeytab(ALICE_LOCALHOST, "alice.keytab");
+    keytab_bob = createPrincipalAndKeytab(BOB_LOCALHOST , "bob.keytab");
+
+    StringBuilder jaas = new StringBuilder(1024);
+    jaas.append(registrySecurity.createJAASEntry(ZOOKEEPER,
+        ZOOKEEPER_LOCALHOST, keytab_zk));
+    jaas.append(registrySecurity.createJAASEntry(ALICE, 
+        ALICE_LOCALHOST , keytab_alice));
+    jaas.append(registrySecurity.createJAASEntry(BOB,
+        BOB_LOCALHOST, keytab_bob));
+
+    jaasFile = new File(kdcWorkDir, "jaas.txt");
+    FileUtils.write(jaasFile, jaas.toString());
+    registrySecurity.bindJVMtoJAASFile(jaasFile);
+    LOG.info(jaas.toString());
   }
 
+  /**
+   * For unknown reasons, the before-class setting of the JVM properties were
+   * not being picked up. This method addresses that by setting them
+   * before every test case
+   */
+  @Before
+  public void forceSetTheJAASBinding() {
+    System.setProperty("sun.security.krb5.debug", "true");
+    registrySecurity.bindJVMtoJAASFile(jaasFile);
+  }
+
+  /**
+   * Turn Kerberos Debugging on
+   */
+  @Before
+
+  public void enableKerberosDebug() {
+    System.setProperty("sun.security.krb5.debug", "true");
+  }
+  
   @AfterClass
   public static void teardownKDC() throws Exception {
     if (kdc != null) {
@@ -243,12 +287,13 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
 
 
   /**
-   * Start the secure ZK instance using the test method name as the path
+   * Start the secure ZK instance using the test method name as the path.
+   * As the entry is saved to the {@link #secureZK} field, it
+   * is automatically stopped after the test case
    * @throws Exception on any failure
    */
   protected void startSecureZK() throws Exception {
-    secureZK = createSecureZKInstance(
-        "test-" + methodName.getMethodName());
+    secureZK = createSecureZKInstance("test-" + methodName.getMethodName());
     secureZK.start();
   }
 
@@ -268,4 +313,24 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     Subject subject = loginContext.getSubject();
     LOG.info("Logged in as {}:\n {}" , name, subject);
   }
-}
+
+  /**
+   * Exec ktutil and list things. This may not be on the classpath
+   * @param keytab
+   * @throws IOException
+   */
+  protected void ktList(File keytab) throws IOException {
+    // ktutil --keytab=target/kdc/zookeeper.keytab list --keys
+
+    if (!Shell.WINDOWS) {
+      String path = keytab.getAbsolutePath();
+      String out = Shell.execCommand(
+          "ktutil",
+          "--keytab=" + path,
+          "list",
+          "--keys"
+      );
+      LOG.info("Listing of keytab {}:\n{}\n", path, out);
+    }
+  }
+} 

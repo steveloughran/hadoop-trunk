@@ -222,10 +222,6 @@ public class CuratorService extends CompositeService
          retryTimes,
          retryCeiling));
 
-    // not actually needed for SASL, that works "differently"
-//    addSecurityBinding(b);
-       
-
 /*
     if (!root.isEmpty()) {
       String namespace = root;
@@ -242,36 +238,6 @@ public class CuratorService extends CompositeService
     return framework;
   }
 
-
-  public CuratorFrameworkFactory.Builder addSecurityBinding(
-      CuratorFrameworkFactory.Builder builder) throws
-      IOException {
-    Configuration conf = getConfig();
-    RegistrySecurity security = new RegistrySecurity(conf);
-
-    String principal = conf.get(KEY_REGISTRY_ZK_PRINCIPAL);
-
-
-    if (StringUtils.isEmpty(principal)) {
-      LOG.debug("No security principal...client is unauthed");
-      return builder;
-    }
-    String zkKeytab = conf.getTrimmed(KEY_REGISTRY_ZK_KEYTAB);
-    File keytabFile = new File(zkKeytab);
-    File jaasFile =
-        security.bindJVMToJAASAuth(principal, keytabFile,
-            File.createTempFile("curator-", ".jaas"));
-    String authScheme = SASL;
-    byte[] data = principal.getBytes("UTF-8");
-    securityConnectionDiagnostics =
-        String.format(
-            " Secured as \"%s:%s\" keytab=%s jaasfile=%s (auth data len=%d)",
-            authScheme, principal, keytabFile, jaasFile, data.length);
-    LOG.debug(securityConnectionDiagnostics);
-
-    builder.authorization(authScheme, data);
-    return builder;
-  }
   
   @Override
   public String toString() {

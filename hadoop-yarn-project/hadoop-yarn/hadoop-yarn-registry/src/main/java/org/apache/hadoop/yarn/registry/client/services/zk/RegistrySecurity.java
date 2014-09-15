@@ -36,6 +36,7 @@ import org.apache.zookeeper.server.auth.DigestAuthenticationProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.security.auth.login.AppConfigurationEntry;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -58,6 +59,7 @@ public class RegistrySecurity {
   public static final String PERMISSIONS_REGISTRY_SYSTEM = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_USERS = "world:anyone:rwcda";
   public static final String CLIENT = "Client";
+  public static final String SERVER = "Server";
   private final Configuration conf;
   private String domain;
 
@@ -161,20 +163,6 @@ public class RegistrySecurity {
   }
 
 
-  /*
-  Server {
-  com.sun.security.auth.module.Krb5LoginModule required
-  useKeyTab=true
-  keyTab="/etc/zookeeper/conf/zookeeper.keytab"
-  storeKey=true
-  useTicketCache=false
-  principal="zookeeper/fully.qualified.domain.name@<YOUR-REALM>";
-};
-   */
-  /**
-   * Printf string for the JAAS entry
-   */
-
   /**
    * JAAS template: {@value}
    * Note the semicolon on the last entry
@@ -187,13 +175,21 @@ public class RegistrySecurity {
       + " principal=\"%s\"\n"
       + " useKeyTab=true\n"
       + " useTicketCache=false\n"
+      + " doNotPrompt=true\n"
       + " storeKey=true;\n"
       + "}; \n";
 
 
   public String createJAASEntry(
       String role,
-      String principal, File keytab) {
+      String principal,
+      File keytab) {
+    Preconditions.checkArgument(StringUtils.isNotEmpty(principal),
+        "invalid principal");
+    Preconditions.checkArgument(StringUtils.isNotEmpty(role),
+        "invalid role");
+    Preconditions.checkArgument(keytab != null && keytab.isFile(),
+        "Keytab null or missing: ");
     return String.format(
         Locale.ENGLISH,
         JAAS_ENTRY,
@@ -211,66 +207,19 @@ public class RegistrySecurity {
    */
   public void buildJAASFile(File dest, String principal, File keytab) throws
       IOException {
-    Preconditions.checkArgument(StringUtils.isNotEmpty(principal),
-        "invalid principal");
-
-    if (!keytab.isFile()) {
-      throw new FileNotFoundException("Keytab not found: " + keytab);
-    }
-    dest.delete();
     StringBuilder jaasBinding = new StringBuilder(256);
     jaasBinding.append(createJAASEntry("Server", principal, keytab));
     jaasBinding.append(createJAASEntry("Client", principal, keytab));
     FileUtils.write(dest, jaasBinding.toString());
   }
 
+  public String bindJVMtoJAASFile(File jaasFile) {
+    return System.setProperty(Environment.JAAS_CONF_KEY, jaasFile.getAbsolutePath());
+  }
 
-  /**
-   * Prepare the JVM for JAAS auth. IF the system properties
-   * do not already defined a JAAS file, it will be created
-   * @param principal principal to auth as
-   * @param keytabFile keytab file
-   * @param jaasFileToCreate jaas file to create if required. Set this
-   * to null to raise an IOException instead
-   * @return the Jaas File
-   * @throws IOException on any IO problem or a missing config
-   */
-  public File bindJVMToJAASAuth(
-      String principal, File keytabFile,
-      File jaasFileToCreate) throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Preparing JAAS auth for {} and keytab {}", principal,
-          keytabFile);
-    }
-    if (!keytabFile.exists()) {
-      throw new FileNotFoundException("Missing keytab "
-                                      + keytabFile.getAbsolutePath());
-    }
+  public void bindZKToServerJAASContext(String contextName) {
     System.setProperty(ZooKeeperSaslServer.LOGIN_CONTEXT_NAME_KEY,
-        ZooKeeperSaslServer.DEFAULT_LOGIN_CONTEXT_NAME);
-    String jaasFilename = System.getProperty(Environment.JAAS_CONF_KEY);
-    File jaasFile;
-
-    if (StringUtils.isEmpty(jaasFilename)) {
-      if (jaasFileToCreate == null) {
-        throw new IOException("No JAAS file specified in the system property"
-                              + Environment.JAAS_CONF_KEY);
-      }
-      // set up jaas.
-      jaasFile = jaasFileToCreate;
-      buildJAASFile(jaasFile, principal, keytabFile);
-      // 
-    } else {
-      jaasFile = new File(jaasFilename);
-    }
-    if (!jaasFile.isFile()) {
-      throw new FileNotFoundException(
-          " File specified in " + Environment.JAAS_CONF_KEY
-          + " not found: " + jaasFile.getAbsolutePath());
-    }
-    // here the JAAS file is set up
-    System.setProperty(Environment.JAAS_CONF_KEY, jaasFile.getAbsolutePath());
-    return jaasFile;
+        contextName);
   }
 
   /**
@@ -278,18 +227,43 @@ public class RegistrySecurity {
    */
   public static void clearJaasSystemProperties() {
     System.clearProperty(Environment.JAAS_CONF_KEY);
+  }
 
+  /**
+   * Resolve the context of an entry. This is an effective test of 
+   * JAAS setup, because it will relay detected problems up
+   * @param context context name
+   * @return the entry
+   * @throws IllegalStateException if there is no context entry oifnd
+   */
+  public static AppConfigurationEntry[] validateContext(
+      String context) {
+    javax.security.auth.login.Configuration configuration =
+        javax.security.auth.login.Configuration.getConfiguration();
+    AppConfigurationEntry[] entries =
+        configuration.getAppConfigurationEntry(context);
+    if (entries == null) {
+      throw new IllegalStateException(
+          String.format("Entry \"%s\" not found in configuration %s",
+              context, configuration));
+    }
+    return entries;
   }
 
   /**
    * Set the client properties. This forces the ZK client into 
    * failing if it can't auth
+   * @param username
    * @param context
+   * @throws RuntimeException if the context cannot be found in the current
+   * JAAS context
    */
-  public static void setZKSaslClientProperties(String context) {
+  public static void setZKSaslClientProperties(String username,
+      String context) {
+    RegistrySecurity.validateContext(context);
+    System.setProperty(ZK_SASL_CLIENT_USERNAME, username);
     System.setProperty(ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY, "true");
-    System.setProperty(ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY,
-        context != null ? context : CLIENT);
+    System.setProperty(ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY, context);
   }
 
   /**
@@ -298,35 +272,10 @@ public class RegistrySecurity {
   public static void clearZKSaslProperties() {
     System.clearProperty(ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY);
     System.clearProperty(ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY);
-  }
-  
-  public String getKeytabConfOption() {
-    return conf.getTrimmed(KEY_REGISTRY_ZK_KEYTAB);
+    System.clearProperty(ZK_SASL_CLIENT_USERNAME);
+
   }
 
-
-  public String getPrincipalConfOption() {
-    return conf.getTrimmed(KEY_REGISTRY_ZK_PRINCIPAL);
-  }
-
-  public boolean isSecurityEnabled() {
-    return StringUtils.isNotEmpty(getPrincipalConfOption());
-  }
-
-
-  /**
-   * Get the keytab file referred to in a configuration
-   * @return the keytab or  null
-   */
-  public File getKeytabConfFile() throws FileNotFoundException {
-    String zkKeytab = getKeytabConfOption();
-    if (StringUtils.isNotEmpty(zkKeytab)) {
-      return new File(zkKeytab);
-    } else {
-      throw new FileNotFoundException("No keytab file specified");
-    }
-  }
-  
   public void logCurrentUser() {
     try {
       UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
