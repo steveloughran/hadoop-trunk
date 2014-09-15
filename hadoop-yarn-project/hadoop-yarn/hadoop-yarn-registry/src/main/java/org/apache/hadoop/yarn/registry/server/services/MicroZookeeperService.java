@@ -196,8 +196,9 @@ public class MicroZookeeperService
   protected void serviceStart() throws Exception {
 
     if (secureServer) {
-      LOG.debug("Setting auth provider " + SASL_AUTH_PROVIDER);
-      System.setProperty("zookeeper.authProvider.1", SASL_AUTH_PROVIDER);
+      System.setProperty("zookeeper.allowSaslFailedClients", "false");
+//      LOG.debug("Setting auth provider " + SASL_AUTH_PROVIDER);
+//      System.setProperty("zookeeper.authProvider.1", SASL_AUTH_PROVIDER);
     }
     ZooKeeperServer zkServer = new ZooKeeperServer();
     FileTxnSnapLog ftxn = new FileTxnSnapLog(dataDir, dataDir);
