@@ -329,13 +329,6 @@ public class ApplicationMasterService extends AbstractService implements
       response.setSchedulerResourceTypes(rScheduler
         .getSchedulingResourceTypes());
 
-      
-      // notify the registry that the AM has registered itself with the RM
-      if (rmContext.getRegistry() != null) {
-        rmContext.getRegistry().onApplicationMasterRegistered(
-            app.getUser(),
-            applicationAttemptId);
-      }
       return response;
     }
   }
