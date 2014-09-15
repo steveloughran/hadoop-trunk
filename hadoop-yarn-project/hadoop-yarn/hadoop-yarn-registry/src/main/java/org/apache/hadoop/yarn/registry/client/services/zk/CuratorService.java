@@ -153,7 +153,7 @@ public class CuratorService extends CompositeService
    * @throws IOException any bind/parse problem
    */
   protected List<ACL> buildRootACL() throws IOException {
-    return getACLs(KEY_REGISTRY_ZK_ACL, DEFAULT_REGISTRY_ROOT_PERMISSIONS);
+    return buildACLs(KEY_REGISTRY_ZK_ACL, DEFAULT_REGISTRY_ROOT_PERMISSIONS);
   }
 
   protected List<ACL> getRootACL() {
@@ -173,7 +173,7 @@ public class CuratorService extends CompositeService
    * @throws IOException
    * @throws ZKUtil.BadAclFormatException on a bad ACL parse
    */
-  public List<ACL> getACLs(String confKey, String defaultPermissions) throws
+  public List<ACL> buildACLs(String confKey, String defaultPermissions) throws
       IOException, ZKUtil.BadAclFormatException {
     String zkAclConf = getConfig().get(confKey, defaultPermissions);
     return parseACLs(zkAclConf);
@@ -252,6 +252,7 @@ public class CuratorService extends CompositeService
 
 
     if (StringUtils.isEmpty(principal)) {
+      LOG.debug("No security principal...client is unauthed");
       return builder;
     }
     String zkKeytab = conf.getTrimmed(KEY_REGISTRY_ZK_KEYTAB);
@@ -445,6 +446,23 @@ public class CuratorService extends CompositeService
       throw new PathNotFoundException(path);
     }
     return stat;
+  }
+  
+  public List<ACL> zkGetACLS(String path) throws IOException {
+    String fullpath = createFullPath(path);
+    List<ACL> acls;
+    try {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Stat {}", fullpath);
+      }
+      acls = curator.getACL().forPath(fullpath);
+    } catch (Exception e) {
+      throw operationFailure(fullpath, "read()", e);
+    }
+    if (acls == null) {
+      throw new PathNotFoundException(path);
+    }
+    return acls;
   }
   
   /**

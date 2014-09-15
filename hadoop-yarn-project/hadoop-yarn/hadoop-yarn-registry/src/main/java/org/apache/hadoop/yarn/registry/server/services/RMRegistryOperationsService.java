@@ -32,8 +32,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
@@ -165,7 +163,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   @VisibleForTesting
   public void createRegistryPaths() throws IOException {
     // create the root directories
-    rootRegistryACL = getACLs(KEY_REGISTRY_ZK_ACL,
+    rootRegistryACL = buildACLs(KEY_REGISTRY_ZK_ACL,
         RegistrySecurity.PERMISSIONS_REGISTRY_ROOT);
     maybeCreate("", CreateMode.PERSISTENT, rootRegistryACL, false);
 
