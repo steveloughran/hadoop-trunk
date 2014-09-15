@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry.server.services;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang.StringUtils;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -28,6 +29,7 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.services.BindingInformation;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
+import org.apache.zookeeper.Environment;
 import org.apache.zookeeper.server.ServerCnxnFactory;
 import org.apache.zookeeper.server.ZooKeeperServer;
 import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
@@ -67,8 +69,7 @@ public class MicroZookeeperService
 
   private static final Logger
       LOG = LoggerFactory.getLogger(MicroZookeeperService.class);
-  public static final String SASL_AUTH_PROVIDER =
-      "org.apache.zookeeper.server.auth.SASLAuthenticationProvider";
+
 
   private File instanceDir;
   private File dataDir;
@@ -171,18 +172,19 @@ public class MicroZookeeperService
   protected boolean setupSecurity() throws IOException {
     Configuration conf = getConfig();
     RegistrySecurity security = new RegistrySecurity(conf);
-    secureServer = security.isSecurityEnabled();
-    if (!secureServer) {
+    String jaasContext = conf.getTrimmed(KEY_ZKSERVICE_JAAS_CONTEXT);
+    secureServer = StringUtils.isNotEmpty(jaasContext);
+    if (secureServer) {
+      RegistrySecurity.validateContext(jaasContext);
+      security.bindZKToServerJAASContext(jaasContext);
+      addDiagnostics("jaasContext for=%s Jaas File Sysprop=%s",
+          jaasContext,
+          System.getProperty(Environment.JAAS_CONF_KEY));
+      return true;
+    } else {
       return false;
+
     }
-    String zkPrincipal = security.getPrincipalConfOption();
-    String zkKeytab = conf.getTrimmed(KEY_REGISTRY_ZK_KEYTAB);
-    File keytabFile = security.getKeytabConfFile();
-    File jaasFile =
-        security.bindJVMToJAASAuth(zkPrincipal, keytabFile,
-            File.createTempFile("zookeeper", ".jaas", confDir));
-    addDiagnostics("principal=%s keytab=%s", zkPrincipal, keytabFile); 
-    return true;
   }
 
   /**

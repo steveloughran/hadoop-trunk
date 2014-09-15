@@ -179,15 +179,21 @@ public interface RegistryConstants {
    */
   String KEY_REGISTRY_ZK_ROOT = ZK_PREFIX + "root";
 
+
   /**
    * principal. If set, secure mode is expected
    */
+  @Deprecated
   String KEY_REGISTRY_ZK_PRINCIPAL = ZK_PREFIX + "principal";
 
+
   /**
-   * keytab for secure mode. No default
+   * Key to define the JAAS context. IF set, it forces the
+   * service into secure mode —which will require JAAS to have
+   * been set up
    */
-  String KEY_REGISTRY_ZK_KEYTAB = ZK_PREFIX + "keytab";
+  String KEY_ZKSERVICE_JAAS_CONTEXT = ZK_PREFIX + "jaas.context";
+
 
   /**
    * ACL: {@value} for the registry root
@@ -248,4 +254,20 @@ public interface RegistryConstants {
    * Permissions for any other user entry. Full access
    */
   int PERMISSIONS_REGISTRY_USER = ZooDefs.Perms.ALL;
+
+  /**
+   * This is a property which must be set to enable secure clients
+   */
+  String SYSPROP_ZOOKEEPER_SASL_CLIENT = "zookeeper.sasl.client";
+
+
+  /**
+   * Set this to the <i>short</i> name of the client
+   */
+  String ZK_SASL_CLIENT_USERNAME = "zookeeper.sasl.client.username";
+
+  /**
+   * Should ZK downgrade on an auth failure?
+   */
+  String ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE ="zookeeper.maintain_connection_despite_sasl_failure";
 }

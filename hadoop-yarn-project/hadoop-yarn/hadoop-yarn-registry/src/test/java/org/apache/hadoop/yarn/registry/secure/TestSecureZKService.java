@@ -30,12 +30,12 @@ import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
+import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.security.auth.login.LoginContext;
-import java.io.File;
 import java.util.List;
 
 /**
@@ -45,6 +45,10 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestSecureZKService.class);
 
+  @Before
+  public void enableSasl() throws Throwable {
+    System.setProperty(SYSPROP_ZOOKEEPER_SASL_CLIENT, "true");
+  }
 
   @Test
   public void testCreateSecureZK() throws Throwable {
@@ -88,31 +92,32 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
    * @throws Throwable
    */
   @Test
-  public void testAuthedSecureClientToZK() throws Throwable {
-    startSecureZK();
-    resetJaasConfKeys();
+  public void testAliceCanWrite() throws Throwable {
+
     System.setProperty("curator-log-events", "true");
-    LoginContext aliceLogin = login (ALICE, RegistrySecurity.CLIENT , keytab_alice);
+    startSecureZK();
+    LoginContext aliceLogin = login(ALICE_LOCALHOST, ALICE, keytab_alice);
     try {
       logLoginDetails(ALICE, aliceLogin);
-      RegistrySecurity.setZKSaslClientProperties(null);
+      ktList(keytab_alice);
+      RegistrySecurity.setZKSaslClientProperties(ALICE, ALICE);
       CuratorService alice =
-          startCuratorServiceInstance(ALICE, keytab_alice);
+          startCuratorServiceInstance("alice's");
       addToTeardown(alice);
       alice.zkList("/");
+      alice.zkMkPath("/alice", CreateMode.PERSISTENT, false,
+          RegistrySecurity.WorldReadOwnerWriteACL);
     } finally {
       logout(aliceLogin);
     }
 
   }
 
-  protected CuratorService startCuratorServiceInstance(String principal,
-      File keytab) {
+  protected CuratorService startCuratorServiceInstance(String name) {
     Configuration clientConf = new Configuration();
-    bindZKPrincipal(clientConf, principal, keytab);
     clientConf.set(KEY_REGISTRY_ZK_ROOT, "/");
     describe(LOG, "Starting Curator service");
-    CuratorService curatorService = new CuratorService("client", secureZK);
+    CuratorService curatorService = new CuratorService(name, secureZK);
     curatorService.init(clientConf);
     curatorService.start();
     LOG.info("Curator Binding {}",
@@ -127,10 +132,9 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
     // alice
     CuratorService alice = null;
     LoginContext aliceLogin =
-        login(ALICE, RegistrySecurity.CLIENT, keytab_alice);
+        login(ALICE_LOCALHOST, ALICE, keytab_alice);
     try {
-      logLoginDetails(ALICE, aliceLogin);
-      alice = startCuratorServiceInstance(ALICE, keytab_alice);
+      alice = startCuratorServiceInstance("alice's");
       alice.zkList("/");
       alice.zkMkPath("/alice", CreateMode.PERSISTENT, false,
           RegistrySecurity.WorldReadOwnerWriteACL);
@@ -144,10 +148,10 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
     }
     CuratorService bobCurator = null;
     LoginContext bobLogin =
-        login(BOB, RegistrySecurity.CLIENT, keytab_bob);
+        login(BOB_LOCALHOST, BOB, keytab_bob);
 
     try {
-      bobCurator = startCuratorServiceInstance(BOB, keytab_bob);
+      bobCurator = startCuratorServiceInstance("bob's");
       bobCurator.zkMkPath("/alice/bob", CreateMode.PERSISTENT, false,
           RegistrySecurity.WorldReadOwnerWriteACL);
       fail("Expected a failure —but bob could create a path under /alice");
