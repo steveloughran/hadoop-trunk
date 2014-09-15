@@ -24,6 +24,7 @@ import com.google.common.collect.Lists;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.zookeeper.Environment;
 import org.apache.zookeeper.client.ZooKeeperSaslClient;
@@ -31,6 +32,8 @@ import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Id;
 import org.apache.zookeeper.server.ZooKeeperSaslServer;
 import org.apache.zookeeper.server.auth.DigestAuthenticationProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -47,13 +50,13 @@ import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
  * Implement the registry security ... standalone for easier testing
  */
 public class RegistrySecurity {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RegistrySecurity.class);
   public static final String PERMISSIONS_REGISTRY_ROOT = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_SYSTEM = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_USERS = "world:anyone:rwcda";
   private final Configuration conf;
   private String domain;
-
 
   /**
    * Create an instance
@@ -208,7 +211,7 @@ public class RegistrySecurity {
   /**
    * Prepare the JVM for JAAS auth. IF the system properties
    * do not already defined a JAAS file, it will be created
-   * @param zkPrincipal principal to auth as
+   * @param principal principal to auth as
    * @param keytabFile keytab file
    * @param jaasFileToCreate jaas file to create if required. Set this
    * to null to raise an IOException instead
@@ -216,10 +219,14 @@ public class RegistrySecurity {
    * @throws IOException on any IO problem or a missing config
    */
   public File prepareJAASAuth(
-      String zkPrincipal, File keytabFile,
+      String principal, File keytabFile,
       File jaasFileToCreate) throws IOException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Preparing JAAS auth for {} and keytab {}", principal,
+          keytabFile);
+    }
     if (!keytabFile.exists()) {
-      throw new FileNotFoundException("Missing zookeeper keytab "
+      throw new FileNotFoundException("Missing keytab "
                                       + keytabFile.getAbsolutePath());
     }
     System.setProperty(ZooKeeperSaslServer.LOGIN_CONTEXT_NAME_KEY,
@@ -234,7 +241,7 @@ public class RegistrySecurity {
       }
       // set up jaas.
       jaasFile = jaasFileToCreate;
-      buildJAASFile(jaasFile, zkPrincipal, keytabFile);
+      buildJAASFile(jaasFile, principal, keytabFile);
       // 
     } else {
       jaasFile = new File(jaasFilename);
@@ -252,7 +259,7 @@ public class RegistrySecurity {
   /**
    * Reset any system properties related to JAAS
    */
-  public static void resetJaasSystemProperties() {
+  public static void clearJaasSystemProperties() {
     System.clearProperty(Environment.JAAS_CONF_KEY);
 
   }
@@ -262,10 +269,18 @@ public class RegistrySecurity {
    * failing if it can't auth
    * @param context
    */
-  public void setZKSaslClientProperties(String context) {
+  public static void setZKSaslClientProperties(String context) {
     System.setProperty(ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY, "true");
     System.setProperty(ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY,
         context != null ? context : "Client");
+  }
+
+  /**
+   * Clear all the ZK Sasl properties
+   */
+  public static void clearZKSaslProperties() {
+    System.clearProperty(ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY);
+    System.clearProperty(ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY);
   }
   
   public String getKeytabConfOption() {
@@ -292,6 +307,17 @@ public class RegistrySecurity {
       return new File(zkKeytab);
     } else {
       throw new FileNotFoundException("No keytab file specified");
+    }
+  }
+  
+  public void logCurrentUser() {
+    try {
+      UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
+      LOG.info("Current user = {}",currentUser);
+      UserGroupInformation realUser = currentUser.getRealUser();
+      LOG.info("Real User = {}" , realUser);
+    } catch (IOException e) {
+      LOG.warn("Failed to get current user {}, {}", e);
     }
   }
 }

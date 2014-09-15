@@ -18,13 +18,17 @@
 
 package org.apache.hadoop.yarn.registry.secure;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.minikdc.MiniKdc;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
-import org.apache.hadoop.yarn.registry.AbstractRegistryTest;
+import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.RegistryTestHelper;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.server.services.AddingCompositeService;
+import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperService;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -37,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.login.LoginContext;
+import javax.security.auth.login.LoginException;
 import java.io.File;
 import java.io.IOException;
 import java.security.Principal;
@@ -49,6 +54,11 @@ import java.util.Set;
  * and its test case, <code>TestMiniKdc</code>
  */
 public class AbstractSecureRegistryTest extends RegistryTestHelper {
+  public static final String ZOOKEEPER = "zookeeper/localhost";
+  public static final String ALICE = "alice/localhost";
+  public static final String BOB = "bob/localhost";
+  public static final String SASL_AUTH_PROVIDER =
+      "org.apache.hadoop.yarn.registry.secure.ExtendedSASLAuthenticationProvider";
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractSecureRegistryTest.class);
 
@@ -56,22 +66,68 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   private static final AddingCompositeService servicesToTeardown =
       new AddingCompositeService("teardown");
 
+  public static final Configuration CONF = new Configuration();
+
   // static initializer guarantees it is always started
   // ahead of any @BeforeClass methods
   static {
-    servicesToTeardown.init(new Configuration());
+    servicesToTeardown.init(CONF);
     servicesToTeardown.start();
   }
 
   protected static MiniKdc kdc;
+  protected static File keytab_zk;
+  protected static File keytab_bob;
+  protected static File keytab_alice;
   private static File kdcWorkDir;
   private static Properties kdcConf;
+  protected RegistrySecurity registrySecurity = new RegistrySecurity(CONF); 
+  
+
 
   @Rule
   public final Timeout testTimeout = new Timeout(10000);
 
   @Rule
   public TestName methodName = new TestName();
+  protected MicroZookeeperService secureZK;
+  protected LoginContext loginContext;
+
+  /**
+   * set the ZK registy parameters to bind the mini cluster to a ZK principal
+   * @param conf config
+   * @param principal principal
+   * @param keytab keytab
+   */
+  protected static void bindZKPrincipal(Configuration conf,
+      String principal, File keytab)  {
+    conf.set(RegistryConstants.KEY_REGISTRY_ZK_KEYTAB,
+        keytab.getAbsolutePath());
+    conf.set(RegistryConstants.KEY_REGISTRY_ZK_PRINCIPAL,
+        getPrincipalAndRealm(principal) );
+  }
+
+  @BeforeClass
+  public static void createPrincipals() throws Exception {
+    keytab_zk = createPrincipalAndKeytab(ZOOKEEPER, "zookeeper.keytab");
+    keytab_alice = createPrincipalAndKeytab(ALICE, "alice.keytab");
+    keytab_bob = createPrincipalAndKeytab(BOB, "bob.keytab");
+  }
+
+  protected static MicroZookeeperService createSecureZKInstance(String name) throws Exception {
+    Configuration conf = new Configuration();
+
+    File testdir = new File(System.getProperty("test.dir", "target"));
+    File workDir = new File(testdir, name);
+    workDir.mkdirs();
+    bindZKPrincipal(conf, ZOOKEEPER, keytab_zk);
+    MicroZookeeperService secureZK = new MicroZookeeperService("secure");
+    secureZK.init(conf);
+    LOG.info(secureZK.getDiagnostics());
+    LOG.debug("Setting auth provider " + SASL_AUTH_PROVIDER);
+    System.setProperty("zookeeper.authProvider.1", SASL_AUTH_PROVIDER);
+    return secureZK;
+  }
 
   /**
    * give our thread a name
@@ -101,7 +157,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     kdc = new MiniKdc(kdcConf, kdcWorkDir);
     kdc.start();
   }
-  
+
   @AfterClass
   public static void teardownKDC() throws Exception {
     if (kdc != null) {
@@ -127,7 +183,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
       String filename) throws Exception {
     assertNotEmpty("empty principal", principal);
     assertNotEmpty("empty host", filename);
-    File keytab = new File(kdcWorkDir, filename );
+    File keytab = new File(kdcWorkDir, filename);
     kdc.createPrincipal(keytab, principal);
     return keytab;
   }
@@ -147,7 +203,8 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
    * @return
    * @throws Exception
    */
-  public static LoginContext login(String principal, File keytab) throws Exception {
+  public static LoginContext login(String principal, File keytab) throws
+      Exception {
 
 
     Set<Principal> principals = new HashSet<Principal>();
@@ -163,4 +220,52 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   }
 
 
+  @Before
+  public void resetJaasConfKeys() {
+    RegistrySecurity.clearJaasSystemProperties();
+  }
+
+  @Before
+  public void initHadoopSecurity() {
+    // resetting kerberos security
+    Configuration conf = new Configuration();
+    UserGroupInformation.setConfiguration(conf);
+  }
+
+  @After
+  public void stopSecureZK() {
+    ServiceOperations.stop(secureZK);
+  }
+
+  protected LoginContext loginAsClient(String principal,
+      String context, File keytab) throws LoginException {
+    assertNull("already logged in", loginContext);
+    loginContext = null;
+    String principalAndRealm = getPrincipalAndRealm(principal);
+    Set<Principal> principals = new HashSet<Principal>();
+    principals.add(new KerberosPrincipal(principal));
+    Subject subject = new Subject(false, principals, new HashSet<Object>(),
+        new HashSet<Object>());
+    loginContext = new LoginContext(context, subject, null,
+        KerberosConfiguration.createClientConfig(principal, keytab));
+    loginContext.login();
+    return loginContext;
+  }
+
+  @After
+  public void logout() throws LoginException {
+    if (loginContext != null) {
+      loginContext.logout();
+    }
+  }
+
+  /**
+   * Start the secure ZK instance using the test method name as the path
+   * @throws Exception on any failure
+   */
+  protected void startSecureZK() throws Exception {
+    secureZK = createSecureZKInstance(
+        "test-" + methodName.getMethodName());
+    secureZK.start();
+  }
 }

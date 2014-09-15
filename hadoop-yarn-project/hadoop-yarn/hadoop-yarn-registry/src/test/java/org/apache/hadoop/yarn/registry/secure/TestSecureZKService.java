@@ -22,32 +22,20 @@ package org.apache.hadoop.yarn.registry.secure;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.ServiceOperations;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.exceptions.AuthenticationFailedException;
 import org.apache.hadoop.yarn.registry.client.services.zk.CuratorService;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
-import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperService;
 
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
 import org.apache.zookeeper.CreateMode;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.security.auth.Subject;
-import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.login.LoginContext;
-import javax.security.auth.login.LoginException;
-import java.io.File;
-import java.security.Principal;
 import java.security.PrivilegedExceptionAction;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * Verify that the Mini ZK service can be started up securely
@@ -55,51 +43,8 @@ import java.util.Set;
 public class TestSecureZKService extends AbstractSecureRegistryTest {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestSecureZKService.class);
-  public static final String ZOOKEEPER = "zookeeper/localhost";
-  private MicroZookeeperService secureZK;
-  private static File keytab;
-  private LoginContext loginContext;
 
-  @BeforeClass
-  public static void createPrincipal() throws Exception {
-    keytab = createPrincipalAndKeytab(ZOOKEEPER, "zookeeper.keytab");
-  }
-  
-  
-  @Before
-  public void resetJaasConfKeys() {
-    RegistrySecurity.resetJaasSystemProperties();
-  }
 
-  @Before
-  public void initHadoopSecurity() {
-    // resetting kerberos security
-    Configuration conf = new Configuration();
-    UserGroupInformation.setConfiguration(conf);
-  }
-  
-  @After
-  public void stopSecureZK() {
-    ServiceOperations.stop(secureZK);
-  }
-  
-  @After
-  public void logout() throws LoginException {
-    if (loginContext != null) {
-      loginContext.logout();
-    }
-  }
-
-  
-  @Test
-  public void testHasRealm() throws Throwable {
-    assertNotNull(getRealm());
-    LOG.info("ZK principal = {}", getPrincipalAndRealm(ZOOKEEPER));
-    
-  }
-
-  
-  
   @Test
   public void testCreateSecureZK() throws Throwable {
     startSecureZK();
@@ -116,15 +61,13 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
     curatorService.zkList("/");
   }
 
-  protected void startSecureZK() throws Exception {
-    secureZK = createSecureZKInstance(
-        "test-" + methodName.getMethodName());
-    secureZK.start();
-  }
-
   @Test
   public void testAuthedClientToZKNoCredentials() throws Throwable {
     startSecureZK();
+    RegistrySecurity.clearJaasSystemProperties();
+    RegistrySecurity.clearZKSaslProperties();
+    registrySecurity.logCurrentUser();
+    
     CuratorService curatorService = new CuratorService("client", secureZK);
     curatorService.init(secureZK.getConfig());
     curatorService.start();
@@ -136,6 +79,7 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
     }
   }
 
+
   /**
    * give the client credentials
    * @throws Throwable
@@ -144,10 +88,9 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
   public void testAuthedSecureClientToZK() throws Throwable {
     startSecureZK();
     resetJaasConfKeys();
-    LoginContext login = loginAsClient("");
-    
-    RegistrySecurity security = new RegistrySecurity(new Configuration());
-    security.setZKSaslClientProperties(null);
+    LoginContext login = loginAsClient(ALICE, "", keytab_alice);
+
+    RegistrySecurity.setZKSaslClientProperties(null);
     final Configuration clientConf = secureZK.getConfig();
     // sets root to /
     clientConf.set(KEY_REGISTRY_ZK_ROOT, "/");
@@ -174,60 +117,5 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
     });
 
   }
-
-  @Test
-  public void testClientLogin() throws Throwable {
-    loginAsClient("");
-  }
-
-  protected LoginContext loginAsClient(String name) throws LoginException {
-    assertNull("already logged in", loginContext);
-    loginContext = null;
-    String principalAndRealm = getPrincipalAndRealm(ZOOKEEPER);
-    Set<Principal> principals = new HashSet<Principal>();
-    principals.add(new KerberosPrincipal(ZOOKEEPER));
-    Subject subject = new Subject(false, principals, new HashSet<Object>(),
-        new HashSet<Object>());
-    loginContext = new LoginContext(name, subject, null,
-        KerberosConfiguration.createClientConfig(ZOOKEEPER, keytab));
-    loginContext.login();
-    return loginContext;
-  }
-
-  @Test
-  public void testServerLogin() throws Throwable {
-    String name = "";
-    assertNull("already logged in", loginContext);
-    loginContext = null;
-    String principalAndRealm = getPrincipalAndRealm(ZOOKEEPER);
-    Set<Principal> principals = new HashSet<Principal>();
-    principals.add(new KerberosPrincipal(ZOOKEEPER));
-    Subject subject = new Subject(false, principals, new HashSet<Object>(),
-        new HashSet<Object>());
-    loginContext = new LoginContext(name, subject, null,
-        KerberosConfiguration.createServerConfig(ZOOKEEPER, keytab));
-    loginContext.login();
-  }
-  
-  
-  protected static MicroZookeeperService createSecureZKInstance(String name) throws Exception {
-    YarnConfiguration conf = new YarnConfiguration();
-
-    File testdir = new File(System.getProperty("test.dir", "target"));
-    File workDir = new File(testdir, name);
-    workDir.mkdirs();
-    bindPrincipal(conf);
-    MicroZookeeperService secureZK = new MicroZookeeperService("secure");
-    secureZK.init(conf);
-    LOG.info(secureZK.getDiagnostics());
-    return secureZK;
-  }
-
-  private static void bindPrincipal(YarnConfiguration conf) throws Exception {
-    conf.set(RegistryConstants.KEY_REGISTRY_ZK_KEYTAB, keytab.getAbsolutePath());
-    conf.set(RegistryConstants.KEY_REGISTRY_ZK_PRINCIPAL,
-        getPrincipalAndRealm(ZOOKEEPER) );
-  }
-
 
 }
