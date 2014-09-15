@@ -20,7 +20,6 @@ package org.apache.hadoop.yarn.registry.server.services;
 
 import com.google.common.base.Preconditions;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
@@ -39,7 +38,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 
@@ -181,7 +179,7 @@ public class MicroZookeeperService
     String zkKeytab = conf.getTrimmed(KEY_REGISTRY_ZK_KEYTAB);
     File keytabFile = security.getKeytabConfFile();
     File jaasFile =
-        security.prepareJAASAuth(zkPrincipal, keytabFile,
+        security.bindJVMToJAASAuth(zkPrincipal, keytabFile,
             File.createTempFile("zookeeper", ".jaas", confDir));
     addDiagnostics("principal=%s keytab=%s", zkPrincipal, keytabFile); 
     return true;

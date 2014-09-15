@@ -57,6 +57,7 @@ public class RegistrySecurity {
   public static final String PERMISSIONS_REGISTRY_ROOT = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_SYSTEM = "world:anyone:rwcda";
   public static final String PERMISSIONS_REGISTRY_USERS = "world:anyone:rwcda";
+  public static final String CLIENT = "Client";
   private final Configuration conf;
   private String domain;
 
@@ -234,7 +235,7 @@ public class RegistrySecurity {
    * @return the Jaas File
    * @throws IOException on any IO problem or a missing config
    */
-  public File prepareJAASAuth(
+  public File bindJVMToJAASAuth(
       String principal, File keytabFile,
       File jaasFileToCreate) throws IOException {
     if (LOG.isDebugEnabled()) {
@@ -288,7 +289,7 @@ public class RegistrySecurity {
   public static void setZKSaslClientProperties(String context) {
     System.setProperty(ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY, "true");
     System.setProperty(ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY,
-        context != null ? context : "Client");
+        context != null ? context : CLIENT);
   }
 
   /**

@@ -20,7 +20,6 @@ package org.apache.hadoop.yarn.registry.secure;
 
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.client.exceptions.AuthenticationFailedException;
 import org.apache.hadoop.yarn.registry.client.services.zk.CuratorService;
@@ -35,11 +34,8 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.security.auth.Subject;
 import javax.security.auth.login.LoginContext;
 import java.io.File;
-import java.io.IOException;
-import java.security.PrivilegedExceptionAction;
 import java.util.List;
 
 /**
@@ -95,14 +91,18 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
   public void testAuthedSecureClientToZK() throws Throwable {
     startSecureZK();
     resetJaasConfKeys();
-
-
-    // alice
-    RegistrySecurity.setZKSaslClientProperties(null);
-    CuratorService alice =
-        startCuratorServiceInstance(ALICE, keytab_alice);
-    addToTeardown(alice);
-    alice.zkList("/");
+    System.setProperty("curator-log-events", "true");
+    LoginContext aliceLogin = login (ALICE, RegistrySecurity.CLIENT , keytab_alice);
+    try {
+      logLoginDetails(ALICE, aliceLogin);
+      RegistrySecurity.setZKSaslClientProperties(null);
+      CuratorService alice =
+          startCuratorServiceInstance(ALICE, keytab_alice);
+      addToTeardown(alice);
+      alice.zkList("/");
+    } finally {
+      logout(aliceLogin);
+    }
 
   }
 
@@ -125,27 +125,38 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
   public void testAliceCanWriteButNotBob() throws Throwable {
     startSecureZK();
     // alice
-    CuratorService alice =
-        startCuratorServiceInstance(ALICE, keytab_alice);
-    addToTeardown(alice);
-    alice.zkList("/");
-    alice.zkMkPath("/alice", CreateMode.PERSISTENT, false,
-        RegistrySecurity.WorldReadOwnerWriteACL);
-    Stat stat = alice.zkStat("/alice");
-    LOG.info("stat /alice = {}", stat);
-    List<ACL> acls = alice.zkGetACLS("/alice");
-    registrySecurity.logACLs(acls);
-
-    CuratorService bobCurator =
-        startCuratorServiceInstance(BOB, keytab_bob);
-    addToTeardown(bobCurator);
+    CuratorService alice = null;
+    LoginContext aliceLogin =
+        login(ALICE, RegistrySecurity.CLIENT, keytab_alice);
     try {
+      logLoginDetails(ALICE, aliceLogin);
+      alice = startCuratorServiceInstance(ALICE, keytab_alice);
+      alice.zkList("/");
+      alice.zkMkPath("/alice", CreateMode.PERSISTENT, false,
+          RegistrySecurity.WorldReadOwnerWriteACL);
+      Stat stat = alice.zkStat("/alice");
+      LOG.info("stat /alice = {}", stat);
+      List<ACL> acls = alice.zkGetACLS("/alice");
+      registrySecurity.logACLs(acls);
+    } finally {
+      ServiceOperations.stop(alice);
+      aliceLogin.logout();
+    }
+    CuratorService bobCurator = null;
+    LoginContext bobLogin =
+        login(BOB, RegistrySecurity.CLIENT, keytab_bob);
+
+    try {
+      bobCurator = startCuratorServiceInstance(BOB, keytab_bob);
       bobCurator.zkMkPath("/alice/bob", CreateMode.PERSISTENT, false,
           RegistrySecurity.WorldReadOwnerWriteACL);
       fail("Expected a failure —but bob could create a path under /alice");
       bobCurator.zkDelete("/alice", false, null);
     } catch (AuthenticationFailedException expected) {
       // expected
+    } finally {
+      ServiceOperations.stop(bobCurator);
+      bobLogin.logout();
     }
 
 
