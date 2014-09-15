@@ -77,8 +77,13 @@ public class TestRegistryPathUtils extends Assert {
     assertCreatedPathEquals("/a/b", "/a", "/b");
     assertCreatedPathEquals("/a/b", "/a", "/b/");
     assertCreatedPathEquals("/a", "/a", "/");
+    assertCreatedPathEquals("/alice", "/", "/alice");
+    assertCreatedPathEquals("/alice", "/alice", "/");
   }
 
+  
+  
+  
   @Test
   public void testComplexPaths() throws Throwable {
     assertCreatedPathEquals("/", "", "");
@@ -146,6 +151,7 @@ public class TestRegistryPathUtils extends Assert {
     assertInvalidPath("/space in string");
 // Is this valid?    assertInvalidPath("/50");
   }
+
   
   private void assertValidPath(String path) throws InvalidPathnameException {
     validateZKPath(path);

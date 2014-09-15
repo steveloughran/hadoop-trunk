@@ -38,6 +38,7 @@ import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.services.zk.CuratorService;
+import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.zookeeper.CreateMode;
@@ -85,9 +86,7 @@ public class RegistryOperationsService extends CuratorService
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
-    userAcl = new ArrayList<ACL>();
-    userAcl.add(new ACL(PERMISSIONS_REGISTRY_USER, ZooDefs.Ids.AUTH_IDS));
-    userAcl.add(new ACL(ZooDefs.Perms.READ, ZooDefs.Ids.ANYONE_ID_UNSAFE));
+    userAcl = RegistrySecurity.WorldReadOwnerWriteACL;
   }
 
   public List<ACL> getUserAcl() {

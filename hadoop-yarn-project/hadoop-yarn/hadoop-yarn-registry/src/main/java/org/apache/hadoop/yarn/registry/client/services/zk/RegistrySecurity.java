@@ -27,6 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.zookeeper.Environment;
+import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.client.ZooKeeperSaslClient;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Id;
@@ -43,6 +44,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
@@ -57,6 +59,20 @@ public class RegistrySecurity {
   public static final String PERMISSIONS_REGISTRY_USERS = "world:anyone:rwcda";
   private final Configuration conf;
   private String domain;
+
+  /**
+   * Special ACL: world readable, but only the owner can write.
+   * Implemented as copy-on-write, so can be extended without
+   * impact on other uses.
+   */
+  public static List<ACL> WorldReadOwnerWriteACL;
+  static {
+    List<ACL> acls =  new ArrayList<ACL>();
+    acls.add(new ACL(PERMISSIONS_REGISTRY_USER, ZooDefs.Ids.AUTH_IDS));
+    acls.add(new ACL(ZooDefs.Perms.READ, ZooDefs.Ids.ANYONE_ID_UNSAFE));
+
+    WorldReadOwnerWriteACL = new CopyOnWriteArrayList<ACL>(acls);
+  }
 
   /**
    * Create an instance
@@ -318,6 +334,12 @@ public class RegistrySecurity {
       LOG.info("Real User = {}" , realUser);
     } catch (IOException e) {
       LOG.warn("Failed to get current user {}, {}", e);
+    }
+  }
+
+  public void logACLs(List<ACL> acls) {
+    for (ACL acl : acls) {
+      LOG.info("{}", acl.toString());
     }
   }
 }

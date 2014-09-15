@@ -48,23 +48,23 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
 
   @Test
   public void testClientLogin() throws Throwable {
-    loginAsClient(ALICE, "", keytab_alice);
+    LoginContext client = login(ALICE, "", keytab_alice);
+    client.logout();
   }
 
 
   @Test
   public void testServerLogin() throws Throwable {
     String name = "";
-    assertNull("already logged in", loginContext);
-    loginContext = null;
     String principalAndRealm = getPrincipalAndRealm(ZOOKEEPER);
     Set<Principal> principals = new HashSet<Principal>();
     principals.add(new KerberosPrincipal(ZOOKEEPER));
     Subject subject = new Subject(false, principals, new HashSet<Object>(),
         new HashSet<Object>());
-    loginContext = new LoginContext(name, subject, null,
+    LoginContext loginContext = new LoginContext(name, subject, null,
         KerberosConfiguration.createServerConfig(ZOOKEEPER, keytab_zk));
     loginContext.login();
+    loginContext.logout();
   }
 
 

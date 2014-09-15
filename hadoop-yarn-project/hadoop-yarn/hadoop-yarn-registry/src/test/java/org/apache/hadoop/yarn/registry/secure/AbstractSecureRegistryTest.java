@@ -91,7 +91,6 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   @Rule
   public TestName methodName = new TestName();
   protected MicroZookeeperService secureZK;
-  protected LoginContext loginContext;
 
   /**
    * set the ZK registy parameters to bind the mini cluster to a ZK principal
@@ -107,11 +106,9 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
         getPrincipalAndRealm(principal) );
   }
 
-  @BeforeClass
-  public static void createPrincipals() throws Exception {
-    keytab_zk = createPrincipalAndKeytab(ZOOKEEPER, "zookeeper.keytab");
-    keytab_alice = createPrincipalAndKeytab(ALICE, "alice.keytab");
-    keytab_bob = createPrincipalAndKeytab(BOB, "bob.keytab");
+  protected static void clearZKPrincipal(Configuration conf) {
+    conf.unset(RegistryConstants.KEY_REGISTRY_ZK_KEYTAB);
+    conf.unset(RegistryConstants.KEY_REGISTRY_ZK_PRINCIPAL);
   }
 
   protected static MicroZookeeperService createSecureZKInstance(String name) throws Exception {
@@ -121,7 +118,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     File workDir = new File(testdir, name);
     workDir.mkdirs();
     bindZKPrincipal(conf, ZOOKEEPER, keytab_zk);
-    MicroZookeeperService secureZK = new MicroZookeeperService("secure");
+    MicroZookeeperService secureZK = new MicroZookeeperService(name);
     secureZK.init(conf);
     LOG.info(secureZK.getDiagnostics());
     LOG.debug("Setting auth provider " + SASL_AUTH_PROVIDER);
@@ -148,7 +145,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
 
 
   @BeforeClass
-  public static void setupKDC() throws Exception {
+  public static void setupKDCAndPrincipals() throws Exception {
     // set up the KDC
     File target = new File(System.getProperty("test.dir", "target"));
     kdcWorkDir = new File(target, "kdc");
@@ -156,6 +153,10 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     kdcConf = MiniKdc.createConf();
     kdc = new MiniKdc(kdcConf, kdcWorkDir);
     kdc.start();
+
+    keytab_zk = createPrincipalAndKeytab(ZOOKEEPER, "zookeeper.keytab");
+    keytab_alice = createPrincipalAndKeytab(ALICE, "alice.keytab");
+    keytab_bob = createPrincipalAndKeytab(BOB, "bob.keytab");
   }
 
   @AfterClass
@@ -183,6 +184,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
       String filename) throws Exception {
     assertNotEmpty("empty principal", principal);
     assertNotEmpty("empty host", filename);
+    assertNotNull("Null KDC", kdc);
     File keytab = new File(kdcWorkDir, filename);
     kdc.createPrincipal(keytab, principal);
     return keytab;
@@ -196,29 +198,28 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     return kdc.getRealm();
   }
 
+
   /**
-   * Create a login context and log in as a client
-   * @param principal
-   * @param keytab
-   * @return
-   * @throws Exception
+   * Log in, defaulting to the client context
+   * @param principal principal
+   * @param context context
+   * @param keytab keytab
+   * @return the logged in context
+   * @throws LoginException failure to log in
    */
-  public static LoginContext login(String principal, File keytab) throws
-      Exception {
-
-
+  protected LoginContext login(String principal,
+      String context, File keytab) throws LoginException {
+    String principalAndRealm = getPrincipalAndRealm(principal);
     Set<Principal> principals = new HashSet<Principal>();
     principals.add(new KerberosPrincipal(principal));
-
-    //client login
     Subject subject = new Subject(false, principals, new HashSet<Object>(),
         new HashSet<Object>());
-    LoginContext loginContext = new LoginContext("", subject, null,
+    LoginContext login;
+    login = new LoginContext(context, subject, null,
         KerberosConfiguration.createClientConfig(principal, keytab));
-    loginContext.login();
-    return loginContext;
+    login.login();
+    return login;
   }
-
 
   @Before
   public void resetJaasConfKeys() {
@@ -237,27 +238,6 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     ServiceOperations.stop(secureZK);
   }
 
-  protected LoginContext loginAsClient(String principal,
-      String context, File keytab) throws LoginException {
-    assertNull("already logged in", loginContext);
-    loginContext = null;
-    String principalAndRealm = getPrincipalAndRealm(principal);
-    Set<Principal> principals = new HashSet<Principal>();
-    principals.add(new KerberosPrincipal(principal));
-    Subject subject = new Subject(false, principals, new HashSet<Object>(),
-        new HashSet<Object>());
-    loginContext = new LoginContext(context, subject, null,
-        KerberosConfiguration.createClientConfig(principal, keytab));
-    loginContext.login();
-    return loginContext;
-  }
-
-  @After
-  public void logout() throws LoginException {
-    if (loginContext != null) {
-      loginContext.logout();
-    }
-  }
 
   /**
    * Start the secure ZK instance using the test method name as the path
@@ -267,5 +247,16 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     secureZK = createSecureZKInstance(
         "test-" + methodName.getMethodName());
     secureZK.start();
+  }
+
+  protected void logout(LoginContext login) {
+    if (login != null) {
+      try {
+        login.logout();
+      } catch (LoginException e) {
+        LOG.warn("Failure during logout: {}", e, e);
+
+      }
+    }
   }
 }

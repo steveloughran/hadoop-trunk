@@ -109,10 +109,19 @@ public class RegistryPathUtils {
     }
     fullpath.append(base);
 
-    if (!path.startsWith("/") && !fullpath.toString().endsWith("/")) {
+    // guarantee a trailing /
+    if (!fullpath.toString().endsWith("/")) {
       fullpath.append("/");
     }
-    fullpath.append(path);
+    // strip off any at the beginning
+    if (path.startsWith("/")) {
+      // path starts with /, so append all other characters -if present
+      if (path.length() > 1) {
+        fullpath.append(path.substring(1));
+      }
+    } else {
+      fullpath.append(path);
+    }
 
     //here there may be a trailing "/"
     String finalpath = fullpath.toString();

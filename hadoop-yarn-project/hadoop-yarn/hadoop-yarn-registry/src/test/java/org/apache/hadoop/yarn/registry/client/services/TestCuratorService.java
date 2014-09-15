@@ -69,10 +69,10 @@ public class TestCuratorService extends AbstractZKRegistryTest {
     curatorService = new CuratorService("curatorService");
     curatorService.init(createRegistryConfiguration());
     curatorService.start();
-    rootACL = curatorService.getACLs(RegistryConstants.KEY_REGISTRY_ZK_ACL,
+    rootACL = curatorService.buildACLs(RegistryConstants.KEY_REGISTRY_ZK_ACL,
         "world:anyone:rwcda");
-    List<ACL> rootACL = curatorService.getACLs(
-        RegistryConstants.KEY_REGISTRY_ZK_ACL, 
+    List<ACL> rootACL = curatorService.buildACLs(
+        RegistryConstants.KEY_REGISTRY_ZK_ACL,
         RegistrySecurity.PERMISSIONS_REGISTRY_ROOT);
     curatorService.maybeCreate("", CreateMode.PERSISTENT, rootACL, true);
   }
