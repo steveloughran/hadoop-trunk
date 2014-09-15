@@ -59,29 +59,29 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Extends the registry operations with extra support for resource management
  * operations, including creating and cleaning up the registry. 
- * 
+ *
  * These actions are all implemented as event handlers to operations
  * which come from the RM.
- * 
+ *
  * This service is expected to be executed by a user with the permissions
  * to manipulate the entire registry,
  */
-@InterfaceAudience.Private
+@InterfaceAudience.LimitedPrivate("YARN")
 @InterfaceStability.Evolving
 public class RMRegistryOperationsService extends RegistryOperationsService {
   private static final Logger LOG =
       LoggerFactory.getLogger(RMRegistryOperationsService.class);
-  
+
   private List<ACL> rootRegistryACL;
 
   private List<ACL> userAcl;
 
   private ExecutorService executor;
-  
+
   private PurgePolicy purgeOnCompletionPolicy = PurgePolicy.PurgeAll;
-  
+
   protected RegistrySecurity security;
-  
+
   public RMRegistryOperationsService(String name) {
     this(name, null);
   }
@@ -100,9 +100,9 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     String yarnUserName = currentUser.getUserName();
     String publicUsers =
         conf.get(KEY_REGISTRY_PUBLIC_ACCESS, DEFAULT_REGISTRY_PUBLIC_ACCESS);
-    userAcl = security.parseIds(publicUsers,"", PERMISSIONS_REGISTRY_USER);
-        
-        parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_USERS);
+    userAcl = security.parseIds(publicUsers, "", PERMISSIONS_REGISTRY_USER);
+
+    parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_USERS);
     executor = Executors.newCachedThreadPool(
         new ThreadFactory() {
           AtomicInteger counter = new AtomicInteger(1);
@@ -165,7 +165,8 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   @VisibleForTesting
   public void createRegistryPaths() throws IOException {
     // create the root directories
-    rootRegistryACL = getACLs(KEY_REGISTRY_ZK_ACL, RegistrySecurity.PERMISSIONS_REGISTRY_ROOT);
+    rootRegistryACL = getACLs(KEY_REGISTRY_ZK_ACL,
+        RegistrySecurity.PERMISSIONS_REGISTRY_ROOT);
     maybeCreate("", CreateMode.PERSISTENT, rootRegistryACL, false);
 
     maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
@@ -201,9 +202,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     maybeCreate(path, CreateMode.PERSISTENT,
         createAclForUser(username), false);
   }
-  
 
-  
 
   /**
    * Get the path to a user's home dir
@@ -233,12 +232,12 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   }
 
   public void onApplicationAttemptRegistered(ApplicationAttemptId attemptId,
-      String host,int rpcport, String trackingurl) throws IOException {
-    
+      String host, int rpcport, String trackingurl) throws IOException {
+
   }
 
   public void onApplicationLaunched(ApplicationId id) throws IOException {
-    
+
   }
 
   /**
@@ -246,7 +245,8 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
    * @param attemptId attempt ID
    * @throws IOException problems
    */
-  public void onApplicationMasterRegistered(ApplicationAttemptId attemptId) throws IOException {
+  public void onApplicationMasterRegistered(ApplicationAttemptId attemptId) throws
+      IOException {
   }
 
   /**
@@ -291,7 +291,6 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   }
 
 
-
   /**
    * Actions to take when an application is completed
    * @param id  application  ID
@@ -334,7 +333,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
         id.toString(),
         PersistencePolicies.CONTAINER);
   }
-  
+
   /**
    * Policy to purge entries
    */
@@ -343,7 +342,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     FailOnChildren,
     SkipOnChildren
   }
-  
+
   /**
    * Queue an async operation to purge all matching records under a base path.
    * <ol>
@@ -377,7 +376,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
    *   <li>If a record matches then it is deleted without any child searches</li>
    *   <li>Deletions will be asynchronous if a callback is provided</li>
    * </ol>
-   * 
+   *
    * @param path base path
    * @param id ID for service record.id
    * @param persistencePolicyMatch ID for the persistence policy to match: no match, no delete.
@@ -408,9 +407,9 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     try {
       ServiceRecord serviceRecord = resolve(path);
       // there is now an entry here.
-      toDelete = serviceRecord.id.equals(id) 
-                 && (persistencePolicyMatch < 0 
-                     || serviceRecord.persistence == persistencePolicyMatch); 
+      toDelete = serviceRecord.id.equals(id)
+                 && (persistencePolicyMatch < 0
+                     || serviceRecord.persistence == persistencePolicyMatch);
     } catch (EOFException ignored) {
       // ignore
     } catch (InvalidRecordException ignored) {
@@ -438,8 +437,8 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     }
 
     int deleteOps = 0;
-    
-    if(toDelete) {
+
+    if (toDelete) {
       deleteOps++;
       zkDelete(path, true, callback);
     }
@@ -526,5 +525,5 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
 
     }
   }
-  
+
 }

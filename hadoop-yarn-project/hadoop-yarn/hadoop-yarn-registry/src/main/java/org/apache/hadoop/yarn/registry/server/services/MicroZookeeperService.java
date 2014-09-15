@@ -20,6 +20,8 @@ package org.apache.hadoop.yarn.registry.server.services;
 
 import com.google.common.base.Preconditions;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.service.AbstractService;
@@ -59,6 +61,7 @@ import java.net.UnknownHostException;
  * to its connection string. Any code with access to the service configuration
  * can view it.
  */
+@InterfaceStability.Evolving
 public class MicroZookeeperService
     extends AbstractService
     implements RegistryBindingSource, RegistryConstants {
