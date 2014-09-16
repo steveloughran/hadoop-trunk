@@ -28,6 +28,7 @@ import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.registry.RegistryTestHelper;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
+import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
 import org.apache.hadoop.yarn.registry.server.services.AddingCompositeService;
 import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperService;
 import org.junit.After;
@@ -101,6 +102,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   public TestName methodName = new TestName();
   protected MicroZookeeperService secureZK;
   protected static File jaasFile;
+  private LoginContext zookeeperLogin;
 
   /**
    * Create a secure instance
@@ -117,7 +119,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     File workDir = new File(testdir, name);
     workDir.mkdirs();
     System.setProperty(
-        RegistryConstants.ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE,
+        ZookeeperConfigOptions.ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE,
         "false");
     RegistrySecurity.validateContext(context);
     conf.set(RegistryConstants.KEY_ZKSERVICE_JAAS_CONTEXT, context);
@@ -165,6 +167,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     kdcWorkDir = new File(target, "kdc");
     kdcWorkDir.mkdirs();
     kdcConf = MiniKdc.createConf();
+    kdcConf.setProperty(MiniKdc.DEBUG, "true");
     kdc = new MiniKdc(kdcConf, kdcWorkDir);
     kdc.start();
 
@@ -256,6 +259,8 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
    */
   protected LoginContext login(String principal,
       String context, File keytab) throws LoginException {
+    LOG.info("Logging in as {} in context {} with keytab {}",
+        principal, context, keytab);
     String principalAndRealm = getPrincipalAndRealm(principal);
     Set<Principal> principals = new HashSet<Principal>();
     principals.add(new KerberosPrincipal(principal));
@@ -283,41 +288,32 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   @After
   public void stopSecureZK() {
     ServiceOperations.stop(secureZK);
+    secureZK = null;
+    logout(zookeeperLogin);
   }
 
 
   /**
    * Start the secure ZK instance using the test method name as the path.
    * As the entry is saved to the {@link #secureZK} field, it
-   * is automatically stopped after the test case
+   * is automatically stopped after the test case.
    * @throws Exception on any failure
    */
   protected void startSecureZK() throws Exception {
+    assertNull("Zookeeper is already running", secureZK);
+    
+    zookeeperLogin = login(ZOOKEEPER_LOCALHOST, ZOOKEEPER, keytab_zk);
     secureZK = createSecureZKInstance("test-" + methodName.getMethodName());
     secureZK.start();
   }
 
-  protected void logout(LoginContext login) {
-    if (login != null) {
-      try {
-        login.logout();
-      } catch (LoginException e) {
-        LOG.warn("Failure during logout: {}", e, e);
-
-      }
-    }
-  }
-
-  protected void logLoginDetails(String name,
-      LoginContext loginContext) {
-    Subject subject = loginContext.getSubject();
-    LOG.info("Logged in as {}:\n {}" , name, subject);
-  }
-
   /**
-   * Exec ktutil and list things. This may not be on the classpath
-   * @param keytab
-   * @throws IOException
+   * Exec the native <code>ktutil</code> to list the keys
+   * (primarily to verify that the generated keytabs are compatible).
+   * This operation is not executed on windows. On other platforms
+   * it requires <code>ktutil</code> to be installed and on the path
+   * @param keytab keytab to list
+   * @throws IOException on any execution problem.
    */
   protected void ktList(File keytab) throws IOException {
     // ktutil --keytab=target/kdc/zookeeper.keytab list --keys

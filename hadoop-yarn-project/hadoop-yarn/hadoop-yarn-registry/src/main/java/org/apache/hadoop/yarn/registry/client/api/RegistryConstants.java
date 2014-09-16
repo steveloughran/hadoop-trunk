@@ -20,7 +20,7 @@ package org.apache.hadoop.yarn.registry.client.api;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
+import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
 import org.apache.zookeeper.ZooDefs;
 
 /**
@@ -81,9 +81,9 @@ public interface RegistryConstants {
   /**
    * The default ZK session timeout: {@value}
    */
-  int DEFAULT_ZK_SESSION_TIMEOUT = 20000;
+  int DEFAULT_ZK_SESSION_TIMEOUT = 60000;
   /**
-   * The default ZK session timeout: {@value}
+   * The default ZK connection timeout: {@value}
    */
   int DEFAULT_ZK_CONNECTION_TIMEOUT = 15000;
   /**
@@ -98,6 +98,10 @@ public interface RegistryConstants {
    * Default limit on retries: {@value}
    */
   int DEFAULT_ZK_RETRY_CEILING = 5;
+
+  /**
+   * Default root of the yarn registry: {@value}
+   */
   String DEFAULT_REGISTRY_ROOT = "/yarnRegistry";
   
   /**
@@ -255,19 +259,4 @@ public interface RegistryConstants {
    */
   int PERMISSIONS_REGISTRY_USER = ZooDefs.Perms.ALL;
 
-  /**
-   * This is a property which must be set to enable secure clients
-   */
-  String SYSPROP_ZOOKEEPER_SASL_CLIENT = "zookeeper.sasl.client";
-
-
-  /**
-   * Set this to the <i>short</i> name of the client
-   */
-  String ZK_SASL_CLIENT_USERNAME = "zookeeper.sasl.client.username";
-
-  /**
-   * Should ZK downgrade on an auth failure?
-   */
-  String ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE ="zookeeper.maintain_connection_despite_sasl_failure";
 }

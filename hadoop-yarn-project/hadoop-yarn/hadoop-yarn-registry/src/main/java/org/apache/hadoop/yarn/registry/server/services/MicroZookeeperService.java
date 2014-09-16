@@ -29,6 +29,7 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.services.BindingInformation;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
+import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
 import org.apache.zookeeper.Environment;
 import org.apache.zookeeper.server.ServerCnxnFactory;
 import org.apache.zookeeper.server.ZooKeeperServer;
@@ -147,17 +148,22 @@ public class MicroZookeeperService
     confDir = new File(instanceDir, "conf");
     dataDir.mkdirs();
     confDir.mkdirs();
-    setupSecurity();
+
     super.serviceInit(conf);
   }
 
+  /**
+   * Add a formatted string to the diagnostics
+   * @param text
+   * @param args
+   */
   protected void addDiagnostics(String text, Object ... args) {
     diagnostics.append(String.format(text, args)).append('\n');
   }
 
   /**
    * Get the diagnostics info
-   * @return
+   * @return the diagnostics string built up
    */
   public String getDiagnostics() {
     return diagnostics.toString();
@@ -177,7 +183,7 @@ public class MicroZookeeperService
     if (secureServer) {
       RegistrySecurity.validateContext(jaasContext);
       security.bindZKToServerJAASContext(jaasContext);
-      addDiagnostics("jaasContext for=%s Jaas File Sysprop=%s",
+      addDiagnostics("jaasContext is=%s in Jaas File=%s",
           jaasContext,
           System.getProperty(Environment.JAAS_CONF_KEY));
       return true;
@@ -195,10 +201,11 @@ public class MicroZookeeperService
   @Override
   protected void serviceStart() throws Exception {
 
+    setupSecurity();
     if (secureServer) {
-      System.setProperty("zookeeper.allowSaslFailedClients", "false");
-//      LOG.debug("Setting auth provider " + SASL_AUTH_PROVIDER);
-//      System.setProperty("zookeeper.authProvider.1", SASL_AUTH_PROVIDER);
+      System.setProperty(ZookeeperConfigOptions.ZK_ALLOW_FAILED_SASL_CLIENTS,
+          "false");
+
     }
     ZooKeeperServer zkServer = new ZooKeeperServer();
     FileTxnSnapLog ftxn = new FileTxnSnapLog(dataDir, dataDir);
@@ -211,7 +218,8 @@ public class MicroZookeeperService
     factory.startup(zkServer);
 
     String connectString = getConnectionString();
-    LOG.info("In memory ZK started: {}", connectString);
+    LOG.info("In memory ZK started at {}\n", connectString);
+    
     if (LOG.isDebugEnabled()) {
       StringWriter sw = new StringWriter();
       PrintWriter pw = new PrintWriter(sw);
