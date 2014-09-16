@@ -38,7 +38,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.security.auth.login.AppConfigurationEntry;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -261,7 +260,7 @@ public class RegistrySecurity {
   public static void setZKSaslClientProperties(String username,
       String context) {
     RegistrySecurity.validateContext(context);
-    System.setProperty(ZK_SASL_CLIENT_USERNAME, username);
+    System.setProperty(ZookeeperConfigOptions.ZK_SASL_CLIENT_USERNAME, username);
     System.setProperty(ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY, "true");
     System.setProperty(ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY, context);
   }
@@ -272,7 +271,7 @@ public class RegistrySecurity {
   public static void clearZKSaslProperties() {
     System.clearProperty(ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY);
     System.clearProperty(ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY);
-    System.clearProperty(ZK_SASL_CLIENT_USERNAME);
+    System.clearProperty(ZookeeperConfigOptions.ZK_SASL_CLIENT_USERNAME);
 
   }
 

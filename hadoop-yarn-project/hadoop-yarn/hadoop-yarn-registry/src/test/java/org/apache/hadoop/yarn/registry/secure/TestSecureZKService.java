@@ -19,6 +19,8 @@
 package org.apache.hadoop.yarn.registry.secure;
 
 
+import com.sun.security.auth.module.Krb5LoginModule;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.client.exceptions.AuthenticationFailedException;
@@ -27,6 +29,7 @@ import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
+import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
@@ -36,7 +39,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.security.auth.login.LoginContext;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import javax.security.auth.Subject;
 
 /**
  * Verify that the Mini ZK service can be started up securely
@@ -47,11 +57,42 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
 
   @Before
   public void enableSasl() throws Throwable {
-    System.setProperty(SYSPROP_ZOOKEEPER_SASL_CLIENT, "true");
+    System.setProperty(ZookeeperConfigOptions.ZK_ENABLE_SASL_CLIENT, "true");
   }
 
   @Test
+  public void testKerberosAuth() throws Throwable {
+    // here to work out what is up with the mini KDC
+    System.setProperty("sun.security.krb5.debug", "true");
+    File krb5conf = getKdc().getKrb5conf();
+    String krbConfig = FileUtils.readFileToString(krb5conf);
+    LOG.info("krb5.conf at {}:\n{}", krb5conf, krbConfig);
+    Subject subject = new Subject();
+
+    final Krb5LoginModule krb5LoginModule = new Krb5LoginModule();
+    final Map<String, String> options = new HashMap<String, String>();
+    options.put("keyTab", keytab_alice.getAbsolutePath());
+    options.put("principal", ALICE_LOCALHOST);
+    options.put("doNotPrompt", "true");
+    options.put("refreshKrb5Config", "true");
+    options.put("useTicketCache", "true");
+    options.put("renewTGT", "true");
+    options.put("useKeyTab", "true");
+    options.put("storeKey", "true");
+    options.put("isInitiator", "true");
+    options.put("debug", "true");
+
+    krb5LoginModule.initialize(subject, null, 
+        new HashMap<String, String>(),
+        options);
+
+    boolean loginOk = krb5LoginModule.login();
+//    boolean commitOk = krb5LoginModule.commit();
+  }
+  
+  @Test
   public void testCreateSecureZK() throws Throwable {
+
     startSecureZK();
     secureZK.stop();
   }

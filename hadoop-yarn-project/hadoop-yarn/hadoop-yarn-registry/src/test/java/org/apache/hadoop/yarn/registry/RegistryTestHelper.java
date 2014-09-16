@@ -26,11 +26,15 @@ import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import org.apache.hadoop.yarn.registry.secure.AbstractSecureRegistryTest;
 import org.apache.zookeeper.common.PathUtils;
 import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.security.auth.Subject;
+import javax.security.auth.login.LoginContext;
+import javax.security.auth.login.LoginException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -87,6 +91,18 @@ public class RegistryTestHelper extends Assert {
     if (StringUtils.isEmpty(check)) {
       fail("Empty string");
     }
+  }
+
+  /**
+   * Log the details of a login context
+   * @param name name to assert that the user is logged in as
+   * @param loginContext the login context
+   */
+  public static void logLoginDetails(String name,
+      LoginContext loginContext) {
+    assertNotNull("Null login context", loginContext);
+    Subject subject = loginContext.getSubject();
+    LOG.info("Logged in as {}:\n {}", name, subject);
   }
 
   /**
@@ -251,5 +267,20 @@ public class RegistryTestHelper extends Assert {
     log.info("\n=======================================");
     log.info(text, args);
     log.info("=======================================\n");
+  }
+
+
+  /**
+   * log out from a context if non-null ... exceptions are caught and logged
+   * @param login login context
+   */
+  public static void logout(LoginContext login) {
+    try {
+      if (login != null) {
+        login.logout();
+      }
+    } catch (LoginException e) {
+      LOG.warn("Exception logging out: {}", e, e);
+    }
   }
 }
