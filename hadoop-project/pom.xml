@@ -73,7 +73,6 @@
     <zookeeper.version>3.4.6</zookeeper.version>
 
     <tomcat.version>6.0.41</tomcat.version>
-    <curator.version>2.4.1</curator.version>
   </properties>
 
   <dependencyManagement>
@@ -895,18 +894,6 @@
        <artifactId>curator-test</artifactId>
        <version>2.6.0</version>
      </dependency>
-      
-      <dependency>
-        <groupId>org.apache.curator</groupId>
-        <artifactId>curator-framework</artifactId>
-        <version>${curator.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.curator</groupId>
-        <artifactId>curator-test</artifactId>
-        <version>${curator.version}</version>
-      </dependency>
 
       <dependency>
         <groupId>org.skyscreamer</groupId>
