@@ -70,14 +70,21 @@ public class RegistrySecurity {
    * Implemented as copy-on-write, so can be extended without
    * impact on other uses.
    */
-  public static List<ACL> WorldReadOwnerWriteACL;
+  public static final List<ACL> WorldReadOwnerWriteACL;
+  public static final List<ACL> WorldReadWriteACL;
   static {
     List<ACL> acls =  new ArrayList<ACL>();
 //    acls.add(new ACL(PERMISSIONS_REGISTRY_USER, ZooDefs.Ids.AUTH_IDS));
     acls.add(new ACL(ZooDefs.Perms.READ, ZooDefs.Ids.ANYONE_ID_UNSAFE));
 
     WorldReadOwnerWriteACL = new CopyOnWriteArrayList<ACL>(acls);
+
+    List<ACL> acls2 = new ArrayList<ACL>();
+    acls2.add(new ACL(ZooDefs.Perms.ALL, ZooDefs.Ids.ANYONE_ID_UNSAFE));
+    WorldReadWriteACL = new CopyOnWriteArrayList<ACL>(acls2);
   }
+  
+  
 
   /**
    * Create an instance with no password
@@ -158,11 +165,11 @@ public class RegistrySecurity {
    * @param domain domain to add
    * @return the ID.
    */
-  public Id parse(String a, String domain) {
+  public Id parse(String a, String domain) throws IOException {
     int firstColon = a.indexOf(':');
     int lastColon = a.lastIndexOf(':');
     if (firstColon == -1 || lastColon == -1 || firstColon != lastColon) {
-      throw new ZKUtil.BadAclFormatException(
+      throw new IOException(
           "ACL '" + a + "' not of expected form scheme:id");
     }
     String scheme = a.substring(0, firstColon);
@@ -185,7 +192,8 @@ public class RegistrySecurity {
    * @param perms permissions
    * @return the relevant ACLs
    */
-  public List<ACL> parseIds(String idString, String realm, int perms) {
+  public List<ACL> parseIds(String idString, String realm, int perms) throws
+      IOException {
     List<String> aclPairs = splitAclPairs(idString);
     List<ACL> ids = new ArrayList<ACL>(aclPairs.size());
     for (String aclPair : aclPairs) {
@@ -198,6 +206,21 @@ public class RegistrySecurity {
   }
 
 
+  /**
+   * Parse an ACL list. This includes configuration indirection
+   * {@link ZKUtil#resolveConfIndirection(String)}
+   * @param zkAclConf configuration string
+   * @return an ACL list
+   * @throws IOException on a bad ACL parse
+   */
+  public List<ACL> parseACLs(String zkAclConf) throws IOException {
+    try {
+      return ZKUtil.parseACLs(ZKUtil.resolveConfIndirection(zkAclConf));
+    } catch (ZKUtil.BadAclFormatException e) {
+      throw new IOException("Parsing " + zkAclConf + " :" + e, e);
+    }
+  }
+  
   /**
    * JAAS template: {@value}
    * Note the semicolon on the last entry
@@ -348,18 +371,17 @@ public class RegistrySecurity {
     }
   }
 
-  /**
-   * Log a list of ACLs at INFO
-   * @param acls ACL list ... can be null
-   */
-  public void logACLs(List<ACL> acls) {
+  public static String aclsToString(List<ACL> acls) {
+    StringBuilder builder = new StringBuilder();
     if (acls == null) {
-      LOG.info("Null ACL list");
+      builder.append("null ACL");
     } else {
-      for (ACL acl : acls) {
-        LOG.info("{}", acl.toString());
+      builder.append('\n');
+      for (ACL acl1 : acls) {
+        builder.append(acl1.toString()).append(" ");
       }
     }
+    return builder.toString();
   }
 
   /**

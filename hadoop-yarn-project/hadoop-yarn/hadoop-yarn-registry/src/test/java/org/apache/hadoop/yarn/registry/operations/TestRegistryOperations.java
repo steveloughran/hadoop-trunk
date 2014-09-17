@@ -171,7 +171,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   }
 
   @Test
-  public void testStatPathThatHasNoEntry() throws Throwable {
+  public void testStatDirectory() throws Throwable {
     String empty = "/empty";
     operations.mkdir(empty, false);
     RegistryPathStatus stat = operations.stat(empty);
@@ -179,6 +179,19 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   
   @Test
   public void testStatRootPath() throws Throwable {
+    operations.mkdir("/", false);
+    RegistryPathStatus stat = operations.stat("/");
+  }
+  
+  @Test
+  public void testStatOneLevelDown() throws Throwable {
+    operations.mkdir("/subdir", true);
+    RegistryPathStatus stat = operations.stat("/subdir");
+  }
+  
+  
+  @Test
+  public void testLsRootPath() throws Throwable {
     String empty = "/";
     operations.mkdir(empty, false);
     RegistryPathStatus stat = operations.stat(empty);
@@ -428,7 +441,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   
 
   @Test
-  public void testPutGetEphemeralServiceEntry() throws Throwable {
+  public void testPutGetContainerPersistenceServiceEntry() throws Throwable {
 
     String path = ENTRY_PATH;
     ServiceRecord written = buildExampleServiceEntry(

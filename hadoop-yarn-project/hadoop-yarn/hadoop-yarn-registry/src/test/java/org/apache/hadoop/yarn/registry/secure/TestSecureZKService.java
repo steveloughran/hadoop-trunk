@@ -27,7 +27,6 @@ import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
-import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
@@ -71,8 +70,9 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
     curatorService.init(new Configuration());
     curatorService.start();
     LOG.info(curatorService.toString());
-    curatorService.zkMkPath("", CreateMode.PERSISTENT);
     curatorService.zkList("/");
+    curatorService.zkMkPath("", CreateMode.PERSISTENT, false,
+        RegistrySecurity.WorldReadWriteACL);
   }
 
   @Test
@@ -89,7 +89,8 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
     LOG.info("Started curator client {}", curatorService);
     curatorService.zkStat("");
     try {
-      curatorService.zkMkPath("", CreateMode.PERSISTENT);
+      curatorService.zkMkPath("", CreateMode.PERSISTENT, false,
+          RegistrySecurity.WorldReadWriteACL);
       fail("expected to be unauthenticated, but was allowed write access" +
            " with binding " + curatorService);
     } catch (AuthenticationFailedException expected) {
@@ -181,7 +182,7 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
       Stat stat = alice.zkStat("/alice");
       LOG.info("stat /alice = {}", stat);
       List<ACL> acls = alice.zkGetACLS("/alice");
-      registrySecurity.logACLs(acls);
+      LOG.info(RegistrySecurity.aclsToString(acls));
     } finally {
       ServiceOperations.stop(alice);
       aliceLogin.logout();

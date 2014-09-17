@@ -23,9 +23,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.server.services.AddingCompositeService;
 import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperService;
 import org.apache.zookeeper.common.PathUtils;
+import org.apache.zookeeper.data.ACL;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -38,6 +40,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 public class AbstractZKRegistryTest extends RegistryTestHelper {
   private static final Logger LOG =

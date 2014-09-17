@@ -153,7 +153,6 @@ public class CuratorService extends CompositeService
    */
   @Override
   protected void serviceStart() throws Exception {
-    rootACL = buildRootACL();
     curator = createCurator();
     super.serviceStart();
   }
@@ -188,24 +187,6 @@ public class CuratorService extends CompositeService
   }
 
   /**
-   * Override point: build the root acl
-   *
-   * @return the ACL
-   * @throws IOException any bind/parse problem
-   */
-  protected List<ACL> buildRootACL() throws IOException {
-    return buildACLs(KEY_REGISTRY_ZK_ACL, DEFAULT_REGISTRY_ROOT_PERMISSIONS);
-  }
-
-  protected List<ACL> getRootACL() {
-    return rootACL;
-  }
-
-  protected void setRootACL(List<ACL> rootACL) {
-    this.rootACL = rootACL;
-  }
-
-  /**
    * Get the ACLs defined in the config key for this service, or
    * the default
    * @param confKey configuration key
@@ -226,11 +207,9 @@ public class CuratorService extends CompositeService
    * @param zkAclConf configuration string
    * @return an ACL list
    * @throws IOException
-   * @throws ZKUtil.BadAclFormatException on a bad ACL parse
    */
-  public List<ACL> parseACLs(String zkAclConf) throws IOException,
-      ZKUtil.BadAclFormatException {
-    return ZKUtil.parseACLs(ZKUtil.resolveConfIndirection(zkAclConf));
+  public List<ACL> parseACLs(String zkAclConf) throws IOException {
+    return registrySecurity.parseACLs(zkAclConf);
   }
 
   /**
@@ -388,7 +367,7 @@ public class CuratorService extends CompositeService
     protected IOException operationFailure (String path,
         String operation,
         Exception exception,
-        List < ACL > acl){
+        List < ACL > acls){
     IOException ioe;
     if (exception instanceof KeeperException.NoNodeException) {
       ioe = new PathNotFoundException(path);
@@ -409,15 +388,8 @@ public class CuratorService extends CompositeService
       // this is a security exception of a kind
       // include the ACLs to help the diagnostics
       StringBuilder builder = new StringBuilder();
-      builder.append(path).append(" ");
-      if (acl==null) {
-        builder.append("null ACL");
-      } else {
-        builder.append('\n');
-        for (ACL acl1 : acl) {
-          builder.append(acl1.toString()).append(" ");
-        }
-      }
+      builder.append(path).append(" ").
+          append(RegistrySecurity.aclsToString(acls));
       ioe = new PathPermissionException(builder.toString());
     } else {
       ioe = new RegistryIOException(path,
@@ -536,16 +508,6 @@ public class CuratorService extends CompositeService
   public String zkPathMustExist(String path) throws IOException {
     zkStat(path);
     return path;
-  }
-
-  /**
-   * Create a path
-   * @param path path to create
-   * @param mode mode for path
-   * @throws IOException
-   */
-  public void zkMkPath(String path, CreateMode mode) throws IOException {
-    zkMkPath(path, mode, false, rootACL);
   }
 
   /**
