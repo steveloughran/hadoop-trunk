@@ -20,7 +20,6 @@ package org.apache.hadoop.yarn.registry.client.api;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
 import org.apache.zookeeper.ZooDefs;
 
 /**
@@ -48,7 +47,7 @@ public interface RegistryConstants {
   /**
    * The default permissions for the registry root: {@value}
    */
-  String DEFAULT_REGISTRY_ROOT_PERMISSIONS = "world:anyone:rwcda";
+  String WORLD_ANYONE_RWCDA = "world:anyone:rwcda";
 
   /**
    * System accounts for the registry: {@value}. 
@@ -61,22 +60,6 @@ public interface RegistryConstants {
    * instructs the registry to append the kerberos domain.
    */
   String DEFAULT_REGISTRY_SYSTEM_ACCESS = "hadoop,yarn,mapred";
-
-  /**
-   * IPv4 address permissions for world readability
-   */
-  String SCHEME_IP_WORLD_READABLE = "ip:0.0.0.0/32";
-
-  /**
-   * System accounts for the registry: {@value}. 
-   */
-  String KEY_REGISTRY_PUBLIC_ACCESS = REGISTRY_PREFIX + "public.access";
-
-  /**
-   * default accounts for the public access to the registry: {@value}. 
-   */
-  String DEFAULT_REGISTRY_PUBLIC_ACCESS = SCHEME_IP_WORLD_READABLE;
-
 
   /**
    * The default ZK session timeout: {@value}

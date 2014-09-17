@@ -87,8 +87,12 @@ public class RegistryOperationsService extends CuratorService
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
     // if a secure cluster, switch to the security settings of this user
-    
-    userAcl = RegistrySecurity.WorldReadOwnerWriteACL;
+
+    if (isSecure()) {
+      setUserAcl(RegistrySecurity.WorldReadOwnerWriteACL);
+    } else {
+      setUserAcl(RegistrySecurity.WorldReadWriteACL);
+    }
   }
 
   public List<ACL> getUserAcl() {

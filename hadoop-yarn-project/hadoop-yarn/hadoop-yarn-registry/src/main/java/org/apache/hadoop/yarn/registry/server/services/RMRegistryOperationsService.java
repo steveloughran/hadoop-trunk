@@ -94,11 +94,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
 
     UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
     String yarnUserName = currentUser.getUserName();
-    String publicUsers =
-        conf.get(KEY_REGISTRY_PUBLIC_ACCESS, DEFAULT_REGISTRY_PUBLIC_ACCESS);
-    setUserAcl(security.parseIds(publicUsers, "", PERMISSIONS_REGISTRY_USER));
 
-    parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_USERS);
     executor = Executors.newCachedThreadPool(
         new ThreadFactory() {
           AtomicInteger counter = new AtomicInteger(1);
@@ -163,12 +159,20 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     // create the root directories
     rootRegistryACL = buildACLs(KEY_REGISTRY_ZK_ACL,
         RegistrySecurity.PERMISSIONS_REGISTRY_ROOT);
+    LOG.info("Root Registry ACLs {}", 
+        RegistrySecurity.aclsToString(rootRegistryACL));
+
     maybeCreate("", CreateMode.PERSISTENT, rootRegistryACL, false);
 
+    List<ACL> userDirACLs = parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_USERS);
+    LOG.info(PATH_USERS+ " ACLs {}", RegistrySecurity.aclsToString(userDirACLs));
     maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
-        parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_USERS), false);
+        userDirACLs, false);
+    List<ACL> systemDirACLs = parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_SYSTEM);
+    LOG.info(PATH_SYSTEM_SERVICES + " ACLs {}",
+        RegistrySecurity.aclsToString(systemDirACLs));
     maybeCreate(PATH_SYSTEM_SERVICES, CreateMode.PERSISTENT,
-        parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_SYSTEM), false);
+        systemDirACLs, false);
   }
 
 

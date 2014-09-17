@@ -69,11 +69,7 @@ public class TestCuratorService extends AbstractZKRegistryTest {
     curatorService = new CuratorService("curatorService");
     curatorService.init(createRegistryConfiguration());
     curatorService.start();
-    rootACL = curatorService.buildACLs(RegistryConstants.KEY_REGISTRY_ZK_ACL,
-        "world:anyone:rwcda");
-    List<ACL> rootACL = curatorService.buildACLs(
-        RegistryConstants.KEY_REGISTRY_ZK_ACL,
-        RegistrySecurity.PERMISSIONS_REGISTRY_ROOT);
+    rootACL = RegistrySecurity.WorldReadWriteACL; 
     curatorService.maybeCreate("", CreateMode.PERSISTENT, rootACL, true);
   }
   
@@ -116,7 +112,8 @@ public class TestCuratorService extends AbstractZKRegistryTest {
   }
 
   private void mkPath(String path, CreateMode mode) throws IOException {
-    curatorService.zkMkPath(path, mode);
+    curatorService.zkMkPath(path, mode, false,
+        RegistrySecurity.WorldReadWriteACL);
   }
 
   public void pathMustExist(String path) throws IOException {
