@@ -241,6 +241,13 @@ public interface RegistryConstants {
    */
   String KEY_ZKSERVICE_DIR = ZK_PREFIX + ".dir";
 
+  
+  /**
+   * Directory containing data: {@value}
+   */
+  String KEY_ZKSERVICE_ALLOW_FAILED_SASL_CLIENTS =
+      ZK_PREFIX + ".allow.failed.sasl.clients";
+
 
   /**
    * Permissions for readers: {@value}.
@@ -259,9 +266,5 @@ public interface RegistryConstants {
   int PERMISSIONS_REGISTRY_USER_ROOT =
       ZooDefs.Perms.READ | ZooDefs.Perms.WRITE | ZooDefs.Perms.CREATE |
       ZooDefs.Perms.DELETE;
-  /**
-   * Permissions for any other user entry. Full access
-   */
-  int PERMISSIONS_REGISTRY_USER = ZooDefs.Perms.ALL;
 
 }

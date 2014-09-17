@@ -388,8 +388,10 @@ public class CuratorService extends CompositeService
       // this is a security exception of a kind
       // include the ACLs to help the diagnostics
       StringBuilder builder = new StringBuilder();
-      builder.append(path).append(" ").
+      builder.append(path).append(" [").
           append(RegistrySecurity.aclsToString(acls));
+      builder.append("]");
+      builder.append(securityConnectionDiagnostics);
       ioe = new PathPermissionException(builder.toString());
     } else {
       ioe = new RegistryIOException(path,

@@ -36,17 +36,23 @@ import org.apache.zookeeper.server.auth.DigestAuthenticationProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.security.auth.Subject;
+import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.login.AppConfigurationEntry;
+import javax.security.auth.login.LoginContext;
+import javax.security.auth.login.LoginException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
+import java.security.Principal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 import static org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions.*;
 import static org.apache.zookeeper.client.ZooKeeperSaslClient.*;
 /**
@@ -65,26 +71,15 @@ public class RegistrySecurity {
   private final String idPassword;
   private String domain;
 
-  /**
-   * Special ACL: world readable, but only the owner can write.
-   * Implemented as copy-on-write, so can be extended without
-   * impact on other uses.
-   */
-  public static final List<ACL> WorldReadOwnerWriteACL;
   public static final List<ACL> WorldReadWriteACL;
+
   static {
-    List<ACL> acls =  new ArrayList<ACL>();
-//    acls.add(new ACL(PERMISSIONS_REGISTRY_USER, ZooDefs.Ids.AUTH_IDS));
-    acls.add(new ACL(ZooDefs.Perms.READ, ZooDefs.Ids.ANYONE_ID_UNSAFE));
+    List<ACL> acls = new ArrayList<ACL>();
+    acls.add(new ACL(ZooDefs.Perms.ALL, ZooDefs.Ids.ANYONE_ID_UNSAFE));
+    WorldReadWriteACL = new CopyOnWriteArrayList<ACL>(acls);
 
-    WorldReadOwnerWriteACL = new CopyOnWriteArrayList<ACL>(acls);
-
-    List<ACL> acls2 = new ArrayList<ACL>();
-    acls2.add(new ACL(ZooDefs.Perms.ALL, ZooDefs.Ids.ANYONE_ID_UNSAFE));
-    WorldReadWriteACL = new CopyOnWriteArrayList<ACL>(acls2);
   }
-  
-  
+
 
   /**
    * Create an instance with no password
@@ -102,8 +97,6 @@ public class RegistrySecurity {
   public RegistrySecurity(Configuration conf, String idPassword) throws
       IOException {
     this.conf = conf;
-    
-    
     
     this.idPassword = idPassword;
     if (!StringUtils.isEmpty(idPassword)) {
@@ -279,8 +272,7 @@ public class RegistrySecurity {
   }
 
   public static void bindZKToServerJAASContext(String contextName) {
-    System.setProperty(ZooKeeperSaslServer.LOGIN_CONTEXT_NAME_KEY,
-        contextName);
+    System.setProperty(ZK_SASL_SERVER_CONTEXT, contextName);
   }
 
   /**
@@ -371,6 +363,17 @@ public class RegistrySecurity {
     }
   }
 
+  public ACL buildOwnerWriteACL(String principal) {
+    // this is oly valid on a secure cluster
+    // todo
+    return null;
+  }
+  
+  /**
+   * Stringify a list of ACLs for logging
+   * @param acls ACL list
+   * @return a string for logs, exceptions, ...
+   */
   public static String aclsToString(List<ACL> acls) {
     StringBuilder builder = new StringBuilder();
     if (acls == null) {
@@ -415,4 +418,6 @@ public class RegistrySecurity {
   private static String describeProperty(String name, String def) {
     return "; " + name + "=" + System.getProperty(name, def);
   }
+
+
 }

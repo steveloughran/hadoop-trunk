@@ -177,19 +177,21 @@ public class MicroZookeeperService
    */
   protected boolean setupSecurity() throws IOException {
     Configuration conf = getConfig();
-    RegistrySecurity security = new RegistrySecurity(conf, "");
     String jaasContext = conf.getTrimmed(KEY_ZKSERVICE_JAAS_CONTEXT);
     secureServer = StringUtils.isNotEmpty(jaasContext);
     if (secureServer) {
       RegistrySecurity.validateContext(jaasContext);
-      security.bindZKToServerJAASContext(jaasContext);
-      addDiagnostics("jaasContext is=%s in Jaas File=%s",
-          jaasContext,
-          System.getProperty(Environment.JAAS_CONF_KEY));
+      RegistrySecurity.bindZKToServerJAASContext(jaasContext);
+      // policy on failed auth
+      System.setProperty(ZookeeperConfigOptions.ZK_ALLOW_FAILED_SASL_CLIENTS,
+          conf.get(KEY_ZKSERVICE_ALLOW_FAILED_SASL_CLIENTS, "true"));
+      addDiagnostics(new RegistrySecurity(conf).buildSecurityDiagnostics());
+      String serverContext =
+          System.getProperty(ZookeeperConfigOptions.ZK_SASL_SERVER_CONTEXT);
+      addDiagnostics("Server JAAS context s = %s",jaasContext);
       return true;
     } else {
       return false;
-
     }
   }
 
@@ -202,11 +204,7 @@ public class MicroZookeeperService
   protected void serviceStart() throws Exception {
 
     setupSecurity();
-    if (secureServer) {
-      System.setProperty(ZookeeperConfigOptions.ZK_ALLOW_FAILED_SASL_CLIENTS,
-          "false");
 
-    }
     ZooKeeperServer zkServer = new ZooKeeperServer();
     FileTxnSnapLog ftxn = new FileTxnSnapLog(dataDir, dataDir);
     zkServer.setTxnLogFactory(ftxn);
