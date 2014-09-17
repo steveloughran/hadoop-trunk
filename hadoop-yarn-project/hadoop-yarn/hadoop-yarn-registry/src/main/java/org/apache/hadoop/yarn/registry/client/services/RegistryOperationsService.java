@@ -57,7 +57,7 @@ import java.util.List;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class RegistryOperationsService extends CuratorService 
-  implements RegistryOperations{
+  implements RegistryOperations {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistryOperationsService.class);
@@ -84,7 +84,7 @@ public class RegistryOperationsService extends CuratorService
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
     // if a secure cluster, switch to the security settings of this user
-
+    
     if (isSecure()) {
       setUserAcl(RegistrySecurity.WorldReadWriteACL);
     } else {

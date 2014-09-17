@@ -166,8 +166,21 @@ public class CuratorService extends CompositeService
     super.serviceStop();
   }
 
+  /**
+   * Flag to indicate whether or not the registry is secure.
+   * Valid once the service is inited.
+   * @return service security policy
+   */
   public boolean isSecure() {
     return secure;
+  }
+
+  /**
+   * Get the registry security helper
+   * @return the registry security helper
+   */
+  protected RegistrySecurity getRegistrySecurity() {
+    return registrySecurity;
   }
 
   /**
