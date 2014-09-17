@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry.client.services.zk;
 
 import org.apache.zookeeper.client.ZooKeeperSaslClient;
+import org.apache.zookeeper.server.ZooKeeperSaslServer;
 
 /**
  * Some ZK-internal configuration options which 
@@ -37,6 +38,11 @@ public interface ZookeeperConfigOptions {
    * Set this to the <i>short</i> name of the client
    */
   String ZK_SASL_CLIENT_USERNAME = "zookeeper.sasl.client.username";
+
+  /**
+   * Set this to the <i>short</i> name of the client
+   */
+  String ZK_SASL_SERVER_CONTEXT = ZooKeeperSaslServer.LOGIN_CONTEXT_NAME_KEY;
 
   /**
    * Should ZK downgrade on an auth failure?

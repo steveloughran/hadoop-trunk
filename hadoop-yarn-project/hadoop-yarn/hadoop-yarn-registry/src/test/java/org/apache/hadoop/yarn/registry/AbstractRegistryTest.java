@@ -47,12 +47,12 @@ public class AbstractRegistryTest extends AbstractZKRegistryTest {
   @Before
   public void setupRegistry() throws IOException {
     registry = new RMRegistryOperationsService("yarnRegistry");
+    operations = registry;
     registry.init(createRegistryConfiguration());
     registry.start();
+    operations.delete("/", true);
     registry.createRootRegistryPaths();
     addToTeardown(registry);
-    operations = registry;
-    operations.delete(ENTRY_PATH, true);
   }
 
 

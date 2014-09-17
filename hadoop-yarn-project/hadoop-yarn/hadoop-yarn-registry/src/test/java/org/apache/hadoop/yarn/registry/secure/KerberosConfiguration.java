@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.registry.secure;
 
+import org.apache.hadoop.security.authentication.util.KerberosUtil;
+
 import javax.security.auth.login.AppConfigurationEntry;
 import java.io.File;
 import java.util.HashMap;
@@ -47,12 +49,6 @@ class KerberosConfiguration extends javax.security.auth.login.Configuration {
     return new KerberosConfiguration(principal, keytab, false);
   }
 
-  private static String getKrb5LoginModuleName() {
-    return System.getProperty("java.vendor").contains("IBM")
-           ? "com.ibm.security.auth.module.Krb5LoginModule"
-           : "com.sun.security.auth.module.Krb5LoginModule";
-  }
-
   @Override
   public AppConfigurationEntry[] getAppConfigurationEntry(String name) {
     Map<String, String> options = new HashMap<String, String>();
@@ -72,7 +68,7 @@ class KerberosConfiguration extends javax.security.auth.login.Configuration {
     options.put("debug", "true");
 
     return new AppConfigurationEntry[]{
-        new AppConfigurationEntry(getKrb5LoginModuleName(),
+        new AppConfigurationEntry(KerberosUtil.getKrb5LoginModuleName(),
             AppConfigurationEntry.LoginModuleControlFlag.REQUIRED,
             options)
     };

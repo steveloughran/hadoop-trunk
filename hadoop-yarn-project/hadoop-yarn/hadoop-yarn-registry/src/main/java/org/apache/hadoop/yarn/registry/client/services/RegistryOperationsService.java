@@ -29,8 +29,6 @@ import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
-
 import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils.*;
 
@@ -42,7 +40,6 @@ import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -89,7 +86,7 @@ public class RegistryOperationsService extends CuratorService
     // if a secure cluster, switch to the security settings of this user
 
     if (isSecure()) {
-      setUserAcl(RegistrySecurity.WorldReadOwnerWriteACL);
+      setUserAcl(RegistrySecurity.WorldReadWriteACL);
     } else {
       setUserAcl(RegistrySecurity.WorldReadWriteACL);
     }

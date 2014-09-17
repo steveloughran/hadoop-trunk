@@ -139,9 +139,8 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   
   @Test
   public void testDoubleMkdir() throws Throwable {
-
     operations.mkdir(USERPATH, false);
-    String path = USERPATH +"newentry";
+    String path = USERPATH + "newentry";
     assertTrue(operations.mkdir(path, false));
     RegistryPathStatus stat = operations.stat(path);
     assertFalse(operations.mkdir(path, false));

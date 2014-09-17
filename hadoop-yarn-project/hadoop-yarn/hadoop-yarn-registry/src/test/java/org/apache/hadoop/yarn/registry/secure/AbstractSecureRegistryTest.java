@@ -140,7 +140,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   public void beforeSecureRegistryTest() {
     enableKerberosDebugging();
     resetJaasConfKeys();
-    registrySecurity.bindJVMtoJAASFile(jaasFile);
+    RegistrySecurity.bindJVMtoJAASFile(jaasFile);
     initHadoopSecurity();
   }
 
@@ -197,7 +197,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
 
     jaasFile = new File(kdcWorkDir, "jaas.txt");
     FileUtils.write(jaasFile, jaas.toString());
-    registrySecurity.bindJVMtoJAASFile(jaasFile);
+    RegistrySecurity.bindJVMtoJAASFile(jaasFile);
     LOG.info(jaas.toString());
   }
 
@@ -293,7 +293,6 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
       String context, File keytab) throws LoginException {
     LOG.info("Logging in as {} in context {} with keytab {}",
         principal, context, keytab);
-    String principalAndRealm = getPrincipalAndRealm(principal);
     Set<Principal> principals = new HashSet<Principal>();
     principals.add(new KerberosPrincipal(principal));
     Subject subject = new Subject(false, principals, new HashSet<Object>(),
