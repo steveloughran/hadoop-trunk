@@ -73,7 +73,7 @@ public class RegistrySecurity {
   public static List<ACL> WorldReadOwnerWriteACL;
   static {
     List<ACL> acls =  new ArrayList<ACL>();
-    acls.add(new ACL(PERMISSIONS_REGISTRY_USER, ZooDefs.Ids.AUTH_IDS));
+//    acls.add(new ACL(PERMISSIONS_REGISTRY_USER, ZooDefs.Ids.AUTH_IDS));
     acls.add(new ACL(ZooDefs.Perms.READ, ZooDefs.Ids.ANYONE_ID_UNSAFE));
 
     WorldReadOwnerWriteACL = new CopyOnWriteArrayList<ACL>(acls);

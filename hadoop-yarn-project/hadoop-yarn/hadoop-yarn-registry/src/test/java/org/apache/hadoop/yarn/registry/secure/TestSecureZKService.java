@@ -102,6 +102,33 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
    * @throws Throwable
    */
   @Test
+  public void testZookeeperCanWrite() throws Throwable {
+
+    System.setProperty("curator-log-events", "true");
+    startSecureZK();
+    LoginContext login = login(ZOOKEEPER_LOCALHOST, ZOOKEEPER, keytab_zk);
+    try {
+      logLoginDetails(ZOOKEEPER, login);
+      RegistrySecurity.setZKSaslClientProperties(ZOOKEEPER, ZOOKEEPER);
+      CuratorService client =
+          startCuratorServiceInstance("client");
+      LOG.info(client.toString());
+
+      addToTeardown(client);
+      client.zkList("/");
+      client.zkMkPath("/zookeeper", CreateMode.PERSISTENT, false,
+          RegistrySecurity.WorldReadOwnerWriteACL);
+    } finally {
+      logout(login);
+    }
+
+  }
+
+  /**
+   * give the client credentials
+   * @throws Throwable
+   */
+  @Test
   public void testAliceCanWrite() throws Throwable {
 
     System.setProperty("curator-log-events", "true");
