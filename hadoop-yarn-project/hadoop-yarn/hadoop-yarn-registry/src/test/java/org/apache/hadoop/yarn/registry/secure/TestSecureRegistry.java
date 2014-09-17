@@ -77,7 +77,7 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
         RegistrySecurity.WorldReadWriteACL);
   }
 
-  @Test
+//  @Test
   public void testAuthedClientToZKNoCredentials() throws Throwable {
     startSecureZK();
     userZookeeperToCreateRoot();
@@ -133,7 +133,7 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
    * give the client credentials
    * @throws Throwable
    */
-  @Test
+//  @Test
   public void testAliceCanWrite() throws Throwable {
 
     System.setProperty("curator-log-events", "true");
@@ -165,7 +165,7 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
   }
 
 
-  @Test
+//  @Test
   public void testAliceCanWriteButNotBob() throws Throwable {
     startSecureZK();
     // alice
