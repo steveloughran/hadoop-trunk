@@ -419,5 +419,26 @@ public class RegistrySecurity {
     return "; " + name + "=" + System.getProperty(name, def);
   }
 
+  /**
+   * Build the ACLs for the current user
+   * @return
+   */
+/*
+  public String buildRWACLsForCurrentPrincipal() {
+    
+  }
+*/
+
+  /**
+   * Build the base ACL for a user
+   * @param principal the principal
+   * @return
+   */
+/*
+  public String buildUserBaseACLForUser(String principal) {
+    
+    
+  }
+*/
 
 }
