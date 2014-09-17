@@ -66,10 +66,13 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
   @Test
   public void testInsecureClientToZK() throws Throwable {
     startSecureZK();
-    CuratorService curatorService = new CuratorService("client", secureZK);
-    curatorService.init(new Configuration());
-    curatorService.start();
-    LOG.info(curatorService.toString());
+    userZookeeperToCreateRoot();
+    RegistrySecurity.clearJaasSystemProperties();
+    RegistrySecurity.clearZKSaslProperties();
+    
+    CuratorService curatorService =
+        startCuratorServiceInstance("insecure client", false);
+
     curatorService.zkList("/");
     curatorService.zkMkPath("", CreateMode.PERSISTENT, false,
         RegistrySecurity.WorldReadWriteACL);
@@ -78,15 +81,15 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
   @Test
   public void testAuthedClientToZKNoCredentials() throws Throwable {
     startSecureZK();
+    userZookeeperToCreateRoot();
     RegistrySecurity.clearJaasSystemProperties();
     RegistrySecurity.clearZKSaslProperties();
     registrySecurity.logCurrentHadoopUser();
-    
-    CuratorService curatorService = new CuratorService("client", secureZK);
-    Configuration config = new Configuration();
-    curatorService.init(config);
-    curatorService.start();
+    CuratorService curatorService =
+        startCuratorServiceInstance("authed with no credentials", true);
     LOG.info("Started curator client {}", curatorService);
+    // read only operations MUST work
+    curatorService.zkStat("");
     curatorService.zkStat("");
     try {
       curatorService.zkMkPath("", CreateMode.PERSISTENT, false,
@@ -99,7 +102,7 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
   }
 
   /**
-   * give the client credentials
+   * test that ZK can write as itself
    * @throws Throwable
    */
   @Test
@@ -107,22 +110,51 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
 
     System.setProperty("curator-log-events", "true");
     startSecureZK();
+    CuratorService curator = null;
     LoginContext login = login(ZOOKEEPER_LOCALHOST, ZOOKEEPER, keytab_zk);
     try {
       logLoginDetails(ZOOKEEPER, login);
       RegistrySecurity.setZKSaslClientProperties(ZOOKEEPER, ZOOKEEPER);
-      CuratorService client =
-          startCuratorServiceInstance("client");
-      LOG.info(client.toString());
+      curator = startCuratorServiceInstance("ZK", true);
+      LOG.info(curator.toString());
 
-      addToTeardown(client);
-      client.zkList("/");
-      client.zkMkPath("/zookeeper", CreateMode.PERSISTENT, false,
+      addToTeardown(curator);
+      curator.zkMkPath("/", CreateMode.PERSISTENT, false,
+          RegistrySecurity.WorldReadOwnerWriteACL);
+      curator.zkList("/");
+      curator.zkMkPath("/zookeeper", CreateMode.PERSISTENT, false,
           RegistrySecurity.WorldReadOwnerWriteACL);
     } finally {
       logout(login);
+      ServiceOperations.stop(curator);
     }
+  }
+  
+  /**
+   * have the ZK user create the root dir.
+   * This logs out the ZK user after and stops its curator instance,
+   * to avoid contamination
+   * @throws Throwable
+   */
+  @Test
+  public void userZookeeperToCreateRoot() throws Throwable {
 
+    System.setProperty("curator-log-events", "true");
+    CuratorService curator = null;
+    LoginContext login = login(ZOOKEEPER_LOCALHOST, ZOOKEEPER, keytab_zk);
+    try {
+      logLoginDetails(ZOOKEEPER, login);
+      RegistrySecurity.setZKSaslClientProperties(ZOOKEEPER, ZOOKEEPER);
+      curator = startCuratorServiceInstance("ZK", true);
+      LOG.info(curator.toString());
+
+      addToTeardown(curator);
+      curator.zkMkPath("/", CreateMode.PERSISTENT, false,
+          RegistrySecurity.WorldReadOwnerWriteACL);
+    } finally {
+      logout(login);
+      ServiceOperations.stop(curator);
+    }
   }
 
   /**
@@ -140,7 +172,7 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
       ktList(keytab_alice);
       RegistrySecurity.setZKSaslClientProperties(ALICE, ALICE);
       CuratorService alice =
-          startCuratorServiceInstance("alice's");
+          startCuratorServiceInstance("alice's", true);
       LOG.info(alice.toString());
 
       addToTeardown(alice);
@@ -153,10 +185,11 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
 
   }
 
-  protected CuratorService startCuratorServiceInstance(String name) {
+  protected CuratorService startCuratorServiceInstance(String name,
+      boolean secure) {
     Configuration clientConf = new Configuration();
     clientConf.set(KEY_REGISTRY_ZK_ROOT, "/");
-    clientConf.setBoolean(KEY_REGISTRY_SECURE, true);
+    clientConf.setBoolean(KEY_REGISTRY_SECURE, secure);
     describe(LOG, "Starting Curator service");
     CuratorService curatorService = new CuratorService(name, secureZK);
     curatorService.init(clientConf);
@@ -175,7 +208,7 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
     LoginContext aliceLogin =
         login(ALICE_LOCALHOST, ALICE, keytab_alice);
     try {
-      alice = startCuratorServiceInstance("alice's");
+      alice = startCuratorServiceInstance("alice's", true);
       alice.zkList("/");
       alice.zkMkPath("/alice", CreateMode.PERSISTENT, false,
           RegistrySecurity.WorldReadOwnerWriteACL);
@@ -192,7 +225,7 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
         login(BOB_LOCALHOST, BOB, keytab_bob);
 
     try {
-      bobCurator = startCuratorServiceInstance("bob's");
+      bobCurator = startCuratorServiceInstance("bob's", true);
       bobCurator.zkMkPath("/alice/bob", CreateMode.PERSISTENT, false,
           RegistrySecurity.WorldReadOwnerWriteACL);
       fail("Expected a failure —but bob could create a path under /alice");
