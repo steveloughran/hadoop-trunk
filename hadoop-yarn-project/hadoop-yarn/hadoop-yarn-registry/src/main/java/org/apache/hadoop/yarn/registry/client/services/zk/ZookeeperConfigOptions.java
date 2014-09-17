@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.registry.client.services.zk;
 
+import org.apache.zookeeper.client.ZooKeeperSaslClient;
+
 /**
  * Some ZK-internal configuration options which 
  * are usually set via system properties.
@@ -28,7 +30,7 @@ public interface ZookeeperConfigOptions {
   /**
    * This is a property which must be set to enable secure clients
    */
-  String ZK_ENABLE_SASL_CLIENT = "zookeeper.sasl.client";
+  String ZK_ENABLE_SASL_CLIENT = ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY;
 
 
   /**

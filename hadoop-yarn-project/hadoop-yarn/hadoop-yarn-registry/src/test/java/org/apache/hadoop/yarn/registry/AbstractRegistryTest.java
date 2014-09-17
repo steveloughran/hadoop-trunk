@@ -21,24 +21,15 @@ package org.apache.hadoop.yarn.registry;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
-import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
-import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
-import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
-import org.apache.zookeeper.data.ACL;
 import org.junit.Before;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.List;
-
-import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.*;
 
 /**
  * Abstract registry tests .. inits the field {@link #registry}
@@ -58,7 +49,7 @@ public class AbstractRegistryTest extends AbstractZKRegistryTest {
     registry = new RMRegistryOperationsService("yarnRegistry");
     registry.init(createRegistryConfiguration());
     registry.start();
-    registry.createRegistryPaths();
+    registry.createRootRegistryPaths();
     addToTeardown(registry);
     operations = registry;
     operations.delete(ENTRY_PATH, true);

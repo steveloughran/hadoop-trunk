@@ -86,11 +86,17 @@ public class RegistryOperationsService extends CuratorService
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
+    // if a secure cluster, switch to the security settings of this user
+    
     userAcl = RegistrySecurity.WorldReadOwnerWriteACL;
   }
 
   public List<ACL> getUserAcl() {
     return userAcl;
+  }
+
+  public void setUserAcl(List<ACL> userAcl) {
+    this.userAcl = userAcl;
   }
 
   protected void validatePath(String path) throws InvalidPathnameException {
@@ -104,7 +110,8 @@ public class RegistryOperationsService extends CuratorService
       InvalidPathnameException,
       IOException {
     validatePath(path);
-    return zkMkPath(path, CreateMode.PERSISTENT, createParents, getUserAcl());
+    return zkMkPath(path, CreateMode.PERSISTENT, createParents,
+        getUserAcl());
   }
 
   @Override

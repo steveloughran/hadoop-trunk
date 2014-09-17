@@ -38,8 +38,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.security.auth.login.AppConfigurationEntry;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,7 +47,8 @@ import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
-
+import static org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions.*;
+import static org.apache.zookeeper.client.ZooKeeperSaslClient.*;
 /**
  * Implement the registry security ... standalone for easier testing
  */
@@ -59,7 +60,9 @@ public class RegistrySecurity {
   public static final String PERMISSIONS_REGISTRY_USERS = "world:anyone:rwcda";
   public static final String CLIENT = "Client";
   public static final String SERVER = "Server";
+  private static File lastSetJAASFile;
   private final Configuration conf;
+  private final String idPassword;
   private String domain;
 
   /**
@@ -77,15 +80,46 @@ public class RegistrySecurity {
   }
 
   /**
-   * Create an instance
+   * Create an instance with no password
    */
-  public RegistrySecurity(Configuration conf) {
+  public RegistrySecurity(Configuration conf) throws IOException {
+    this(conf, "");
+  }
+
+  /**
+   * Create an instance
+   * @param conf config
+   * @param idPassword id:pass pair. If not empty, this tuple is validated
+   * @throws IOException
+   */
+  public RegistrySecurity(Configuration conf, String idPassword) throws
+      IOException {
     this.conf = conf;
-    try {
-      MessageDigest.getInstance("SHA1");
-    } catch (NoSuchAlgorithmException e) {
-      throw new RuntimeException(e.toString(), e);
+    
+    
+    
+    this.idPassword = idPassword;
+    if (!StringUtils.isEmpty(idPassword)) {
+      if (!isValid(idPassword)) {
+        throw new IOException("Invalid id:password: " + idPassword);
+      }
+      digest(idPassword);
     }
+  }
+
+  /**
+   * Check for an id:password tuple being valid. 
+   * This test is stricter than that in {@link DigestAuthenticationProvider},
+   * which splits the string, but doesn't check the contents of each
+   * half for being non-"".
+   * @param idPassword id:pass pair
+   * @return true if the pass is considered valid.
+   */
+  public boolean isValid(String idPassword) {
+    String parts[] = idPassword.split(":");
+    return parts.length == 2 
+           && !StringUtils.isEmpty(parts[0])
+           && !StringUtils.isEmpty(parts[1]);
   }
 /*
   public String extractCurrentDomain() throws IOException {
@@ -96,16 +130,18 @@ public class RegistrySecurity {
   */
 
   /**
-   * Generate a base-64 encoded digest of the password
-   * @param password pass
+   * Generate a base-64 encoded digest of the idPassword pair
+   * @param idPassword pass
    * @return a string that can be used for authentication
    */
-  public String digest(String password) throws NoSuchAlgorithmException {
+  public String digest(String idPassword) throws
+      IOException {
+    Preconditions.checkArgument(idPassword != null, "Null/empty idPassword");
     try {
-      return DigestAuthenticationProvider.generateDigest(password);
+      return DigestAuthenticationProvider.generateDigest(idPassword);
     } catch (NoSuchAlgorithmException e) {
       // because this gets caught in the constructor, this will never happen.
-      throw new RuntimeException(e.toString(), e);
+      throw new IOException(e.toString(), e);
 
     }
   }
@@ -212,11 +248,14 @@ public class RegistrySecurity {
     FileUtils.write(dest, jaasBinding.toString());
   }
 
-  public String bindJVMtoJAASFile(File jaasFile) {
-    return System.setProperty(Environment.JAAS_CONF_KEY, jaasFile.getAbsolutePath());
+  public static String bindJVMtoJAASFile(File jaasFile) {
+    String path = jaasFile.getAbsolutePath();
+    LOG.debug("Binding {} to {}", Environment.JAAS_CONF_KEY, path);
+    lastSetJAASFile = jaasFile;
+    return System.setProperty(Environment.JAAS_CONF_KEY, path);
   }
 
-  public void bindZKToServerJAASContext(String contextName) {
+  public static void bindZKToServerJAASContext(String contextName) {
     System.setProperty(ZooKeeperSaslServer.LOGIN_CONTEXT_NAME_KEY,
         contextName);
   }
@@ -233,49 +272,72 @@ public class RegistrySecurity {
    * JAAS setup, because it will relay detected problems up
    * @param context context name
    * @return the entry
-   * @throws IllegalStateException if there is no context entry oifnd
+   * @throws FileNotFoundException if there is no context entry oifnd
    */
-  public static AppConfigurationEntry[] validateContext(
-      String context) {
+  public static AppConfigurationEntry[] validateContext(String context) throws
+      FileNotFoundException {
     javax.security.auth.login.Configuration configuration =
         javax.security.auth.login.Configuration.getConfiguration();
     AppConfigurationEntry[] entries =
         configuration.getAppConfigurationEntry(context);
     if (entries == null) {
-      throw new IllegalStateException(
-          String.format("Entry \"%s\" not found in configuration %s",
-              context, configuration));
+      throw new FileNotFoundException(
+          String.format("Entry \"%s\" not found; " +
+                        "JAAS config = %s",
+              context, describeProperty(Environment.JAAS_CONF_KEY) ));
     }
     return entries;
   }
 
   /**
    * Set the client properties. This forces the ZK client into 
-   * failing if it can't auth
-   * @param username
-   * @param context
+   * failing if it can't auth.
+   * <b>Important:</b>This is JVM-wide.
+   * @param username username
+   * @param context login context
    * @throws RuntimeException if the context cannot be found in the current
    * JAAS context
    */
   public static void setZKSaslClientProperties(String username,
-      String context) {
+      String context) throws FileNotFoundException {
     RegistrySecurity.validateContext(context);
-    System.setProperty(ZookeeperConfigOptions.ZK_SASL_CLIENT_USERNAME, username);
-    System.setProperty(ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY, "true");
-    System.setProperty(ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY, context);
+    enableZookeeperSASL();
+    System.setProperty(ZK_SASL_CLIENT_USERNAME, username);
+    System.setProperty(LOGIN_CONTEXT_NAME_KEY, context);
+    bindZKToServerJAASContext(context);
+  }
+
+  /**
+   * Turn ZK SASL on 
+   * <b>Important:</b>This is JVM-wide
+   */
+  protected static void enableZookeeperSASL() {
+    System.setProperty(ENABLE_CLIENT_SASL_KEY, "true");
   }
 
   /**
    * Clear all the ZK Sasl properties
+   * <b>Important:</b>This is JVM-wide
    */
   public static void clearZKSaslProperties() {
-    System.clearProperty(ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY);
+    disableZookeeperSASL();
     System.clearProperty(ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY);
     System.clearProperty(ZookeeperConfigOptions.ZK_SASL_CLIENT_USERNAME);
-
   }
 
-  public void logCurrentUser() {
+  /**
+   * Force disable ZK SASL bindings.
+   * <b>Important:</b>This is JVM-wide
+   */
+  public static void disableZookeeperSASL() {
+    System.clearProperty(ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY);
+  }
+
+  /**
+   * Log details about the current Hadoop user at INFO.
+   * Robust against IOEs when trying to get the current user
+   */
+  public void logCurrentHadoopUser() {
     try {
       UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
       LOG.info("Current user = {}",currentUser);
@@ -286,9 +348,49 @@ public class RegistrySecurity {
     }
   }
 
+  /**
+   * Log a list of ACLs at INFO
+   * @param acls ACL list ... can be null
+   */
   public void logACLs(List<ACL> acls) {
-    for (ACL acl : acls) {
-      LOG.info("{}", acl.toString());
+    if (acls == null) {
+      LOG.info("Null ACL list");
+    } else {
+      for (ACL acl : acls) {
+        LOG.info("{}", acl.toString());
+      }
     }
+  }
+
+  /**
+   * Build up low-level security diagnostics to aid debugging
+   * @return a string to use in diagnostics
+   */
+  public String buildSecurityDiagnostics() {
+    StringBuilder builder = new StringBuilder();
+    builder.append(describeProperty(Environment.JAAS_CONF_KEY));
+    String sasl =
+        System.getProperty(ENABLE_CLIENT_SASL_KEY,
+            ENABLE_CLIENT_SASL_DEFAULT);
+    boolean saslEnabled = Boolean.valueOf(sasl);
+    builder.append(describeProperty(ENABLE_CLIENT_SASL_KEY,
+        ENABLE_CLIENT_SASL_DEFAULT));
+    if (saslEnabled) {
+      builder.append(describeProperty(ZK_SASL_CLIENT_USERNAME));
+      builder.append(describeProperty(LOGIN_CONTEXT_NAME_KEY));
+    }
+    builder.append(describeProperty(ZK_ALLOW_FAILED_SASL_CLIENTS,
+        "(undefined but defaults to true)"));
+    builder.append(describeProperty(ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE));
+
+    return builder.toString();
+  }
+
+
+  private static String describeProperty(String name) {
+    return describeProperty(name, "(undefined)");
+  }
+  private static String describeProperty(String name, String def) {
+    return "; " + name + "=" + System.getProperty(name, def);
   }
 }

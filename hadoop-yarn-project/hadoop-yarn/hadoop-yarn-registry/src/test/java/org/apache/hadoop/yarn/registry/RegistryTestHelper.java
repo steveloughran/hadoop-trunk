@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
@@ -35,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import javax.security.auth.Subject;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -103,6 +105,13 @@ public class RegistryTestHelper extends Assert {
     assertNotNull("Null login context", loginContext);
     Subject subject = loginContext.getSubject();
     LOG.info("Logged in as {}:\n {}", name, subject);
+  }
+
+  /**
+   * Set the JVM property to enable Kerberos debugging
+   */
+  public static void enableKerberosDebugging() {
+    System.setProperty(AbstractSecureRegistryTest.SUN_SECURITY_KRB5_DEBUG, "true");
   }
 
   /**
@@ -273,14 +282,40 @@ public class RegistryTestHelper extends Assert {
   /**
    * log out from a context if non-null ... exceptions are caught and logged
    * @param login login context
+   * @return null, always
    */
-  public static void logout(LoginContext login) {
+  public static LoginContext logout(LoginContext login) {
     try {
       if (login != null) {
         login.logout();
       }
     } catch (LoginException e) {
       LOG.warn("Exception logging out: {}", e, e);
+    }
+    return null;
+  }
+
+  /**
+   * Exec the native <code>ktutil</code> to list the keys
+   * (primarily to verify that the generated keytabs are compatible).
+   * This operation is not executed on windows. On other platforms
+   * it requires <code>ktutil</code> to be installed and on the path
+   * <pre>
+   *   ktutil --keytab=target/kdc/zookeeper.keytab list --keys
+   * </pre>
+   * @param keytab keytab to list
+   * @throws IOException on any execution problem.
+   */
+  public static void ktList(File keytab) throws IOException {
+    if (!Shell.WINDOWS) {
+      String path = keytab.getAbsolutePath();
+      String out = Shell.execCommand(
+          "ktutil",
+          "--keytab=" + path,
+          "list",
+          "--keys"
+      );
+      LOG.info("Listing of keytab {}:\n{}\n", path, out);
     }
   }
 }
