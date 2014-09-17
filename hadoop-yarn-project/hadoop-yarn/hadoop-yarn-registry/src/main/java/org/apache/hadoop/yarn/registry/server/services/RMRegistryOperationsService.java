@@ -72,8 +72,6 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
 
   private List<ACL> rootRegistryACL;
 
-  private List<ACL> userAcl;
-
   private ExecutorService executor;
 
   private PurgePolicy purgeOnCompletionPolicy = PurgePolicy.PurgeAll;
@@ -92,13 +90,13 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
-    security = new RegistrySecurity(conf);
+    security = new RegistrySecurity(conf, "");
 
     UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
     String yarnUserName = currentUser.getUserName();
     String publicUsers =
         conf.get(KEY_REGISTRY_PUBLIC_ACCESS, DEFAULT_REGISTRY_PUBLIC_ACCESS);
-    userAcl = security.parseIds(publicUsers, "", PERMISSIONS_REGISTRY_USER);
+    setUserAcl(security.parseIds(publicUsers, "", PERMISSIONS_REGISTRY_USER));
 
     parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_USERS);
     executor = Executors.newCachedThreadPool(
@@ -122,7 +120,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     super.serviceStart();
 
     // create the root directories
-    createRegistryPaths();
+    createRootRegistryPaths();
   }
 
   /**
@@ -161,7 +159,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
    * @throws IOException any failure
    */
   @VisibleForTesting
-  public void createRegistryPaths() throws IOException {
+  public void createRootRegistryPaths() throws IOException {
     // create the root directories
     rootRegistryACL = buildACLs(KEY_REGISTRY_ZK_ACL,
         RegistrySecurity.PERMISSIONS_REGISTRY_ROOT);
@@ -213,12 +211,16 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
 
   /**
    * Set up the ACL for the user.
+   * <b>Important: this must run client-side as it needs
+   * to know the id:pass tuple for a user</b>
    * @param username user name
    * @return an ACL list
    * @throws IOException ACL creation/parsing problems
    */
   private List<ACL> createAclForUser(String username) throws IOException {
-    return userAcl;
+    // todo, make more specific for that user. 
+    // 
+    return getUserAcl();
   }
 
   public PurgePolicy getPurgeOnCompletionPolicy() {

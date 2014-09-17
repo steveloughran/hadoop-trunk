@@ -177,7 +177,7 @@ public class MicroZookeeperService
    */
   protected boolean setupSecurity() throws IOException {
     Configuration conf = getConfig();
-    RegistrySecurity security = new RegistrySecurity(conf);
+    RegistrySecurity security = new RegistrySecurity(conf, "");
     String jaasContext = conf.getTrimmed(KEY_ZKSERVICE_JAAS_CONTEXT);
     secureServer = StringUtils.isNotEmpty(jaasContext);
     if (secureServer) {

@@ -176,6 +176,13 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     operations.mkdir(empty, false);
     RegistryPathStatus stat = operations.stat(empty);
   }
+  
+  @Test
+  public void testStatRootPath() throws Throwable {
+    String empty = "/";
+    operations.mkdir(empty, false);
+    RegistryPathStatus stat = operations.stat(empty);
+  }
 
 
   @Test

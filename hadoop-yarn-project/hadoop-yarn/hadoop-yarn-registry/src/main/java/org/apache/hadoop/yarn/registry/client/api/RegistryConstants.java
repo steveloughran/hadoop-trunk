@@ -179,6 +179,28 @@ public interface RegistryConstants {
       ZK_PREFIX + "retry.ceiling-ms";
 
   /**
+   * for simple authentication, the auth password: {@value}.
+   * If set it enables pass-based auth... this is exclusive
+   * with Kerberos authentication.
+   */
+  String KEY_REGISTRY_AUTH_PASS = REGISTRY_PREFIX + "auth.pass";
+
+  /**
+   * For simple auth, the registry ID. This can override
+   * anything worked out from the user (i.e. their shortname)
+   */
+  String KEY_REGISTRY_AUTH_ID = REGISTRY_PREFIX + "auth.id";
+
+  /**
+   * Key to set if the registry is secure. Turning it on
+   * changes the permissions policy from "open access"
+   * to restrictions on kerberos with the option of
+   * a user adding one or more auth key pairs down their
+   * own tree.
+   */
+  String KEY_REGISTRY_SECURE = REGISTRY_PREFIX + "secure";
+
+  /**
    * Root path in the ZK tree for the registry: {@value}
    */
   String KEY_REGISTRY_ZK_ROOT = ZK_PREFIX + "root";

@@ -19,8 +19,6 @@
 package org.apache.hadoop.yarn.registry.secure;
 
 
-import com.sun.security.auth.module.Krb5LoginModule;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.client.exceptions.AuthenticationFailedException;
@@ -33,20 +31,14 @@ import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.security.auth.login.LoginContext;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import javax.security.auth.Subject;
 
 /**
  * Verify that the Mini ZK service can be started up securely
@@ -56,38 +48,13 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
       LoggerFactory.getLogger(TestSecureZKService.class);
 
   @Before
-  public void enableSasl() throws Throwable {
-    System.setProperty(ZookeeperConfigOptions.ZK_ENABLE_SASL_CLIENT, "true");
+  public void beforeTestSecureZKService() throws Throwable {
+//    System.setProperty(ZookeeperConfigOptions.ZK_ENABLE_SASL_CLIENT, "true");
   }
-
-  @Test
-  public void testKerberosAuth() throws Throwable {
-    // here to work out what is up with the mini KDC
-    System.setProperty("sun.security.krb5.debug", "true");
-    File krb5conf = getKdc().getKrb5conf();
-    String krbConfig = FileUtils.readFileToString(krb5conf);
-    LOG.info("krb5.conf at {}:\n{}", krb5conf, krbConfig);
-    Subject subject = new Subject();
-
-    final Krb5LoginModule krb5LoginModule = new Krb5LoginModule();
-    final Map<String, String> options = new HashMap<String, String>();
-    options.put("keyTab", keytab_alice.getAbsolutePath());
-    options.put("principal", ALICE_LOCALHOST);
-    options.put("doNotPrompt", "true");
-    options.put("refreshKrb5Config", "true");
-    options.put("useTicketCache", "true");
-    options.put("renewTGT", "true");
-    options.put("useKeyTab", "true");
-    options.put("storeKey", "true");
-    options.put("isInitiator", "true");
-    options.put("debug", "true");
-
-    krb5LoginModule.initialize(subject, null, 
-        new HashMap<String, String>(),
-        options);
-
-    boolean loginOk = krb5LoginModule.login();
-//    boolean commitOk = krb5LoginModule.commit();
+  
+  @After
+  public void afterTestSecureZKService() throws Throwable {
+    RegistrySecurity.clearZKSaslProperties();
   }
   
   @Test
@@ -103,6 +70,7 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
     CuratorService curatorService = new CuratorService("client", secureZK);
     curatorService.init(new Configuration());
     curatorService.start();
+    LOG.info(curatorService.toString());
     curatorService.zkMkPath("", CreateMode.PERSISTENT);
     curatorService.zkList("/");
   }
@@ -112,13 +80,14 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
     startSecureZK();
     RegistrySecurity.clearJaasSystemProperties();
     RegistrySecurity.clearZKSaslProperties();
-    registrySecurity.logCurrentUser();
+    registrySecurity.logCurrentHadoopUser();
     
     CuratorService curatorService = new CuratorService("client", secureZK);
     Configuration config = new Configuration();
     curatorService.init(config);
     curatorService.start();
     LOG.info("Started curator client {}", curatorService);
+    curatorService.zkStat("");
     try {
       curatorService.zkMkPath("", CreateMode.PERSISTENT);
       fail("expected to be unauthenticated, but was allowed write access" +
@@ -144,6 +113,8 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
       RegistrySecurity.setZKSaslClientProperties(ALICE, ALICE);
       CuratorService alice =
           startCuratorServiceInstance("alice's");
+      LOG.info(alice.toString());
+
       addToTeardown(alice);
       alice.zkList("/");
       alice.zkMkPath("/alice", CreateMode.PERSISTENT, false,
@@ -157,6 +128,7 @@ public class TestSecureZKService extends AbstractSecureRegistryTest {
   protected CuratorService startCuratorServiceInstance(String name) {
     Configuration clientConf = new Configuration();
     clientConf.set(KEY_REGISTRY_ZK_ROOT, "/");
+    clientConf.setBoolean(KEY_REGISTRY_SECURE, true);
     describe(LOG, "Starting Curator service");
     CuratorService curatorService = new CuratorService(name, secureZK);
     curatorService.init(clientConf);
