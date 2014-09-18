@@ -190,6 +190,17 @@ public interface RegistryConstants {
 
 
   /**
+   * System principals. If they finish with an @, that meansa
+   * add default realm
+   */
+  String KEY_REGISTRY_SYSTEM_PRINCIPALS = REGISTRY_PREFIX + "system.principals";
+
+  /**
+   * Default system principals: {@value}
+   */
+  String DEFAULT_REGISTRY_SYSTEM_PRINCIPALS = "yarn@,mapred@,hdfs@";
+
+  /**
    * principal. If set, secure mode is expected
    */
   @Deprecated

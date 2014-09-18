@@ -25,6 +25,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.zookeeper.Environment;
 import org.apache.zookeeper.ZooDefs;
@@ -44,17 +45,20 @@ import javax.security.auth.login.LoginException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions.*;
 import static org.apache.zookeeper.client.ZooKeeperSaslClient.*;
+
 /**
  * Implement the registry security ... standalone for easier testing
  */
@@ -80,6 +84,7 @@ public class RegistrySecurity {
 
   }
 
+  private List<ACL> system_principals;
 
   /**
    * Create an instance with no password
@@ -112,11 +117,11 @@ public class RegistrySecurity {
    * This test is stricter than that in {@link DigestAuthenticationProvider},
    * which splits the string, but doesn't check the contents of each
    * half for being non-"".
-   * @param idPassword id:pass pair
+   * @param idPasswordPair id:pass pair
    * @return true if the pass is considered valid.
    */
-  public boolean isValid(String idPassword) {
-    String parts[] = idPassword.split(":");
+  public boolean isValid(String idPasswordPair) {
+    String parts[] = idPasswordPair.split(":");
     return parts.length == 2 
            && !StringUtils.isEmpty(parts[0])
            && !StringUtils.isEmpty(parts[1]);
@@ -130,48 +135,60 @@ public class RegistrySecurity {
   */
 
   /**
-   * Generate a base-64 encoded digest of the idPassword pair
-   * @param idPassword pass
+   * Generate a base-64 encoded digest of the idPasswordPair pair
+   * @param idPasswordPair id:password
    * @return a string that can be used for authentication
    */
-  public String digest(String idPassword) throws
+  public String digest(String idPasswordPair) throws
       IOException {
-    Preconditions.checkArgument(idPassword != null, "Null/empty idPassword");
+    if (StringUtils.isEmpty(idPasswordPair) || !isValid(idPasswordPair)) {
+      throw new IOException("Invalid id:password: " + idPasswordPair);
+    }
     try {
-      return DigestAuthenticationProvider.generateDigest(idPassword);
+      return DigestAuthenticationProvider.generateDigest(idPasswordPair);
     } catch (NoSuchAlgorithmException e) {
-      // because this gets caught in the constructor, this will never happen.
+      // unlikely since it is standard to the JVM, but maybe JCE restrictions
+      // could trigger it
       throw new IOException(e.toString(), e);
-
     }
   }
 
-  public List<String> splitAclPairs(String aclString) {
-    return Lists.newArrayList(
+  
+  public List<String> splitAclPairs(String aclString, String realm) {
+    List<String> list = Lists.newArrayList(
         Splitter.on(',').omitEmptyStrings().trimResults()
                 .split(aclString));
+    ListIterator<String> listIterator = list.listIterator();
+    while (listIterator.hasNext()) {
+      String next = listIterator.next();
+      if (next.startsWith("sasl") && next.endsWith("@")) {
+        listIterator.set(next + realm);
+      }
+    }
+    return list;
   }
 
   /**
-   * Parse a string down to an ID, adding a domain if needed
-   * @param a id source
-   * @param domain domain to add
+   * Parse a string down to an ID, adding a realm if needed
+   * @param idPair id:data tuple
+   * @param realm realm to add
    * @return the ID.
+   * @throws IllegalArgumentException if the idPair is invalid 
    */
-  public Id parse(String a, String domain) throws IOException {
-    int firstColon = a.indexOf(':');
-    int lastColon = a.lastIndexOf(':');
+  public Id parse(String idPair, String realm) {
+    int firstColon = idPair.indexOf(':');
+    int lastColon = idPair.lastIndexOf(':');
     if (firstColon == -1 || lastColon == -1 || firstColon != lastColon) {
-      throw new IOException(
-          "ACL '" + a + "' not of expected form scheme:id");
+      throw new IllegalArgumentException(
+          "ACL '" + idPair + "' not of expected form scheme:id");
     }
-    String scheme = a.substring(0, firstColon);
-    String id = a.substring(firstColon + 1);
+    String scheme = idPair.substring(0, firstColon);
+    String id = idPair.substring(firstColon + 1);
     if (id.endsWith("@")) {
       Preconditions.checkArgument(
-          StringUtils.isNotEmpty(domain),
-          "@ suffixed account but no domain %s", id);
-      id = id + domain;
+          StringUtils.isNotEmpty(realm),
+          "@ suffixed account but no realm %s", id);
+      id = id + realm;
     }
     return new Id(scheme, id);
 
@@ -180,14 +197,14 @@ public class RegistrySecurity {
 
   /**
    * Parse the IDs, adding a realm if needed, setting the permissions
-   * @param idString id string
+   * @param principalList id string
    * @param realm realm to add
    * @param perms permissions
    * @return the relevant ACLs
    */
-  public List<ACL> parseIds(String idString, String realm, int perms) throws
+  public List<ACL> buildACLs(String principalList, String realm, int perms) throws
       IOException {
-    List<String> aclPairs = splitAclPairs(idString);
+    List<String> aclPairs = splitAclPairs(principalList, realm);
     List<ACL> ids = new ArrayList<ACL>(aclPairs.size());
     for (String aclPair : aclPairs) {
       ACL newAcl = new ACL();
@@ -415,10 +432,32 @@ public class RegistrySecurity {
   private static String describeProperty(String name) {
     return describeProperty(name, "(undefined)");
   }
+  
   private static String describeProperty(String name, String def) {
     return "; " + name + "=" + System.getProperty(name, def);
   }
 
+  /**
+   * Get the default kerberos realm —returning "" if there
+   * is no realm or other problem
+   * @return the default realm of the system if it
+   * could be determined
+   */
+  public static String getDefaultRealm() {
+    try {
+      return KerberosUtil.getDefaultRealm();
+      // JDK7
+    } catch (ClassNotFoundException e) {
+
+    } catch (NoSuchMethodException e) {
+
+    } catch (IllegalAccessException e) {
+
+    } catch (InvocationTargetException e) {
+
+    }
+    return "";
+  }
   /**
    * Build the ACLs for the current user
    * @return
