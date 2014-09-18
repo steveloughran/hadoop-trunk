@@ -22,6 +22,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.zookeeper.ZooDefs;
 
+import java.io.IOException;
+
 /**
  * Constants for the registry, including configuration keys and default
  * values.
@@ -62,6 +64,11 @@ public interface RegistryConstants {
    */
   String KEY_REGISTRY_SECURE = REGISTRY_PREFIX + "secure";
 
+  /**
+   * Default registry security policy: {@value}
+   */
+  boolean DEFAULT_REGISTRY_SECURE = false;
+  
   /**
    * Root path in the ZK tree for the registry: {@value}
    */
@@ -152,6 +159,7 @@ public interface RegistryConstants {
   /**
    * ACL: {@value} for the registry root
    */
+  @Deprecated
   String KEY_REGISTRY_ZK_ACL = ZK_PREFIX + "acl";
 
 
@@ -195,6 +203,5 @@ public interface RegistryConstants {
    */
   String DEFAULT_REGISTRY_CLIENT_JAAS_CONTEXT = "Client";
 
-  
 
 }

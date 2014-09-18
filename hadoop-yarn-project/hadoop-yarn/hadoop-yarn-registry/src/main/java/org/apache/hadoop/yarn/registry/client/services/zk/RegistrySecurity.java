@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.services.zk;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
@@ -32,32 +33,26 @@ import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.client.ZooKeeperSaslClient;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Id;
-import org.apache.zookeeper.server.ZooKeeperSaslServer;
 import org.apache.zookeeper.server.auth.DigestAuthenticationProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.security.auth.Subject;
-import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.login.AppConfigurationEntry;
-import javax.security.auth.login.LoginContext;
-import javax.security.auth.login.LoginException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.security.NoSuchAlgorithmException;
-import java.security.Principal;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions.*;
 import static org.apache.zookeeper.client.ZooKeeperSaslClient.*;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
 /**
  * Implement the registry security ... standalone for easier testing
@@ -65,26 +60,33 @@ import static org.apache.zookeeper.client.ZooKeeperSaslClient.*;
 public class RegistrySecurity {
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistrySecurity.class);
-  public static final String PERMISSIONS_REGISTRY_ROOT = "world:anyone:rwcda";
-  public static final String PERMISSIONS_REGISTRY_SYSTEM = "world:anyone:rwcda";
-  public static final String PERMISSIONS_REGISTRY_USERS = "world:anyone:rwcda";
   public static final String CLIENT = "Client";
   public static final String SERVER = "Server";
+  public static final String E_NO_KERBEROS =
+      "Registry security is enabled -but this " +
+      "application is not running under Kerberos";
   private static File lastSetJAASFile;
   private final Configuration conf;
-  private final String idPassword;
+  private String idPassword;
   private String domain;
-
+  private boolean secure;
+  public static final ACL ALL_READWRITE_ACCESS =
+      new ACL(ZooDefs.Perms.ALL, ZooDefs.Ids.ANYONE_ID_UNSAFE);
   public static final List<ACL> WorldReadWriteACL;
 
   static {
     List<ACL> acls = new ArrayList<ACL>();
-    acls.add(new ACL(ZooDefs.Perms.ALL, ZooDefs.Ids.ANYONE_ID_UNSAFE));
+    acls.add(ALL_READWRITE_ACCESS);
     WorldReadWriteACL = new CopyOnWriteArrayList<ACL>(acls);
 
   }
 
-  private List<ACL> system_principals;
+  // list of ACLs
+  private List<ACL> systemACLs = new ArrayList<ACL>();
+  
+  // default k-realm
+  private String kerberosRealm;
+
 
   /**
    * Create an instance with no password
@@ -97,19 +99,138 @@ public class RegistrySecurity {
    * Create an instance
    * @param conf config
    * @param idPassword id:pass pair. If not empty, this tuple is validated
+   * @throws IOException on any configuration problem
+   */
+  public RegistrySecurity(Configuration conf, String idPassword)
+      throws IOException {
+    this.conf = conf;
+
+    secure = conf.getBoolean(KEY_REGISTRY_SECURE, DEFAULT_REGISTRY_SECURE);
+
+
+    setIdPassword(idPassword);
+
+  }
+
+  /**
+   * Init security. This triggers extraction and validation
+   * of both the 
+   * After this operation, the {@link #systemACLs} list is valid. 
+   * @return true if the cluster is secure.
    * @throws IOException
    */
-  public RegistrySecurity(Configuration conf, String idPassword) throws
+  public boolean initSecurity() throws
       IOException {
-    this.conf = conf;
-    
-    this.idPassword = idPassword;
-    if (!StringUtils.isEmpty(idPassword)) {
-      if (!isValid(idPassword)) {
-        throw new IOException("Invalid id:password: " + idPassword);
-      }
-      digest(idPassword);
+    if (!UserGroupInformation.isSecurityEnabled()) {
+      addSystemACL(ALL_READWRITE_ACCESS);
+      return false;
     }
+    initACLs();
+    return true;
+  }
+
+  /**
+   * Create a SASL 
+   * @param perms
+   * @return
+   * @throws IOException
+   */
+  public ACL createSaslACLFromCurrentUser(int perms) throws IOException {
+    UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
+    UgiInfo info = new UgiInfo(currentUser);
+    return createSaslACL(currentUser, perms);
+  }
+
+  /**
+   * Given a UGI, create a SASL ACL from it
+   * @param ugi UGI
+   * @param perms permissions
+   * @return a new ACL
+   */
+  public ACL createSaslACL(UserGroupInformation ugi, int perms) {
+    String userName = ugi.getUserName();
+    return new ACL(perms, new Id("sasl", userName));
+  }
+
+  /**
+   * Init the ACLs. 
+   * After this operation, the {@link #systemACLs} list is valid. 
+   * @return true if the cluster is secure.
+   * @throws IOException
+   */
+  @VisibleForTesting
+  public void initACLs() throws IOException {
+    if (secure) {
+      
+      String sysacls =
+          getOrFail(KEY_REGISTRY_SYSTEM_ACLS, DEFAULT_REGISTRY_SYSTEM_ACLS);
+
+      kerberosRealm = conf.get(KEY_REGISTRY_KERBEROS_REALM,
+          getDefaultRealmInJVM());
+
+      systemACLs =
+          buildACLs(sysacls, kerberosRealm, ZooDefs.Perms.ALL);
+      
+    } else {
+      // principal list is empty
+      systemACLs = WorldReadWriteACL;
+    }
+  }
+
+  /**
+   * Add another system ACL
+   * @param acl add ACL
+   */
+  public void addSystemACL(ACL acl) {
+    systemACLs.add(acl);
+  }
+
+
+  protected void setIdPassword(String idPasswordPair) throws IOException {
+    this.idPassword = idPasswordPair;
+    if (!StringUtils.isEmpty(idPasswordPair)) {
+      if (!isValid(idPasswordPair)) {
+        throw new IOException("Invalid id:password: " + idPasswordPair);
+      }
+      digest(idPasswordPair);
+    }
+  }
+
+  /**
+   * Flag to indicate the cluster is secure
+   * @return true if the config enabled security
+   */
+  public boolean isSecure() {
+    return secure;
+  }
+
+  /**
+   * Get the system principals
+   * @return the system principals
+   */
+  public List<ACL> getSystemACLs() {
+    Preconditions.checkNotNull(systemACLs,
+        "registry security is unitialized");
+    return Collections.unmodifiableList(systemACLs);
+  }
+
+  public String getKerberosRealm() {
+    return kerberosRealm;
+  }
+
+  /**
+   * Get a conf option, throw an exception if it is null/empty
+   * @param key key
+   * @param defval default value
+   * @return the value
+   * @throws IOException if missing
+   */
+  private String getOrFail(String key, String defval) throws IOException {
+    String val = conf.get(key, defval);
+    if (StringUtils.isEmpty(val)) {
+      throw new IOException("Missing value for configuration option " + key);
+    }
+    return val;
   }
 
   /**
@@ -245,7 +366,8 @@ public class RegistrySecurity {
       + " useTicketCache=false\n"
       + " doNotPrompt=true\n"
       + " storeKey=true;\n"
-      + "}; \n";
+      + "}; \n"
+      ;
 
 
   public String createJAASEntry(
@@ -289,7 +411,7 @@ public class RegistrySecurity {
   }
 
   public static void bindZKToServerJAASContext(String contextName) {
-    System.setProperty(ZK_SASL_SERVER_CONTEXT, contextName);
+    System.setProperty(PROP_ZK_SASL_SERVER_CONTEXT, contextName);
   }
 
   /**
@@ -334,7 +456,7 @@ public class RegistrySecurity {
       String context) throws FileNotFoundException {
     RegistrySecurity.validateContext(context);
     enableZookeeperSASL();
-    System.setProperty(ZK_SASL_CLIENT_USERNAME, username);
+    System.setProperty(SP_ZK_SASL_CLIENT_USERNAME, username);
     System.setProperty(LOGIN_CONTEXT_NAME_KEY, context);
     bindZKToServerJAASContext(context);
   }
@@ -354,7 +476,7 @@ public class RegistrySecurity {
   public static void clearZKSaslProperties() {
     disableZookeeperSASL();
     System.clearProperty(ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY);
-    System.clearProperty(ZookeeperConfigOptions.ZK_SASL_CLIENT_USERNAME);
+    System.clearProperty(ZookeeperConfigOptions.SP_ZK_SASL_CLIENT_USERNAME);
   }
 
   /**
@@ -378,12 +500,6 @@ public class RegistrySecurity {
     } catch (IOException e) {
       LOG.warn("Failed to get current user {}, {}", e);
     }
-  }
-
-  public ACL buildOwnerWriteACL(String principal) {
-    // this is oly valid on a secure cluster
-    // todo
-    return null;
   }
   
   /**
@@ -410,6 +526,12 @@ public class RegistrySecurity {
    */
   public String buildSecurityDiagnostics() {
     StringBuilder builder = new StringBuilder();
+    builder.append(secure ? "secure registry; "
+                          : "insecure registry; ");
+
+    builder.append("System ACLs: ").append(aclsToString(systemACLs));
+    builder.append(UgiInfo.fromCurrentUser());
+    builder.append("Kerberos Realm: ").append(kerberosRealm).append(" ; ");
     builder.append(describeProperty(Environment.JAAS_CONF_KEY));
     String sasl =
         System.getProperty(ENABLE_CLIENT_SASL_KEY,
@@ -418,13 +540,13 @@ public class RegistrySecurity {
     builder.append(describeProperty(ENABLE_CLIENT_SASL_KEY,
         ENABLE_CLIENT_SASL_DEFAULT));
     if (saslEnabled) {
-      builder.append(describeProperty(ZK_SASL_CLIENT_USERNAME));
+      builder.append(describeProperty(SP_ZK_SASL_CLIENT_USERNAME));
       builder.append(describeProperty(LOGIN_CONTEXT_NAME_KEY));
     }
-    builder.append(describeProperty(ZK_ALLOW_FAILED_SASL_CLIENTS,
+    builder.append(describeProperty(PROP_ZK_ALLOW_FAILED_SASL_CLIENTS,
         "(undefined but defaults to true)"));
-    builder.append(describeProperty(ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE));
-
+    builder.append(describeProperty(
+        PROP_ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE));
     return builder.toString();
   }
 
@@ -458,26 +580,80 @@ public class RegistrySecurity {
     }
     return "";
   }
-  /**
-   * Build the ACLs for the current user
-   * @return
-   */
-/*
-  public String buildRWACLsForCurrentPrincipal() {
-    
-  }
-*/
 
   /**
-   * Build the base ACL for a user
-   * @param principal the principal
+   * Create an ACL For a user.
+   * @param user
    * @return
    */
-/*
-  public String buildUserBaseACLForUser(String principal) {
-    
-    
-  }
-*/
+  public ACL createACLForUser(UserGroupInformation user, int perms) {
+    LOG.debug("Creating ACL For ", new UgiInfo(user));
 
+    if (!secure) {
+      return ALL_READWRITE_ACCESS;
+    } else {
+      String username = user.getUserName();
+      if (!username.contains("@")) {
+        username = username + "@" + kerberosRealm;
+        LOG.debug("Appending kerberos realm to make {}", username);
+      }
+      return new ACL(perms, new Id("sasl", username));
+    }
+  }
+  
+
+  /**
+   * On demand string-ifier for UGI with extra details
+   */
+  public static class UgiInfo {
+    
+    public static UgiInfo fromCurrentUser() {
+      try {
+        return new UgiInfo(UserGroupInformation.getCurrentUser());
+      } catch (IOException e) {
+        LOG.info("Failed to get current user {}", e, e);
+        return new UgiInfo(null);
+
+      }
+    }
+    
+    private final UserGroupInformation ugi;
+
+    public UgiInfo(UserGroupInformation ugi) {
+      this.ugi = ugi;
+    }
+
+    
+    
+    @Override
+    public String toString() {
+      if (ugi==null) {
+        return "(null ugi)";
+      }
+      StringBuilder builder = new StringBuilder();
+      builder.append(ugi.getUserName()).append(": ");
+      builder.append(ugi.toString());
+      builder.append(" hasKerberosCredentials=").append(
+          ugi.hasKerberosCredentials());
+      builder.append(" isFromKeytab=").append(ugi.isFromKeytab());
+      builder.append(" kerberos is enabled in Hadoop =").append(UserGroupInformation.isSecurityEnabled());
+      
+      return builder.toString();
+    }
+
+  }
+  
+  public static class AclListInfo {
+    final List<ACL> acls;
+
+
+    public AclListInfo(List<ACL> acls) {
+      this.acls = acls;
+    }
+
+    @Override
+    public String toString() {
+      return aclsToString(acls);
+    }
+  } 
 }

@@ -27,32 +27,34 @@ import org.apache.zookeeper.server.ZooKeeperSaslServer;
  */
 public interface ZookeeperConfigOptions {
 
-
   /**
    * This is a property which must be set to enable secure clients
    */
-  String ZK_ENABLE_SASL_CLIENT = ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY;
+  String PROP_ZK_ENABLE_SASL_CLIENT = ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY;
 
+
+  /**
+   * Set this to the <i>short</i> name of the client, e.g, "user",
+   * not "user/host", or "user/host@realm"
+   */
+  String SP_ZK_SASL_CLIENT_USERNAME = "zookeeper.sasl.client.username";
 
   /**
    * Set this to the <i>short</i> name of the client
    */
-  String ZK_SASL_CLIENT_USERNAME = "zookeeper.sasl.client.username";
-
-  /**
-   * Set this to the <i>short</i> name of the client
-   */
-  String ZK_SASL_SERVER_CONTEXT = ZooKeeperSaslServer.LOGIN_CONTEXT_NAME_KEY;
+  String PROP_ZK_SASL_SERVER_CONTEXT = ZooKeeperSaslServer.LOGIN_CONTEXT_NAME_KEY;
 
   /**
    * Should ZK downgrade on an auth failure?
    */
-  String ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE =
+  String PROP_ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE =
       "zookeeper.maintain_connection_despite_sasl_failure";
 
   /**
    * Allow failed SASL clients
    */
-  String ZK_ALLOW_FAILED_SASL_CLIENTS =
+  String PROP_ZK_ALLOW_FAILED_SASL_CLIENTS =
       "zookeeper.allowSaslFailedClients";
+
+  String PROP_ZK_SERVER_REALM = "zookeeper.server.realm";
 }

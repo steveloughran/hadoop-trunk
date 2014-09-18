@@ -71,6 +71,7 @@ public class CuratorService extends CompositeService
   private static final Logger LOG =
       LoggerFactory.getLogger(CuratorService.class);
   public static final String SASL = "sasl";
+  protected List<ACL> systemACLs;
 
   /**
    * the Curator binding
@@ -137,12 +138,13 @@ public class CuratorService extends CompositeService
     registryRoot = conf.getTrimmed(KEY_REGISTRY_ZK_ROOT,
         DEFAULT_ZK_REGISTRY_ROOT);
 
+    registrySecurity = new RegistrySecurity(conf);
     // is the registry secure?
-    secure = conf.getBoolean(KEY_REGISTRY_SECURE, false);
+    secure = registrySecurity.isSecure();
     // if it is secure, either the user is using kerberos and has
     // full rights, or they are delegated
     LOG.debug("Creating Registry with root {}", registryRoot);
-    registrySecurity = new RegistrySecurity(conf);
+
     super.serviceInit(conf);
   }
 
@@ -185,7 +187,7 @@ public class CuratorService extends CompositeService
 
   /**
    * Build the security diagnostics string
-   * @return
+   * @return a string for diagnostics
    */
   protected String buildSecurityDiagnostics() {
     // build up the security connection diags
@@ -530,28 +532,33 @@ public class CuratorService extends CompositeService
    * @param path path to create
    * @param mode mode for path
    * @param createParents flag to trigger parent creation
-   * @param acl ACL for path 
+   * @param acls ACL for path 
    * @throws IOException any problem
    */
   public boolean zkMkPath(String path,
       CreateMode mode,
       boolean createParents,
-      List<ACL> acl) 
+      List<ACL> acls) 
       throws IOException {
     path = createFullPath(path);
-    if (acl != null && acl.size() == 0) {
+    if (acls != null && acls.size() == 0) {
       throw new PathPermissionException(path + ": empty ACL list");
     }
+    
     try {
+      RegistrySecurity.AclListInfo aclInfo =
+          new RegistrySecurity.AclListInfo(acls);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Creating path {} with mode {} and ACL {}",
+            path, mode, aclInfo);
+      }
       CreateBuilder createBuilder = curator.create();
-      createBuilder.withMode(mode).withACL(acl);
+      createBuilder.withMode(mode).withACL(acls);
       if (createParents) {
         createBuilder.creatingParentsIfNeeded();
       }
       createBuilder.forPath(path);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Created path {} with mode {} and ACL {}", path, mode, acl);
-      }
+
     } catch (KeeperException.NodeExistsException e) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("path already present: {}", path, e);
@@ -559,7 +566,7 @@ public class CuratorService extends CompositeService
       return false;
     
     } catch (Exception e) {
-      throw operationFailure(path, "mkdir() ", e, acl);
+      throw operationFailure(path, "mkdir() ", e, acls);
     }
     return true;
   }
@@ -584,20 +591,23 @@ public class CuratorService extends CompositeService
    * without data
    * @param path path of operation
    * @param data initial data
-   * @param acl
+   * @param acls
    * @throws IOException
    */
   public void zkCreate(String path,
       CreateMode mode,
       byte[] data,
-      List<ACL> acl) throws IOException {
+      List<ACL> acls) throws IOException {
     Preconditions.checkArgument(data != null, "null data");
     String fullpath = createFullPath(path);
     try {
-      LOG.debug("Creating {} with {} bytes", fullpath, data.length);
-      curator.create().withMode(mode).withACL(acl).forPath(fullpath, data);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Creating {} with {} bytes ACL {}", fullpath, data.length,
+            new RegistrySecurity.AclListInfo(acls));
+      }
+      curator.create().withMode(mode).withACL(acls).forPath(fullpath, data);
     } catch (Exception e) {
-      throw operationFailure(fullpath, "create()", e, acl);
+      throw operationFailure(fullpath, "create()", e, acls);
     }
   }
 

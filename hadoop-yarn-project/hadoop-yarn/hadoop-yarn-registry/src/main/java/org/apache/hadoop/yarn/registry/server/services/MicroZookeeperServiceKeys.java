@@ -25,7 +25,7 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
  * These are not used in registry clients or the RM-side service,
  * so are kept separate.
  */
-public class MicroZookeeperServiceKeys {
+public interface MicroZookeeperServiceKeys {
   public static final String ZKSERVICE_PREFIX =
       RegistryConstants.REGISTRY_PREFIX + "zk.service.";
   /**

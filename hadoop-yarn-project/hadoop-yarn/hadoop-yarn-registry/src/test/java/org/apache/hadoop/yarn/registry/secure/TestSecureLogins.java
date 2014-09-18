@@ -22,8 +22,12 @@ package org.apache.hadoop.yarn.registry.secure;
 
 import com.sun.security.auth.module.Krb5LoginModule;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.zookeeper.Environment;
+import org.apache.zookeeper.data.ACL;
+import org.junit.Assume;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +37,7 @@ import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.login.LoginContext;
 import java.io.File;
 import java.security.Principal;
+import java.security.PrivilegedExceptionAction;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -46,6 +51,14 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
       LoggerFactory.getLogger(TestSecureLogins.class);
 
 
+  @Test
+  public void testZKinKeytab() throws Throwable {
+    Assume.assumeTrue(!Shell.WINDOWS);
+    String listing = ktList(keytab_zk);
+    assertTrue("no " + ZOOKEEPER_LOCALHOST + " in " + listing,
+        listing.contains(ZOOKEEPER_LOCALHOST));
+  }
+  
   @Test
   public void testHasRealm() throws Throwable {
     assertNotNull(getRealm());
@@ -127,6 +140,32 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
     assertTrue("Failed to login", loginOk);
     boolean commitOk = krb5LoginModule.commit();
     assertTrue("Failed to Commit", commitOk);
+  }
+
+  @Test
+  public void testUGILogin() throws Throwable {
+
+    UserGroupInformation ugi = loginUGI(ZOOKEEPER_LOCALHOST, keytab_zk);
+
+    RegistrySecurity.UgiInfo ugiInfo =
+        new RegistrySecurity.UgiInfo(ugi);
+    LOG.info("logged in as: {}", ugiInfo);
+    assertTrue("security is not enabled: " + ugiInfo,
+        UserGroupInformation.isSecurityEnabled());
+    assertTrue("login is keytab based: " + ugiInfo,
+        ugi.isFromKeytab());
+    
+    // now we are here, build a SASL ACL
+    ACL acl = ugi.doAs(new PrivilegedExceptionAction<ACL>() {
+      @Override
+      public ACL run() throws Exception {
+        return registrySecurity.createSaslACLFromCurrentUser(0);
+      }
+    });
+    assertEquals(ZOOKEEPER_LOCALHOST_REALM, acl.getId().getId());
+    assertEquals("sasl", acl.getId().getScheme());
+    registrySecurity.addSystemACL(acl);
+    
   }
 
 }

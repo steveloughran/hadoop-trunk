@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
@@ -111,7 +112,15 @@ public class RegistryTestHelper extends Assert {
    * Set the JVM property to enable Kerberos debugging
    */
   public static void enableKerberosDebugging() {
-    System.setProperty(AbstractSecureRegistryTest.SUN_SECURITY_KRB5_DEBUG, "true");
+    System.setProperty(AbstractSecureRegistryTest.SUN_SECURITY_KRB5_DEBUG,
+        "true");
+  }
+  /**
+   * Set the JVM property to enable Kerberos debugging
+   */
+  public static void disableKerberosDebugging() {
+    System.setProperty(AbstractSecureRegistryTest.SUN_SECURITY_KRB5_DEBUG,
+        "false");
   }
 
   /**
@@ -306,7 +315,7 @@ public class RegistryTestHelper extends Assert {
    * @param keytab keytab to list
    * @throws IOException on any execution problem.
    */
-  public static void ktList(File keytab) throws IOException {
+  public static String ktList(File keytab) throws IOException {
     if (!Shell.WINDOWS) {
       String path = keytab.getAbsolutePath();
       String out = Shell.execCommand(
@@ -316,6 +325,21 @@ public class RegistryTestHelper extends Assert {
           "--keys"
       );
       LOG.info("Listing of keytab {}:\n{}\n", path, out);
+      return out;
     }
+    return "";
+  }
+
+  /**
+   * Login via a UGI. Requres UGI to have been set up
+   * @param user
+   * @param keytab
+   * @return
+   * @throws IOException
+   */
+  protected UserGroupInformation loginUGI(String user, File keytab) throws
+      IOException {
+    return UserGroupInformation.loginUserFromKeytabAndReturnUGI(user,
+        keytab.getAbsolutePath());
   }
 }

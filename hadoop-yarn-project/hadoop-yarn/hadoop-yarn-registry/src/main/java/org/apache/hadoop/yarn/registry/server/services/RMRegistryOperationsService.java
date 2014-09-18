@@ -42,6 +42,7 @@ import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,13 +72,9 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   private static final Logger LOG =
       LoggerFactory.getLogger(RMRegistryOperationsService.class);
 
-  private List<ACL> rootRegistryACL;
-
   private ExecutorService executor;
 
   private PurgePolicy purgeOnCompletionPolicy = PurgePolicy.PurgeAll;
-
-  protected RegistrySecurity security;
 
   public RMRegistryOperationsService(String name) {
     this(name, null);
@@ -91,10 +88,15 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
-    security = new RegistrySecurity(conf, "");
+    RegistrySecurity registrySecurity = getRegistrySecurity();
+    if (registrySecurity.isSecure()) {
+      ACL sasl = registrySecurity.createSaslACLFromCurrentUser(ZooDefs.Perms.ALL);
+      registrySecurity.addSystemACL(sasl);
+      LOG.info("Registry System ACLs:",
+          RegistrySecurity.aclsToString(
+          registrySecurity.getSystemACLs()));
+    }
 
-    UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
-    String yarnUserName = currentUser.getUserName();
 
     executor = Executors.newCachedThreadPool(
         new ThreadFactory() {
@@ -158,22 +160,17 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   @VisibleForTesting
   public void createRootRegistryPaths() throws IOException {
     // create the root directories
-    rootRegistryACL = buildACLs(KEY_REGISTRY_ZK_ACL,
-        RegistrySecurity.PERMISSIONS_REGISTRY_ROOT);
-    LOG.info("Root Registry ACLs {}", 
-        RegistrySecurity.aclsToString(rootRegistryACL));
 
-    maybeCreate("", CreateMode.PERSISTENT, rootRegistryACL, false);
+    systemACLs = getRegistrySecurity().getSystemACLs();
+    LOG.info("System ACLs {}",
+        RegistrySecurity.aclsToString(systemACLs));
 
-    List<ACL> userDirACLs = parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_USERS);
-    LOG.info(RegistryInternalConstants.PATH_USERS+ " ACLs {}", RegistrySecurity.aclsToString(userDirACLs));
+    maybeCreate("", CreateMode.PERSISTENT, systemACLs, false);
     maybeCreate(RegistryInternalConstants.PATH_USERS, CreateMode.PERSISTENT,
-        userDirACLs, false);
-    List<ACL> systemDirACLs = parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_SYSTEM);
-    LOG.info(RegistryInternalConstants.PATH_SYSTEM_SERVICES + " ACLs {}",
-        RegistrySecurity.aclsToString(systemDirACLs));
-    maybeCreate(RegistryInternalConstants.PATH_SYSTEM_SERVICES, CreateMode.PERSISTENT,
-        systemDirACLs, false);
+        systemACLs, false);
+    maybeCreate(RegistryInternalConstants.PATH_SYSTEM_SERVICES,
+        CreateMode.PERSISTENT,
+        systemACLs, false);
   }
 
 

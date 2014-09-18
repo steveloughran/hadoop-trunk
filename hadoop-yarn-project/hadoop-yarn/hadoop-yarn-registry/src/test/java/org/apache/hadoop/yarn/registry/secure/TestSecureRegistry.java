@@ -49,11 +49,13 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
 
   @Before
   public void beforeTestSecureZKService() throws Throwable {
+      enableKerberosDebugging();
 //    System.setProperty(ZookeeperConfigOptions.ZK_ENABLE_SASL_CLIENT, "true");
   }
   
   @After
   public void afterTestSecureZKService() throws Throwable {
+    disableKerberosDebugging();
     RegistrySecurity.clearZKSaslProperties();
   }
   

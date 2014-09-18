@@ -56,8 +56,11 @@ import java.util.Set;
  * and its test case, <code>TestMiniKdc</code>
  */
 public class AbstractSecureRegistryTest extends RegistryTestHelper {
+  public static final String REALM = "EXAMPLE.COM";
   public static final String ZOOKEEPER = "zookeeper";
   public static final String ZOOKEEPER_LOCALHOST = "zookeeper/localhost";
+  public static final String ZOOKEEPER_LOCALHOST_REALM = 
+      ZOOKEEPER_LOCALHOST+ "@" + REALM;
   public static final String ALICE = "alice";
   public static final String ALICE_LOCALHOST = "alice/localhost";
   public static final String BOB = "bob";
@@ -67,8 +70,14 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractSecureRegistryTest.class);
 
-  public static final Configuration CONF = new Configuration();
+  public static final Configuration CONF;
 
+  static {
+    CONF = new Configuration();
+    CONF.set("hadoop.security.authentication", "kerberos");
+    CONF.setBoolean("hadoop.security.authorization", true);
+  }
+ 
   private static final AddingCompositeService classTeardown =
       new AddingCompositeService("classTeardown");
 
@@ -137,7 +146,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
    */
   @Before
   public void beforeSecureRegistryTest() {
-    enableKerberosDebugging();
+
     resetJaasConfKeys();
     RegistrySecurity.bindJVMtoJAASFile(jaasFile);
     initHadoopSecurity();
@@ -173,7 +182,6 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
    */
   public static void setupKDCAndPrincipals() throws Exception {
     // set up the KDC
-    enableKerberosDebugging();
     File target = new File(System.getProperty("test.dir", "target"));
     kdcWorkDir = new File(target, "kdc");
     kdcWorkDir.mkdirs();
@@ -208,9 +216,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
 
 
   public void initHadoopSecurity() {
-    // resetting kerberos security
-    Configuration conf = new Configuration();
-    UserGroupInformation.setConfiguration(conf);
+    UserGroupInformation.setConfiguration(CONF);
   }
 
   /**
@@ -251,7 +257,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     File workDir = new File(testdir, name);
     workDir.mkdirs();
     System.setProperty(
-        ZookeeperConfigOptions.ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE,
+        ZookeeperConfigOptions.PROP_ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE,
         "false");
     RegistrySecurity.validateContext(context);
     conf.set(MicroZookeeperServiceKeys.KEY_REGISTRY_ZKSERVICE_JAAS_CONTEXT, context);

@@ -28,6 +28,7 @@ import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.services.BindingInformation;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
+import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
 import org.apache.zookeeper.server.ServerCnxnFactory;
@@ -64,7 +65,9 @@ import java.net.UnknownHostException;
 @InterfaceStability.Evolving
 public class MicroZookeeperService
     extends AbstractService
-    implements RegistryBindingSource, RegistryConstants {
+    implements RegistryBindingSource, RegistryConstants,
+    ZookeeperConfigOptions,
+    MicroZookeeperServiceKeys{
 
 
   private static final Logger
@@ -129,12 +132,12 @@ public class MicroZookeeperService
    */
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
-    port = conf.getInt(MicroZookeeperServiceKeys.KEY_ZKSERVICE_PORT, 0);
-    tickTime = conf.getInt(MicroZookeeperServiceKeys.KEY_ZKSERVICE_TICK_TIME,
+    port = conf.getInt(KEY_ZKSERVICE_PORT, 0);
+    tickTime = conf.getInt(KEY_ZKSERVICE_TICK_TIME,
         ZooKeeperServer.DEFAULT_TICK_TIME);
     String instancedirname = conf.getTrimmed(
-        MicroZookeeperServiceKeys.KEY_ZKSERVICE_DIR, "");
-    host = conf.getTrimmed(MicroZookeeperServiceKeys.KEY_ZKSERVICE_HOST, MicroZookeeperServiceKeys.DEFAULT_ZKSERVICE_HOST);
+        KEY_ZKSERVICE_DIR, "");
+    host = conf.getTrimmed(KEY_ZKSERVICE_HOST, DEFAULT_ZKSERVICE_HOST);
     if (instancedirname.isEmpty()) {
       File testdir = new File(System.getProperty("test.dir", "target"));
       instanceDir = new File(testdir, "zookeeper" + getName());
@@ -175,21 +178,24 @@ public class MicroZookeeperService
    *
    * @param conf configuration
    */
-  protected boolean setupSecurity() throws IOException {
+  public boolean setupSecurity() throws IOException {
     Configuration conf = getConfig();
-    String jaasContext = conf.getTrimmed(
-        MicroZookeeperServiceKeys.KEY_REGISTRY_ZKSERVICE_JAAS_CONTEXT);
+    String jaasContext = conf.getTrimmed(KEY_REGISTRY_ZKSERVICE_JAAS_CONTEXT);
     secureServer = StringUtils.isNotEmpty(jaasContext);
     if (secureServer) {
       RegistrySecurity.validateContext(jaasContext);
       RegistrySecurity.bindZKToServerJAASContext(jaasContext);
       // policy on failed auth
-      System.setProperty(ZookeeperConfigOptions.ZK_ALLOW_FAILED_SASL_CLIENTS,
-          conf.get(
-              MicroZookeeperServiceKeys.KEY_ZKSERVICE_ALLOW_FAILED_SASL_CLIENTS, "true"));
-      addDiagnostics(new RegistrySecurity(conf).buildSecurityDiagnostics());
+      System.setProperty(PROP_ZK_ALLOW_FAILED_SASL_CLIENTS,
+        conf.get(KEY_ZKSERVICE_ALLOW_FAILED_SASL_CLIENTS,
+            "true"));
+      
+      //needed so that you can use sasl: strings in the registry
+      System.setProperty(RegistryInternalConstants.ZOOKEEPER_AUTH_PROVIDER +".1",
+          RegistryInternalConstants.SASLAUTHENTICATION_PROVIDER);
+          addDiagnostics(new RegistrySecurity(conf).buildSecurityDiagnostics());
       String serverContext =
-          System.getProperty(ZookeeperConfigOptions.ZK_SASL_SERVER_CONTEXT);
+          System.getProperty(PROP_ZK_SASL_SERVER_CONTEXT);
       addDiagnostics("Server JAAS context s = %s",jaasContext);
       return true;
     } else {

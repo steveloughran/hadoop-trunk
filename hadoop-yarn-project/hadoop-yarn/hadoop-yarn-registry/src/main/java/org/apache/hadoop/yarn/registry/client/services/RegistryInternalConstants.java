@@ -72,4 +72,8 @@ public interface RegistryInternalConstants {
    *  {@value}
    */
   String SUBPATH_COMPONENTS = "/components";
+  String
+      SASLAUTHENTICATION_PROVIDER =
+      "org.apache.zookeeper.server.auth.SASLAuthenticationProvider";
+  String ZOOKEEPER_AUTH_PROVIDER = "zookeeper.authProvider";
 }

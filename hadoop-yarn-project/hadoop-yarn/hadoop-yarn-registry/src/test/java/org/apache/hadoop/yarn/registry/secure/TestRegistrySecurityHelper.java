@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry.secure;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.zookeeper.ZooDefs;
@@ -26,14 +27,20 @@ import org.apache.zookeeper.data.ACL;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
 /**
  * Test for registry security operations
  */
 public class TestRegistrySecurityHelper extends Assert {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestRegistrySecurityHelper.class);
 
   public static final String YARN_EXAMPLE_COM = "yarn@example.com";
   public static final String SASL_YARN_EXAMPLE_COM =
@@ -51,7 +58,11 @@ public class TestRegistrySecurityHelper extends Assert {
   @BeforeClass
   public static void setupTestRegistrySecurityHelper() throws IOException {
     Configuration conf = new Configuration();
+    conf.setBoolean(KEY_REGISTRY_SECURE, true);
+    conf.set(KEY_REGISTRY_KERBEROS_REALM, "KERBEROS");
     registrySecurity = new RegistrySecurity(conf);
+    // init the ACLs OUTSIDE A KERBEROS CLUSTER
+    registrySecurity.initACLs();
   }
 
   @Test
@@ -167,7 +178,34 @@ public class TestRegistrySecurityHelper extends Assert {
 
   @Test
   public void testDefaultRealm() throws Throwable {
-    RegistrySecurity.getDefaultRealmInJVM();
+    String realm = RegistrySecurity.getDefaultRealmInJVM();
+    LOG.info("Realm {}", realm);
   }
 
+  @Test
+  public void testUGIProperties() throws Throwable {
+    UserGroupInformation user = UserGroupInformation.getCurrentUser();
+    ACL acl = registrySecurity.createACLForUser(user, ZooDefs.Perms.ALL);
+    assertFalse(RegistrySecurity.ALL_READWRITE_ACCESS.equals(acl));
+    LOG.info("User {} has ACL {}", user, acl);
+  }
+
+
+  @Test
+  public void testSecurityImpliesKerberos() throws Throwable {
+    Configuration conf = new Configuration();
+    conf.getBoolean("hadoop.security.authentication", true);
+    conf.setBoolean(KEY_REGISTRY_SECURE, true);
+    conf.set(KEY_REGISTRY_KERBEROS_REALM, "KERBEROS");
+    RegistrySecurity security = new RegistrySecurity(conf);
+    try {
+      security.initSecurity();
+    } catch (IOException e) {
+      assertTrue(
+          "did not find "+ RegistrySecurity.E_NO_KERBEROS + " in " + e,
+          e.toString().contains(RegistrySecurity.E_NO_KERBEROS));
+    }
+  }
+  
+  
 }
