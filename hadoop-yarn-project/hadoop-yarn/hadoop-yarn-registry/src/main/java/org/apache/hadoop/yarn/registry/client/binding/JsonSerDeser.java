@@ -61,7 +61,7 @@ public class JsonSerDeser<T> {
   private static final Logger LOG = LoggerFactory.getLogger(JsonSerDeser.class);
   private static final String UTF_8 = "UTF-8";
 
-  private final Class classType;
+  private final Class<T> classType;
   private final ObjectMapper mapper;
   private final byte[] header;
 
@@ -70,7 +70,7 @@ public class JsonSerDeser<T> {
    * @param classType class to marshall
    * @param header byte array to use as header
    */
-  public JsonSerDeser(Class classType, byte[] header) {
+  public JsonSerDeser(Class<T> classType, byte[] header) {
     Preconditions.checkArgument(classType != null, "null classType");
     Preconditions.checkArgument(header != null, "null header");
     this.classType = classType;
@@ -114,7 +114,7 @@ public class JsonSerDeser<T> {
   public synchronized T fromFile(File jsonFile)
       throws IOException, JsonParseException, JsonMappingException {
     try {
-      return (T) (mapper.readValue(jsonFile, classType));
+      return mapper.readValue(jsonFile, classType);
     } catch (IOException e) {
       LOG.error("Exception while parsing json file {}: {}", jsonFile, e);
       throw e;
@@ -128,7 +128,7 @@ public class JsonSerDeser<T> {
    * @throws IOException IO problems
    * @throws JsonMappingException failure to map from the JSON to this class
    */
-  @SuppressWarnings("IOResourceOpenedButNotSafelyClosed")
+  @SuppressWarnings({"IOResourceOpenedButNotSafelyClosed"})
   public synchronized T fromResource(String resource)
       throws IOException, JsonParseException, JsonMappingException {
     InputStream resStream = null;
@@ -137,7 +137,7 @@ public class JsonSerDeser<T> {
       if (resStream == null) {
         throw new FileNotFoundException(resource);
       }
-      return (T) (mapper.readValue(resStream, classType));
+      return mapper.readValue(resStream, classType);
     } catch (IOException e) {
       LOG.error("Exception while parsing json resource {}: {}", resource, e);
       throw e;

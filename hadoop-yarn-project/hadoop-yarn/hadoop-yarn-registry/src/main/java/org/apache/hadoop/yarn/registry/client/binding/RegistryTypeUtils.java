@@ -63,19 +63,26 @@ public class RegistryTypeUtils {
     return new Endpoint(api,
         AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
         protocolType,
-        RegistryTypeUtils.tuple(hostname, Integer.toString(port)));
+        tuplelist(hostname, Integer.toString(port)));
   }
 
   public static Endpoint ipcEndpoint(String api,
       boolean protobuf, List<String> address) {
+    ArrayList<List<String>> addressList = new ArrayList<List<String>>();
+    addressList.add(address);
     return new Endpoint(api,
         AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
         protobuf ? ProtocolTypes.PROTOCOL_HADOOP_IPC_PROTOBUF
                  : ProtocolTypes.PROTOCOL_HADOOP_IPC,
-        address
-    );
+        addressList);
   }
 
+  public static List<List<String>> tuplelist(String... t1) {
+    ArrayList<List<String>> outer = new ArrayList<List<String>>();
+    outer.add(tuple(t1));
+    return outer;
+  }
+  
   public static List<String> tuple(String... t1) {
     return Arrays.asList(t1);
   }
@@ -89,12 +96,13 @@ public class RegistryTypeUtils {
   }
 
   /**
-   * Convert a socket address pair into a string tuple, (host, port)
+   * Convert a socket address pair into a string tuple, (host, port).
+   * JDK7: move to InetAddress.getHostString() to avoid DNS lookups.
    * @param address an address
    * @return an element for the address list
    */
   public static List<String> marshall(InetSocketAddress address) {
-    return tuple(address.getHostString(), address.getPort());
+    return tuple(address.getHostName(), address.getPort());
   }
 
   /**

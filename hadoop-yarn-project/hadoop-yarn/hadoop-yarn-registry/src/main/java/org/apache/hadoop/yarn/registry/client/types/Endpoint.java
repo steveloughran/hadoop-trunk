@@ -77,13 +77,13 @@ public class Endpoint {
   public Endpoint(String api,
       String addressType,
       String protocolType,
-      List<String>... addrs) {
+      List<List<String>> addrs) {
     this.api = api;
     this.addressType = addressType;
     this.protocolType = protocolType;
     this.addresses = new ArrayList<List<String>>();
     if (addrs != null) {
-      Collections.addAll(addresses, addrs);
+      addresses.addAll(addrs);
     }
   }
 
