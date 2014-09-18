@@ -21,9 +21,9 @@ package org.apache.hadoop.yarn.server;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
 import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperService;
-import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.registry.RMRegistryService;
 import org.junit.Assert;
@@ -105,7 +105,7 @@ public class TestMiniYARNClusterRegistry extends Assert {
 
     operations.stat("/");
     //verifies that the RM startup has created the system services path
-    operations.stat(RegistryConstants.PATH_SYSTEM_SERVICES);
+    operations.stat(RegistryInternalConstants.PATH_SYSTEM_SERVICES);
 
   }
 }

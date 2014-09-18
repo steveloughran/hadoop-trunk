@@ -21,20 +21,31 @@ package org.apache.hadoop.yarn.registry.client.types;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.codehaus.jackson.annotate.JsonAnySetter;
+import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+import org.codehaus.jackson.annotate.JsonProperty;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 /**
- * JSON-marshallable description of a single component
+ * JSON-marshallable description of a single component.
+ * It supports the deserialization of unknown attributes, but does
+ * not support their creation.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class ServiceRecord {
 
+  /**
+   * Attribute name of the yarn persistence option.
+   */
+  public static final String YARN_PERSISTENCE = "yarn:persistence";
   /**
    * The time the service was registered -as seen by the service making
    * the registration request.
@@ -52,10 +63,18 @@ public class ServiceRecord {
   public String description;
 
   /**
+   * map to handle unknown attributes.
+   */
+  @JsonIgnore
+  private Map<String, Object> otherAttributes =
+      new HashMap<String, Object>(4);
+
+  /**
    *   The persistence attribute defines when a record and any child 
    *   entries may be deleted.
    *   {@link PersistencePolicies}
    */
+  @JsonProperty(YARN_PERSISTENCE)
   public int persistence = PersistencePolicies.PERMANENT;
   
   /**
@@ -121,6 +140,23 @@ public class ServiceRecord {
     return findByAPI(external, api);
   }
 
+  /**
+   * Handle unknown attributes by storing them in the
+   * {@link #otherAttributes} map
+   * @param key attribute name
+   * @param value attribute value.
+   */
+  @JsonAnySetter
+  public void setOtherAttribute(String key, Object value) {
+    otherAttributes.put(key, value);
+  }
+
+  @JsonIgnore
+  public Map<String, Object> getOtherAttributes() {
+    return otherAttributes;
+  }
+
+  
   /**
    * Find an endpoint by its API
    * @param list list

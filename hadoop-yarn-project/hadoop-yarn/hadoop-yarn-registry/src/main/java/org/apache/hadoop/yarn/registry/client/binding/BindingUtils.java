@@ -22,10 +22,9 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 
 import java.io.IOException;
-
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
 /**
  * Methods for binding paths according to recommended layout, and for
@@ -44,10 +43,10 @@ public class BindingUtils {
   public static String userPath(String user) {
     Preconditions.checkArgument(user != null, "null user");
     if (user.isEmpty()) {
-      return PATH_SYSTEM_SERVICES;
+      return RegistryInternalConstants.PATH_SYSTEM_SERVICES;
     }
 
-    return RegistryPathUtils.join(PATH_USERS,
+    return RegistryPathUtils.join(RegistryInternalConstants.PATH_USERS,
         RegistryPathUtils.encodeForRegistry(user));
   }
 
@@ -102,7 +101,7 @@ public class BindingUtils {
       String serviceClass, String serviceName) {
 
     return RegistryPathUtils.join(servicePath(user, serviceClass, serviceName),
-                                  SUBPATH_COMPONENTS);
+                                  RegistryInternalConstants.SUBPATH_COMPONENTS);
   }
 
   /**

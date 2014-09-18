@@ -135,7 +135,7 @@ public class CuratorService extends CompositeService
   protected void serviceInit(Configuration conf) throws Exception {
 
     registryRoot = conf.getTrimmed(KEY_REGISTRY_ZK_ROOT,
-        DEFAULT_REGISTRY_ROOT);
+        DEFAULT_ZK_REGISTRY_ROOT);
 
     // is the registry secure?
     secure = conf.getBoolean(KEY_REGISTRY_SECURE, false);
@@ -260,8 +260,8 @@ public class CuratorService extends CompositeService
      .sessionTimeoutMs(sessionTimeout)
      
      .retryPolicy(new BoundedExponentialBackoffRetry(retryInterval,
-         retryTimes,
-         retryCeiling));
+         retryCeiling,
+         retryTimes));
 
 /*
     if (!root.isEmpty()) {
@@ -352,7 +352,7 @@ public class CuratorService extends CompositeService
    */
   protected String buildConnectionString() {
     return getConfig().getTrimmed(KEY_REGISTRY_ZK_QUORUM,
-        DEFAULT_ZK_HOSTS);
+        DEFAULT_REGISTRY_ZK_QUORUM);
   }
 
   

@@ -443,7 +443,7 @@ public class RegistrySecurity {
    * @return the default realm of the system if it
    * could be determined
    */
-  public static String getDefaultRealm() {
+  public static String getDefaultRealmInJVM() {
     try {
       return KerberosUtil.getDefaultRealm();
       // JDK7

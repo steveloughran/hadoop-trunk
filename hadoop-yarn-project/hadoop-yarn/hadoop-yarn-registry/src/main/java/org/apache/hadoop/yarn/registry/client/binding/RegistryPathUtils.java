@@ -22,8 +22,8 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.PathNotFoundException;
-import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
+import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 import org.apache.zookeeper.common.PathUtils;
 
 import java.io.IOException;
@@ -41,7 +41,7 @@ public class RegistryPathUtils {
 
 
   private static final Pattern HOSTNAME =
-      Pattern.compile(RegistryConstants.HOSTNAME_PATTERN);
+      Pattern.compile(RegistryInternalConstants.HOSTNAME_PATTERN);
 
   /**
    * Validate ZK path with the path itself included in

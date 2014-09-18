@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry.secure;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
@@ -80,7 +81,7 @@ public class TestRegistrySecurityHelper extends Assert {
   }
 
   @Test
-  public void testACLSplitNoRealm() throws Throwable {
+  public void testACLDefaultRealm() throws Throwable {
     List<String> pairs =
         registrySecurity.splitAclPairs(
             SASL_YARN_SHORT +
@@ -93,7 +94,7 @@ public class TestRegistrySecurityHelper extends Assert {
   }
   
   @Test
-  public void testBuildAclsNoRealm() throws Throwable {
+  public void testBuildAclsDefaultRealm() throws Throwable {
     List<ACL> acls = registrySecurity.buildACLs(
         SASL_YARN_SHORT +
         ", " +
@@ -129,6 +130,19 @@ public class TestRegistrySecurityHelper extends Assert {
   }
 
   @Test
+  public void testACLDefaultRealmOnlySASL() throws Throwable {
+    List<String> pairs =
+        registrySecurity.splitAclPairs(
+            SASL_YARN_SHORT +
+            ", " +
+            DIGEST_F0AF,
+            REALM_EXAMPLE_COM);
+
+    assertEquals(SASL_YARN_EXAMPLE_COM, pairs.get(0));
+    assertEquals(DIGEST_F0AF, pairs.get(1));
+  }
+  
+  @Test
   public void testACLSplitMixed() throws Throwable {
     List<String> pairs =
         registrySecurity.splitAclPairs(
@@ -144,5 +158,16 @@ public class TestRegistrySecurityHelper extends Assert {
     assertEquals(DIGEST_F0AF, pairs.get(2));
   }
 
+  @Test
+  public void testDefaultAClsValid() throws Throwable {
+    registrySecurity.buildACLs(
+        RegistryConstants.DEFAULT_REGISTRY_SYSTEM_ACLS,
+        REALM_EXAMPLE_COM, ZooDefs.Perms.ALL);
+  }
+
+  @Test
+  public void testDefaultRealm() throws Throwable {
+    RegistrySecurity.getDefaultRealmInJVM();
+  }
 
 }

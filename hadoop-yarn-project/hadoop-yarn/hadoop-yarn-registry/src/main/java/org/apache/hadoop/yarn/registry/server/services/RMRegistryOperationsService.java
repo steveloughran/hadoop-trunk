@@ -35,6 +35,7 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
+import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
@@ -165,13 +166,13 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     maybeCreate("", CreateMode.PERSISTENT, rootRegistryACL, false);
 
     List<ACL> userDirACLs = parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_USERS);
-    LOG.info(PATH_USERS+ " ACLs {}", RegistrySecurity.aclsToString(userDirACLs));
-    maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
+    LOG.info(RegistryInternalConstants.PATH_USERS+ " ACLs {}", RegistrySecurity.aclsToString(userDirACLs));
+    maybeCreate(RegistryInternalConstants.PATH_USERS, CreateMode.PERSISTENT,
         userDirACLs, false);
     List<ACL> systemDirACLs = parseACLs(RegistrySecurity.PERMISSIONS_REGISTRY_SYSTEM);
-    LOG.info(PATH_SYSTEM_SERVICES + " ACLs {}",
+    LOG.info(RegistryInternalConstants.PATH_SYSTEM_SERVICES + " ACLs {}",
         RegistrySecurity.aclsToString(systemDirACLs));
-    maybeCreate(PATH_SYSTEM_SERVICES, CreateMode.PERSISTENT,
+    maybeCreate(RegistryInternalConstants.PATH_SYSTEM_SERVICES, CreateMode.PERSISTENT,
         systemDirACLs, false);
   }
 

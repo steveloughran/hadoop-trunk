@@ -22,7 +22,6 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.yarn.registry.AbstractRegistryTest;
-import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.*;
 
@@ -32,6 +31,7 @@ import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.services.CuratorEventCatcher;
+import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
@@ -265,7 +265,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
 
     operations.mkdir(USERPATH, false);
     operations.create(appPath, webapp, CreateFlags.OVERWRITE);
-    String components = appPath + RegistryConstants.SUBPATH_COMPONENTS + "/";
+    String components = appPath + RegistryInternalConstants.SUBPATH_COMPONENTS + "/";
     operations.mkdir(components, false);
     String dns1 = RegistryPathUtils.encodeYarnID(cid1);
     String dns1path = components + dns1;

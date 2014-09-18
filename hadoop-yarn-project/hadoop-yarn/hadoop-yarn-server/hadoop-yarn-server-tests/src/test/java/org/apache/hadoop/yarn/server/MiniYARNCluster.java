@@ -51,6 +51,7 @@ import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperService;
+import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperServiceKeys;
 import org.apache.hadoop.yarn.server.api.ResourceTracker;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
@@ -269,7 +270,7 @@ public class MiniYARNCluster extends CompositeService {
       zookeeper = new MicroZookeeperService("Local ZK service");
       addService(zookeeper);
       conf.setBooleanIfUnset(RegistryConstants.KEY_REGISTRY_ENABLED, true);
-      conf.set(RegistryConstants.KEY_ZKSERVICE_DIR,
+      conf.set(MicroZookeeperServiceKeys.KEY_ZKSERVICE_DIR,
           new File(testWorkDir, "zookeeper").getAbsolutePath());
     }
     

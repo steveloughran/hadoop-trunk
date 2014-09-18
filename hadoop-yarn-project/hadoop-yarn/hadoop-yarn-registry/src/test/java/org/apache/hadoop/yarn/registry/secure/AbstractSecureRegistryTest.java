@@ -24,13 +24,12 @@ import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.service.ServiceOperations;
-import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.registry.RegistryTestHelper;
-import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
 import org.apache.hadoop.yarn.registry.server.services.AddingCompositeService;
 import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperService;
+import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperServiceKeys;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -255,7 +254,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
         ZookeeperConfigOptions.ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE,
         "false");
     RegistrySecurity.validateContext(context);
-    conf.set(RegistryConstants.KEY_ZKSERVICE_JAAS_CONTEXT, context);
+    conf.set(MicroZookeeperServiceKeys.KEY_REGISTRY_ZKSERVICE_JAAS_CONTEXT, context);
     MicroZookeeperService secureZK = new MicroZookeeperService(name);
     secureZK.init(conf);
     LOG.info(secureZK.getDiagnostics());
