@@ -60,14 +60,6 @@ public interface RegistryInternalConstants {
       ZooDefs.Perms.READ | ZooDefs.Perms.WRITE | ZooDefs.Perms.CREATE |
       ZooDefs.Perms.DELETE;
   /**
-   *  path to users off the root: {@value}
-   */
-  String PATH_USERS = "users/";
-  /**
-   *  path to system services off the root : {@value}
-   */
-  String PATH_SYSTEM_SERVICES = "services/";
-  /**
    *  path under a service record to point to components of that service:
    *  {@value}
    */

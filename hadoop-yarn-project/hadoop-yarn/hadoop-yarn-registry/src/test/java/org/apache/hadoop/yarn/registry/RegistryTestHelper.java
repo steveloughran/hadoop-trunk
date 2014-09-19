@@ -21,9 +21,9 @@ package org.apache.hadoop.yarn.registry;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Shell;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
-import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
@@ -62,7 +62,7 @@ public class RegistryTestHelper extends Assert {
   public static final String API_WEBHDFS = "org_apache_hadoop_namenode_webhdfs";
   public static final String API_HDFS = "org_apache_hadoop_namenode_dfs";
   public static final String USERPATH =
-      "/" + RegistryInternalConstants.PATH_USERS + USER;
+      "/" + RegistryConstants.PATH_USERS + USER;
   public static final String PARENT_PATH = USERPATH + SC_HADOOP + "/";
   public static final String ENTRY_PATH = PARENT_PATH + NAME;
   public static final String NNIPC = "nnipc";

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 
 import java.io.IOException;
@@ -43,10 +44,10 @@ public class BindingUtils {
   public static String userPath(String user) {
     Preconditions.checkArgument(user != null, "null user");
     if (user.isEmpty()) {
-      return RegistryInternalConstants.PATH_SYSTEM_SERVICES;
+      return RegistryConstants.PATH_SYSTEM_SERVICES;
     }
 
-    return RegistryPathUtils.join(RegistryInternalConstants.PATH_USERS,
+    return RegistryPathUtils.join(RegistryConstants.PATH_USERS,
         RegistryPathUtils.encodeForRegistry(user));
   }
 

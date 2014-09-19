@@ -34,7 +34,6 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
-import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
@@ -71,7 +70,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   private static final Logger LOG =
       LoggerFactory.getLogger(RMRegistryOperationsService.class);
 
-  private ExecutorService executor;
+  private final ExecutorService executor;
 
   private PurgePolicy purgeOnCompletionPolicy = PurgePolicy.PurgeAll;
 
@@ -82,6 +81,18 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   public RMRegistryOperationsService(String name,
       RegistryBindingSource bindingSource) {
     super(name, bindingSource);
+
+
+    executor = Executors.newCachedThreadPool(
+        new ThreadFactory() {
+          AtomicInteger counter = new AtomicInteger(1);
+
+          @Override
+          public Thread newThread(Runnable r) {
+            return new Thread(r,
+                "RegistryOperations " + counter.getAndIncrement());
+          }
+        });
   }
 
   @Override
@@ -96,17 +107,6 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
           registrySecurity.getSystemACLs()));
     }
 
-
-    executor = Executors.newCachedThreadPool(
-        new ThreadFactory() {
-          AtomicInteger counter = new AtomicInteger(1);
-
-          @Override
-          public Thread newThread(Runnable r) {
-            return new Thread(r,
-                "RegistryOperations " + counter.getAndIncrement());
-          }
-        });
   }
 
   /**
@@ -139,16 +139,14 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   protected synchronized void stopExecutor() {
     if (executor != null) {
       executor.shutdownNow();
-      executor = null;
     }
   }
-
 
   /**
    * Get the executor
    * @return the executor
    */
-  protected synchronized ExecutorService getExecutor() {
+  protected ExecutorService getExecutor() {
     return executor;
   }
 
@@ -165,9 +163,9 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
         RegistrySecurity.aclsToString(systemACLs));
 
     maybeCreate("", CreateMode.PERSISTENT, systemACLs, false);
-    maybeCreate(RegistryInternalConstants.PATH_USERS, CreateMode.PERSISTENT,
+    maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
         systemACLs, false);
-    maybeCreate(RegistryInternalConstants.PATH_SYSTEM_SERVICES,
+    maybeCreate(PATH_SYSTEM_SERVICES,
         CreateMode.PERSISTENT,
         systemACLs, false);
   }

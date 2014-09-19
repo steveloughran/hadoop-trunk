@@ -157,13 +157,6 @@ public interface RegistryConstants {
 
 
   /**
-   * ACL: {@value} for the registry root
-   */
-  @Deprecated
-  String KEY_REGISTRY_ZK_ACL = ZK_PREFIX + "acl";
-
-
-  /**
    * A comma separated list of Zookeeper ACL identifiers with
    * system access to the registry in a secure cluster: {@value}.
    * 
@@ -204,4 +197,12 @@ public interface RegistryConstants {
   String DEFAULT_REGISTRY_CLIENT_JAAS_CONTEXT = "Client";
 
 
+  /**
+   *  path to users off the root: {@value}
+   */
+  String PATH_USERS = "/users/";
+  /**
+   *  path to system services off the root : {@value}
+   */
+  String PATH_SYSTEM_SERVICES = "/services/";
 }

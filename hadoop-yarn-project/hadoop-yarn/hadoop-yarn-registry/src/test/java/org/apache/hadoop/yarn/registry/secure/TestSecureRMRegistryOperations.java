@@ -21,8 +21,8 @@ package org.apache.hadoop.yarn.registry.secure;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
-import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
 import org.junit.After;
@@ -125,7 +125,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     RMRegistryOperationsService rmRegistryOperations =
         createRMRegistryOperations();
     RegistryOperations operations = rmRegistryOperations;
-    operations.mknode(RegistryInternalConstants.PATH_SYSTEM_SERVICES + "hdfs",
+    operations.mknode(RegistryConstants.PATH_SYSTEM_SERVICES + "hdfs",
         false);
   }
 
