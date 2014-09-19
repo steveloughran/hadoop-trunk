@@ -81,6 +81,12 @@ public class RegistrySecurity {
       new ACL(ZooDefs.Perms.ALL, ZooDefs.Ids.ANYONE_ID_UNSAFE);
 
   /**
+   * An ACL with read access for anyone
+   */
+  public static final ACL ALL_READ_ACCESS =
+      new ACL(ZooDefs.Perms.READ, ZooDefs.Ids.ANYONE_ID_UNSAFE);
+
+  /**
    * An ACL list containing the {@link #ALL_READWRITE_ACCESS} entry.
    * It is copy on write so can be shared without worry
    */
@@ -90,7 +96,6 @@ public class RegistrySecurity {
     List<ACL> acls = new ArrayList<ACL>();
     acls.add(ALL_READWRITE_ACCESS);
     WorldReadWriteACL = new CopyOnWriteArrayList<ACL>(acls);
-
   }
 
   /**
@@ -122,9 +127,7 @@ public class RegistrySecurity {
 
     secure = conf.getBoolean(KEY_REGISTRY_SECURE, DEFAULT_REGISTRY_SECURE);
 
-
     setIdPassword(idPassword);
-
   }
 
   /**
@@ -183,7 +186,7 @@ public class RegistrySecurity {
 
       systemACLs =
           buildACLs(sysacls, kerberosRealm, ZooDefs.Perms.ALL);
-      
+      addSystemACL(ALL_READ_ACCESS);
     } else {
       // principal list is empty
       systemACLs = WorldReadWriteACL;
@@ -199,6 +202,11 @@ public class RegistrySecurity {
   }
 
 
+  /**
+   * Add an id:password pair
+   * @param idPasswordPair
+   * @throws IOException
+   */
   protected void setIdPassword(String idPasswordPair) throws IOException {
     this.idPassword = idPasswordPair;
     if (!StringUtils.isEmpty(idPasswordPair)) {
@@ -222,8 +230,7 @@ public class RegistrySecurity {
    * @return the system principals
    */
   public List<ACL> getSystemACLs() {
-    Preconditions.checkNotNull(systemACLs,
-        "registry security is unitialized");
+    Preconditions.checkNotNull(systemACLs, "registry security is unitialized");
     return Collections.unmodifiableList(systemACLs);
   }
 

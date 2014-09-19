@@ -142,7 +142,6 @@ public interface RegistryOperations extends Service {
    * recursive is false.
    * @throws IOException Any other IO Exception
    * 
-   * @throws IOException
    */
   void delete(String path, boolean recursive)
       throws PathNotFoundException,

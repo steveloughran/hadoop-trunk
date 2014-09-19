@@ -37,15 +37,19 @@ import java.util.Map;
  * It supports the deserialization of unknown attributes, but does
  * not support their creation.
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class ServiceRecord {
 
   /**
-   * Attribute name of the yarn persistence option.
+   * Attribute name of the yarn persistence option: {@value}
    */
   public static final String YARN_PERSISTENCE = "yarn:persistence";
+
+  /**
+   * Attribute name of the yarn ID option used with yarn:persistence: {@value}
+   */
+  public static final String YARN_ID = "yarn:id";
 
   /**
    * The time the service was registered -as seen by the service making
@@ -54,21 +58,15 @@ public class ServiceRecord {
   public long registrationTime;
 
   /**
-   * ID. For containers: container ID. For application instances, application ID.
-   */
-  public String id;
-
-  /**
    * Description string
    */
   public String description;
 
   /**
-   * map to handle unknown attributes.
+   * ID. For containers: container ID. For application instances, application ID.
    */
-  @JsonIgnore
-  private Map<String, Object> otherAttributes =
-      new HashMap<String, Object>(4);
+  @JsonProperty(YARN_ID)
+  public String id;
 
   /**
    *   The persistence attribute defines when a record and any child 
@@ -77,7 +75,13 @@ public class ServiceRecord {
    */
   @JsonProperty(YARN_PERSISTENCE)
   public int persistence = PersistencePolicies.PERMANENT;
-  
+
+  /**
+   * map to handle unknown attributes.
+   */
+  @JsonIgnore
+  private Map<String, Object> otherAttributes = new HashMap<String, Object>(4);
+
   /**
    * List of endpoints intended to of use to external callers
    */
