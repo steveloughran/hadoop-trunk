@@ -36,6 +36,7 @@ import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.login.LoginContext;
 import java.io.File;
+import java.io.IOException;
 import java.security.Principal;
 import java.security.PrivilegedExceptionAction;
 import java.util.HashMap;
@@ -50,13 +51,17 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestSecureLogins.class);
 
-
   @Test
   public void testZKinKeytab() throws Throwable {
     Assume.assumeTrue(!Shell.WINDOWS);
-    String listing = ktList(keytab_zk);
-    assertTrue("no " + ZOOKEEPER_LOCALHOST + " in " + listing,
-        listing.contains(ZOOKEEPER_LOCALHOST));
+    try {
+      String listing = ktList(keytab_zk);
+      assertTrue("no " + ZOOKEEPER_LOCALHOST + " in " + listing,
+          listing.contains(ZOOKEEPER_LOCALHOST));
+    } catch (IOException e) {
+      LOG.debug(KTUTIL + " failure: {}", e, e);
+      Assume.assumeTrue("Failed to run "+ KTUTIL+": " + e, false );
+    }
   }
   
   @Test

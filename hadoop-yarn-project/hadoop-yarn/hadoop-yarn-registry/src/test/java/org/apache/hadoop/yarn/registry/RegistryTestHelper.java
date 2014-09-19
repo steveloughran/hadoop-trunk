@@ -61,14 +61,14 @@ public class RegistryTestHelper extends Assert {
   public static final String NAME = "hdfs";
   public static final String API_WEBHDFS = "org_apache_hadoop_namenode_webhdfs";
   public static final String API_HDFS = "org_apache_hadoop_namenode_dfs";
-  public static final String USERPATH =
-      "/" + RegistryConstants.PATH_USERS + USER;
+  public static final String USERPATH = RegistryConstants.PATH_USERS + USER;
   public static final String PARENT_PATH = USERPATH + SC_HADOOP + "/";
   public static final String ENTRY_PATH = PARENT_PATH + NAME;
   public static final String NNIPC = "nnipc";
   public static final String IPC2 = "IPC2";
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistryTestHelper.class);
+  public static final String KTUTIL = "ktutil";
   private final RecordOperations.ServiceRecordMarshal recordMarshal =
       new RecordOperations.ServiceRecordMarshal();
 
@@ -313,13 +313,14 @@ public class RegistryTestHelper extends Assert {
    *   ktutil --keytab=target/kdc/zookeeper.keytab list --keys
    * </pre>
    * @param keytab keytab to list
-   * @throws IOException on any execution problem.
+   * @throws IOException on any execution problem, including the executable
+   * being missing
    */
   public static String ktList(File keytab) throws IOException {
     if (!Shell.WINDOWS) {
       String path = keytab.getAbsolutePath();
       String out = Shell.execCommand(
-          "ktutil",
+          KTUTIL,
           "--keytab=" + path,
           "list",
           "--keys"
