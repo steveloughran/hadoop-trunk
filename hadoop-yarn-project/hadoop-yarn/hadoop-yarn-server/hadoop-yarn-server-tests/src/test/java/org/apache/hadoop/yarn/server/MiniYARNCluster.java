@@ -269,7 +269,7 @@ public class MiniYARNCluster extends CompositeService {
     if (enableRegistry) {
       zookeeper = new MicroZookeeperService("Local ZK service");
       addService(zookeeper);
-      conf.setBooleanIfUnset(RegistryConstants.KEY_REGISTRY_ENABLED, true);
+      conf.setBoolean(RegistryConstants.KEY_REGISTRY_ENABLED, true);
       conf.set(MicroZookeeperServiceKeys.KEY_ZKSERVICE_DIR,
           new File(testWorkDir, "zookeeper").getAbsolutePath());
     }

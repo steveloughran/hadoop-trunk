@@ -84,7 +84,8 @@ public class TestMiniYARNClusterRegistry extends Assert {
   @Test
   public void testRegistryCreated() throws Exception {
     assertTrue("registry not enabled",
-        conf.getBoolean(RegistryConstants.KEY_REGISTRY_ENABLED, false));
+        cluster.getConfig().getBoolean(RegistryConstants.KEY_REGISTRY_ENABLED,
+            false));
     MicroZookeeperService zookeeper = cluster.getZookeeper();
     String connectionString = zookeeper.getConnectionString();
     String confConnection = conf.get(RegistryConstants.KEY_REGISTRY_ZK_QUORUM);
