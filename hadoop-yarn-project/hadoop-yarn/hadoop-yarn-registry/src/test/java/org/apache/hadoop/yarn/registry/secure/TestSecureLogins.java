@@ -77,7 +77,7 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
   public void testJaasFileBinding() throws Throwable {
     // the JVM has seemed inconsistent on setting up here
     assertNotNull("jaasFile", jaasFile);
-    registrySecurity.bindJVMtoJAASFile(jaasFile);
+    RegistrySecurity.bindJVMtoJAASFile(jaasFile);
     String confFilename = System.getProperty(Environment.JAAS_CONF_KEY);
     assertEquals(jaasFile.getAbsolutePath(), confFilename);
   }

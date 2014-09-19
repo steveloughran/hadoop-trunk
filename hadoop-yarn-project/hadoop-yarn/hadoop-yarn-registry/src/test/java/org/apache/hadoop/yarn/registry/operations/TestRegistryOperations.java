@@ -25,13 +25,13 @@ import org.apache.hadoop.yarn.registry.AbstractRegistryTest;
 
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.*;
 
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.services.CuratorEventCatcher;
-import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
@@ -265,7 +265,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
 
     operations.mknode(USERPATH, false);
     operations.create(appPath, webapp, CreateFlags.OVERWRITE);
-    String components = appPath + RegistryInternalConstants.SUBPATH_COMPONENTS + "/";
+    String components = appPath + RegistryConstants.SUBPATH_COMPONENTS + "/";
     operations.mknode(components, false);
     String dns1 = RegistryPathUtils.encodeYarnID(cid1);
     String dns1path = components + dns1;

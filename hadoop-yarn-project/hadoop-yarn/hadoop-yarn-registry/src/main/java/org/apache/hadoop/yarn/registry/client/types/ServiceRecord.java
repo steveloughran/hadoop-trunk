@@ -120,22 +120,40 @@ public class ServiceRecord {
     this.data = data;
   }
 
+  /**
+   * Add an external endpoint
+   * @param endpoint endpoint to set
+   */
   public void addExternalEndpoint(Endpoint endpoint) {
     Preconditions.checkArgument(endpoint != null);
     endpoint.validate();
     external.add(endpoint);
   }
 
+  /**
+   * Add an internal endpoint
+   * @param endpoint endpoint to set
+   */
   public void addInternalEndpoint(Endpoint endpoint) {
     Preconditions.checkArgument(endpoint != null);
     endpoint.validate();
     internal.add(endpoint);
   }
 
+  /**
+   * Look up an internal endpoint
+   * @param api API
+   * @return the endpoint or null if there was no match
+   */
   public Endpoint getInternalEndpoint(String api) {
     return findByAPI(internal, api);
   }
 
+  /**
+   * Look up an external endpoint
+   * @param api API
+   * @return the endpoint or null if there was no match
+   */
   public Endpoint getExternalEndpoint(String api) {
     return findByAPI(external, api);
   }
@@ -151,17 +169,22 @@ public class ServiceRecord {
     otherAttributes.put(key, value);
   }
 
+  /**
+   * The map of "other" attributes set when parsing. These
+   * are not included in the JSON value of this record when it
+   * is generated.
+   * @return a map of any unknown attributes in the deserialized JSON.
+   */
   @JsonIgnore
   public Map<String, Object> getOtherAttributes() {
     return otherAttributes;
   }
 
-  
   /**
    * Find an endpoint by its API
    * @param list list
    * @param api api name
-   * @return
+   * @return the endpoint or null if there was no match
    */
   private Endpoint findByAPI(List<Endpoint> list,  String api) {
     for (Endpoint endpoint : list) {

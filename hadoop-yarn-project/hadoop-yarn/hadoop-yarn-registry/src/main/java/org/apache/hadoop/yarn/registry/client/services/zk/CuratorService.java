@@ -335,7 +335,7 @@ public class CuratorService extends CompositeService
    * Supply the binding information.
    * This implementation returns a fixed ensemble bonded to
    * the quorum supplied by {@link #buildConnectionString()}
-   * @return
+   * @return the binding information
    */
   @Override
   public BindingInformation supplyBindingInformation() {

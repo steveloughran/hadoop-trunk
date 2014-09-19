@@ -35,7 +35,7 @@ public interface RegistryInternalConstants {
   String HOSTNAME_PATTERN =
       "([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])";
   /**
-   * Header of a service record: {@value}
+   * Header of a service record:  "jsonservicrec"
    * By making this over 12 bytes long, we can auto-determine which entries
    * in a listing are too short to contain a record without getting their data
    */
@@ -46,6 +46,7 @@ public interface RegistryInternalConstants {
    * Permissions for readers: {@value}.
    */
   int PERMISSIONS_REGISTRY_READERS = ZooDefs.Perms.READ;
+  
   /**
    * Permissions for system services: {@value}
    */
@@ -59,13 +60,17 @@ public interface RegistryInternalConstants {
   int PERMISSIONS_REGISTRY_USER_ROOT =
       ZooDefs.Perms.READ | ZooDefs.Perms.WRITE | ZooDefs.Perms.CREATE |
       ZooDefs.Perms.DELETE;
+
   /**
-   *  path under a service record to point to components of that service:
-   *  {@value}
+   * Name of the SASL auth provider which has to be added to ZK server to enable
+   * sasl: auth patterns. Without this callers can connect via SASL, but
+   * they can't use it in ACLs
    */
-  String SUBPATH_COMPONENTS = "/components";
-  String
-      SASLAUTHENTICATION_PROVIDER =
+  String SASLAUTHENTICATION_PROVIDER =
       "org.apache.zookeeper.server.auth.SASLAuthenticationProvider";
+
+  /**
+   * String to use as the prefix when declaring a new auth provide.
+   */
   String ZOOKEEPER_AUTH_PROVIDER = "zookeeper.authProvider";
 }

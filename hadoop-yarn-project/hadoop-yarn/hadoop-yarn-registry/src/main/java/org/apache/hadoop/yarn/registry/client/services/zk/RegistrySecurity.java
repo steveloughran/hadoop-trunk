@@ -62,16 +62,28 @@ public class RegistrySecurity {
       LoggerFactory.getLogger(RegistrySecurity.class);
   public static final String CLIENT = "Client";
   public static final String SERVER = "Server";
+
+  /**
+   * Error raised when the registry is tagged as secure but this
+   * process doesn't have hadoop security enabled.
+   */
   public static final String E_NO_KERBEROS =
-      "Registry security is enabled -but this " +
-      "application is not running under Kerberos";
-  private static File lastSetJAASFile;
+      "Registry security is enabled -but Hadoop security is not enabled";
   private final Configuration conf;
   private String idPassword;
   private String domain;
   private boolean secure;
+
+  /**
+   * An ACL with read-write access for anyone
+   */
   public static final ACL ALL_READWRITE_ACCESS =
       new ACL(ZooDefs.Perms.ALL, ZooDefs.Ids.ANYONE_ID_UNSAFE);
+
+  /**
+   * An ACL list containing the {@link #ALL_READWRITE_ACCESS} entry.
+   * It is copy on write so can be shared without worry
+   */
   public static final List<ACL> WorldReadWriteACL;
 
   static {
@@ -81,12 +93,15 @@ public class RegistrySecurity {
 
   }
 
-  // list of ACLs
+  /**
+   * the list of system ACLs
+   */
   private List<ACL> systemACLs = new ArrayList<ACL>();
-  
-  // default k-realm
-  private String kerberosRealm;
 
+  /**
+   * the default kerberos realm 
+   */  
+  private String kerberosRealm;
 
   /**
    * Create an instance with no password
@@ -131,8 +146,8 @@ public class RegistrySecurity {
 
   /**
    * Create a SASL 
-   * @param perms
-   * @return
+   * @param perms permissions
+   * @return an ACL for the current user
    * @throws IOException
    */
   public ACL createSaslACLFromCurrentUser(int perms) throws IOException {
@@ -155,7 +170,6 @@ public class RegistrySecurity {
   /**
    * Init the ACLs. 
    * After this operation, the {@link #systemACLs} list is valid. 
-   * @return true if the cluster is secure.
    * @throws IOException
    */
   @VisibleForTesting
@@ -247,13 +261,6 @@ public class RegistrySecurity {
            && !StringUtils.isEmpty(parts[0])
            && !StringUtils.isEmpty(parts[1]);
   }
-/*
-  public String extractCurrentDomain() throws IOException {
-    UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
-    UserGroupInformation realUser = currentUser.getRealUser();
-    realUser.g
-  }
-  */
 
   /**
    * Generate a base-64 encoded digest of the idPasswordPair pair
@@ -273,7 +280,6 @@ public class RegistrySecurity {
       throw new IOException(e.toString(), e);
     }
   }
-
   
   public List<String> splitAclPairs(String aclString, String realm) {
     List<String> list = Lists.newArrayList(
@@ -314,7 +320,6 @@ public class RegistrySecurity {
     return new Id(scheme, id);
 
   }
-
 
   /**
    * Parse the IDs, adding a realm if needed, setting the permissions
@@ -370,20 +375,27 @@ public class RegistrySecurity {
       ;
 
 
+  /**
+   * Create a JAAS entry for insertion
+   * @param context context of the entry
+   * @param principal kerberos principal
+   * @param keytab keytab
+   * @return a context
+   */
   public String createJAASEntry(
-      String role,
+      String context,
       String principal,
       File keytab) {
     Preconditions.checkArgument(StringUtils.isNotEmpty(principal),
         "invalid principal");
-    Preconditions.checkArgument(StringUtils.isNotEmpty(role),
-        "invalid role");
+    Preconditions.checkArgument(StringUtils.isNotEmpty(context),
+        "invalid context");
     Preconditions.checkArgument(keytab != null && keytab.isFile(),
         "Keytab null or missing: ");
     return String.format(
         Locale.ENGLISH,
         JAAS_ENTRY,
-        role,
+        context,
         keytab.getAbsolutePath(),
         principal);
   }
@@ -403,13 +415,26 @@ public class RegistrySecurity {
     FileUtils.write(dest, jaasBinding.toString());
   }
 
-  public static String bindJVMtoJAASFile(File jaasFile) {
+  /**
+   * Bind the JVM JAS setting to the specified JAAS file.
+   * 
+   * <b>Important:</b> once a file has been loaded the JVM doesn't pick up
+   * changes
+   * @param jaasFile the JAAS file
+   */
+  public static void bindJVMtoJAASFile(File jaasFile) {
     String path = jaasFile.getAbsolutePath();
     LOG.debug("Binding {} to {}", Environment.JAAS_CONF_KEY, path);
-    lastSetJAASFile = jaasFile;
-    return System.setProperty(Environment.JAAS_CONF_KEY, path);
+    System.setProperty(Environment.JAAS_CONF_KEY, path);
   }
 
+  /**
+   * Set the Zookeeper server property
+   * {@link ZookeeperConfigOptions#PROP_ZK_SASL_SERVER_CONTEXT}
+   * to the SASL context. When the ZK server starts, this is the context
+   * which it will read in
+   * @param contextName the name of the context
+   */
   public static void bindZKToServerJAASContext(String contextName) {
     System.setProperty(PROP_ZK_SASL_SERVER_CONTEXT, contextName);
   }
@@ -426,7 +451,7 @@ public class RegistrySecurity {
    * JAAS setup, because it will relay detected problems up
    * @param context context name
    * @return the entry
-   * @throws FileNotFoundException if there is no context entry oifnd
+   * @throws FileNotFoundException if there is no context entry found
    */
   public static AppConfigurationEntry[] validateContext(String context) throws
       FileNotFoundException {
@@ -584,7 +609,8 @@ public class RegistrySecurity {
   /**
    * Create an ACL For a user.
    * @param user
-   * @return
+   * @return the ACL For the specified user. Ifthe username doesn't end
+   * in "@" then the realm is added
    */
   public ACL createACLForUser(UserGroupInformation user, int perms) {
     LOG.debug("Creating ACL For ", new UgiInfo(user));

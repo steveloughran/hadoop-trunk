@@ -176,7 +176,7 @@ public class MicroZookeeperService
    * set up security. this must be done prior to creating
    * the ZK instance, as it sets up JAAS if that has not been done already.
    *
-   * @param conf configuration
+   * @return true if the cluster has security enabled.
    */
   public boolean setupSecurity() throws IOException {
     Configuration conf = getConfig();

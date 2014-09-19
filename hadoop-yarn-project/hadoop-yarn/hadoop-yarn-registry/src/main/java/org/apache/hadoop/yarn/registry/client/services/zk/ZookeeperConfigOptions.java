@@ -40,7 +40,7 @@ public interface ZookeeperConfigOptions {
   String SP_ZK_SASL_CLIENT_USERNAME = "zookeeper.sasl.client.username";
 
   /**
-   * Set this to the <i>short</i> name of the client
+   * Set this to the <i>short</i> name of the client: {@value}
    */
   String PROP_ZK_SASL_SERVER_CONTEXT = ZooKeeperSaslServer.LOGIN_CONTEXT_NAME_KEY;
 

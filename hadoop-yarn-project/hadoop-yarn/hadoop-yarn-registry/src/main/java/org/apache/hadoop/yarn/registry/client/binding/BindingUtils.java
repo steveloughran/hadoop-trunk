@@ -23,7 +23,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 
 import java.io.IOException;
 
@@ -66,8 +65,8 @@ public class BindingUtils {
   
 
   /**
-   * Get the current user path formatted for the system
-   * @return
+   * Get the current user path formatted for the registry
+   * @return the encoded shortname of the current user
    * @throws IOException
    */
   public static String currentUser() throws IOException {
@@ -102,7 +101,7 @@ public class BindingUtils {
       String serviceClass, String serviceName) {
 
     return RegistryPathUtils.join(servicePath(user, serviceClass, serviceName),
-                                  RegistryInternalConstants.SUBPATH_COMPONENTS);
+                                  RegistryConstants.SUBPATH_COMPONENTS);
   }
 
   /**
