@@ -38,10 +38,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStoreAppEve
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStoreEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStoreEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppRejectedEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event.RMAppAttemptContainerFinishedEvent;
@@ -187,8 +183,8 @@ public class RMRegistryService extends CompositeService {
 
   /**
    * Lifted from RMAppManager
-   * @param application
-   * @return
+   * @param application app submission
+   * @return credentials
    * @throws IOException
    */
   private Credentials parseCredentials(ApplicationSubmissionContext application)
@@ -213,7 +209,6 @@ public class RMRegistryService extends CompositeService {
    */
   private Credentials extractCredentials(ApplicationId applicationId) throws
       IOException {
-    RMStateStore rmStore = rmContext.getStateStore();
     RMApp rmApp = rmContext.getRMApps().get(applicationId);
     ApplicationSubmissionContext applicationSubmissionContext =
         rmApp.getApplicationSubmissionContext();
@@ -233,6 +228,7 @@ public class RMRegistryService extends CompositeService {
       case FINISHED:
         ContainerId containerId = event.getContainerId();
         registryOperations.onContainerFinished(containerId);
+        break;
 
       default:
         break;
