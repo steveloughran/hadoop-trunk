@@ -606,7 +606,7 @@ public class ApplicationMaster {
       String serviceName = RegistryPathUtils.encodeYarnID(appId);
       String path =
           BindingUtils.servicePath(username, serviceClass, serviceName);
-      registryOperations.mkdir(RegistryPathUtils.parentOf(path), true);
+      registryOperations.mknode(RegistryPathUtils.parentOf(path), true);
       // app attempt entry
       registryOperations.create(path + "-attempt", serviceRecord,
           CreateFlags.OVERWRITE);

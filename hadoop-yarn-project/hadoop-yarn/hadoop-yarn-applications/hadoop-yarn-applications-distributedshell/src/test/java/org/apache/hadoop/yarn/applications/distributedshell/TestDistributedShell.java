@@ -78,6 +78,7 @@ public class TestDistributedShell {
   @Before
   public void setup() throws Exception {
     LOG.info("Starting up YARN cluster");
+    conf.setBoolean(RegistryConstants.KEY_REGISTRY_ENABLED, true);
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB, 128);
     conf.setClass(YarnConfiguration.RM_SCHEDULER, 
         FifoScheduler.class, ResourceScheduler.class);
@@ -875,7 +876,11 @@ public class TestDistributedShell {
     LOG.info("Registry Binding: " + regOps);
     
     // do a simple registry operation to verify that it is live
-    regOps.listDir("/");
+    regOps.list("/");
+    // check the system dir is present
+    regOps.list(RegistryConstants.PATH_SYSTEM_SERVICES);
+    // check the users dir is present
+    regOps.list(RegistryConstants.PATH_USERS);
 
     try {
       String[] args = {
@@ -932,7 +937,7 @@ public class TestDistributedShell {
       assertDeleted(regOps, client.appRecordPath);
       assertDeleted(regOps, client.servicePath);
     } finally {
-      regOps.stop();
+      ServiceOperations.stop(regOps);
     }
   }
 
