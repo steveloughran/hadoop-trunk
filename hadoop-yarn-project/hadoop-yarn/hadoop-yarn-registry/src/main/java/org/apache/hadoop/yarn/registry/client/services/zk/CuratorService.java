@@ -324,7 +324,6 @@ public class CuratorService extends CompositeService
    */
   protected void createEnsembleProvider() {
     BindingInformation binding = bindingSource.supplyBindingInformation();
-    String connectString = buildConnectionString();
     connectionDescription = binding.description
                             + " " + securityConnectionDiagnostics;
     ensembleProvider = binding.ensembleProvider;

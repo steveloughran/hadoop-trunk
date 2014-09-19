@@ -35,14 +35,6 @@ public interface RegistryInternalConstants {
   String HOSTNAME_PATTERN =
       "([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])";
   /**
-   * Header of a service record:  "jsonservicrec"
-   * By making this over 12 bytes long, we can auto-determine which entries
-   * in a listing are too short to contain a record without getting their data
-   */
-  byte[] RECORD_HEADER = {'j', 's', 'o', 'n', 
-                          's', 'e','r','v','i', 'c', 'e',
-                          'r','e','c'};
-  /**
    * Permissions for readers: {@value}.
    */
   int PERMISSIONS_REGISTRY_READERS = ZooDefs.Perms.READ;

@@ -77,7 +77,10 @@ public class JsonSerDeser<T> {
     this.mapper = new ObjectMapper();
     mapper.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES,
         false);
-    this.header = header;
+    // make an immutable copy to keep findbugs happy.
+    byte[] h = new byte[header.length];
+    System.arraycopy(header, 0, h, 0, header.length);
+    this.header = h;
   }
 
   public String getName() {
@@ -96,7 +99,7 @@ public class JsonSerDeser<T> {
   public synchronized T fromJson(String json)
       throws IOException, JsonParseException, JsonMappingException {
     try {
-      return (T) (mapper.readValue(json, classType));
+      return mapper.readValue(json, classType);
     } catch (IOException e) {
       LOG.error("Exception while parsing json : " + e + "\n" + json, e);
       throw e;

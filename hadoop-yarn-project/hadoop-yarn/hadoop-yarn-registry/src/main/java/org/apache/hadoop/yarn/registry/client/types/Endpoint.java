@@ -92,7 +92,7 @@ public class Endpoint {
    * is ASCII-encoded and added to the list of addresses.
    * @param api API name
    * @param protocolType protocol type
-   * @param uris
+   * @param uris URIs to convert to a list of tup;les
    */
   public Endpoint(String api,
       String protocolType,
@@ -103,7 +103,6 @@ public class Endpoint {
     this.protocolType = protocolType;
     List<List<String>> addrs = new ArrayList<List<String>>(uris.length);
     for (URI uri : uris) {
-      ArrayList<String> elt  = new ArrayList<String>(1);
       addrs.add(RegistryTypeUtils.tuple(uri.toString()));
     }
     this.addresses = addrs;

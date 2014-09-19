@@ -22,9 +22,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
-import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecordHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +43,7 @@ public class RecordOperations {
 
   public static class ServiceRecordMarshal extends JsonSerDeser<ServiceRecord> {
     public ServiceRecordMarshal() {
-      super(ServiceRecord.class, RegistryInternalConstants.RECORD_HEADER);
+      super(ServiceRecord.class, ServiceRecordHeader.getData());
     }
   }
 
@@ -59,7 +59,7 @@ public class RecordOperations {
       RegistryPathStatus[] stats) throws IOException {
     Map<String, ServiceRecord> results = new HashMap<String, ServiceRecord>(stats.length);
     for (RegistryPathStatus stat : stats) {
-      if (stat.size > RegistryInternalConstants.RECORD_HEADER.length) {
+      if (stat.size > ServiceRecordHeader.getLength()) {
         // maybe has data
         try {
           ServiceRecord serviceRecord = operations.resolve(stat.path);

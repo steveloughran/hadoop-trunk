@@ -146,13 +146,27 @@ public class MicroZookeeperService
       FileUtil.fullyDelete(instanceDir);
     }
     LOG.debug("Instance directory is {}", instanceDir);
-    instanceDir.mkdirs();
+    mkdirStrict(instanceDir);
     dataDir = new File(instanceDir, "data");
     confDir = new File(instanceDir, "conf");
-    dataDir.mkdirs();
-    confDir.mkdirs();
-
+    mkdirStrict(dataDir);
+    mkdirStrict(confDir);
     super.serviceInit(conf);
+  }
+
+  /**
+   * Create a directory, ignoring if the dir is already there,
+   * and failing if a file or something else was at the end of that
+   * path
+   * @param dir dir to guarantee the existence of
+   * @throws IOException IO problems, or path exists but is not a dir
+   */
+  private void mkdirStrict(File dir) throws IOException {
+    if (!dir.mkdirs()) {
+      if (!dir.isDirectory()) {
+        throw new IOException("Failed to mkdir " + dir);
+      }
+    }
   }
 
   /**
@@ -196,7 +210,7 @@ public class MicroZookeeperService
           addDiagnostics(new RegistrySecurity(conf).buildSecurityDiagnostics());
       String serverContext =
           System.getProperty(PROP_ZK_SASL_SERVER_CONTEXT);
-      addDiagnostics("Server JAAS context s = %s",jaasContext);
+      addDiagnostics("Server JAAS context s = %s", serverContext);
       return true;
     } else {
       return false;

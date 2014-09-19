@@ -152,7 +152,6 @@ public class RegistrySecurity {
    */
   public ACL createSaslACLFromCurrentUser(int perms) throws IOException {
     UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
-    UgiInfo info = new UgiInfo(currentUser);
     return createSaslACL(currentUser, perms);
   }
 

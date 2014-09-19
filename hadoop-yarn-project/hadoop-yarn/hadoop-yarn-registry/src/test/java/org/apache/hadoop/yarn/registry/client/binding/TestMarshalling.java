@@ -19,8 +19,8 @@
 package org.apache.hadoop.yarn.registry.client.binding;
 
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
-import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecordHeader;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -80,7 +80,7 @@ public class TestMarshalling extends Assert {
 
   @Test(expected = EOFException.class)
   public void testUnmarshallNoBody() throws Throwable {
-    byte[] bytes = RegistryInternalConstants.RECORD_HEADER;
+    byte[] bytes = ServiceRecordHeader.getData();
     marshal.fromBytesWithHeader("src", bytes);
   }
 

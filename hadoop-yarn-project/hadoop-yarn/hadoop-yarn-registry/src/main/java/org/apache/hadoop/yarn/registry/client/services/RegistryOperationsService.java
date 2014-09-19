@@ -171,7 +171,6 @@ public class RegistryOperationsService extends CuratorService
       IOException {
     validatePath(path);
     List<String> childNames = zkList(path);
-    RegistryPathStatus[] results = new RegistryPathStatus[0];
     int size = childNames.size();
     ArrayList<RegistryPathStatus> childList = new ArrayList<RegistryPathStatus>(
         size);

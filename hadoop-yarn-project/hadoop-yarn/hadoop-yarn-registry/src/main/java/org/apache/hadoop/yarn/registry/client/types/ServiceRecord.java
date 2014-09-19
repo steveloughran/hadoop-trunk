@@ -46,6 +46,7 @@ public class ServiceRecord {
    * Attribute name of the yarn persistence option.
    */
   public static final String YARN_PERSISTENCE = "yarn:persistence";
+
   /**
    * The time the service was registered -as seen by the service making
    * the registration request.
@@ -215,4 +216,5 @@ public class ServiceRecord {
     sb.append('}');
     return sb.toString();
   }
+
 }
