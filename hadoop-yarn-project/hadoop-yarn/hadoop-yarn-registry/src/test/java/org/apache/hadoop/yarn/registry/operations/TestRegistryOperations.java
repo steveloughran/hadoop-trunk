@@ -84,7 +84,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     RegistryPathStatus stat = operations.stat(ENTRY_PATH);
 
     RegistryPathStatus[] statuses =
-        operations.listDir(PARENT_PATH);
+        operations.list(PARENT_PATH);
     assertEquals(1, statuses.length);
     assertEquals(stat, statuses[0]);
 
@@ -117,7 +117,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   @Test(expected = PathNotFoundException.class)
   public void testLsEmptyPath() throws Throwable {
     RegistryPathStatus[] statuses =
-        operations.listDir(PARENT_PATH);
+        operations.list(PARENT_PATH);
   }
 
   @Test(expected = PathNotFoundException.class)
@@ -129,7 +129,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   public void testMkdirNoParent() throws Throwable {
     String path = ENTRY_PATH + "/missing";
     try {
-      operations.mkdir(path, false);
+      operations.mknode(path, false);
       RegistryPathStatus stat = operations.stat(path);
       fail("Got a status " + stat);
     } catch (PathNotFoundException expected) {
@@ -139,11 +139,11 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   
   @Test
   public void testDoubleMkdir() throws Throwable {
-    operations.mkdir(USERPATH, false);
+    operations.mknode(USERPATH, false);
     String path = USERPATH + "newentry";
-    assertTrue(operations.mkdir(path, false));
+    assertTrue(operations.mknode(path, false));
     RegistryPathStatus stat = operations.stat(path);
-    assertFalse(operations.mkdir(path, false));
+    assertFalse(operations.mknode(path, false));
   }
 
   @Test
@@ -172,19 +172,19 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   @Test
   public void testStatDirectory() throws Throwable {
     String empty = "/empty";
-    operations.mkdir(empty, false);
+    operations.mknode(empty, false);
     RegistryPathStatus stat = operations.stat(empty);
   }
   
   @Test
   public void testStatRootPath() throws Throwable {
-    operations.mkdir("/", false);
+    operations.mknode("/", false);
     RegistryPathStatus stat = operations.stat("/");
   }
   
   @Test
   public void testStatOneLevelDown() throws Throwable {
-    operations.mkdir("/subdir", true);
+    operations.mknode("/subdir", true);
     RegistryPathStatus stat = operations.stat("/subdir");
   }
   
@@ -192,7 +192,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   @Test
   public void testLsRootPath() throws Throwable {
     String empty = "/";
-    operations.mkdir(empty, false);
+    operations.mknode(empty, false);
     RegistryPathStatus stat = operations.stat(empty);
   }
 
@@ -200,7 +200,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   @Test
   public void testResolvePathThatHasNoEntry() throws Throwable {
     String empty = "/empty2";
-    operations.mkdir(empty, false);
+    operations.mknode(empty, false);
     try {
       ServiceRecord record = operations.resolve(empty);
       fail("expected an exception");
@@ -263,10 +263,10 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     comp2.addInternalEndpoint(
         inetAddrEndpoint("jmx", "JMX", "rack1server28", 35882));
 
-    operations.mkdir(USERPATH, false);
+    operations.mknode(USERPATH, false);
     operations.create(appPath, webapp, CreateFlags.OVERWRITE);
     String components = appPath + RegistryInternalConstants.SUBPATH_COMPONENTS + "/";
-    operations.mkdir(components, false);
+    operations.mknode(components, false);
     String dns1 = RegistryPathUtils.encodeYarnID(cid1);
     String dns1path = components + dns1;
     operations.create(dns1path, comp1, CreateFlags.CREATE);
@@ -286,7 +286,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
         PersistencePolicies.CONTAINER, dns1resolved.persistence);
 
 
-    RegistryPathStatus[] componentStats = operations.listDir(components);
+    RegistryPathStatus[] componentStats = operations.list(components);
     assertEquals(2, componentStats.length);
     Map<String, ServiceRecord> records =
         RecordOperations.extractServiceRecords(operations, componentStats);
@@ -297,8 +297,8 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     assertEquals(PersistencePolicies.CONTAINER, retrieved1.persistence);
 
     // create a listing under components/
-    operations.mkdir(components + "subdir", false);
-    RegistryPathStatus[] componentStatsUpdated = operations.listDir(components);
+    operations.mknode(components + "subdir", false);
+    RegistryPathStatus[] componentStatsUpdated = operations.list(components);
     assertEquals(3, componentStatsUpdated.length);
     Map<String, ServiceRecord> recordsUpdated =
         RecordOperations.extractServiceRecords(operations, componentStats);
@@ -366,7 +366,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
         PersistencePolicies.APPLICATION_ATTEMPT);
     written.id = "testAsyncPurgeEntry_attempt_001";
 
-    operations.mkdir(RegistryPathUtils.parentOf(path), true);
+    operations.mknode(RegistryPathUtils.parentOf(path), true);
     operations.create(path, written, 0);
 
     ZKPathDumper dump = registry.dumpPath();
@@ -409,7 +409,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
         PersistencePolicies.APPLICATION_ATTEMPT);
     written.id = "testAsyncPurgeEntry_attempt_001";
 
-    operations.mkdir(RegistryPathUtils.parentOf(path), true);
+    operations.mknode(RegistryPathUtils.parentOf(path), true);
     operations.create(path, written, 0);
 
     ZKPathDumper dump = registry.dumpPath();
@@ -446,7 +446,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     ServiceRecord written = buildExampleServiceEntry(
         PersistencePolicies.CONTAINER);
 
-    operations.mkdir(RegistryPathUtils.parentOf(path), true);
+    operations.mknode(RegistryPathUtils.parentOf(path), true);
     operations.create(path, written, CreateFlags.CREATE);
     ServiceRecord resolved = operations.resolve(path);
     validateEntry(resolved);

@@ -57,7 +57,7 @@ public interface RegistryOperations extends Service {
    * @throws IOException Any other IO Exception.
    * @return true if the path was created, false if it existed.
    */
-  boolean mkdir(String path, boolean createParents)
+  boolean mknode(String path, boolean createParents)
       throws PathNotFoundException,
       AccessControlException,
       InvalidPathnameException,
@@ -100,8 +100,8 @@ public interface RegistryOperations extends Service {
 
   /**
    * Get the status of a path
-   * @param path
-   * @return
+   * @param path path to query
+   * @return the status of the path
    * @throws PathNotFoundException path is not in the registry.
    * @throws AccessControlException security restriction.
    * @throws InvalidPathnameException the path is invalid.
@@ -122,7 +122,7 @@ public interface RegistryOperations extends Service {
    * @throws InvalidPathnameException the path is invalid.
    * @throws IOException Any other IO Exception
    */
-  RegistryPathStatus[] listDir(String path)
+  RegistryPathStatus[] list(String path)
       throws PathNotFoundException,
       AccessControlException,
       InvalidPathnameException,

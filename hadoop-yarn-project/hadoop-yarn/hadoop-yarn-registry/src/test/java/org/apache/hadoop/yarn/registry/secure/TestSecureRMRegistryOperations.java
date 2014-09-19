@@ -125,7 +125,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     RMRegistryOperationsService rmRegistryOperations =
         createRMRegistryOperations();
     RegistryOperations operations = rmRegistryOperations;
-    operations.mkdir(RegistryInternalConstants.PATH_SYSTEM_SERVICES + "hdfs",
+    operations.mknode(RegistryInternalConstants.PATH_SYSTEM_SERVICES + "hdfs",
         false);
   }
 

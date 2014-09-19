@@ -84,7 +84,7 @@ public class AbstractRegistryTest extends AbstractZKRegistryTest {
       throws IOException, URISyntaxException {
     ServiceRecord record = buildExampleServiceEntry(persistence);
 
-    registry.mkdir(RegistryPathUtils.parentOf(path), true);
+    registry.mknode(RegistryPathUtils.parentOf(path), true);
     operations.create(path, record, createFlags);
     return record;
   }

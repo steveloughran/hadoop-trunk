@@ -105,7 +105,7 @@ public class RegistryOperationsService extends CuratorService
   }
   
   @Override
-  public boolean mkdir(String path, boolean createParents) throws
+  public boolean mknode(String path, boolean createParents) throws
       PathNotFoundException,
       AccessControlException,
       InvalidPathnameException,
@@ -164,7 +164,7 @@ public class RegistryOperationsService extends CuratorService
   }
 
   @Override
-  public RegistryPathStatus[] listDir(String path) throws
+  public RegistryPathStatus[] list(String path) throws
       PathNotFoundException,
       AccessControlException,
       InvalidPathnameException,

@@ -28,7 +28,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -402,7 +401,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
         "Empty 'id' argument");
 
     // list this path's children
-    RegistryPathStatus[] entries = listDir(path);
+    RegistryPathStatus[] entries = list(path);
 
     boolean toDelete = false;
     // look at self to see if it has a service record
