@@ -18,5 +18,5 @@
 
 # YARN Service Registry
 
-* [Architecture](registry-architecture.md)
+* [Architecture](yarn-registry.md)
 * [Security](registry-security.md)
