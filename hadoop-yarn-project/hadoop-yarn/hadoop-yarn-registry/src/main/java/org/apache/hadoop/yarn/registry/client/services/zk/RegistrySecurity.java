@@ -85,11 +85,6 @@ public class RegistrySecurity extends AbstractService {
       + KEY_REGISTRY_USER_ACCOUNTS;
 
   /**
-   * JAAS context name: {@value}
-   */
-  public static final String JAAS_CONTEXT_SERVER = "Server";
-
-  /**
    * Error raised when the registry is tagged as secure but this
    * process doesn't have hadoop security enabled.
    */
@@ -390,7 +385,7 @@ public class RegistrySecurity extends AbstractService {
            && !StringUtils.isEmpty(parts[0])
            && !StringUtils.isEmpty(parts[1]);
   }
-  
+
   /**
    * Generate a base-64 encoded digest of the idPasswordPair pair
    * @param idPasswordPair id:password
@@ -838,7 +833,7 @@ public class RegistrySecurity extends AbstractService {
           LOG.debug("Appending kerberos realm to make {}", username);
         }
       }
-      return new ACL(perms, new Id("sasl", username));
+      return new ACL(perms, new Id(SCHEME_SASL, username));
     }
   }
   
