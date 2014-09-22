@@ -296,6 +296,7 @@ public class RegistryTestHelper extends Assert {
   public static LoginContext logout(LoginContext login) {
     try {
       if (login != null) {
+        LOG.debug("Logging out login context {}", login.toString());
         login.logout();
       }
     } catch (LoginException e) {
@@ -350,7 +351,7 @@ public class RegistryTestHelper extends Assert {
    */
   protected UserGroupInformation loginUGI(String user, File keytab) throws
       IOException {
-    LOG.info("Logging in as {}", user);
+    LOG.info("Logging in as {} from {}", user, keytab);
     return UserGroupInformation.loginUserFromKeytabAndReturnUGI(user,
         keytab.getAbsolutePath());
   }

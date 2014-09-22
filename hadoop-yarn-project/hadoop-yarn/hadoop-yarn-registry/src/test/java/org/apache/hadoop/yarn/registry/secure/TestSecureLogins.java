@@ -22,7 +22,10 @@ package org.apache.hadoop.yarn.registry.secure;
 
 import com.sun.security.auth.module.Krb5LoginModule;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.security.HadoopKerberosName;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
+import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.zookeeper.Environment;
@@ -64,9 +67,6 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
       Assume.assumeTrue("Failed to run "+ KTUTIL+": " + e, false );
     }
   }
-
-  
-
 
   @Test
   public void testHasRealm() throws Throwable {
@@ -156,23 +156,37 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
   }
 
   @Test
+  public void testDefaultRealmValid() throws Throwable {
+    String defaultRealm = KerberosUtil.getDefaultRealm();
+    assertNotEmpty("No default Kerberos Realm",
+        defaultRealm);
+    LOG.info("Default Realm '{}'", defaultRealm);
+  }
+
+  @Test
+  public void testKerberosRulesValid() throws Throwable {
+    assertTrue("!KerberosName.hasRulesBeenSet()",
+        KerberosName.hasRulesBeenSet());
+    String rules = KerberosName.getRules();
+    assertEquals(kerberosRule, rules);
+    LOG.info(rules);
+  }
+  
+  @Test
+  public void testValidKerberosName() throws Throwable {
+
+    new HadoopKerberosName(ZOOKEEPER).getShortName();
+    new HadoopKerberosName(ZOOKEEPER_LOCALHOST).getShortName();
+    new HadoopKerberosName(ZOOKEEPER_REALM).getShortName();
+    // standard rules don't pick this up
+    // new HadoopKerberosName(ZOOKEEPER_LOCALHOST_REALM).getShortName();
+  }
+
+  
+  @Test
   public void testUGILogin() throws Throwable {
-
-    
-    // debugging here to understand why this test has started failing
-    String confFilename = System.getProperty(Environment.JAAS_CONF_KEY);
-    assertEquals(jaasFile.getAbsolutePath(), confFilename);
-
-    LoginContext loginContext = createLoginContextZookeeperLocalhost();
-    loginContext.login();
-    loginContext.logout();
-    
-    ktListRobust(keytab_zk);
-
-    RegistrySecurity.validateContext(ZOOKEEPER);
-    
-//    UserGroupInformation ugi = loginUGI(ZOOKEEPER, keytab_zk);
-    UserGroupInformation ugi = loginUGI(ZOOKEEPER_LOCALHOST, keytab_zk);
+   
+    UserGroupInformation ugi = loginUGI(ZOOKEEPER, keytab_zk);
     RegistrySecurity.UgiInfo ugiInfo =
         new RegistrySecurity.UgiInfo(ugi);
     LOG.info("logged in as: {}", ugiInfo);
@@ -188,7 +202,7 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
         return registrySecurity.createSaslACLFromCurrentUser(0);
       }
     });
-    assertEquals(ZOOKEEPER_LOCALHOST_REALM, acl.getId().getId());
+    assertEquals(ZOOKEEPER_REALM, acl.getId().getId());
     assertEquals("sasl", acl.getId().getScheme());
     registrySecurity.addSystemACL(acl);
 

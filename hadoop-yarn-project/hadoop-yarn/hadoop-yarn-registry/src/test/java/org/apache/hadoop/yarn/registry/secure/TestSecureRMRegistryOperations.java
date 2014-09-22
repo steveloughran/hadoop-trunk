@@ -51,15 +51,13 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
 
   @Before
   public void setupTestSecureRMRegistryOperations() throws Exception {
-    System.setProperty("curator-log-events", "true");
     startSecureZK();
     secureConf = new Configuration();
     secureConf.setBoolean(KEY_REGISTRY_SECURE, true);
 
     // ZK is in charge
     secureConf.set(KEY_REGISTRY_SYSTEM_ACCOUNTS, "sasl:zookeeper@");
-    UserGroupInformation.setConfiguration(CONF);
-    zookeeperUGI = loginUGI(ZOOKEEPER_LOCALHOST, keytab_zk);
+    zookeeperUGI = loginUGI(ZOOKEEPER, keytab_zk);
   }
 
   @After

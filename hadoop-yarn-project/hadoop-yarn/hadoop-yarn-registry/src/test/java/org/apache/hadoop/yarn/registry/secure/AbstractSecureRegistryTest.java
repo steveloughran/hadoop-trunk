@@ -22,6 +22,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.RegistryTestHelper;
@@ -59,8 +60,9 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   public static final String REALM = "EXAMPLE.COM";
   public static final String ZOOKEEPER = "zookeeper";
   public static final String ZOOKEEPER_LOCALHOST = "zookeeper/localhost";
+  public static final String ZOOKEEPER_REALM = "zookeeper@"+REALM;;
   public static final String ZOOKEEPER_LOCALHOST_REALM = 
-      ZOOKEEPER_LOCALHOST+ "@" + REALM;
+      ZOOKEEPER_LOCALHOST + "@" + REALM;
   public static final String ALICE = "alice";
   public static final String ALICE_LOCALHOST = "alice/localhost";
   public static final String BOB = "bob";
@@ -98,7 +100,6 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   public static final String SUN_SECURITY_KRB5_DEBUG =
       "sun.security.krb5.debug";
 
-
   private final AddingCompositeService teardown =
       new AddingCompositeService("teardown");
   
@@ -109,8 +110,6 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   protected static File kdcWorkDir;
   protected static Properties kdcConf;
   protected static RegistrySecurity registrySecurity;
-  
-
 
   @Rule
   public final Timeout testTimeout = new Timeout(900000);
@@ -130,11 +129,15 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     registrySecurity = new RegistrySecurity("registrySecurity");
     registrySecurity.init(CONF);
     setupKDCAndPrincipals();
+    RegistrySecurity.clearJaasSystemProperties();
+    RegistrySecurity.bindJVMtoJAASFile(jaasFile);
+    initHadoopSecurity();
   }
 
   @AfterClass
   public static void afterSecureRegistryTestClass() throws
       Exception {
+    describe(LOG, "teardown of class");
     classTeardown.close();
     teardownKDC();
   }
@@ -154,14 +157,12 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
    */
   @Before
   public void beforeSecureRegistryTest() {
-/*
-    resetJaasConfKeys();
-    RegistrySecurity.bindJVMtoJAASFile(jaasFile);*/
-    initHadoopSecurity();
+
   }
 
   @After
   public void afterSecureRegistryTest() throws IOException {
+    describe(LOG, "teardown of instance");
     teardown.close();
     stopSecureZK();
   }
@@ -182,7 +183,6 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     }
   }
 
-
   /**
    * Sets up the KDC and a set of principals in the JAAS file
    * 
@@ -198,9 +198,9 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     kdc = new MiniKdc(kdcConf, kdcWorkDir);
     kdc.start();
 
-    keytab_zk = createPrincipalAndKeytab(ZOOKEEPER_LOCALHOST, "zookeeper.keytab");
-    keytab_alice = createPrincipalAndKeytab(ALICE_LOCALHOST, "alice.keytab");
-    keytab_bob = createPrincipalAndKeytab(BOB_LOCALHOST , "bob.keytab");
+    keytab_zk = createKeytab(ZOOKEEPER, "zookeeper.keytab");
+    keytab_alice = createKeytab(ALICE, "alice.keytab");
+    keytab_bob = createKeytab(BOB, "bob.keytab");
 
     StringBuilder jaas = new StringBuilder(1024);
     jaas.append(registrySecurity.createJAASEntry(ZOOKEEPER,
@@ -217,14 +217,18 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   }
 
 
+  //
+  protected static final String kerberosRule =
+      "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\nDEFAULT";
 
-  public void resetJaasConfKeys() {
-    RegistrySecurity.clearJaasSystemProperties();
-  }
-
-
-  public void initHadoopSecurity() {
+  /**
+   * Init hadoop security by setting up the UGI config
+   */
+  public static void initHadoopSecurity() {
+   
     UserGroupInformation.setConfiguration(CONF);
+
+    KerberosName.setRules(kerberosRule);
   }
 
   /**
@@ -278,13 +282,21 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     return secureZK;
   }
 
-  public static File createPrincipalAndKeytab(String principal,
+  /**
+   * Create the keytabl for the given principal, includes
+   * raw principal and $principal/localhost
+   * @param principal principal short name
+   * @param filename filename of keytab
+   * @return file of keytab
+   * @throws Exception
+   */
+  public static File createKeytab(String principal,
       String filename) throws Exception {
     assertNotEmpty("empty principal", principal);
     assertNotEmpty("empty host", filename);
     assertNotNull("Null KDC", kdc);
     File keytab = new File(kdcWorkDir, filename);
-    kdc.createPrincipal(keytab, principal);
+    kdc.createPrincipal(keytab, principal, principal +"/localhost");
     return keytab;
   }
 
