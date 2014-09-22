@@ -169,6 +169,7 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
     
     ktListRobust(keytab_zk);
 
+    RegistrySecurity.validateContext(ZOOKEEPER);
     
 //    UserGroupInformation ugi = loginUGI(ZOOKEEPER, keytab_zk);
     UserGroupInformation ugi = loginUGI(ZOOKEEPER_LOCALHOST, keytab_zk);
