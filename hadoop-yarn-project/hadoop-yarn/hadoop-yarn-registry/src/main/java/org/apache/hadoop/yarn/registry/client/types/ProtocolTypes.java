@@ -28,18 +28,77 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceStability.Evolving
 public interface ProtocolTypes {
 
+  /**
+   * Addresses are URIs of Hadoop Filesystem paths: {@value}
+   */
+  String PROTOCOL_FILESYSTEM = "hadoop/filesystem";
+
+  /**
+   * Classic Hadoop IPC : {@value}
+   */
   String PROTOCOL_HADOOP_IPC = "hadoop/IPC";
+
+  /**
+   * Hadoop protocol buffers IPC: {@value}
+   */
   String PROTOCOL_HADOOP_IPC_PROTOBUF = "hadoop/protobuf";
+
+  /**
+   * Corba IIOP: {@value}
+   */
   String PROTOCOL_IIOP = "IIOP";
+
+  /**
+   * REST: {@value}
+   */
   String PROTOCOL_REST = "REST";
+
+  /**
+   * Java RMI: {@value}
+   */
   String PROTOCOL_RMI = "RMI";
+
+  /**
+   * SunOS RPC, as used by NFS and similar: {@value}
+   */
   String PROTOCOL_SUN_RPC = "sunrpc";
+
+  /**
+   * Thrift-based protocols: {@value}
+   */
   String PROTOCOL_THRIFT = "thrift";
+
+  /**
+   * Custom TCP protocol: {@value}
+   */
   String PROTOCOL_TCP = "tcp";
+
+  /**
+   * Custom UPC-based protocol : {@value}
+   */
   String PROTOCOL_UDP = "udp";
+
+  /**
+   * Default value —the protocol is unknown : "{@value}"
+   */
   String PROTOCOL_UNKNOWN = "";
+
+  /**
+   * Web page: {@value}.
+   * 
+   * This protocol implies that the URLs are designed for
+   * people to view via web browsers.
+   */
   String PROTOCOL_WEBUI = "webui";
-  String PROTOCOL_WSAPI = "WS";
+
+  /**
+   * Web Services: {@value}
+   */
+  String PROTOCOL_WSAPI = "WS-*";
+
+  /**
+   * A zookeeper binding: {@value}
+   */
   String PROTOCOL_ZOOKEEPER_BINDING = "zookeeper";
 
 }

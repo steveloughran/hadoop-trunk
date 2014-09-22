@@ -60,8 +60,9 @@ public class TestRegistrySecurityHelper extends Assert {
     Configuration conf = new Configuration();
     conf.setBoolean(KEY_REGISTRY_SECURE, true);
     conf.set(KEY_REGISTRY_KERBEROS_REALM, "KERBEROS");
-    registrySecurity = new RegistrySecurity(conf);
+    registrySecurity = new RegistrySecurity("");
     // init the ACLs OUTSIDE A KERBEROS CLUSTER
+    registrySecurity.init(conf);
     registrySecurity.initACLs();
   }
 
@@ -172,7 +173,7 @@ public class TestRegistrySecurityHelper extends Assert {
   @Test
   public void testDefaultAClsValid() throws Throwable {
     registrySecurity.buildACLs(
-        RegistryConstants.DEFAULT_REGISTRY_SYSTEM_ACLS,
+        RegistryConstants.DEFAULT_REGISTRY_SYSTEM_ACCOUNTS,
         REALM_EXAMPLE_COM, ZooDefs.Perms.ALL);
   }
 
@@ -194,13 +195,13 @@ public class TestRegistrySecurityHelper extends Assert {
   @Test
   public void testSecurityImpliesKerberos() throws Throwable {
     Configuration conf = new Configuration();
-    conf.getBoolean("hadoop.security.authentication", true);
+    conf.setBoolean("hadoop.security.authentication", true);
     conf.setBoolean(KEY_REGISTRY_SECURE, true);
     conf.set(KEY_REGISTRY_KERBEROS_REALM, "KERBEROS");
-    RegistrySecurity security = new RegistrySecurity(conf);
+    RegistrySecurity security = new RegistrySecurity("registry security");
     try {
-      security.initSecurity();
-    } catch (IOException e) {
+      security.init(conf);
+    } catch (Exception e) {
       assertTrue(
           "did not find "+ RegistrySecurity.E_NO_KERBEROS + " in " + e,
           e.toString().contains(RegistrySecurity.E_NO_KERBEROS));

@@ -47,16 +47,21 @@ public final class RegistryPathStatus {
     this.children = children;
   }
 
+  /**
+   * Equality operator checks size, time and path of the entries.
+   * @param other the other entry
+   * @return true if the entries are considered equal.
+   */
   @Override
-  public boolean equals(Object o) {
-    if (this == o) {
+  public boolean equals(Object other) {
+    if (this == other) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (other == null || getClass() != other.getClass()) {
       return false;
     }
 
-    RegistryPathStatus status = (RegistryPathStatus) o;
+    RegistryPathStatus status = (RegistryPathStatus) other;
 
     if (size != status.size) {
       return false;
@@ -71,6 +76,10 @@ public final class RegistryPathStatus {
     return true;
   }
 
+  /**
+   * The hash code is derived from the path.
+   * @return hash code for storing the path in maps.
+   */
   @Override
   public int hashCode() {
     return path != null ? path.hashCode() : 0;

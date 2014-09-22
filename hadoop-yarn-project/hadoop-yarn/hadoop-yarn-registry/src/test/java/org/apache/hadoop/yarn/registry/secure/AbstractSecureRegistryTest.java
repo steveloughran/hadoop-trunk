@@ -120,7 +120,8 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
    */
   @BeforeClass
   public static void beforeSecureRegistryTestClass() throws Exception {
-    registrySecurity = new RegistrySecurity(CONF, "");
+    registrySecurity = new RegistrySecurity("registrySecurity");
+    registrySecurity.init(CONF);
     setupKDCAndPrincipals();
   }
 
@@ -255,12 +256,15 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
 
     File testdir = new File(System.getProperty("test.dir", "target"));
     File workDir = new File(testdir, name);
-    workDir.mkdirs();
+    if (!workDir.mkdirs()) {
+      assertTrue(workDir.isDirectory());      
+    }
     System.setProperty(
         ZookeeperConfigOptions.PROP_ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE,
         "false");
     RegistrySecurity.validateContext(context);
-    conf.set(MicroZookeeperServiceKeys.KEY_REGISTRY_ZKSERVICE_JAAS_CONTEXT, context);
+    conf.set(MicroZookeeperServiceKeys.KEY_REGISTRY_ZKSERVICE_JAAS_CONTEXT,
+        context);
     MicroZookeeperService secureZK = new MicroZookeeperService(name);
     secureZK.init(conf);
     LOG.info(secureZK.getDiagnostics());

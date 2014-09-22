@@ -125,6 +125,8 @@ public class Endpoint {
 
   /**
    * Validate the record by checking for null fields
+   * @throws NullPointerException if a field is null when it
+   * MUST be set.
    */
   public void validate() {
     Preconditions.checkNotNull(api, "null API field");

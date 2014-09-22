@@ -65,9 +65,13 @@ public class RecordOperations {
           ServiceRecord serviceRecord = operations.resolve(stat.path);
           results.put(stat.path, serviceRecord);
         } catch (EOFException ignored) {
-          LOG.debug("data too short for {}", stat.path);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("data too short for {}", stat.path);
+          }
         } catch (InvalidRecordException record) {
-          LOG.debug("Invalid record at {}", stat.path);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Invalid record at {}", stat.path);
+          }
         }
 
       }

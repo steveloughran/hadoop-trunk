@@ -24,9 +24,12 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosUtil;
+import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.zookeeper.Environment;
 import org.apache.zookeeper.ZooDefs;
@@ -39,7 +42,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.security.auth.login.AppConfigurationEntry;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.security.NoSuchAlgorithmException;
@@ -51,17 +53,41 @@ import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions.*;
-import static org.apache.zookeeper.client.ZooKeeperSaslClient.*;
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
 /**
- * Implement the registry security ... standalone for easier testing
+ * Implement the registry security ... a self contained service for
+ * testability.
+ * 
+ * This class contains
+ * <ol>
+ *   <li>
+ *     The registry security policy implementation, configuration reading, ACL
+ * setup and management
+ *   </li>
+ *   <li>Lots of static helper methods to aid security setup and debugging</li>
+ * </ol>
  */
-public class RegistrySecurity {
+
+public class RegistrySecurity extends AbstractService {
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistrySecurity.class);
-  public static final String CLIENT = "Client";
-  public static final String SERVER = "Server";
+
+  public static final String E_UNKNOWN_AUTHENTICATION_MECHANISM =
+      "Unknown/unsupported authentication mechanism; ";
+
+  /**
+   * there's no default user to add with permissions, so it would be
+   * impossible to create nodes with unrestricted user access
+   */
+  public static final String E_NO_USER_DETERMINED_FOR_ACLS =
+      "No user for ACLs determinable from current user or registry option "
+      + KEY_REGISTRY_USER_ACCOUNTS;
+
+  /**
+   * JAAS context name: {@value}
+   */
+  public static final String JAAS_CONTEXT_SERVER = "Server";
 
   /**
    * Error raised when the registry is tagged as secure but this
@@ -69,10 +95,30 @@ public class RegistrySecurity {
    */
   public static final String E_NO_KERBEROS =
       "Registry security is enabled -but Hadoop security is not enabled";
-  private final Configuration conf;
-  private String idPassword;
-  private String domain;
-  private boolean secure;
+
+  /*
+  Access policy options
+   */
+  private enum AccessPolicy {
+    anon, sasl, digest
+  }
+
+  /**
+  Access mechanism
+  */
+  private AccessPolicy access;
+
+
+  /**
+   * Auth data used for digest auth
+   */
+  private byte[] digestAuthData;
+
+
+  /**
+   * flag set to true if the registry has security enabled.
+   */
+  private boolean secureRegistry;
 
   /**
    * An ACL with read-write access for anyone
@@ -101,44 +147,64 @@ public class RegistrySecurity {
   /**
    * the list of system ACLs
    */
-  private List<ACL> systemACLs = new ArrayList<ACL>();
+  private final List<ACL> systemACLs = new ArrayList<ACL>();
 
+  /**
+   * A list of digest ACLs which can be added to permissions
+   * —and cleared later.
+   */
+  private final List<ACL> digestACLs = new ArrayList<ACL>();
+  
   /**
    * the default kerberos realm 
    */  
   private String kerberosRealm;
 
-  /**
-   * Create an instance with no password
-   */
-  public RegistrySecurity(Configuration conf) throws IOException {
-    this(conf, "");
-  }
+  private String jaasClientContext;
+  
+  private String jaasClientIdentity;
 
   /**
    * Create an instance
-   * @param conf config
-   * @param idPassword id:pass pair. If not empty, this tuple is validated
-   * @throws IOException on any configuration problem
+   * @param name
    */
-  public RegistrySecurity(Configuration conf, String idPassword)
-      throws IOException {
-    this.conf = conf;
+  public RegistrySecurity(String name) {
+    super(name);
+  }
 
-    secure = conf.getBoolean(KEY_REGISTRY_SECURE, DEFAULT_REGISTRY_SECURE);
+  @Override
+  protected void serviceInit(Configuration conf) throws Exception {
+    super.serviceInit(conf);
+    String auth = conf.getTrimmed(KEY_REGISTRY_CLIENT_AUTH,
+        REGISTRY_CLIENT_AUTH_ANONYMOUS);
 
-    setIdPassword(idPassword);
+    // JDK7
+    if (REGISTRY_CLIENT_AUTH_KERBEROS.equals(auth)) {
+      access = AccessPolicy.sasl;
+    } else if (REGISTRY_CLIENT_AUTH_DIGEST.equals(auth)) {
+      access = AccessPolicy.digest;
+    } else if (REGISTRY_CLIENT_AUTH_ANONYMOUS.equals(auth)) {
+      access = AccessPolicy.anon;
+    } else {
+      throw new ServiceStateException(E_UNKNOWN_AUTHENTICATION_MECHANISM
+                                      + "\"" + auth + "\"");
+    }
+
+    initSecurity();
   }
 
   /**
-   * Init security. This triggers extraction and validation
-   * of both the 
+   * Init security.
+
    * After this operation, the {@link #systemACLs} list is valid. 
    * @return true if the cluster is secure.
    * @throws IOException
    */
-  public boolean initSecurity() throws
+  private boolean initSecurity() throws
       IOException {
+
+    secureRegistry =
+        getConfig().getBoolean(KEY_REGISTRY_SECURE, DEFAULT_REGISTRY_SECURE);
     if (!UserGroupInformation.isSecurityEnabled()) {
       addSystemACL(ALL_READWRITE_ACCESS);
       return false;
@@ -146,6 +212,128 @@ public class RegistrySecurity {
     initACLs();
     return true;
   }
+
+  /**
+   * Init the ACLs. 
+   * After this operation, the {@link #systemACLs} list is valid. 
+   * @throws IOException
+   */
+  @VisibleForTesting
+  public void initACLs() throws IOException {
+    systemACLs.clear();
+    if (secureRegistry) {
+      addSystemACL(ALL_READ_ACCESS);
+
+      kerberosRealm = getConfig().get(KEY_REGISTRY_KERBEROS_REALM,
+          getDefaultRealmInJVM());
+      // SYSTEM Accounts
+      String system = getOrFail(KEY_REGISTRY_SYSTEM_ACCOUNTS,
+                                DEFAULT_REGISTRY_SYSTEM_ACCOUNTS);
+
+      systemACLs.addAll(buildACLs(system, kerberosRealm, ZooDefs.Perms.ALL));
+      
+      // user accounts (may be empty, but for digest one user AC must
+      // be built up
+      String user = getConfig().get(KEY_REGISTRY_USER_ACCOUNTS, 
+                              DEFAULT_REGISTRY_USER_ACCOUNTS);
+      List<ACL> userACLs = buildACLs(user, kerberosRealm, ZooDefs.Perms.ALL);
+
+
+      // add self if the current user can be determined 
+      ACL self = null;
+      if (UserGroupInformation.isSecurityEnabled()) {
+        self = createSaslACLFromCurrentUser(ZooDefs.Perms.ALL);
+        userACLs.add(self);
+      }
+      
+      // here check for UGI having secure on or digest + ID 
+      switch (access) {
+        case sasl:
+          // secure + SASL => has to be authenticated
+          if (!UserGroupInformation.isSecurityEnabled()) {
+            throw new IOException("Kerberos required for secure registry access");
+          }
+          UserGroupInformation currentUser =
+              UserGroupInformation.getCurrentUser();
+          jaasClientContext = getOrFail(KEY_REGISTRY_CLIENT_JAAS_CONTEXT,
+              DEFAULT_REGISTRY_CLIENT_JAAS_CONTEXT);
+          jaasClientIdentity = currentUser.getShortUserName();
+          break;
+        
+        case digest:
+          String id = getOrFail(KEY_REGISTRY_CLIENT_AUTHENTICATION_ID, "");
+          String pass = getOrFail(KEY_REGISTRY_CLIENT_AUTHENTICATION_PASSWORD, "");
+          if (userACLs.isEmpty()) {
+            // 
+            throw new ServiceStateException(E_NO_USER_DETERMINED_FOR_ACLS);
+          }
+          String digestAuth = digest(id, pass);
+          userACLs.add(new ACL(ZooDefs.Perms.ALL, toDigestId(digestAuth)));
+          digestAuthData = digestAuth.getBytes("UTF-8");
+          break;
+        
+        case anon:
+          // nothing is needed; account is read only.
+          break;
+      }
+      
+    } else {
+      // wide open cluster, adding system acls
+      systemACLs.addAll(WorldReadWriteACL);
+    }
+  }
+
+  /**
+   * Add another system ACL
+   * @param acl add ACL
+   */
+  public void addSystemACL(ACL acl) {
+    systemACLs.add(acl);
+  }
+
+  /**
+   * Add another system ACL
+   * @param acl add ACL
+   */
+  public void addDigestACL(ACL acl) {
+    digestACLs.add(acl);
+  }
+
+  /**
+   * Reset the digest ACL list
+   */
+  public void resetDigestACLs() {
+    digestACLs.clear();
+  }
+
+  /**
+   * Flag to indicate the cluster is secure
+   * @return true if the config enabled security
+   */
+  public boolean isSecureRegistry() {
+    return secureRegistry;
+  }
+
+  /**
+   * Get the system principals
+   * @return the system principals
+   */
+  public List<ACL> getSystemACLs() {
+    Preconditions.checkNotNull(systemACLs, "registry security is unitialized");
+    return Collections.unmodifiableList(systemACLs);
+  }
+
+  /**
+   * Get all ACLs needed for a client to use when writing to the repo.
+   * That is: system ACLs, its own ACL, any digest ACLs
+   * @return the client ACLs
+   */
+  public List<ACL> getClientACLs() {
+    List<ACL> clientACLs = new ArrayList<ACL>(systemACLs);
+    clientACLs.addAll(digestACLs);
+    return clientACLs;
+  }
+
 
   /**
    * Create a SASL 
@@ -166,72 +354,7 @@ public class RegistrySecurity {
    */
   public ACL createSaslACL(UserGroupInformation ugi, int perms) {
     String userName = ugi.getUserName();
-    return new ACL(perms, new Id("sasl", userName));
-  }
-
-  /**
-   * Init the ACLs. 
-   * After this operation, the {@link #systemACLs} list is valid. 
-   * @throws IOException
-   */
-  @VisibleForTesting
-  public void initACLs() throws IOException {
-    if (secure) {
-      
-      String sysacls =
-          getOrFail(KEY_REGISTRY_SYSTEM_ACLS, DEFAULT_REGISTRY_SYSTEM_ACLS);
-
-      kerberosRealm = conf.get(KEY_REGISTRY_KERBEROS_REALM,
-          getDefaultRealmInJVM());
-
-      systemACLs =
-          buildACLs(sysacls, kerberosRealm, ZooDefs.Perms.ALL);
-      addSystemACL(ALL_READ_ACCESS);
-    } else {
-      // principal list is empty
-      systemACLs = WorldReadWriteACL;
-    }
-  }
-
-  /**
-   * Add another system ACL
-   * @param acl add ACL
-   */
-  public void addSystemACL(ACL acl) {
-    systemACLs.add(acl);
-  }
-
-
-  /**
-   * Add an id:password pair
-   * @param idPasswordPair
-   * @throws IOException
-   */
-  protected void setIdPassword(String idPasswordPair) throws IOException {
-    this.idPassword = idPasswordPair;
-    if (!StringUtils.isEmpty(idPasswordPair)) {
-      if (!isValid(idPasswordPair)) {
-        throw new IOException("Invalid id:password: " + idPasswordPair);
-      }
-      digest(idPasswordPair);
-    }
-  }
-
-  /**
-   * Flag to indicate the cluster is secure
-   * @return true if the config enabled security
-   */
-  public boolean isSecure() {
-    return secure;
-  }
-
-  /**
-   * Get the system principals
-   * @return the system principals
-   */
-  public List<ACL> getSystemACLs() {
-    Preconditions.checkNotNull(systemACLs, "registry security is unitialized");
-    return Collections.unmodifiableList(systemACLs);
+    return new ACL(perms, new Id(SCHEME_SASL, userName));
   }
 
   public String getKerberosRealm() {
@@ -246,7 +369,7 @@ public class RegistrySecurity {
    * @throws IOException if missing
    */
   private String getOrFail(String key, String defval) throws IOException {
-    String val = conf.get(key, defval);
+    String val = getConfig().get(key, defval);
     if (StringUtils.isEmpty(val)) {
       throw new IOException("Missing value for configuration option " + key);
     }
@@ -262,19 +385,18 @@ public class RegistrySecurity {
    * @return true if the pass is considered valid.
    */
   public boolean isValid(String idPasswordPair) {
-    String parts[] = idPasswordPair.split(":");
+    String[] parts = idPasswordPair.split(":");
     return parts.length == 2 
            && !StringUtils.isEmpty(parts[0])
            && !StringUtils.isEmpty(parts[1]);
   }
-
+  
   /**
    * Generate a base-64 encoded digest of the idPasswordPair pair
    * @param idPasswordPair id:password
    * @return a string that can be used for authentication
    */
-  public String digest(String idPasswordPair) throws
-      IOException {
+  public String digest(String idPasswordPair) throws IOException {
     if (StringUtils.isEmpty(idPasswordPair) || !isValid(idPasswordPair)) {
       throw new IOException("Invalid id:password: " + idPasswordPair);
     }
@@ -286,7 +408,48 @@ public class RegistrySecurity {
       throw new IOException(e.toString(), e);
     }
   }
-  
+
+  /**
+   * Generate a base-64 encoded digest of the idPasswordPair pair
+   * @param id ID 
+   * @param password pass
+   * @return a string that can be used for authentication
+   * @throws IOException
+   */
+  public String digest(String id, String password) throws IOException {
+    return digest(id + ":" + password);
+  }
+
+  /**
+   * Given a digest, create an ID from it
+   * @param digest digest
+   * @return ID
+   */
+  public Id toDigestId(String digest) {
+    return new Id(SCHEME_DIGEST, digest);
+  }
+
+  public Id toDigestId(String id, String password) throws IOException {
+    return toDigestId(digest(id, password));
+  }
+  /**
+   * Split up a list of the form 
+   * <code>sasl:mapred@,digest:5f55d66, sasl@yarn@EXAMPLE.COM</code>
+   * into a list of possible ACL values, trimming as needed
+   * 
+   * The supplied realm is added to entries where
+   * <ol>
+   *   <li>the string begins "sasl:"</li>
+   *   <li>the string ends with "@"</li>
+   * </ol>
+   * No attempt is made to validate any of the acl patterns.
+   * 
+   * @param aclString list of 0 or more ACLs
+   * @param realm realm to add
+   * @return a list of split and potentially patched ACL pairs.
+   * 
+   * 
+   */
   public List<String> splitAclPairs(String aclString, String realm) {
     List<String> list = Lists.newArrayList(
         Splitter.on(',').omitEmptyStrings().trimResults()
@@ -294,7 +457,7 @@ public class RegistrySecurity {
     ListIterator<String> listIterator = list.listIterator();
     while (listIterator.hasNext()) {
       String next = listIterator.next();
-      if (next.startsWith("sasl") && next.endsWith("@")) {
+      if (next.startsWith(SCHEME_SASL +":") && next.endsWith("@")) {
         listIterator.set(next + realm);
       }
     }
@@ -430,7 +593,9 @@ public class RegistrySecurity {
    */
   public static void bindJVMtoJAASFile(File jaasFile) {
     String path = jaasFile.getAbsolutePath();
-    LOG.debug("Binding {} to {}", Environment.JAAS_CONF_KEY, path);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Binding {} to {}", Environment.JAAS_CONF_KEY, path);
+    }
     System.setProperty(Environment.JAAS_CONF_KEY, path);
   }
 
@@ -457,23 +622,47 @@ public class RegistrySecurity {
    * JAAS setup, because it will relay detected problems up
    * @param context context name
    * @return the entry
-   * @throws FileNotFoundException if there is no context entry found
+   * @throws RuntimeException if there is no context entry found
    */
-  public static AppConfigurationEntry[] validateContext(String context) throws
-      FileNotFoundException {
+  public static AppConfigurationEntry[] validateContext(String context)  {
     javax.security.auth.login.Configuration configuration =
         javax.security.auth.login.Configuration.getConfiguration();
     AppConfigurationEntry[] entries =
         configuration.getAppConfigurationEntry(context);
     if (entries == null) {
-      throw new FileNotFoundException(
+      throw new RuntimeException(
           String.format("Entry \"%s\" not found; " +
                         "JAAS config = %s",
-              context, describeProperty(Environment.JAAS_CONF_KEY) ));
+              context,
+              describeProperty(Environment.JAAS_CONF_KEY) ));
     }
     return entries;
   }
 
+  /**
+   * Apply the security environment to this curator instance. This
+   * may include setting up the ZK system properties for SASL
+   * @param builder curator builder
+   */
+  public void applySecurityEnvironment(CuratorFrameworkFactory.Builder builder) {
+  
+    switch (access) {
+      case anon:
+        disableZookeeperSASL();
+        break;
+
+      case digest:
+        // no SASL
+        disableZookeeperSASL();
+        builder.authorization(SCHEME_DIGEST, digestAuthData);
+        break;
+        
+      case sasl:
+        // bind to the current identity and context within the JAAS file
+        setZKSaslClientProperties(jaasClientIdentity, jaasClientContext);
+    }
+  }
+  
   /**
    * Set the client properties. This forces the ZK client into 
    * failing if it can't auth.
@@ -484,12 +673,11 @@ public class RegistrySecurity {
    * JAAS context
    */
   public static void setZKSaslClientProperties(String username,
-      String context) throws FileNotFoundException {
+      String context)  {
     RegistrySecurity.validateContext(context);
     enableZookeeperSASL();
-    System.setProperty(SP_ZK_SASL_CLIENT_USERNAME, username);
-    System.setProperty(LOGIN_CONTEXT_NAME_KEY, context);
-    bindZKToServerJAASContext(context);
+    System.setProperty(PROP_ZK_SASL_CLIENT_USERNAME, username);
+    System.setProperty(PROP_ZK_SASL_CLIENT_CONTEXT, context);
   }
 
   /**
@@ -497,7 +685,7 @@ public class RegistrySecurity {
    * <b>Important:</b>This is JVM-wide
    */
   protected static void enableZookeeperSASL() {
-    System.setProperty(ENABLE_CLIENT_SASL_KEY, "true");
+    System.setProperty(PROP_ZK_ENABLE_SASL_CLIENT, "true");
   }
 
   /**
@@ -506,8 +694,8 @@ public class RegistrySecurity {
    */
   public static void clearZKSaslProperties() {
     disableZookeeperSASL();
-    System.clearProperty(ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY);
-    System.clearProperty(ZookeeperConfigOptions.SP_ZK_SASL_CLIENT_USERNAME);
+    System.clearProperty(PROP_ZK_SASL_CLIENT_CONTEXT);
+    System.clearProperty(PROP_ZK_SASL_CLIENT_USERNAME);
   }
 
   /**
@@ -534,7 +722,8 @@ public class RegistrySecurity {
   }
   
   /**
-   * Stringify a list of ACLs for logging
+   * Stringify a list of ACLs for logging. Digest ACLs have their
+   * digest values stripped for security.
    * @param acls ACL list
    * @return a string for logs, exceptions, ...
    */
@@ -544,8 +733,15 @@ public class RegistrySecurity {
       builder.append("null ACL");
     } else {
       builder.append('\n');
-      for (ACL acl1 : acls) {
-        builder.append(acl1.toString()).append(" ");
+      for (ACL acl : acls) {
+        String s;
+        if (acl.getId().getScheme().equals(SCHEME_DIGEST)) {
+          s = String.format(Locale.ENGLISH,
+              "%d, id=digest", acl.getPerms());
+        } else {
+          s = acl.toString();
+        }
+        builder.append(s).append(" ");
       }
     }
     return builder.toString();
@@ -557,22 +753,31 @@ public class RegistrySecurity {
    */
   public String buildSecurityDiagnostics() {
     StringBuilder builder = new StringBuilder();
-    builder.append(secure ? "secure registry; "
+    builder.append(secureRegistry ? "secure registry; "
                           : "insecure registry; ");
+    builder.append("Access policy: ").append(access);
 
     builder.append("System ACLs: ").append(aclsToString(systemACLs));
     builder.append(UgiInfo.fromCurrentUser());
     builder.append("Kerberos Realm: ").append(kerberosRealm).append(" ; ");
     builder.append(describeProperty(Environment.JAAS_CONF_KEY));
     String sasl =
-        System.getProperty(ENABLE_CLIENT_SASL_KEY,
-            ENABLE_CLIENT_SASL_DEFAULT);
+        System.getProperty(PROP_ZK_ENABLE_SASL_CLIENT,
+            DEFAULT_ZK_ENABLE_SASL_CLIENT);
     boolean saslEnabled = Boolean.valueOf(sasl);
-    builder.append(describeProperty(ENABLE_CLIENT_SASL_KEY,
-        ENABLE_CLIENT_SASL_DEFAULT));
+    builder.append(describeProperty(PROP_ZK_ENABLE_SASL_CLIENT,
+        DEFAULT_ZK_ENABLE_SASL_CLIENT));
     if (saslEnabled) {
-      builder.append(describeProperty(SP_ZK_SASL_CLIENT_USERNAME));
-      builder.append(describeProperty(LOGIN_CONTEXT_NAME_KEY));
+      builder.append(KEY_REGISTRY_CLIENT_JAAS_CONTEXT)
+             .append("=")
+             .append(jaasClientContext)
+             .append("; ");
+      builder.append("jaasClientIdentity")
+             .append("=")
+             .append(jaasClientIdentity)
+             .append("; ");
+      builder.append(describeProperty(PROP_ZK_SASL_CLIENT_USERNAME));
+      builder.append(describeProperty(PROP_ZK_SASL_CLIENT_CONTEXT));
     }
     builder.append(describeProperty(PROP_ZK_ALLOW_FAILED_SASL_CLIENTS,
         "(undefined but defaults to true)"));
@@ -619,15 +824,19 @@ public class RegistrySecurity {
    * in "@" then the realm is added
    */
   public ACL createACLForUser(UserGroupInformation user, int perms) {
-    LOG.debug("Creating ACL For ", new UgiInfo(user));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Creating ACL For ", new UgiInfo(user));
+    }
 
-    if (!secure) {
+    if (!secureRegistry) {
       return ALL_READWRITE_ACCESS;
     } else {
       String username = user.getUserName();
       if (!username.contains("@")) {
         username = username + "@" + kerberosRealm;
-        LOG.debug("Appending kerberos realm to make {}", username);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Appending kerberos realm to make {}", username);
+        }
       }
       return new ACL(perms, new Id("sasl", username));
     }
@@ -655,7 +864,6 @@ public class RegistrySecurity {
       this.ugi = ugi;
     }
 
-    
     
     @Override
     public String toString() {

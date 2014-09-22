@@ -99,7 +99,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
     RegistrySecurity registrySecurity = getRegistrySecurity();
-    if (registrySecurity.isSecure()) {
+    if (registrySecurity.isSecureRegistry()) {
       ACL sasl = registrySecurity.createSaslACLFromCurrentUser(ZooDefs.Perms.ALL);
       registrySecurity.addSystemACL(sasl);
       LOG.info("Registry System ACLs:",
@@ -286,9 +286,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     LOG.info("Application attempt {} unregistered, purging app attempt records",
         attemptId);
     purgeAppAttemptRecords(attemptId);
-
   }
-
 
   /**
    * Actions to take when an application is completed
@@ -318,7 +316,6 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
       IOException {
     initUserRegistryAsync(user);
   }
-
 
   /**
    * Actions to take when the AM container is completed
@@ -436,7 +433,6 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     }
 
     int deleteOps = 0;
-
     if (toDelete) {
       deleteOps++;
       zkDelete(path, true, callback);
@@ -453,7 +449,6 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
 
     return deleteOps;
   }
-
 
   /**
    * Callback for delete operations completing
@@ -481,7 +476,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   }
 
   /**
-   * An async registry action
+   * An async registry purge action
    */
   private class AsyncPurgeRegistry implements Callable<Integer> {
 
@@ -503,7 +498,9 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     @Override
     public Integer call() throws Exception {
       try {
-        LOG.info("executing {}", this);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Executing {}", this);
+        }
         return purgeRecords(path,
             id,
             persistencePolicyMatch,
@@ -517,11 +514,9 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
 
     @Override
     public String toString() {
-
       return String.format(
-          "record purge under %s with ID %s and policy %d: {}",
+          "Record purge under %s with ID %s and policy %d: {}",
           path, id, persistencePolicyMatch);
-
     }
   }
 

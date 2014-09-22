@@ -20,9 +20,6 @@ package org.apache.hadoop.yarn.registry.client.api;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.zookeeper.ZooDefs;
-
-import java.io.IOException;
 
 /**
  * Constants for the registry, including configuration keys and default
@@ -41,23 +38,27 @@ public interface RegistryConstants {
 
 
   /**
-   * Prefix for zookeeper-specific options. For clients
-   * using other protocols, these options are not used.
+   * Prefix for zookeeper-specific options: {@value}
+   * 
+   * For clients using other protocols, these options are not supported.
    */
   String ZK_PREFIX = REGISTRY_PREFIX + "zk.";
   
   /**
    * flag to indicate whether or not the registry should
-   * be enabled: {@value}
+   * be enabled in the RM: {@value}
    */
   String KEY_REGISTRY_ENABLED = REGISTRY_PREFIX + "rm.enabled";
 
+  /**
+   * Defaut value for enabling the registry in the RM: {@value}
+   */
   boolean DEFAULT_REGISTRY_ENABLED = false;
 
 
   /**
-   * Key to set if the registry is secure. Turning it on
-   * changes the permissions policy from "open access"
+   * Key to set if the registry is secure: {@value}.
+   * Turning it on changes the permissions policy from "open access"
    * to restrictions on kerberos with the option of
    * a user adding one or more auth key pairs down their
    * own tree.
@@ -65,7 +66,7 @@ public interface RegistryConstants {
   String KEY_REGISTRY_SECURE = REGISTRY_PREFIX + "secure";
 
   /**
-   * Default registry security policy: {@value}
+   * Default registry security policy: {@value}.
    */
   boolean DEFAULT_REGISTRY_SECURE = false;
   
@@ -78,6 +79,63 @@ public interface RegistryConstants {
    * Default root of the yarn registry: {@value}
    */
   String DEFAULT_ZK_REGISTRY_ROOT = "/registry";
+
+
+ 
+
+  /**
+   * Registry client authentication policy.
+   * 
+   * This is only used in secure clusters.
+   * 
+   * If the Factory methods of {@link RegistryOperationsFactory}
+   * are used, this key does not need to be set: it is set
+   * up based on the factory method used.
+   */
+  String KEY_REGISTRY_CLIENT_AUTH =
+      REGISTRY_PREFIX + "client.auth";
+
+  /**
+   * Registry client uses Kerberos: authentication is automatic from
+   * logged in user
+   */
+  String REGISTRY_CLIENT_AUTH_KERBEROS = "kerberos";
+
+  /**
+   * Username/password is the authentication mechanism.
+   * If set then both {@link #KEY_REGISTRY_CLIENT_AUTHENTICATION_ID}
+   * and {@link #KEY_REGISTRY_CLIENT_AUTHENTICATION_PASSWORD} must be set.
+   */
+  String REGISTRY_CLIENT_AUTH_DIGEST = "digest";
+
+  /**
+   * No authentication; client is anonymous
+   */
+  String REGISTRY_CLIENT_AUTH_ANONYMOUS = "";
+
+
+  /**
+   * Registry client authentication ID
+   *
+   * This is only used in secure clusters with
+   * {@link #KEY_REGISTRY_CLIENT_AUTH} set to
+   * {@link #REGISTRY_CLIENT_AUTH_DIGEST}
+   * 
+   */
+  String KEY_REGISTRY_CLIENT_AUTHENTICATION_ID =
+      KEY_REGISTRY_CLIENT_AUTH + ".id";
+
+
+  /**
+   * Registry client authentication password
+   *
+   * This is only used in secure clusters with
+   * {@link #KEY_REGISTRY_CLIENT_AUTH} set to
+   * {@link #REGISTRY_CLIENT_AUTH_DIGEST}
+   * 
+   */
+  String KEY_REGISTRY_CLIENT_AUTHENTICATION_PASSWORD =
+      KEY_REGISTRY_CLIENT_AUTH + ".password";
 
 
   /**
@@ -97,7 +155,7 @@ public interface RegistryConstants {
   String KEY_REGISTRY_ZK_SESSION_TIMEOUT =
       ZK_PREFIX + "session.timeout.ms";
 
-  /*
+  /**
   * The default ZK session timeout: {@value}
   */
   int DEFAULT_ZK_SESSION_TIMEOUT = 60000;
@@ -165,15 +223,34 @@ public interface RegistryConstants {
    * If there is an "@" at the end of an entry it 
    * instructs the registry client to append the default kerberos domain.
    */
-  String KEY_REGISTRY_SYSTEM_ACLS = REGISTRY_PREFIX + "system.acls";
+  String KEY_REGISTRY_SYSTEM_ACCOUNTS = REGISTRY_PREFIX + "system.accounts";
+
+  /**
+   * Default system accounts: {@value}
+   */
+  String DEFAULT_REGISTRY_SYSTEM_ACCOUNTS = "sasl:yarn@, sasl:mapred@, sasl:mapred@hdfs@";
+
+
+  /**
+   * A comma separated list of Zookeeper ACL identifiers with
+   * system access to the registry in a secure cluster: {@value}.
+   * 
+   * These are given full access to all entries.
+   * 
+   * If there is an "@" at the end of an entry it 
+   * instructs the registry client to append the default kerberos domain.
+   */
+  String KEY_REGISTRY_USER_ACCOUNTS = REGISTRY_PREFIX + "user.accounts";
 
   /**
    * Default system acls: {@value}
    */
-  String DEFAULT_REGISTRY_SYSTEM_ACLS = "sasl:yarn@, sasl:mapred@, sasl:mapred@hdfs@";
+  String DEFAULT_REGISTRY_USER_ACCOUNTS = "";
 
   /**
-   * The kerberos realm: used to set the realm of
+   * The kerberos realm: {@value}.
+   * 
+   * This is used to set the realm of
    * system principals which do not declare their realm,
    * and any other accounts that need the value.
    * 
@@ -187,12 +264,12 @@ public interface RegistryConstants {
 
 
   /**
-   * Key to define the JAAS context. Used in secure registries.
+   * Key to define the JAAS context. Used in secure registries: {@value}.
    */
   String KEY_REGISTRY_CLIENT_JAAS_CONTEXT = REGISTRY_PREFIX + "jaas.context";
 
   /**
-   * default registry JAAS context: {@value}
+   * default client-side registry JAAS context: {@value}
    */
   String DEFAULT_REGISTRY_CLIENT_JAAS_CONTEXT = "Client";
 
@@ -201,10 +278,12 @@ public interface RegistryConstants {
    *  path to users off the root: {@value}
    */
   String PATH_USERS = "/users/";
+  
   /**
    *  path to system services off the root : {@value}
    */
   String PATH_SYSTEM_SERVICES = "/services/";
+  
   /**
    *  path under a service record to point to components of that service:
    *  {@value}

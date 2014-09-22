@@ -39,7 +39,6 @@ import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.fs.PathPermissionException;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.service.CompositeService;
-import org.apache.hadoop.util.ZKUtil;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
@@ -50,6 +49,7 @@ import org.apache.hadoop.yarn.registry.client.services.BindingInformation;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -70,7 +70,7 @@ public class CuratorService extends CompositeService
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CuratorService.class);
-  public static final String SASL = "sasl";
+
   protected List<ACL> systemACLs;
 
   /**
@@ -89,7 +89,7 @@ public class CuratorService extends CompositeService
   private String registryRoot;
 
   private final RegistryBindingSource bindingSource;
-  
+
   private RegistrySecurity registrySecurity;
 
   /**
@@ -97,10 +97,8 @@ public class CuratorService extends CompositeService
    */
   private String connectionDescription;
   private String securityConnectionDiagnostics = "";
-  
-  private EnsembleProvider ensembleProvider;
-  private boolean secure;
 
+  private EnsembleProvider ensembleProvider;
 
   /**
    * Construct the service.
@@ -113,7 +111,7 @@ public class CuratorService extends CompositeService
     if (bindingSource != null) {
       this.bindingSource = bindingSource;
     } else {
-      this.bindingSource = this;     
+      this.bindingSource = this;
     }
   }
 
@@ -138,12 +136,13 @@ public class CuratorService extends CompositeService
     registryRoot = conf.getTrimmed(KEY_REGISTRY_ZK_ROOT,
         DEFAULT_ZK_REGISTRY_ROOT);
 
-    registrySecurity = new RegistrySecurity(conf);
-    // is the registry secure?
-    secure = registrySecurity.isSecure();
-    // if it is secure, either the user is using kerberos and has
-    // full rights, or they are delegated
-    LOG.debug("Creating Registry with root {}", registryRoot);
+    // create and add the registy service
+    registrySecurity = new RegistrySecurity("registry security for " + getName());
+    addService(registrySecurity);
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Creating Registry with root {}", registryRoot);
+    }
 
     super.serviceInit(conf);
   }
@@ -155,8 +154,14 @@ public class CuratorService extends CompositeService
    */
   @Override
   protected void serviceStart() throws Exception {
-    curator = createCurator();
+
     super.serviceStart();
+
+    
+    // create the curator; rely on the registry security code
+    // to set up the JVM context and curator
+    curator = createCurator();
+
   }
 
   /**
@@ -174,7 +179,7 @@ public class CuratorService extends CompositeService
    * @return service security policy
    */
   public boolean isSecure() {
-    return secure;
+    return registrySecurity.isSecureRegistry();
   }
 
   /**
@@ -191,7 +196,7 @@ public class CuratorService extends CompositeService
    */
   protected String buildSecurityDiagnostics() {
     // build up the security connection diags
-    if (!secure) {
+    if (!isSecure()) {
       return "security disabled";
     } else {
       StringBuilder builder = new StringBuilder();
@@ -199,32 +204,6 @@ public class CuratorService extends CompositeService
       builder.append(registrySecurity.buildSecurityDiagnostics());
       return builder.toString();
     }
-  }
-
-  /**
-   * Get the ACLs defined in the config key for this service, or
-   * the default
-   * @param confKey configuration key
-   * @param defaultPermissions default values
-   * @return an ACL list. 
-   * @throws IOException
-   * @throws ZKUtil.BadAclFormatException on a bad ACL parse
-   */
-  public List<ACL> buildACLs(String confKey, String defaultPermissions) throws
-      IOException, ZKUtil.BadAclFormatException {
-    String zkAclConf = getConfig().get(confKey, defaultPermissions);
-    return parseACLs(zkAclConf);
-  }
-
-  /**
-   * Parse an ACL list. This includes configuration indirection
-   * {@link ZKUtil#resolveConfIndirection(String)}
-   * @param zkAclConf configuration string
-   * @return an ACL list
-   * @throws IOException
-   */
-  public List<ACL> parseACLs(String zkAclConf) throws IOException {
-    return registrySecurity.parseACLs(zkAclConf);
   }
 
   /**
@@ -247,41 +226,37 @@ public class CuratorService extends CompositeService
     int retryCeiling = conf.getInt(KEY_REGISTRY_ZK_RETRY_CEILING,
         DEFAULT_ZK_RETRY_CEILING);
 
-    LOG.debug("Creating CuratorService with connection {}",
-        connectionDescription);
-    
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Creating CuratorService with connection {}",
+          connectionDescription);
+    }
+
     // set the security options
-    
+
     //log them
     securityConnectionDiagnostics = buildSecurityDiagnostics();
-    
+
     // build up the curator itself
-    CuratorFrameworkFactory.Builder b = CuratorFrameworkFactory.builder();
-    b.ensembleProvider(ensembleProvider)
+    CuratorFrameworkFactory.Builder builder = CuratorFrameworkFactory.builder();
+    builder.ensembleProvider(ensembleProvider)
      .connectionTimeoutMs(connectionTimeout)
      .sessionTimeoutMs(sessionTimeout)
-     
+        
+
      .retryPolicy(new BoundedExponentialBackoffRetry(retryInterval,
          retryCeiling,
          retryTimes));
+    
+    // set up the builder AND any JVM context
+    registrySecurity.applySecurityEnvironment(builder);
 
-/*
-    if (!root.isEmpty()) {
-      String namespace = root;
-      if (namespace.startsWith("/")) {
-        namespace = namespace.substring(1);
-      }
-      b.namespace(namespace);
-    }
-*/
-
-    CuratorFramework framework = b.build();
+    CuratorFramework framework = builder.build();
     framework.start();
 
     return framework;
   }
 
-  
+
   @Override
   public String toString() {
     return super.toString()
@@ -320,7 +295,7 @@ public class CuratorService extends CompositeService
    * Sets {@link #ensembleProvider} to that value;
    * sets {@link #connectionDescription} to the binding info
    * for use in toString and logging;
-   * 
+   *
    */
   protected void createEnsembleProvider() {
     BindingInformation binding = bindingSource.supplyBindingInformation();
@@ -345,7 +320,7 @@ public class CuratorService extends CompositeService
         "fixed ZK quorum \"" + connectString + "\"";
     return binding;
   }
-  
+
   /**
    * Override point: get the connection string used to connect to
    * the ZK service
@@ -356,7 +331,6 @@ public class CuratorService extends CompositeService
         DEFAULT_REGISTRY_ZK_QUORUM);
   }
 
-  
   /**
    * Create an IOE when an operation fails
    * @param path path of operation
@@ -370,18 +344,17 @@ public class CuratorService extends CompositeService
     return operationFailure(path, operation, exception, null);
   }
 
-
-    /**
-     * Create an IOE when an operation fails
-     * @param path path of operation
-     * @param operation operation attempted
-     * @param exception caught the exception caught
-     * @return an IOE to throw that contains the path and operation details.
-     */
-    protected IOException operationFailure (String path,
-        String operation,
-        Exception exception,
-        List < ACL > acls){
+  /**
+   * Create an IOE when an operation fails
+   * @param path path of operation
+   * @param operation operation attempted
+   * @param exception caught the exception caught
+   * @return an IOE to throw that contains the path and operation details.
+   */
+  protected IOException operationFailure(String path,
+      String operation,
+      Exception exception,
+      List<ACL> acls) {
     IOException ioe;
     if (exception instanceof KeeperException.NoNodeException) {
       ioe = new PathNotFoundException(path);
@@ -416,7 +389,6 @@ public class CuratorService extends CompositeService
     if (ioe.getCause() == null) {
       ioe.initCause(exception);
     }
-
     return ioe;
   }
 
@@ -456,7 +428,6 @@ public class CuratorService extends CompositeService
     return zkMkPath(path, mode, createParents, acl);
   }
 
-
   /**
    * Stat the file
    * @param path path of operation
@@ -480,7 +451,7 @@ public class CuratorService extends CompositeService
     }
     return stat;
   }
-  
+
   public List<ACL> zkGetACLS(String path) throws IOException {
     String fullpath = createFullPath(path);
     List<ACL> acls;
@@ -497,7 +468,7 @@ public class CuratorService extends CompositeService
     }
     return acls;
   }
-  
+
   /**
    * Poll for a path existing
    * @param path path of operation
@@ -537,13 +508,13 @@ public class CuratorService extends CompositeService
   public boolean zkMkPath(String path,
       CreateMode mode,
       boolean createParents,
-      List<ACL> acls) 
+      List<ACL> acls)
       throws IOException {
     path = createFullPath(path);
     if (acls != null && acls.size() == 0) {
       throw new PathPermissionException(path + ": empty ACL list");
     }
-    
+
     try {
       RegistrySecurity.AclListInfo aclInfo =
           new RegistrySecurity.AclListInfo(acls);
@@ -563,7 +534,7 @@ public class CuratorService extends CompositeService
         LOG.debug("path already present: {}", path, e);
       }
       return false;
-    
+
     } catch (Exception e) {
       throw operationFailure(path, "mkdir() ", e, acls);
     }
@@ -581,8 +552,8 @@ public class CuratorService extends CompositeService
       IOException {
     // split path into elements
 
-      zkMkPath(RegistryPathUtils.parentOf(path),
-          CreateMode.PERSISTENT, true, acl);
+    zkMkPath(RegistryPathUtils.parentOf(path),
+        CreateMode.PERSISTENT, true, acl);
   }
 
   /**
@@ -620,7 +591,9 @@ public class CuratorService extends CompositeService
     Preconditions.checkArgument(data != null, "null data");
     path = createFullPath(path);
     try {
-      LOG.debug("Updating {} with {} bytes", path, data.length);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Updating {} with {} bytes", path, data.length);
+      }
       curator.setData().forPath(path, data);
     } catch (Exception e) {
       throw operationFailure(path, "update()", e);
@@ -669,7 +642,9 @@ public class CuratorService extends CompositeService
       BackgroundCallback backgroundCallback) throws IOException {
     String fullpath = createFullPath(path);
     try {
-      LOG.debug("Deleting {}", fullpath);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Deleting {}", fullpath);
+      }
       DeleteBuilder delete = curator.delete();
       if (recursive) {
         delete.deletingChildrenIfNeeded();
@@ -694,7 +669,9 @@ public class CuratorService extends CompositeService
   public List<String> zkList(String path) throws IOException {
     String fullpath = createFullPath(path);
     try {
-      LOG.debug("ls {}", fullpath);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("ls {}", fullpath);
+      }
       GetChildrenBuilder builder = curator.getChildren();
       List<String> children = builder.forPath(fullpath);
       return children;
@@ -702,7 +679,7 @@ public class CuratorService extends CompositeService
       throw operationFailure(path, "ls()", e);
     }
   }
-  
+
   /**
    * Read data on a path
    * @param path path of operation
@@ -712,7 +689,9 @@ public class CuratorService extends CompositeService
   public byte[] zkRead(String path) throws IOException {
     String fullpath = createFullPath(path);
     try {
-      LOG.debug("Reading {}", fullpath);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Reading {}", fullpath);
+      }
       return curator.getData().forPath(fullpath);
     } catch (Exception e) {
       throw operationFailure(fullpath, "read()", e);
@@ -728,5 +707,25 @@ public class CuratorService extends CompositeService
   @VisibleForTesting
   public ZKPathDumper dumpPath() {
     return new ZKPathDumper(curator, registryRoot);
+  }
+
+  /**
+   * Add a new write access entry for all future write operations.
+   * @param id ID to use
+   * @param pass password
+   * @throws IOException on any failure to build the digest
+   */
+  public void addWriteAccessor(String id, String pass) throws IOException {
+    RegistrySecurity registrySecurity = getRegistrySecurity();
+    registrySecurity.addDigestACL(
+        new ACL(ZooDefs.Perms.ALL,
+            registrySecurity.toDigestId(registrySecurity.digest(id, pass))));
+  }
+
+  /**
+   * Clear all write accessors
+   */
+  public void clearWriteAccessors() {
+    getRegistrySecurity().resetDigestACLs();
   }
 }

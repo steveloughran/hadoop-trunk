@@ -28,7 +28,6 @@ import org.apache.zookeeper.ZooDefs;
  */
 public interface RegistryInternalConstants {
 
-
   /**
    * Pattern of a hostname : {@value}
    */

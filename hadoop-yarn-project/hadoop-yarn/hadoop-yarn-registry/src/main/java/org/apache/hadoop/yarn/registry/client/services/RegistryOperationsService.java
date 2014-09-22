@@ -36,9 +36,11 @@ import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.services.zk.CuratorService;
+import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -64,8 +66,6 @@ public class RegistryOperationsService extends CuratorService
   private final RecordOperations.ServiceRecordMarshal serviceRecordMarshal
       = new RecordOperations.ServiceRecordMarshal();
 
-  private List<ACL> userAcl;
-
   public RegistryOperationsService(String name) {
     this(name, null);
   }
@@ -79,25 +79,8 @@ public class RegistryOperationsService extends CuratorService
     super(name, bindingSource);
   }
 
-  @Override
-  protected void serviceInit(Configuration conf) throws Exception {
-    super.serviceInit(conf);
-    
-    // if a secure cluster, switch to the security settings of this user
-    getRegistrySecurity().initSecurity();
-
-    // tODO: build up user ACLs for this user
-
-    List<ACL> userAcls = getRegistrySecurity().getSystemACLs();
-    setUserAcl(userAcls);
-  }
-
   public List<ACL> getUserAcl() {
-    return userAcl;
-  }
-
-  public void setUserAcl(List<ACL> userAcl) {
-    this.userAcl = userAcl;
+    return getRegistrySecurity().getClientACLs();
   }
 
   protected void validatePath(String path) throws InvalidPathnameException {
@@ -111,8 +94,7 @@ public class RegistryOperationsService extends CuratorService
       InvalidPathnameException,
       IOException {
     validatePath(path);
-    return zkMkPath(path, CreateMode.PERSISTENT, createParents,
-        getUserAcl());
+    return zkMkPath(path, CreateMode.PERSISTENT, createParents, getUserAcl());
   }
 
   @Override
@@ -159,7 +141,9 @@ public class RegistryOperationsService extends CuratorService
         stat.getCtime(),
         stat.getDataLength(),
         stat.getNumChildren());
-    LOG.debug("Stat {} => {}", path, status);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Stat {} => {}", path, status);
+    }
     return status;
   }
 
@@ -190,4 +174,5 @@ public class RegistryOperationsService extends CuratorService
     validatePath(path);
     zkDelete(path, recursive, null);
   }
+
 }

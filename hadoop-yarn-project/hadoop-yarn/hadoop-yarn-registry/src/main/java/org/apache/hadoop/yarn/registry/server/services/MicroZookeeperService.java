@@ -207,7 +207,6 @@ public class MicroZookeeperService
       //needed so that you can use sasl: strings in the registry
       System.setProperty(RegistryInternalConstants.ZOOKEEPER_AUTH_PROVIDER +".1",
           RegistryInternalConstants.SASLAUTHENTICATION_PROVIDER);
-          addDiagnostics(new RegistrySecurity(conf).buildSecurityDiagnostics());
       String serverContext =
           System.getProperty(PROP_ZK_SASL_SERVER_CONTEXT);
       addDiagnostics("Server JAAS context s = %s", serverContext);

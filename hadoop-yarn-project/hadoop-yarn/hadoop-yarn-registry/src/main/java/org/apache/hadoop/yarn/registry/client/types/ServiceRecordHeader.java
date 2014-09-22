@@ -18,10 +18,15 @@
 
 package org.apache.hadoop.yarn.registry.client.types;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * Service record header; access to the byte array kept private
  * to avoid findbugs warnings of mutability
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class ServiceRecordHeader {
   /**
    * Header of a service record:  "jsonservicrec"

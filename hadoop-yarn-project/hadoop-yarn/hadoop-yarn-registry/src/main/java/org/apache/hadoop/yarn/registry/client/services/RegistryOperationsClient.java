@@ -16,36 +16,39 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.types;
+package org.apache.hadoop.yarn.registry.client.services;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
+
 /**
- * Enum of address types -as integers. 
- * Why integers and not enums? Cross platform serialization as JSON
+ * This is the client service for applications to work with the registry.
+ *
+ * It does not set up the root paths for the registry, is bonded
+ * to a user, and can be set to use SASL, anonymous or id:pass auth.
+ *
+ * For SASL, the client must be operating in the context of an authed user.
+ *
+ * For id:pass the client must have the relevant id & password, SASL is
+ * not used even if the client has credentials.
+ *
+ * For anonymous, nothing is used.
+ *
+ * Any SASL-authed client also has the ability to add one or more authentication
+ * id:pass pair on all future writes, and to reset them later. 
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public interface AddressTypes {
+public class RegistryOperationsClient extends RegistryOperationsService {
 
-  /**
-   * Any other address
-   */
-  public static final String ADDRESS_OTHER = "";
 
-  /**
-   * URI entries
-   */
-  public static final String ADDRESS_URI = "uri";
+  public RegistryOperationsClient(String name) {
+    super(name);
+  }
 
-  /**
-   * hostname/FQDN and port tuple. 
-   */
-  public static final String ADDRESS_HOSTNAME_AND_PORT = "host/port";
-
-  /**
-   * path /a/b/c style
-   */
-  public static final String ADDRESS_PATH = "path";
+  public RegistryOperationsClient(String name,
+      RegistryBindingSource bindingSource) {
+    super(name, bindingSource);
+  }
 }

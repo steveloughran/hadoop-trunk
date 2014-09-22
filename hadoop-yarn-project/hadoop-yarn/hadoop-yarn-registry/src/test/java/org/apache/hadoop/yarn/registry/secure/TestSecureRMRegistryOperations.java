@@ -37,7 +37,7 @@ import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_SECURE;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_SYSTEM_ACLS;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_SYSTEM_ACCOUNTS;
 
 /**
  * Verify that the {@link RMRegistryOperationsService} works securely
@@ -57,7 +57,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     secureConf.setBoolean(KEY_REGISTRY_SECURE, true);
 
     // ZK is in charge
-    secureConf.set(KEY_REGISTRY_SYSTEM_ACLS, "sasl:zookeeper@");
+    secureConf.set(KEY_REGISTRY_SYSTEM_ACCOUNTS, "sasl:zookeeper@");
     UserGroupInformation.setConfiguration(CONF);
     zookeeperUGI = loginUGI(ZOOKEEPER_LOCALHOST, keytab_zk);
   }
@@ -81,11 +81,11 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
         new PrivilegedExceptionAction<RMRegistryOperationsService>() {
           @Override
           public RMRegistryOperationsService run() throws Exception {
-            RMRegistryOperationsService registryOperations
+            RMRegistryOperationsService operations
                 = new RMRegistryOperationsService("rm", secureZK);
-            registryOperations.init(secureConf);
-            registryOperations.start();
-            return registryOperations;
+            operations.init(secureConf);
+            operations.start();
+            return operations;
           }
         }
     );
