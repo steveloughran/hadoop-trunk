@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.login.LoginContext;
+import javax.security.auth.login.LoginException;
 import java.io.File;
 import java.io.IOException;
 import java.security.Principal;
@@ -63,7 +64,10 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
       Assume.assumeTrue("Failed to run "+ KTUTIL+": " + e, false );
     }
   }
+
   
+
+
   @Test
   public void testHasRealm() throws Throwable {
     assertNotNull(getRealm());
@@ -104,16 +108,20 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
 
   @Test
   public void testServerLogin() throws Throwable {
-    String name = "";
+    LoginContext loginContext = createLoginContextZookeeperLocalhost();
+    loginContext.login();
+    loginContext.logout();
+  }
+
+  public LoginContext createLoginContextZookeeperLocalhost() throws
+      LoginException {
     String principalAndRealm = getPrincipalAndRealm(ZOOKEEPER_LOCALHOST);
     Set<Principal> principals = new HashSet<Principal>();
     principals.add(new KerberosPrincipal(ZOOKEEPER_LOCALHOST));
     Subject subject = new Subject(false, principals, new HashSet<Object>(),
         new HashSet<Object>());
-    LoginContext loginContext = new LoginContext(name, subject, null,
+    return new LoginContext("", subject, null,
         KerberosConfiguration.createServerConfig(ZOOKEEPER_LOCALHOST, keytab_zk));
-    loginContext.login();
-    loginContext.logout();
   }
 
 
@@ -150,8 +158,20 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
   @Test
   public void testUGILogin() throws Throwable {
 
-    UserGroupInformation ugi = loginUGI(ZOOKEEPER_LOCALHOST, keytab_zk);
+    
+    // debugging here to understand why this test has started failing
+    String confFilename = System.getProperty(Environment.JAAS_CONF_KEY);
+    assertEquals(jaasFile.getAbsolutePath(), confFilename);
 
+    LoginContext loginContext = createLoginContextZookeeperLocalhost();
+    loginContext.login();
+    loginContext.logout();
+    
+    ktListRobust(keytab_zk);
+
+    
+//    UserGroupInformation ugi = loginUGI(ZOOKEEPER, keytab_zk);
+    UserGroupInformation ugi = loginUGI(ZOOKEEPER_LOCALHOST, keytab_zk);
     RegistrySecurity.UgiInfo ugiInfo =
         new RegistrySecurity.UgiInfo(ugi);
     LOG.info("logged in as: {}", ugiInfo);
@@ -159,7 +179,7 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
         UserGroupInformation.isSecurityEnabled());
     assertTrue("login is keytab based: " + ugiInfo,
         ugi.isFromKeytab());
-    
+
     // now we are here, build a SASL ACL
     ACL acl = ugi.doAs(new PrivilegedExceptionAction<ACL>() {
       @Override
@@ -170,7 +190,7 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
     assertEquals(ZOOKEEPER_LOCALHOST_REALM, acl.getId().getId());
     assertEquals("sasl", acl.getId().getScheme());
     registrySecurity.addSystemACL(acl);
-    
+
   }
 
 }

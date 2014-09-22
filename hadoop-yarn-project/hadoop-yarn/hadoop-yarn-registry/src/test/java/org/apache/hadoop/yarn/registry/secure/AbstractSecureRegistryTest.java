@@ -67,6 +67,13 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   public static final String BOB_LOCALHOST = "bob/localhost";
   public static final String SASL_AUTH_PROVIDER =
       "org.apache.hadoop.yarn.registry.secure.ExtendedSASLAuthenticationProvider";
+
+  /**
+   * This appears to be the context hadoop expects
+   */
+  public static final String KEYTAB_KERBEROS_CONTEXT_NAME =
+    "hadoop-keytab-kerberos";
+
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractSecureRegistryTest.class);
 
@@ -147,9 +154,9 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
    */
   @Before
   public void beforeSecureRegistryTest() {
-
+/*
     resetJaasConfKeys();
-    RegistrySecurity.bindJVMtoJAASFile(jaasFile);
+    RegistrySecurity.bindJVMtoJAASFile(jaasFile);*/
     initHadoopSecurity();
   }
 

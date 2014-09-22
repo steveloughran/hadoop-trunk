@@ -331,15 +331,26 @@ public class RegistryTestHelper extends Assert {
     return "";
   }
 
+  public static String ktListRobust(File keytab) throws IOException {
+    try {
+      return ktList(keytab);
+    } catch (IOException e) {
+      // probably not on the path
+      return "";
+    }
+  }
+
+
   /**
    * Login via a UGI. Requres UGI to have been set up
-   * @param user
-   * @param keytab
-   * @return
+   * @param user username
+   * @param keytab keytab to list
+   * @return the UGI
    * @throws IOException
    */
   protected UserGroupInformation loginUGI(String user, File keytab) throws
       IOException {
+    LOG.info("Logging in as {}", user);
     return UserGroupInformation.loginUserFromKeytabAndReturnUGI(user,
         keytab.getAbsolutePath());
   }
