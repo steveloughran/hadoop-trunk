@@ -356,12 +356,13 @@ public class CuratorService extends CompositeService
       Exception exception,
       List<ACL> acls) {
     IOException ioe;
+    String aclList = "[" + RegistrySecurity.aclsToString(acls) + "]";
     if (exception instanceof KeeperException.NoNodeException) {
       ioe = new PathNotFoundException(path);
     } else if (exception instanceof KeeperException.NodeExistsException) {
       ioe = new FileAlreadyExistsException(path);
     } else if (exception instanceof KeeperException.NoAuthException) {
-      ioe = new PathAccessDeniedException(path);
+      ioe = new PathAccessDeniedException(path + " / " + aclList);
     } else if (exception instanceof KeeperException.NotEmptyException) {
       ioe = new PathIsNotEmptyDirectoryException(path);
     } else if (exception instanceof KeeperException.AuthFailedException) {
@@ -375,9 +376,8 @@ public class CuratorService extends CompositeService
       // this is a security exception of a kind
       // include the ACLs to help the diagnostics
       StringBuilder builder = new StringBuilder();
-      builder.append(path).append(" [").
-          append(RegistrySecurity.aclsToString(acls));
-      builder.append("]");
+      builder.append(path).append(" ").append(aclList);
+      builder.append(" ");
       builder.append(securityConnectionDiagnostics);
       ioe = new PathPermissionException(builder.toString());
     } else {

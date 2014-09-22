@@ -189,7 +189,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
 
   /**
    * Perform the actual initialization actions
-   * @param username
+   * @param username user name of the user
    * @throws IOException
    */
   public void initUserRegistry(String username) throws IOException {
