@@ -111,7 +111,7 @@ public final class RegistryOperationsFactory {
    * @throws ServiceStateException on any failure to initialize
    * @throws IllegalArgumentException if an argument is invalid
    */
-  public static RegistryOperations createDigestInstance(Configuration conf,
+  public static RegistryOperations createAuthenticatedInstance(Configuration conf,
       String id,
       String password) {
     Preconditions.checkArgument(!StringUtils.isEmpty(id), "empty Id");
