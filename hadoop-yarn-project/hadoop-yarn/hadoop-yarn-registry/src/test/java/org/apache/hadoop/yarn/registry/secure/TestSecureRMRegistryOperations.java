@@ -156,6 +156,19 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
 
     String servicePath = RegistryConstants.PATH_SYSTEM_SERVICES + "hdfs";
     expectMkNodeFailure(operations, servicePath);
+  }  
+  
+  @Test
+  public void testAnonNoWriteAccessOffRoot() throws Throwable {
+    RMRegistryOperationsService rmRegistryOperations =
+        startRMRegistryOperations();
+    describe(LOG, "testAnonNoWriteAccessOffRoot");
+    RegistryOperations operations =
+        RegistryOperationsFactory.createAnonymousInstance(zkClientConf);
+    addToTeardown(operations);
+    operations.start();
+
+    expectMkNodeFailure(operations, "/");
   }
 
   /**
@@ -177,32 +190,6 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
 
 
   @Test
-  public void testAlicePathAliceAccess() throws Throwable {
-    RMRegistryOperationsService rmRegistryOperations =
-        startRMRegistryOperations();
-    final String aliceHome = rmRegistryOperations.initUserRegistry(ALICE);
-    describe(LOG, "Creating alice accessor");
-
-    RegistryOperations operations = aliceUGI.doAs(
-        new PrivilegedExceptionAction<RegistryOperations>() {
-          @Override
-          public RegistryOperations run() throws Exception {
-            RegistryOperations operations =
-                RegistryOperationsFactory.createKerberosInstance(zkClientConf,
-                    ALICE_CLIENT_CONTEXT);
-            addToTeardown(operations);
-            operations.start();
-            RegistryPathStatus[] stats = operations.list(aliceHome);
-            String path = aliceHome + "/subpath";
-            operations.mknode(path, false);
-            return operations;
-          }
-        });
-
-
-  }
-  
-  @Test
   public void testAlicePathRestrictedAnonAccess() throws Throwable {
     RMRegistryOperationsService rmRegistryOperations =
         startRMRegistryOperations();
@@ -215,7 +202,49 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     RegistryPathStatus[] stats = anonOperations.list(aliceHome);
     expectMkNodeFailure(anonOperations, aliceHome);
   }
-  
-  
 
+
+  @Test
+  public void testUserZookeeperHomePathAccess() throws Throwable {
+    RMRegistryOperationsService rmRegistryOperations =
+        startRMRegistryOperations();
+    final String home = rmRegistryOperations.initUserRegistry(ZOOKEEPER);
+    describe(LOG, "Creating ZK client");
+
+    RegistryOperations operations = zookeeperUGI.doAs(
+        new PrivilegedExceptionAction<RegistryOperations>() {
+          @Override
+          public RegistryOperations run() throws Exception {
+            RegistryOperations operations =
+                RegistryOperationsFactory.createKerberosInstance(zkClientConf,
+                    ZOOKEEPER_CLIENT_CONTEXT);
+            addToTeardown(operations);
+            operations.start();
+
+            return operations;
+          }
+        });
+    RegistryPathStatus[] stats = operations.list(home);
+    String path = home + "/subpath";
+    operations.mknode(path, false);
+  }
+
+  @Test
+  public void testDigestAccess() throws Throwable {
+    RMRegistryOperationsService registryAdmin =
+        startRMRegistryOperations();
+    String id = "digestid";
+    String pass = "password";
+    registryAdmin.addWriteAccessor(id, pass);
+    String base = "/digested";
+    registryAdmin.mknode(base, false);
+
+    RegistryOperations operations =
+        RegistryOperationsFactory.createAuthenticatedInstance(zkClientConf,
+            id,
+            pass);
+    operations.start();
+    operations.mknode(base + "/subdir", false);
+
+  }
 }
