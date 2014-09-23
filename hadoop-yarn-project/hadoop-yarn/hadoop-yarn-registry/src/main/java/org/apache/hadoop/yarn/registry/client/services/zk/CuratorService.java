@@ -39,6 +39,7 @@ import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.fs.PathPermissionException;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.service.CompositeService;
+import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
@@ -171,6 +172,18 @@ public class CuratorService extends CompositeService
   }
 
   /**
+   * Internal check that a service is in the live state
+   * @throws ServiceStateException if not
+   */
+  private void checkServiceLive() throws ServiceStateException {
+    if (!isInState(STATE.STARTED)) {
+      throw new ServiceStateException(
+          "Service " + getName() + " is in wrong state: "
+          + getServiceState());
+    }
+  }
+  
+  /**
    * Flag to indicate whether or not the registry is secure.
    * Valid once the service is inited.
    * @return service security policy
@@ -260,6 +273,10 @@ public class CuratorService extends CompositeService
            + bindingDiagnosticDetails();
   }
 
+  /**
+   * Get the binding diagnostics
+   * @return a diagnostics string valid after the service is started.
+   */
   public String bindingDiagnosticDetails() {
     return " Connection=\"" + connectionDescription + "\""
            + " root=\"" + registryRoot + "\""
@@ -433,6 +450,7 @@ public class CuratorService extends CompositeService
    * @throws PathNotFoundException if the path was not found
    */
   public Stat zkStat(String path) throws IOException {
+    checkServiceLive();
     String fullpath = createFullPath(path);
     Stat stat;
     try {
@@ -456,6 +474,7 @@ public class CuratorService extends CompositeService
    * @throws IOException
    */
   public List<ACL> zkGetACLS(String path) throws IOException {
+    checkServiceLive();
     String fullpath = createFullPath(path);
     List<ACL> acls;
     try {
@@ -480,6 +499,7 @@ public class CuratorService extends CompositeService
    * @throws IOException
    */
   public boolean zkPathExists(String path) throws IOException {
+    checkServiceLive();
     try {
       return zkStat(path) != null;
     } catch (PathNotFoundException e) {
@@ -513,6 +533,7 @@ public class CuratorService extends CompositeService
       boolean createParents,
       List<ACL> acls)
       throws IOException {
+    checkServiceLive();
     path = createFullPath(path);
     if (acls != null && acls.size() == 0) {
       throw new PathPermissionException(path + ": empty ACL list");
@@ -572,6 +593,7 @@ public class CuratorService extends CompositeService
       byte[] data,
       List<ACL> acls) throws IOException {
     Preconditions.checkArgument(data != null, "null data");
+    checkServiceLive();
     String fullpath = createFullPath(path);
     try {
       if (LOG.isDebugEnabled()) {
@@ -592,6 +614,7 @@ public class CuratorService extends CompositeService
    */
   public void zkUpdate(String path, byte[] data) throws IOException {
     Preconditions.checkArgument(data != null, "null data");
+    checkServiceLive();
     path = createFullPath(path);
     try {
       if (LOG.isDebugEnabled()) {
@@ -617,6 +640,7 @@ public class CuratorService extends CompositeService
       byte[] data,
       List<ACL> acl, boolean overwrite) throws IOException {
     Preconditions.checkArgument(data != null, "null data");
+    checkServiceLive();
     if (!zkPathExists(path)) {
       zkCreate(path, mode, data, acl);
       return true;
@@ -643,6 +667,7 @@ public class CuratorService extends CompositeService
   public void zkDelete(String path,
       boolean recursive,
       BackgroundCallback backgroundCallback) throws IOException {
+    checkServiceLive();
     String fullpath = createFullPath(path);
     try {
       if (LOG.isDebugEnabled()) {
@@ -670,6 +695,7 @@ public class CuratorService extends CompositeService
    * @throws IOException
    */
   public List<String> zkList(String path) throws IOException {
+    checkServiceLive();
     String fullpath = createFullPath(path);
     try {
       if (LOG.isDebugEnabled()) {
@@ -690,6 +716,7 @@ public class CuratorService extends CompositeService
    * @throws IOException read failure
    */
   public byte[] zkRead(String path) throws IOException {
+    checkServiceLive();
     String fullpath = createFullPath(path);
     try {
       if (LOG.isDebugEnabled()) {
@@ -719,10 +746,10 @@ public class CuratorService extends CompositeService
    * @throws IOException on any failure to build the digest
    */
   public void addWriteAccessor(String id, String pass) throws IOException {
-    RegistrySecurity registrySecurity = getRegistrySecurity();
-    registrySecurity.addDigestACL(
+    RegistrySecurity security = getRegistrySecurity();
+    security.addDigestACL(
         new ACL(ZooDefs.Perms.ALL,
-            registrySecurity.toDigestId(registrySecurity.digest(id, pass))));
+            security.toDigestId(security.digest(id, pass))));
   }
 
   /**
