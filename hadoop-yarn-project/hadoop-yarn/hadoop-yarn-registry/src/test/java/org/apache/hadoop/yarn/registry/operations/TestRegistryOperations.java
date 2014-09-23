@@ -236,4 +236,11 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     assertMatches(written, resolved);
   }
 
+  @Test
+  public void testAddingWriteAccessIsNoOpEntry() throws Throwable {
+
+    assertFalse(operations.addWriteAccessor("id","pass"));
+    operations.clearWriteAccessors();
+  }
+
 }

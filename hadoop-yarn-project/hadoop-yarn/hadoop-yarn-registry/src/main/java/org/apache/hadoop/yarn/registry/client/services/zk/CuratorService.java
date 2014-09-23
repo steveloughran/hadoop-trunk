@@ -471,11 +471,12 @@ public class CuratorService extends CompositeService
   }
 
   /**
-   * Poll for a path existing
+   * Probe for a path existing
    * @param path path of operation
    * @return true if the path was visible from the ZK server
    * queried.
-   * @throws IOException
+   * @throws IOException on any exception other than 
+   * {@link PathNotFoundException}
    */
   public boolean zkPathExists(String path) throws IOException {
     checkServiceLive();
@@ -483,8 +484,8 @@ public class CuratorService extends CompositeService
       return zkStat(path) != null;
     } catch (PathNotFoundException e) {
       return false;
-    } catch (Exception e) {
-      throw operationFailure(path, "existence check", e);
+    } catch (IOException e) {
+      throw e;
     }
   }
 
@@ -725,11 +726,11 @@ public class CuratorService extends CompositeService
    * @param pass password
    * @throws IOException on any failure to build the digest
    */
-  public void addWriteAccessor(String id, String pass) throws IOException {
+  public boolean addWriteAccessor(String id, String pass) throws IOException {
     RegistrySecurity security = getRegistrySecurity();
     ACL digestACL = new ACL(ZooDefs.Perms.ALL,
         security.toDigestId(security.digest(id, pass)));
-    security.addDigestACL(digestACL);
+    return security.addDigestACL(digestACL);
   }
 
   /**

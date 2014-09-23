@@ -113,6 +113,16 @@ public interface RegistryOperations extends Service {
       IOException;
 
   /**
+   * Probe for a path existing.
+   * This is equivalent to {@link #stat(String)} with
+   * any failure downgraded to a
+   * @param path path to query
+   * @return true if the path was found
+   * @throws IOException
+   */
+  boolean exists(String path) throws IOException;
+  
+  /**
    * List children of a directory
    * @param path path
    * @return a possibly empty array of child entries
@@ -150,15 +160,28 @@ public interface RegistryOperations extends Service {
       IOException;
 
   /**
-   * Add a new write access entry for all future write operations.
+   * Add a new write access entry to be added to node permissions in all 
+   * future write operations of a session connected to a secure registry.
+   * 
+   * This does not grant the session any more rights: if it lacked any write
+   * access, it will still be unable to manipulate the registry.
+   * 
+   * In an insecure cluster, this operation has no effect.
    * @param id ID to use
    * @param pass password
+   * @return true if the accessor was added: that is, the registry connection
+   * uses permissions to manage access
    * @throws IOException on any failure to build the digest
    */
-  void addWriteAccessor(String id, String pass) throws IOException ;
+  boolean addWriteAccessor(String id, String pass) throws IOException ;
 
   /**
-   * Clear all write accessors
+   * Clear all write accessors.
+   * 
+   * At this point all standard permissions/ACLs are retained,
+   * including any set on behalf of the user
+   * Only  accessors added via {@link #addWriteAccessor(String, String)}
+   * are removed.
    */
   public void clearWriteAccessors();
 }

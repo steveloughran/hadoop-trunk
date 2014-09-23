@@ -136,6 +136,12 @@ public class RegistryOperationsService extends CuratorService
   }
 
   @Override
+  public boolean exists(String path) throws IOException {
+    validatePath(path);
+    return zkPathExists(path);
+  }
+
+  @Override
   public RegistryPathStatus stat(String path) throws
       PathNotFoundException,
       AccessControlException,

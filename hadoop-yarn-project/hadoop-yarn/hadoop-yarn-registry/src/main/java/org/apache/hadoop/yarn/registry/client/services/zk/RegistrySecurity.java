@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.registry.client.services.zk;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
@@ -310,11 +309,19 @@ public class RegistrySecurity extends AbstractService {
    * Add another system ACL
    * @param acl add ACL
    */
-  public void addDigestACL(ACL acl) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Added ACL {}", aclToString(acl));
+  public boolean addDigestACL(ACL acl) {
+    if (secureRegistry) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Added ACL {}", aclToString(acl));
+      }
+      digestACLs.add(acl);
+      return true;
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Ignoring added ACL - registry is insecure{}", aclToString(acl));
+      }
+      return false;
     }
-    digestACLs.add(acl);
   }
 
   /**
@@ -804,7 +811,12 @@ public class RegistrySecurity extends AbstractService {
     String s;
     if (id.getScheme().equals(SCHEME_DIGEST)) {
       s = id.toString();
-//      s = SCHEME_DIGEST +": " + id.getId().substring(0, 4);
+      String ids = id.getId();
+      int colon = ids.indexOf(':');
+      if (colon>0) {
+        ids = ids.substring(colon + 3);
+      }
+      s = SCHEME_DIGEST +": " + ids;
     } else {
       s = id.toString();
     }
