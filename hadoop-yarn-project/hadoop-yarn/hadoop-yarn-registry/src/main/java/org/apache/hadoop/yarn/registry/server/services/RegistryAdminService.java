@@ -23,13 +23,18 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.curator.framework.api.CuratorEvent;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
+import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import org.apache.hadoop.yarn.registry.server.integration.RMRegistryOperationsService;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -139,6 +144,74 @@ public class RegistryAdminService extends RegistryOperationsService {
         return null;
       }
     });
+  }
+
+  @Override
+  protected void serviceInit(Configuration conf) throws Exception {
+    super.serviceInit(conf);
+    RegistrySecurity registrySecurity = getRegistrySecurity();
+    if (registrySecurity.isSecureRegistry()) {
+      ACL sasl = registrySecurity.createSaslACLFromCurrentUser(ZooDefs.Perms.ALL);
+      registrySecurity.addSystemACL(sasl);
+      LOG.info("Registry System ACLs:",
+          RegistrySecurity.aclsToString(
+          registrySecurity.getSystemACLs()));
+    }
+  }
+
+  /**
+   * Start the service, including creating base directories with permissions
+   * @throws Exception
+   */
+  @Override
+  protected void serviceStart() throws Exception {
+    super.serviceStart();
+
+    // create the root directories
+    createRootRegistryPaths();
+  }
+
+  /**
+   * Create the initial registry paths
+   * @throws IOException any failure
+   */
+  @VisibleForTesting
+  public void createRootRegistryPaths() throws IOException {
+    // create the root directories
+
+    systemACLs = getRegistrySecurity().getSystemACLs();
+    LOG.info("System ACLs {}",
+        RegistrySecurity.aclsToString(systemACLs));
+
+    maybeCreate("", CreateMode.PERSISTENT, systemACLs, false);
+    maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
+        systemACLs, false);
+    maybeCreate(PATH_SYSTEM_SERVICES,
+        CreateMode.PERSISTENT,
+        systemACLs, false);
+  }
+
+  /**
+   * Get the path to a user's home dir
+   * @param username username
+   * @return a path for services underneath
+   */
+  protected String homeDir(String username) {
+    return BindingUtils.userPath(username);
+  }
+
+  /**
+   * Set up the ACL for the user.
+   * <b>Important: this must run client-side as it needs
+   * to know the id:pass tuple for a user</b>
+   * @param username user name
+   * @return an ACL list
+   * @throws IOException ACL creation/parsing problems
+   */
+  protected List<ACL> aclsForUser(String username) throws IOException {
+    // todo, make more specific for that user. 
+    // 
+    return getClientAcls();
   }
 
   /**

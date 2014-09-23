@@ -22,26 +22,19 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
-import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.server.services.DeleteCompletionCallback;
 import org.apache.hadoop.yarn.registry.server.services.RegistryAdminService;
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.ZooDefs;
-import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.Future;
 
 /**
@@ -72,54 +65,9 @@ public class RMRegistryOperationsService extends RegistryAdminService {
 
   }
 
-  @Override
-  protected void serviceInit(Configuration conf) throws Exception {
-    super.serviceInit(conf);
-    RegistrySecurity registrySecurity = getRegistrySecurity();
-    if (registrySecurity.isSecureRegistry()) {
-      ACL sasl = registrySecurity.createSaslACLFromCurrentUser(ZooDefs.Perms.ALL);
-      registrySecurity.addSystemACL(sasl);
-      LOG.info("Registry System ACLs:",
-          RegistrySecurity.aclsToString(
-          registrySecurity.getSystemACLs()));
-    }
-  }
-
   /**
-   * Start the service, including creating base directories with permissions
-   * @throws Exception
-   */
-  @Override
-  protected void serviceStart() throws Exception {
-    super.serviceStart();
-
-    // create the root directories
-    createRootRegistryPaths();
-  }
-
-  /**
-   * Create the initial registry paths
-   * @throws IOException any failure
-   */
-  @VisibleForTesting
-  public void createRootRegistryPaths() throws IOException {
-    // create the root directories
-
-    systemACLs = getRegistrySecurity().getSystemACLs();
-    LOG.info("System ACLs {}",
-        RegistrySecurity.aclsToString(systemACLs));
-
-    maybeCreate("", CreateMode.PERSISTENT, systemACLs, false);
-    maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
-        systemACLs, false);
-    maybeCreate(PATH_SYSTEM_SERVICES,
-        CreateMode.PERSISTENT,
-        systemACLs, false);
-  }
-
-
-  /**
-   * Start an async operation to create the gome path for a user
+   * Start an async operation to create the home path for a user
+   * if it does not exist
    * @param username username
    * @return the path created
    * @throws IOException any failure
@@ -127,33 +75,12 @@ public class RMRegistryOperationsService extends RegistryAdminService {
   @VisibleForTesting
   public String initUserRegistryAsync(final String username)
       throws IOException {
-    String path = homeDir(username);
-    List<ACL> acls = aclsForUser(username);
-    createDirAsync(path, acls, false);
-    return path;
-  }
 
-  /**
-   * Get the path to a user's home dir
-   * @param username username
-   * @return a path for services underneath
-   */
-  protected String homeDir(String username) {
-    return BindingUtils.userPath(username);
-  }
-
-  /**
-   * Set up the ACL for the user.
-   * <b>Important: this must run client-side as it needs
-   * to know the id:pass tuple for a user</b>
-   * @param username user name
-   * @return an ACL list
-   * @throws IOException ACL creation/parsing problems
-   */
-  private List<ACL> aclsForUser(String username) throws IOException {
-    // todo, make more specific for that user. 
-    // 
-    return getClientAcls();
+    String homeDir = homeDir(username);
+    if (!exists(homeDir)) {
+      createDirAsync(homeDir, aclsForUser(username), false);
+    }
+    return homeDir;
   }
 
   public PurgePolicy getPurgeOnCompletionPolicy() {
