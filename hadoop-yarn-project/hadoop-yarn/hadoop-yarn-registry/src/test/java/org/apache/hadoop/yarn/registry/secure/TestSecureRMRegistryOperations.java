@@ -26,10 +26,13 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperationsFactory;
+import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsClient;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
+import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
 import org.apache.zookeeper.client.ZooKeeperSaslClient;
+import org.apache.zookeeper.data.ACL;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -40,6 +43,7 @@ import javax.security.auth.login.LoginException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
+import java.util.List;
 
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_CLIENT_AUTH;
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_CLIENT_JAAS_CONTEXT;
@@ -233,17 +237,37 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
   public void testDigestAccess() throws Throwable {
     RMRegistryOperationsService registryAdmin =
         startRMRegistryOperations();
-    String id = "digestid";
+    String id = "username";
     String pass = "password";
     registryAdmin.addWriteAccessor(id, pass);
+    List<ACL> clientAcls = registryAdmin.getClientAcls();
+    LOG.info("Client ACLS=\n{}", RegistrySecurity.aclsToString(clientAcls));
+
     String base = "/digested";
     registryAdmin.mknode(base, false);
-
+    List<ACL> baseACLs = registryAdmin.zkGetACLS(base);
+    String aclset = RegistrySecurity.aclsToString(baseACLs);
+    LOG.info("Base ACLs=\n{}", aclset);
+    ACL found = null;
+    for (ACL acl : baseACLs) {
+      if (ZookeeperConfigOptions.SCHEME_DIGEST.equals(acl.getId().getScheme())) {
+        found = acl;
+        break;
+      }
+    }
+    assertNotNull("Did not find digest entry in ACLs " + aclset, found);
     RegistryOperations operations =
         RegistryOperationsFactory.createAuthenticatedInstance(zkClientConf,
             id,
             pass);
+    addToTeardown(operations);
     operations.start();
+    RegistryOperationsClient operationsClient =
+        (RegistryOperationsClient) operations;
+    List<ACL> digestClientACLs = operationsClient.getClientAcls();
+    LOG.info("digest client ACLs=\n{}",
+        RegistrySecurity.aclsToString(digestClientACLs));
+    operations.stat(base);
     operations.mknode(base + "/subdir", false);
 
   }

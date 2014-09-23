@@ -127,8 +127,10 @@ public class TestCuratorService extends AbstractZKRegistryTest {
 
   @Test
   public void testMaybeCreate() throws Throwable {
-    assertTrue(curatorService.maybeCreate("/p3", CreateMode.PERSISTENT));
-    assertFalse(curatorService.maybeCreate("/p3", CreateMode.PERSISTENT));
+    assertTrue(curatorService.maybeCreate("/p3", CreateMode.PERSISTENT,
+        RegistrySecurity.WorldReadWriteACL, false));
+    assertFalse(curatorService.maybeCreate("/p3", CreateMode.PERSISTENT,
+        RegistrySecurity.WorldReadWriteACL, false));
   }
 
   @Test

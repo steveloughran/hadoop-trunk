@@ -103,13 +103,22 @@ public class RegistrySecurity extends AbstractService {
   */
   private AccessPolicy access;
 
+  /**
+   * User used for digest auth
+   */
+
+  private String digestAuthUser;
+
+  /**
+   * Password used for digest auth
+   */
+
+  private String digestAuthPassword;
 
   /**
    * Auth data used for digest auth
    */
   private byte[] digestAuthData;
-
-
   /**
    * flag set to true if the registry has security enabled.
    */
@@ -198,25 +207,12 @@ public class RegistrySecurity extends AbstractService {
    * Init security.
 
    * After this operation, the {@link #systemACLs} list is valid. 
-   * @return true if the cluster is secure.
    * @throws IOException
    */
-  private boolean initSecurity() throws
-      IOException {
+  private void initSecurity() throws IOException {
 
     secureRegistry =
         getConfig().getBoolean(KEY_REGISTRY_SECURE, DEFAULT_REGISTRY_SECURE);
-    initACLs();
-    return true;
-  }
-
-  /**
-   * Init the ACLs. 
-   * After this operation, the {@link #systemACLs} list is valid. 
-   * @throws IOException
-   */
-  @VisibleForTesting
-  public void initACLs() throws IOException {
     systemACLs.clear();
     if (secureRegistry) {
       addSystemACL(ALL_READ_ACCESS);
@@ -234,7 +230,6 @@ public class RegistrySecurity extends AbstractService {
       String user = getConfig().get(KEY_REGISTRY_USER_ACCOUNTS, 
                               DEFAULT_REGISTRY_USER_ACCOUNTS);
       List<ACL> userACLs = buildACLs(user, kerberosRealm, ZooDefs.Perms.ALL);
-
 
       // add self if the current user can be determined 
       ACL self = null;
@@ -270,11 +265,16 @@ public class RegistrySecurity extends AbstractService {
             throw new ServiceStateException(E_NO_USER_DETERMINED_FOR_ACLS);
           }
           String digestAuth = digest(id, pass);
-          userACLs.add(new ACL(ZooDefs.Perms.ALL, toDigestId(digestAuth)));
-          digestAuthData = digestAuth.getBytes("UTF-8");
+          ACL acl = new ACL(ZooDefs.Perms.ALL, toDigestId(id, pass));
+          userACLs.add(acl);
+          digestAuthUser = id;
+          digestAuthPassword = pass;
+          String authPair = id + ":" + pass;
+          digestAuthData = authPair.getBytes("UTF-8");
           if (LOG.isDebugEnabled()) {
             LOG.debug("Auth is digest with ID \"{}\" pass length={}", id,
                 pass.length());
+            LOG.debug("Digest ACL={}", acl);
           }
           break;
         
@@ -285,6 +285,7 @@ public class RegistrySecurity extends AbstractService {
           }
           break;
       }
+      systemACLs.addAll(userACLs);
       
     } else {
       if (LOG.isDebugEnabled()) {
@@ -308,6 +309,9 @@ public class RegistrySecurity extends AbstractService {
    * @param acl add ACL
    */
   public void addDigestACL(ACL acl) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Added ACL {}", aclToString(acl));
+    }
     digestACLs.add(acl);
   }
 
@@ -315,6 +319,9 @@ public class RegistrySecurity extends AbstractService {
    * Reset the digest ACL list
    */
   public void resetDigestACLs() {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Cleared digest ACLs");
+    }
     digestACLs.clear();
   }
 
@@ -763,17 +770,40 @@ public class RegistrySecurity extends AbstractService {
     } else {
       builder.append('\n');
       for (ACL acl : acls) {
-        String s;
-        if (acl.getId().getScheme().equals(SCHEME_DIGEST)) {
-          s = String.format(Locale.ENGLISH,
-              "%d, id=digest", acl.getPerms());
-        } else {
-          s = acl.toString();
-        }
-        builder.append(s).append(" ");
+        builder.append(aclToString(acl))
+               .append(" ");
       }
     }
     return builder.toString();
+  }
+
+  /**
+   * Convert an ACL to a string, with any obfuscation needed
+   * @param acl ACL
+   * @return ACL string value
+   */
+  public static String aclToString(ACL acl) {
+    StringBuilder builder = new StringBuilder();
+    builder.append(acl.getPerms()).append(", ");
+    builder.append(idToString(acl.getId()));
+    return builder.toString();
+  }
+
+  /**
+   * Convert an ID to a string, stripping out all but the first 4 characters
+   * of any digest auth for security reasons
+   * @param id ID
+   * @return a string description of a Zookeeper ID
+   */
+  public static String idToString(Id id) {
+    String s;
+    if (id.getScheme().equals(SCHEME_DIGEST)) {
+      s = id.toString();
+//      s = SCHEME_DIGEST +": " + id.getId().substring(0, 4);
+    } else {
+      s = id.toString();
+    }
+    return s;
   }
 
   /**

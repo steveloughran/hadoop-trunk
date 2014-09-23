@@ -197,7 +197,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   public String initUserRegistry(String username) throws IOException {
     String path = homeDir(username);
     maybeCreate(path, CreateMode.PERSISTENT,
-        createAclForUser(username), false);
+        aclsForUser(username), false);
     return path;
   }
 
@@ -219,10 +219,10 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
    * @return an ACL list
    * @throws IOException ACL creation/parsing problems
    */
-  private List<ACL> createAclForUser(String username) throws IOException {
+  private List<ACL> aclsForUser(String username) throws IOException {
     // todo, make more specific for that user. 
     // 
-    return getUserAcl();
+    return getClientAcls();
   }
 
   public PurgePolicy getPurgeOnCompletionPolicy() {

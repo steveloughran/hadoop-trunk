@@ -80,11 +80,6 @@ public class CuratorService extends CompositeService
   private CuratorFramework curator;
 
   /**
-   * Parsed root ACL
-   */
-  private List<ACL> rootACL;
-
-  /**
    * Path to the registry root
    */
   private String registryRoot;
@@ -413,22 +408,6 @@ public class CuratorService extends CompositeService
    * propagated to the ZK node polled.
    *
    * @param path path to create
-   * @return true iff the path was created
-   * @throws IOException
-   */
-  @VisibleForTesting
-  public boolean maybeCreate(String path, CreateMode mode) throws IOException {
-    List<ACL> acl = rootACL;
-    return maybeCreate(path, mode, acl, false);
-  }
-
-  /**
-   * Create a path if it does not exist. 
-   * The check is poll + create; there's a risk that another process
-   * may create the same path before the create() operation is executed/
-   * propagated to the ZK node polled.
-   *
-   * @param path path to create
    * @param acl ACL for path -used when creating a new entry
    * @param createParents flag to trigger parent creation
    * @return true iff the path was created
@@ -597,7 +576,8 @@ public class CuratorService extends CompositeService
     String fullpath = createFullPath(path);
     try {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Creating {} with {} bytes ACL {}", fullpath, data.length,
+        LOG.debug("Creating {} with {} bytes of data and ACL {}",
+            fullpath, data.length,
             new RegistrySecurity.AclListInfo(acls));
       }
       curator.create().withMode(mode).withACL(acls).forPath(fullpath, data);
@@ -747,9 +727,9 @@ public class CuratorService extends CompositeService
    */
   public void addWriteAccessor(String id, String pass) throws IOException {
     RegistrySecurity security = getRegistrySecurity();
-    security.addDigestACL(
-        new ACL(ZooDefs.Perms.ALL,
-            security.toDigestId(security.digest(id, pass))));
+    ACL digestACL = new ACL(ZooDefs.Perms.ALL,
+        security.toDigestId(security.digest(id, pass)));
+    security.addDigestACL(digestACL);
   }
 
   /**

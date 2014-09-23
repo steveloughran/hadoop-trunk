@@ -63,7 +63,6 @@ public class TestRegistrySecurityHelper extends Assert {
     registrySecurity = new RegistrySecurity("");
     // init the ACLs OUTSIDE A KERBEROS CLUSTER
     registrySecurity.init(conf);
-    registrySecurity.initACLs();
   }
 
   @Test

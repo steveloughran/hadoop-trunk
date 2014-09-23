@@ -76,10 +76,20 @@ public class RegistryOperationsService extends CuratorService
     super(name, bindingSource);
   }
 
-  public List<ACL> getUserAcl() {
+  /**
+   * Get the aggregate set of ACLs the client should use
+   * to create directories
+   * @return the ACL list
+   */
+  public List<ACL> getClientAcls() {
     return getRegistrySecurity().getClientACLs();
   }
 
+  /**
+   * Validate a path ... this includes checking that they are DNS-valid
+   * @param path path to validate
+   * @throws InvalidPathnameException if a path is considered invalid
+   */
   protected void validatePath(String path) throws InvalidPathnameException {
     RegistryPathUtils.validateElementsAsDNS(path);
   }
@@ -91,7 +101,7 @@ public class RegistryOperationsService extends CuratorService
       InvalidPathnameException,
       IOException {
     validatePath(path);
-    return zkMkPath(path, CreateMode.PERSISTENT, createParents, getUserAcl());
+    return zkMkPath(path, CreateMode.PERSISTENT, createParents, getClientAcls());
   }
 
   @Override
@@ -111,7 +121,7 @@ public class RegistryOperationsService extends CuratorService
 
     CreateMode mode = CreateMode.PERSISTENT;
     byte[] bytes = serviceRecordMarshal.toByteswithHeader(record);
-    zkSet(path, mode, bytes, getUserAcl(),
+    zkSet(path, mode, bytes, getClientAcls(),
         ((createFlags & CreateFlags.OVERWRITE) != 0));
   }
 
