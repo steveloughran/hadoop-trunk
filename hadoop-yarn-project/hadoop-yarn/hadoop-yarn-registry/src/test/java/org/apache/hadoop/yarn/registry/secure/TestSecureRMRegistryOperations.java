@@ -83,7 +83,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     // kerberos
     secureConf.set(KEY_REGISTRY_CLIENT_AUTH,
         REGISTRY_CLIENT_AUTH_KERBEROS);
-    secureConf.set(KEY_REGISTRY_CLIENT_JAAS_CONTEXT, ZOOKEEPER);
+    secureConf.set(KEY_REGISTRY_CLIENT_JAAS_CONTEXT, ZOOKEEPER_CLIENT_CONTEXT);
 
     RMRegistryOperationsService registryOperations = zookeeperUGI.doAs(
         new PrivilegedExceptionAction<RMRegistryOperationsService>() {

@@ -61,6 +61,8 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   public static final String ZOOKEEPER = "zookeeper";
   public static final String ZOOKEEPER_LOCALHOST = "zookeeper/localhost";
   public static final String ZOOKEEPER_REALM = "zookeeper@" + REALM;
+  public static final String ZOOKEEPER_CLIENT_CONTEXT = ZOOKEEPER;
+  public static final String ZOOKEEPER_SERVER_CONTEXT = "ZOOKEEPER_SERVER";
   ;
   public static final String ZOOKEEPER_LOCALHOST_REALM = 
       ZOOKEEPER_LOCALHOST + "@" + REALM;
@@ -204,7 +206,9 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     keytab_bob = createKeytab(BOB, "bob.keytab");
 
     StringBuilder jaas = new StringBuilder(1024);
-    jaas.append(registrySecurity.createJAASEntry(ZOOKEEPER,
+    jaas.append(registrySecurity.createJAASEntry(ZOOKEEPER_CLIENT_CONTEXT,
+        ZOOKEEPER, keytab_zk));
+    jaas.append(registrySecurity.createJAASEntry(ZOOKEEPER_SERVER_CONTEXT,
         ZOOKEEPER_LOCALHOST, keytab_zk));
     jaas.append(registrySecurity.createJAASEntry(ALICE, 
         ALICE_LOCALHOST , keytab_alice));
@@ -213,8 +217,8 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
 
     jaasFile = new File(kdcWorkDir, "jaas.txt");
     FileUtils.write(jaasFile, jaas.toString());
+    LOG.info("\n"+ jaas.toString());
     RegistrySecurity.bindJVMtoJAASFile(jaasFile);
-    LOG.info(jaas.toString());
   }
 
 
@@ -263,7 +267,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
    */
   protected static MicroZookeeperService createSecureZKInstance(String name)
       throws Exception {
-    String context = ZOOKEEPER;
+    String context = ZOOKEEPER_SERVER_CONTEXT;
     Configuration conf = new Configuration();
 
     File testdir = new File(System.getProperty("test.dir", "target"));
@@ -343,7 +347,9 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   protected synchronized void startSecureZK() throws Exception {
     assertNull("Zookeeper is already running", secureZK);
     
-    zookeeperLogin = login(ZOOKEEPER_LOCALHOST, ZOOKEEPER, keytab_zk);
+    zookeeperLogin = login(ZOOKEEPER_LOCALHOST,
+        ZOOKEEPER_SERVER_CONTEXT,
+        keytab_zk);
     secureZK = createSecureZKInstance("test-" + methodName.getMethodName());
     secureZK.start();
   }

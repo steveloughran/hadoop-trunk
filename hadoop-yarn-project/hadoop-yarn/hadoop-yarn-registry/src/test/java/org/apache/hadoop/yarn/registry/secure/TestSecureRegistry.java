@@ -111,10 +111,13 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
     System.setProperty("curator-log-events", "true");
     startSecureZK();
     CuratorService curator = null;
-    LoginContext login = login(ZOOKEEPER_LOCALHOST, ZOOKEEPER, keytab_zk);
+    LoginContext login = login(ZOOKEEPER_LOCALHOST, 
+                              ZOOKEEPER_CLIENT_CONTEXT,
+                              keytab_zk);
     try {
       logLoginDetails(ZOOKEEPER, login);
-      RegistrySecurity.setZKSaslClientProperties(ZOOKEEPER, ZOOKEEPER);
+      RegistrySecurity.setZKSaslClientProperties(ZOOKEEPER,
+                                                ZOOKEEPER_CLIENT_CONTEXT);
       curator = startCuratorServiceInstance("ZK", true);
       LOG.info(curator.toString());
 
@@ -232,10 +235,13 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
 
     System.setProperty("curator-log-events", "true");
     CuratorService curator = null;
-    LoginContext login = login(ZOOKEEPER_LOCALHOST, ZOOKEEPER, keytab_zk);
+    LoginContext login = login(ZOOKEEPER_LOCALHOST,
+        ZOOKEEPER_CLIENT_CONTEXT,
+        keytab_zk);
     try {
       logLoginDetails(ZOOKEEPER, login);
-      RegistrySecurity.setZKSaslClientProperties(ZOOKEEPER, ZOOKEEPER);
+      RegistrySecurity.setZKSaslClientProperties(ZOOKEEPER,
+          ZOOKEEPER_CLIENT_CONTEXT);
       curator = startCuratorServiceInstance("ZK", true);
       LOG.info(curator.toString());
 
