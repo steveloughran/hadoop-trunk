@@ -19,10 +19,13 @@
 package org.apache.hadoop.yarn.registry.secure;
 
 
+import com.google.common.base.Preconditions;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathAccessDeniedException;
 import org.apache.hadoop.fs.PathPermissionException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperationsFactory;
@@ -46,9 +49,12 @@ import java.security.PrivilegedExceptionAction;
 import java.util.List;
 
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_CLIENT_AUTH;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_CLIENT_AUTHENTICATION_ID;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_CLIENT_AUTHENTICATION_PASSWORD;
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_CLIENT_JAAS_CONTEXT;
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_SECURE;
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_SYSTEM_ACCOUNTS;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.REGISTRY_CLIENT_AUTH_DIGEST;
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.REGISTRY_CLIENT_AUTH_KERBEROS;
 
 /**
@@ -271,4 +277,37 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     operations.mknode(base + "/subdir", false);
 
   }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testNoDigestAuthMissingId() throws Throwable {
+    RegistryOperationsFactory.createAuthenticatedInstance(zkClientConf,
+        "",
+        "pass");
+  }
+  
+  @Test(expected = ServiceStateException.class)
+  public void testNoDigestAuthMissingId2() throws Throwable {
+    zkClientConf.set(KEY_REGISTRY_CLIENT_AUTH, REGISTRY_CLIENT_AUTH_DIGEST);
+    zkClientConf.set(KEY_REGISTRY_CLIENT_AUTHENTICATION_ID, "");
+    zkClientConf.set(KEY_REGISTRY_CLIENT_AUTHENTICATION_PASSWORD, "pass");
+    RegistryOperationsFactory.createInstance("DigestRegistryOperations",
+        zkClientConf);
+  }
+  
+  @Test(expected = IllegalArgumentException.class)
+  public void testNoDigestAuthMissingPass() throws Throwable {
+    RegistryOperationsFactory.createAuthenticatedInstance(zkClientConf,
+        "id",
+        "");
+  }
+
+  @Test(expected = ServiceStateException.class)
+  public void testNoDigestAuthMissingPass2() throws Throwable {
+    zkClientConf.set(KEY_REGISTRY_CLIENT_AUTH, REGISTRY_CLIENT_AUTH_DIGEST);
+    zkClientConf.set(KEY_REGISTRY_CLIENT_AUTHENTICATION_ID, "id");
+    zkClientConf.set(KEY_REGISTRY_CLIENT_AUTHENTICATION_PASSWORD, "");
+    RegistryOperationsFactory.createInstance("DigestRegistryOperations",
+        zkClientConf);
+  }
+
 }

@@ -100,9 +100,11 @@ public final class RegistryOperationsFactory {
   }
 
   /**
-   * Create and initialize an operations instance authenticated with write access via
-   * a <code>id:password</code> pair. The instance will have the read access
-   * across the registy, but write access only to that part of the registry
+   * Create and initialize an operations instance authenticated with write
+   * access via an <code>id:password</code> pair. 
+   * 
+   * The instance will have the read access
+   * across the registry, but write access only to that part of the registry
    * to which it has been give the relevant permissions.
    * @param conf configuration
    * @param id user ID
