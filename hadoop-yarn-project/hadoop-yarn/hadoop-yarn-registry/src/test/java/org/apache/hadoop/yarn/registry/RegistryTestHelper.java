@@ -69,12 +69,12 @@ public class RegistryTestHelper extends Assert {
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistryTestHelper.class);
   public static final String KTUTIL = "ktutil";
-  private final RecordOperations.ServiceRecordMarshal recordMarshal =
+  private static final RecordOperations.ServiceRecordMarshal recordMarshal =
       new RecordOperations.ServiceRecordMarshal();
 
   /**
    * Assert the path is valid by ZK rules
-   * @param path
+   * @param path path to check
    */
   public static void assertValidZKPath(String path) {
     try {
@@ -84,12 +84,21 @@ public class RegistryTestHelper extends Assert {
     }
   }
 
+  /**
+   * Assert that a string is not empty (null or "")
+   * @param message message to raise if the string is empty
+   * @param check string to check
+   */
   public static void assertNotEmpty(String message, String check) {
     if (StringUtils.isEmpty(check)) {
       fail(message);
     }
   }
 
+  /**
+   * Assert that a string is empty (null or "")
+   * @param check string to check
+   */
   public static void assertNotEmpty(String check) {
     if (StringUtils.isEmpty(check)) {
       fail("Empty string");
@@ -128,7 +137,7 @@ public class RegistryTestHelper extends Assert {
    * {@link #addSampleEndpoints(ServiceRecord, String)}
    * @param record instance to check
    */
-  protected void validateEntry(ServiceRecord record) {
+  public static void validateEntry(ServiceRecord record) {
     assertNotNull("null service record", record);
     List<Endpoint> endpoints = record.external;
     assertEquals(2, endpoints.size());
@@ -152,17 +161,16 @@ public class RegistryTestHelper extends Assert {
     Endpoint web = findEndpoint(record, "web", true, 1, 1);
     assertEquals(1, web.addresses.size());
     assertEquals(1, web.addresses.get(0).size());
-    
   }
 
   /**
    * Assert that an endpoint matches the criteria
-   * @param endpoint
-   * @param addressType
-   * @param protocolType
-   * @param api
+   * @param endpoint endpoint to examine
+   * @param addressType expected address type
+   * @param protocolType expected protocol type
+   * @param api API
    */
-  public void assertMatches(Endpoint endpoint,
+  public static void assertMatches(Endpoint endpoint,
       String addressType,
       String protocolType,
       String api) {
@@ -178,7 +186,7 @@ public class RegistryTestHelper extends Assert {
    * @param source record that was written
    * @param resolved the one that resolved.
    */
-  public void assertMatches(ServiceRecord source, ServiceRecord resolved) {
+  public static void assertMatches(ServiceRecord source, ServiceRecord resolved) {
     assertNotNull("Null source record ", source);
     assertNotNull("Null resolved record ", resolved);
     assertEquals(source.id, resolved.id);
@@ -196,7 +204,7 @@ public class RegistryTestHelper extends Assert {
    * @param addressTupleSize expected size of a type
    * @return the endpoint.
    */
-  public Endpoint findEndpoint(ServiceRecord record,
+  public static Endpoint findEndpoint(ServiceRecord record,
       String api, boolean external, int addressElements, int addressTupleSize) {
     Endpoint epr = external ? record.getExternalEndpoint(api)
                             : record.getInternalEndpoint(api);
@@ -224,7 +232,7 @@ public class RegistryTestHelper extends Assert {
    * @throws IOException only if something bizarre goes wrong marshalling
    * a record.
    */
-  public void logRecord(String name, ServiceRecord record) throws
+  public static void logRecord(String name, ServiceRecord record) throws
       IOException {
     LOG.info(" {} = \n{}\n", name, recordMarshal.toJson(record));
   }
@@ -236,7 +244,7 @@ public class RegistryTestHelper extends Assert {
    * @return the record
    * @throws IOException on a failure
    */
-  protected ServiceRecord buildExampleServiceEntry(int persistence) throws
+  public static ServiceRecord buildExampleServiceEntry(int persistence) throws
       IOException,
       URISyntaxException {
     ServiceRecord record = new ServiceRecord();
@@ -251,8 +259,8 @@ public class RegistryTestHelper extends Assert {
    * Add some endpoints
    * @param entry entry
    */
-  protected void addSampleEndpoints(ServiceRecord entry, String hostname) throws
-      URISyntaxException {
+  public static void addSampleEndpoints(ServiceRecord entry, String hostname)
+      throws URISyntaxException {
     entry.addExternalEndpoint(webEndpoint("web",
         new URI("http", hostname + ":80", "/")));
     entry.addExternalEndpoint(
@@ -332,7 +340,13 @@ public class RegistryTestHelper extends Assert {
     return "";
   }
 
-  public static String ktListRobust(File keytab) throws IOException {
+  /**
+   * Perform a robust <code>ktutils -l</code> ... catches and ignores
+   * exceptions, otherwise the output is logged.
+   * @param keytab keytab to list
+   * @return the result of the operation, or "" on any problem
+   */
+  public static String ktListRobust(File keytab) {
     try {
       return ktList(keytab);
     } catch (IOException e) {
@@ -340,7 +354,6 @@ public class RegistryTestHelper extends Assert {
       return "";
     }
   }
-
 
   /**
    * Login via a UGI. Requres UGI to have been set up

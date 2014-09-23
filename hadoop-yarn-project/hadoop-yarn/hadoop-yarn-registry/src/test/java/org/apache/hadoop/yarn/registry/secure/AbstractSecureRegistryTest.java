@@ -72,14 +72,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   public static final String BOB = "bob";
   public static final String BOB_CLIENT_CONTEXT = "bob";
   public static final String BOB_LOCALHOST = "bob/localhost";
-  public static final String SASL_AUTH_PROVIDER =
-      "org.apache.hadoop.yarn.registry.secure.ExtendedSASLAuthenticationProvider";
 
-  /**
-   * This appears to be the context hadoop expects
-   */
-  public static final String KEYTAB_KERBEROS_CONTEXT_NAME =
-    "hadoop-keytab-kerberos";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractSecureRegistryTest.class);
@@ -198,6 +191,9 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     File target = new File(System.getProperty("test.dir", "target"));
     kdcWorkDir = new File(target, "kdc");
     kdcWorkDir.mkdirs();
+    if (!kdcWorkDir.mkdirs()) {
+      assertTrue(kdcWorkDir.isDirectory());
+    }
     kdcConf = MiniKdc.createConf();
     kdcConf.setProperty(MiniKdc.DEBUG, "true");
     kdc = new MiniKdc(kdcConf, kdcWorkDir);
@@ -219,7 +215,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
 
     jaasFile = new File(kdcWorkDir, "jaas.txt");
     FileUtils.write(jaasFile, jaas.toString());
-    LOG.info("\n"+ jaas.toString());
+    LOG.info("\n"+ jaas);
     RegistrySecurity.bindJVMtoJAASFile(jaasFile);
   }
 
@@ -263,8 +259,8 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
 
   /**
    * Create a secure instance
-   * @param name
-   * @return
+   * @param name instance name
+   * @return the instance
    * @throws Exception
    */
   protected static MicroZookeeperService createSecureZKInstance(String name)

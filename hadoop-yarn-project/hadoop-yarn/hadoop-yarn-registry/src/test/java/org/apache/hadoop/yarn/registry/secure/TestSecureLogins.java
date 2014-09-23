@@ -28,6 +28,7 @@ import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
+import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
 import org.apache.zookeeper.Environment;
 import org.apache.zookeeper.data.ACL;
 import org.junit.Assume;
@@ -205,7 +206,7 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
       }
     });
     assertEquals(ZOOKEEPER_REALM, acl.getId().getId());
-    assertEquals("sasl", acl.getId().getScheme());
+    assertEquals(ZookeeperConfigOptions.SCHEME_SASL, acl.getId().getScheme());
     registrySecurity.addSystemACL(acl);
 
   }

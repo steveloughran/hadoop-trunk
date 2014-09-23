@@ -55,7 +55,6 @@ public class AbstractRegistryTest extends AbstractZKRegistryTest {
     addToTeardown(registry);
   }
 
-
   /**
    * Create a service entry with the sample endpoints, and put it
    * at the destination
