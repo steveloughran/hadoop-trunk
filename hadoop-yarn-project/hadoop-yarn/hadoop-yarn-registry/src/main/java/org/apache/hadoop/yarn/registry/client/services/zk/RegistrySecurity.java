@@ -155,13 +155,19 @@ public class RegistrySecurity extends AbstractService {
    */  
   private String kerberosRealm;
 
+  /**
+   * Client context
+   */
   private String jaasClientContext;
-  
+
+  /**
+   * Client identity
+   */
   private String jaasClientIdentity;
 
   /**
    * Create an instance
-   * @param name
+   * @param name service name
    */
   public RegistrySecurity(String name) {
     super(name);
@@ -200,10 +206,6 @@ public class RegistrySecurity extends AbstractService {
 
     secureRegistry =
         getConfig().getBoolean(KEY_REGISTRY_SECURE, DEFAULT_REGISTRY_SECURE);
-    if (!UserGroupInformation.isSecurityEnabled()) {
-      addSystemACL(ALL_READWRITE_ACCESS);
-      return false;
-    }
     initACLs();
     return true;
   }
@@ -253,6 +255,11 @@ public class RegistrySecurity extends AbstractService {
           jaasClientContext = getOrFail(KEY_REGISTRY_CLIENT_JAAS_CONTEXT,
               DEFAULT_REGISTRY_CLIENT_JAAS_CONTEXT);
           jaasClientIdentity = currentUser.getShortUserName();
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Auth is SASL user=\"{}\" JAAS context=\"{}\"",
+                jaasClientIdentity,
+                jaasClientContext);
+          }
           break;
         
         case digest:
@@ -265,14 +272,24 @@ public class RegistrySecurity extends AbstractService {
           String digestAuth = digest(id, pass);
           userACLs.add(new ACL(ZooDefs.Perms.ALL, toDigestId(digestAuth)));
           digestAuthData = digestAuth.getBytes("UTF-8");
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Auth is digest with ID \"{}\" pass length={}", id,
+                pass.length());
+          }
           break;
         
         case anon:
           // nothing is needed; account is read only.
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Auth is anonymous");
+          }
           break;
       }
       
     } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Registry has no security");
+      }
       // wide open cluster, adding system acls
       systemACLs.addAll(WorldReadWriteACL);
     }
@@ -329,9 +346,8 @@ public class RegistrySecurity extends AbstractService {
     return clientACLs;
   }
 
-
   /**
-   * Create a SASL 
+   * Create a SASL ACL for the user
    * @param perms permissions
    * @return an ACL for the current user
    * @throws IOException
@@ -350,10 +366,6 @@ public class RegistrySecurity extends AbstractService {
   public ACL createSaslACL(UserGroupInformation ugi, int perms) {
     String userName = ugi.getUserName();
     return new ACL(perms, new Id(SCHEME_SASL, userName));
-  }
-
-  public String getKerberosRealm() {
-    return kerberosRealm;
   }
 
   /**
@@ -424,9 +436,17 @@ public class RegistrySecurity extends AbstractService {
     return new Id(SCHEME_DIGEST, digest);
   }
 
+  /**
+   * Create a Digest ID from an id:pass pair
+   * @param id ID
+   * @param password password
+   * @return an ID
+   * @throws IOException
+   */
   public Id toDigestId(String id, String password) throws IOException {
     return toDigestId(digest(id, password));
   }
+  
   /**
    * Split up a list of the form 
    * <code>sasl:mapred@,digest:5f55d66, sasl@yarn@EXAMPLE.COM</code>
@@ -442,7 +462,6 @@ public class RegistrySecurity extends AbstractService {
    * @param aclString list of 0 or more ACLs
    * @param realm realm to add
    * @return a list of split and potentially patched ACL pairs.
-   * 
    * 
    */
   public List<String> splitAclPairs(String aclString, String realm) {
@@ -504,7 +523,6 @@ public class RegistrySecurity extends AbstractService {
     }
     return ids;
   }
-
 
   /**
    * Parse an ACL list. This includes configuration indirection
@@ -620,6 +638,12 @@ public class RegistrySecurity extends AbstractService {
    * @throws RuntimeException if there is no context entry found
    */
   public static AppConfigurationEntry[] validateContext(String context)  {
+    if (context == null) {
+      throw new RuntimeException("Null context argument");
+    }
+    if (context.isEmpty()) {
+      throw new RuntimeException("empty context argument");
+    }
     javax.security.auth.login.Configuration configuration =
         javax.security.auth.login.Configuration.getConfiguration();
     AppConfigurationEntry[] entries =
@@ -641,20 +665,22 @@ public class RegistrySecurity extends AbstractService {
    */
   public void applySecurityEnvironment(CuratorFrameworkFactory.Builder builder) {
   
-    switch (access) {
-      case anon:
-        clearZKSaslClientProperties();
-        break;
+    if (isSecureRegistry()) {
+      switch (access) {
+        case anon:
+          clearZKSaslClientProperties();
+          break;
 
-      case digest:
-        // no SASL
-        clearZKSaslClientProperties();
-        builder.authorization(SCHEME_DIGEST, digestAuthData);
-        break;
-        
-      case sasl:
-        // bind to the current identity and context within the JAAS file
-        setZKSaslClientProperties(jaasClientIdentity, jaasClientContext);
+        case digest:
+          // no SASL
+          clearZKSaslClientProperties();
+          builder.authorization(SCHEME_DIGEST, digestAuthData);
+          break;
+
+        case sasl:
+          // bind to the current identity and context within the JAAS file
+          setZKSaslClientProperties(jaasClientIdentity, jaasClientContext);
+      }
     }
   }
   
