@@ -60,7 +60,8 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   public static final String REALM = "EXAMPLE.COM";
   public static final String ZOOKEEPER = "zookeeper";
   public static final String ZOOKEEPER_LOCALHOST = "zookeeper/localhost";
-  public static final String ZOOKEEPER_REALM = "zookeeper@"+REALM;;
+  public static final String ZOOKEEPER_REALM = "zookeeper@" + REALM;
+  ;
   public static final String ZOOKEEPER_LOCALHOST_REALM = 
       ZOOKEEPER_LOCALHOST + "@" + REALM;
   public static final String ALICE = "alice";

@@ -72,6 +72,13 @@ public interface ZookeeperConfigOptions {
    */
   String PROP_ZK_SERVER_REALM = "zookeeper.server.realm";
 
+
+  /**
+   * Path to a kinit binary; defaults to
+   * <code>"/usr/bin/kinit"</code>
+   */
+  String PROP_ZK_KINIT_PATH = "zookeeper.kinit";
+  
   /**
    * ID scheme for SASL: {@value}.
    */

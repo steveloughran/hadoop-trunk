@@ -162,6 +162,7 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
     LOG.info("System ACLs {}",
         RegistrySecurity.aclsToString(systemACLs));
 
+    LOG.info("own ACL:");
     maybeCreate("", CreateMode.PERSISTENT, systemACLs, false);
     maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
         systemACLs, false);

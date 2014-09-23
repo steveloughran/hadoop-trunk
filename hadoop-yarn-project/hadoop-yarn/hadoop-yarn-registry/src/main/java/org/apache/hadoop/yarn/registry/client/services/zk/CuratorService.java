@@ -452,12 +452,18 @@ public class CuratorService extends CompositeService
     return stat;
   }
 
+  /**
+   * Get the ACLs of a path
+   * @param path path of operation
+   * @return a possibly empty list of ACLs
+   * @throws IOException
+   */
   public List<ACL> zkGetACLS(String path) throws IOException {
     String fullpath = createFullPath(path);
     List<ACL> acls;
     try {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Stat {}", fullpath);
+        LOG.debug("GetACLS {}", fullpath);
       }
       acls = curator.getACL().forPath(fullpath);
     } catch (Exception e) {

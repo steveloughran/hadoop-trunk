@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
@@ -36,11 +35,9 @@ import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.services.zk.CuratorService;
-import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -136,11 +133,12 @@ public class RegistryOperationsService extends CuratorService
       IOException {
     validatePath(path);
     Stat stat = zkStat(path);
+    
     RegistryPathStatus status = new RegistryPathStatus(
         path,
         stat.getCtime(),
         stat.getDataLength(),
-        stat.getNumChildren());
+        stat.getNumChildren(), "");
     if (LOG.isDebugEnabled()) {
       LOG.debug("Stat {} => {}", path, status);
     }

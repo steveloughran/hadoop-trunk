@@ -36,8 +36,11 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_CLIENT_AUTH;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_CLIENT_JAAS_CONTEXT;
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_SECURE;
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_SYSTEM_ACCOUNTS;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.REGISTRY_CLIENT_AUTH_KERBEROS;
 
 /**
  * Verify that the {@link RMRegistryOperationsService} works securely
@@ -72,16 +75,24 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
    */
   public RMRegistryOperationsService createRMRegistryOperations() throws
       LoginException, IOException, InterruptedException {
-    RegistrySecurity.setZKSaslClientProperties(ZOOKEEPER,
+    ktListRobust(keytab_zk);
+/*
+    RegistrySecurity.setZKSaslClientProperties(ZOOKEEPER_REALM,
         ZOOKEEPER);
-    LOG.info(registrySecurity.buildSecurityDiagnostics());
+*/
+    // kerberos
+    secureConf.set(KEY_REGISTRY_CLIENT_AUTH,
+        REGISTRY_CLIENT_AUTH_KERBEROS);
+    secureConf.set(KEY_REGISTRY_CLIENT_JAAS_CONTEXT, ZOOKEEPER);
+
     RMRegistryOperationsService registryOperations = zookeeperUGI.doAs(
         new PrivilegedExceptionAction<RMRegistryOperationsService>() {
           @Override
           public RMRegistryOperationsService run() throws Exception {
             RMRegistryOperationsService operations
-                = new RMRegistryOperationsService("rm", secureZK);
+                = new RMRegistryOperationsService("rmregistry", secureZK);
             operations.init(secureConf);
+            LOG.info(operations.bindingDiagnosticDetails());
             operations.start();
             return operations;
           }
@@ -92,7 +103,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     LOG.info(" Binding {}",
         registryOperations.bindingDiagnosticDetails());
     // should this be automatic?
-   
+
     return registryOperations;
   }
   
