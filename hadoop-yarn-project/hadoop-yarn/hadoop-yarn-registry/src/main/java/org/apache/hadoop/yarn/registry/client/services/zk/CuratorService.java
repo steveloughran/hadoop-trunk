@@ -154,14 +154,11 @@ public class CuratorService extends CompositeService
    */
   @Override
   protected void serviceStart() throws Exception {
-
     super.serviceStart();
-
     
     // create the curator; rely on the registry security code
     // to set up the JVM context and curator
     curator = createCurator();
-
   }
 
   /**

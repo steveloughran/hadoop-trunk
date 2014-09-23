@@ -273,7 +273,6 @@ public interface RegistryConstants {
    */
   String DEFAULT_REGISTRY_CLIENT_JAAS_CONTEXT = "Client";
 
-
   /**
    *  path to users off the root: {@value}
    */

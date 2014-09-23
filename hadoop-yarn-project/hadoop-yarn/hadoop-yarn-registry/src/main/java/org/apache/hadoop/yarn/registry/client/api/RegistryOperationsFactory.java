@@ -53,7 +53,7 @@ public final class RegistryOperationsFactory {
   
   /**
    * Create and initialize a registry operations instance.
-   * Access writes will be determined from the configuration
+   * Access rights will be determined from the configuration
    * @param name name of the instance
    * @param conf configuration
    * @return a registry operations instance
@@ -71,7 +71,8 @@ public final class RegistryOperationsFactory {
    * In a secure cluster, this instance will only have read access to the 
    * registry.
    * @param conf configuration
-   * @return a registry operations instance
+   * @return an anonymous registry operations instance
+   *
    * @throws ServiceStateException on any failure to initialize
    */
   public static RegistryOperations createAnonymousInstance(Configuration conf) {
@@ -106,7 +107,8 @@ public final class RegistryOperationsFactory {
    * @throws IllegalArgumentException if an argument is invalid
    */
   public static RegistryOperations createDigestInstance(Configuration conf,
-      String id, String password) {
+      String id,
+      String password) {
     Preconditions.checkArgument(!StringUtils.isEmpty(id), "empty Id");
     Preconditions.checkArgument(!StringUtils.isEmpty(password), "empty Password");
     conf.set(KEY_REGISTRY_CLIENT_AUTH, REGISTRY_CLIENT_AUTH_DIGEST);
