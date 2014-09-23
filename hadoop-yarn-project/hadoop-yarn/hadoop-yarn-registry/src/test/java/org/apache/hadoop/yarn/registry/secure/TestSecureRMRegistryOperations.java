@@ -21,6 +21,7 @@ package org.apache.hadoop.yarn.registry.secure;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathAccessDeniedException;
+import org.apache.hadoop.fs.PathPermissionException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
@@ -55,6 +56,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
   private Configuration secureConf;
   private Configuration zkClientConf;
   private UserGroupInformation zookeeperUGI;
+  private UserGroupInformation aliceUGI;
 
 
   @Before
@@ -65,11 +67,13 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
 
     // create client conf containing the ZK quorum
     zkClientConf = new Configuration(secureZK.getConfig());
+    zkClientConf.setBoolean(KEY_REGISTRY_SECURE, true);
     assertNotEmpty(zkClientConf.get(RegistryConstants.KEY_REGISTRY_ZK_QUORUM));
     
     // ZK is in charge
     secureConf.set(KEY_REGISTRY_SYSTEM_ACCOUNTS, "sasl:zookeeper@");
     zookeeperUGI = loginUGI(ZOOKEEPER, keytab_zk);
+    aliceUGI = loginUGI(ALICE, keytab_alice);
   }
 
   @After
@@ -84,11 +88,6 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
    */
   public RMRegistryOperationsService startRMRegistryOperations() throws
       LoginException, IOException, InterruptedException {
-    ktListRobust(keytab_zk);
-/*
-    RegistrySecurity.setZKSaslClientProperties(ZOOKEEPER_REALM,
-        ZOOKEEPER);
-*/
     // kerberos
     secureConf.set(KEY_REGISTRY_CLIENT_AUTH,
         REGISTRY_CLIENT_AUTH_KERBEROS);
@@ -106,29 +105,11 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
             operations.start();
             return operations;
           }
-        }
-    );
+        });
 
 
     return registryOperations;
   }
-  
-/*
-
-  @Test
-  public void testInsecureClientToZK() throws Throwable {
-
-    userZookeeperToCreateRoot();
-    RegistrySecurity.clearZKSaslProperties();
-    
-    CuratorService curatorService =
-        startCuratorServiceInstance("insecure client", false);
-
-    curatorService.zkList("/");
-    curatorService.zkMkPath("", CreateMode.PERSISTENT, false,
-        RegistrySecurity.WorldReadWriteACL);
-  }
-*/
 
   /**
    * test that ZK can write as itself
@@ -149,7 +130,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
   public void testAnonReadAccess() throws Throwable {
     RMRegistryOperationsService rmRegistryOperations =
         startRMRegistryOperations();
-
+    describe(LOG, "testAnonReadAccess");
     RegistryOperations operations =
         RegistryOperationsFactory.createAnonymousInstance(zkClientConf);
     addToTeardown(operations);
@@ -167,18 +148,28 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
   public void testAnonNoWriteAccess() throws Throwable {
     RMRegistryOperationsService rmRegistryOperations =
         startRMRegistryOperations();
-
+    describe(LOG, "testAnonNoWriteAccess");
     RegistryOperations operations =
         RegistryOperationsFactory.createAnonymousInstance(zkClientConf);
     addToTeardown(operations);
-    describe(LOG, "starting anon operations");
     operations.start();
-    
+
+    String servicePath = RegistryConstants.PATH_SYSTEM_SERVICES + "hdfs";
+    expectMkNodeFailure(operations, servicePath);
+  }
+
+  /**
+   * Expect a mknode operation to fail
+   * @param operations operations instance
+   * @param path path
+   * @throws IOException An IO failure other than PathAccessDeniedException
+   */
+  public void expectMkNodeFailure(RegistryOperations operations,
+      String path) throws IOException {
     try {
-      String servicePath = RegistryConstants.PATH_SYSTEM_SERVICES + "hdfs";
-      operations.mknode(servicePath,
-          false);
-      fail("should have failed to create a node under " + servicePath);
+      operations.mknode(path, false);
+      fail("should have failed to create a node under " + path);
+    } catch (PathPermissionException expected) {
     } catch (PathAccessDeniedException expected) {
       // expected
     }
@@ -186,47 +177,45 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
 
 
   @Test
-  public void testCreateAlicePath() throws Throwable {
+  public void testAlicePathAliceAccess() throws Throwable {
+    RMRegistryOperationsService rmRegistryOperations =
+        startRMRegistryOperations();
+    final String aliceHome = rmRegistryOperations.initUserRegistry(ALICE);
+    describe(LOG, "Creating alice accessor");
+
+    RegistryOperations operations = aliceUGI.doAs(
+        new PrivilegedExceptionAction<RegistryOperations>() {
+          @Override
+          public RegistryOperations run() throws Exception {
+            RegistryOperations operations =
+                RegistryOperationsFactory.createKerberosInstance(zkClientConf,
+                    ALICE_CLIENT_CONTEXT);
+            addToTeardown(operations);
+            operations.start();
+            RegistryPathStatus[] stats = operations.list(aliceHome);
+            String path = aliceHome + "/subpath";
+            operations.mknode(path, false);
+            return operations;
+          }
+        });
+
+
+  }
+  
+  @Test
+  public void testAlicePathRestrictedAnonAccess() throws Throwable {
     RMRegistryOperationsService rmRegistryOperations =
         startRMRegistryOperations();
     String aliceHome = rmRegistryOperations.initUserRegistry(ALICE);
-    
+    describe(LOG, "Creating anonymous accessor");
+    RegistryOperations anonOperations =
+        RegistryOperationsFactory.createAnonymousInstance(zkClientConf);
+    addToTeardown(anonOperations);
+    anonOperations.start();
+    RegistryPathStatus[] stats = anonOperations.list(aliceHome);
+    expectMkNodeFailure(anonOperations, aliceHome);
   }
   
-  /**
-   * give the client credentials
-   * @throws Throwable
-   */
-//  @Test
-/*  public void testAliceCanWrite() throws Throwable {
-
-    System.setProperty("curator-log-events", "true");
-    startSecureZK();
-    userZookeeperToCreateRoot();
-    RegistrySecurity.clearZKSaslProperties();
-    LoginContext aliceLogin = login(ALICE_LOCALHOST, ALICE, keytab_alice);
-    try {
-      logLoginDetails(ALICE, aliceLogin);
-      ktList(keytab_alice);
-      RegistrySecurity.setZKSaslClientProperties(ALICE, ALICE);
-      describe(LOG, "Starting Alice Curator");
-      CuratorService alice =
-          startCuratorServiceInstance("alice's", true);
-      LOG.info(alice.toString());
-
-      addToTeardown(alice);
-      
-      // stat must work
-      alice.zkStat("");
-
-      alice.zkList("/");
-      alice.zkMkPath("/alice", CreateMode.PERSISTENT, false,
-          RegistrySecurity.WorldReadWriteACL);
-    } finally {
-      logout(aliceLogin);
-    }
-
-  }*/
-
+  
 
 }

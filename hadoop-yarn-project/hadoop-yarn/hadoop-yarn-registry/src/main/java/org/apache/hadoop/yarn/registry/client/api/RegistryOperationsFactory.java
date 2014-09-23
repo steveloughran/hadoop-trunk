@@ -83,14 +83,19 @@ public final class RegistryOperationsFactory {
   /**
    * Create and initialize an secure, Kerberos-authenticated instance.
    * 
+   * The user identity will be inferred from the current user 
+   * 
    * The authentication of this instance will expire when any kerberos
    * tokens needed to authenticate with the registry infrastructure expire.
    * @param conf configuration
+   * @param jaasContext the JAAS context of the account. 
    * @return a registry operations instance
    * @throws ServiceStateException on any failure to initialize
    */
-  public static RegistryOperations createKerberosInstance(Configuration conf) {
+  public static RegistryOperations createKerberosInstance(Configuration conf,
+      String jaasContext) {
     conf.set(KEY_REGISTRY_CLIENT_AUTH, REGISTRY_CLIENT_AUTH_KERBEROS);
+    conf.set(KEY_REGISTRY_CLIENT_JAAS_CONTEXT, jaasContext);
     return createInstance("KerberosRegistryOperations", conf);
   }
 
