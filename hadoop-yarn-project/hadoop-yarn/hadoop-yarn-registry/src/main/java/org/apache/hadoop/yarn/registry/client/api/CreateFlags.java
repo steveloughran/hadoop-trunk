@@ -38,12 +38,4 @@ public interface CreateFlags {
    */
   int OVERWRITE = 1;
 
-
-  /**
-   * The entry is ephemeral, when this session is closed the entry
-   * will be deleted.
-   */
-  // this is not currently in use, so commented out.
-  //int EPHEMERAL = 2;
-
 }
