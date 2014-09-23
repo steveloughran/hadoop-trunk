@@ -204,7 +204,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
   public void testAlicePathRestrictedAnonAccess() throws Throwable {
     RMRegistryOperationsService rmRegistryOperations =
         startRMRegistryOperations();
-    String aliceHome = rmRegistryOperations.initUserRegistry(ALICE);
+    String aliceHome = rmRegistryOperations.initUserRegistryAsync(ALICE);
     describe(LOG, "Creating anonymous accessor");
     RegistryOperations anonOperations =
         RegistryOperationsFactory.createAnonymousInstance(zkClientConf);
@@ -219,7 +219,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
   public void testUserZookeeperHomePathAccess() throws Throwable {
     RMRegistryOperationsService rmRegistryOperations =
         startRMRegistryOperations();
-    final String home = rmRegistryOperations.initUserRegistry(ZOOKEEPER);
+    final String home = rmRegistryOperations.initUserRegistryAsync(ZOOKEEPER);
     describe(LOG, "Creating ZK client");
 
     RegistryOperations operations = zookeeperUGI.doAs(

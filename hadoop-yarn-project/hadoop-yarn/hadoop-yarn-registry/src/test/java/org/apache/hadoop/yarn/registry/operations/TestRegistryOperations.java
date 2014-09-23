@@ -22,27 +22,18 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.yarn.registry.AbstractRegistryTest;
-
-import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.*;
-
-import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
-import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
-import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
-import org.apache.hadoop.yarn.registry.client.services.CuratorEventCatcher;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
-import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
 import java.util.Map;
-import java.util.concurrent.Future;
 
 public class TestRegistryOperations extends AbstractRegistryTest {
   protected static final Logger LOG =
@@ -136,7 +127,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
 
     }
   }
-  
+
   @Test
   public void testDoubleMkdir() throws Throwable {
     operations.mknode(USERPATH, false);
@@ -175,20 +166,20 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     operations.mknode(empty, false);
     RegistryPathStatus stat = operations.stat(empty);
   }
-  
+
   @Test
   public void testStatRootPath() throws Throwable {
     operations.mknode("/", false);
     RegistryPathStatus stat = operations.stat("/");
   }
-  
+
   @Test
   public void testStatOneLevelDown() throws Throwable {
     operations.mknode("/subdir", true);
     RegistryPathStatus stat = operations.stat("/subdir");
   }
-  
-  
+
+
   @Test
   public void testLsRootPath() throws Throwable {
     String empty = "/";
@@ -230,214 +221,6 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     assertMatches(resolved1, resolved3);
   }
 
-  /**
-   * Create a complex example app
-   * @throws Throwable
-   */
-  @Test
-  public void testCreateComplexApplication() throws Throwable {
-    String appId = "application_1408631738011_0001";
-    String cid = "container_1408631738011_0001_01_";
-    String cid1 = cid +"000001";
-    String cid2 = cid +"000002";
-    String appPath = USERPATH + "tomcat";
-
-    ServiceRecord webapp = new ServiceRecord(appId,
-        "tomcat-based web application", 
-        PersistencePolicies.APPLICATION, null);
-    webapp.addExternalEndpoint(restEndpoint("www",
-        new URI("http","//loadbalancer/", null)));
-
-    ServiceRecord comp1 = new ServiceRecord(cid1, null,
-        PersistencePolicies.CONTAINER, null);
-    comp1.addExternalEndpoint(restEndpoint("www",
-        new URI("http", "//rack4server3:43572", null)));
-    comp1.addInternalEndpoint(
-        inetAddrEndpoint("jmx", "JMX", "rack4server3", 43573));
-    
-    // Component 2 has a container lifespan
-    ServiceRecord comp2 = new ServiceRecord(cid2, null,
-        PersistencePolicies.CONTAINER, null);
-    comp2.addExternalEndpoint(restEndpoint("www",
-        new URI("http", "//rack1server28:35881",null)));
-    comp2.addInternalEndpoint(
-        inetAddrEndpoint("jmx", "JMX", "rack1server28", 35882));
-
-    operations.mknode(USERPATH, false);
-    operations.create(appPath, webapp, CreateFlags.OVERWRITE);
-    String components = appPath + RegistryConstants.SUBPATH_COMPONENTS + "/";
-    operations.mknode(components, false);
-    String dns1 = RegistryPathUtils.encodeYarnID(cid1);
-    String dns1path = components + dns1;
-    operations.create(dns1path, comp1, CreateFlags.CREATE);
-    String dns2 = RegistryPathUtils.encodeYarnID(cid2);
-    String dns2path = components + dns2;
-    operations.create(dns2path, comp2, CreateFlags.CREATE );
-
-    ZKPathDumper pathDumper = registry.dumpPath();
-    LOG.info(pathDumper.toString());
-
-    logRecord("tomcat", webapp);
-    logRecord(dns1, comp1);
-    logRecord(dns2, comp2);
-
-    ServiceRecord dns1resolved = operations.resolve(dns1path);
-    assertEquals("Persistence policies on resolved entry",
-        PersistencePolicies.CONTAINER, dns1resolved.persistence);
-
-
-    RegistryPathStatus[] componentStats = operations.list(components);
-    assertEquals(2, componentStats.length);
-    Map<String, ServiceRecord> records =
-        RecordOperations.extractServiceRecords(operations, componentStats);
-    assertEquals(2, records.size());
-    ServiceRecord retrieved1 = records.get(dns1path);
-    logRecord(retrieved1.id, retrieved1);
-    assertMatches(dns1resolved, retrieved1);
-    assertEquals(PersistencePolicies.CONTAINER, retrieved1.persistence);
-
-    // create a listing under components/
-    operations.mknode(components + "subdir", false);
-    RegistryPathStatus[] componentStatsUpdated = operations.list(components);
-    assertEquals(3, componentStatsUpdated.length);
-    Map<String, ServiceRecord> recordsUpdated =
-        RecordOperations.extractServiceRecords(operations, componentStats);
-    assertEquals(2, recordsUpdated.size());
-
-    
-    
-    // now do some deletions.
-    
-    // synchronous delete container ID 2
-    
-    // fail if the app policy is chosen
-    assertEquals(0, registry.purgeRecords("/", cid2,
-        PersistencePolicies.APPLICATION,
-        RMRegistryOperationsService.PurgePolicy.FailOnChildren,
-        null));
-    // succeed for container
-    assertEquals(1, registry.purgeRecords("/", cid2,
-        PersistencePolicies.CONTAINER,
-        RMRegistryOperationsService.PurgePolicy.FailOnChildren,
-        null));
-    assertPathNotFound(dns2path);
-    assertPathExists(dns1path);
-    
-    // attempt to delete root with policy of fail on children
-    try {
-      registry.purgeRecords("/",
-          appId,
-          PersistencePolicies.APPLICATION,
-          RMRegistryOperationsService.PurgePolicy.FailOnChildren, null);
-      fail("expected a failure");
-    } catch (PathIsNotEmptyDirectoryException expected) {
-     // expected
-    }
-    assertPathExists(appPath);
-    assertPathExists(dns1path);
-
-    // downgrade to a skip on children
-    assertEquals(0,
-        registry.purgeRecords("/", appId,
-            PersistencePolicies.APPLICATION,
-            RMRegistryOperationsService.PurgePolicy.SkipOnChildren,
-            null));
-    assertPathExists(appPath);
-    assertPathExists(dns1path);
-
-    // now trigger recursive delete
-    assertEquals(1,
-        registry.purgeRecords("/",
-            appId,
-            PersistencePolicies.APPLICATION,
-            RMRegistryOperationsService.PurgePolicy.PurgeAll,
-            null));
-    assertPathNotFound(appPath);
-    assertPathNotFound(dns1path);
-
-  }
-
-
-  @Test
-  public void testPurgeEntryCuratorCallback() throws Throwable {
-
-    String path = "/users/example/hbase/hbase1/";
-    ServiceRecord written = buildExampleServiceEntry(
-        PersistencePolicies.APPLICATION_ATTEMPT);
-    written.id = "testAsyncPurgeEntry_attempt_001";
-
-    operations.mknode(RegistryPathUtils.parentOf(path), true);
-    operations.create(path, written, 0);
-
-    ZKPathDumper dump = registry.dumpPath();
-    CuratorEventCatcher events = new CuratorEventCatcher();
-
-    LOG.info("Initial state {}", dump);
-
-    // container query
-    int opcount = registry.purgeRecords("/",
-        written.id,
-        PersistencePolicies.CONTAINER,
-        RMRegistryOperationsService.PurgePolicy.PurgeAll,
-        events);
-    assertPathExists(path);
-    assertEquals(0, opcount);
-    assertEquals("Event counter", 0, events.getCount());
-
-
-    // now the application attempt
-    opcount = registry.purgeRecords("/",
-        written.id,
-        -1,
-        RMRegistryOperationsService.PurgePolicy.PurgeAll,
-        events);
-
-    LOG.info("Final state {}", dump);
-
-    assertPathNotFound(path);
-    assertEquals("wrong no of delete operations in " + dump, 1, opcount);
-    // and validate the callback event
-    assertEquals("Event counter", 1, events.getCount());
-
-  }
-  
-  @Test
-  public void testAsyncPurgeEntry() throws Throwable {
-
-    String path = "/users/example/hbase/hbase1/";
-    ServiceRecord written = buildExampleServiceEntry(
-        PersistencePolicies.APPLICATION_ATTEMPT);
-    written.id = "testAsyncPurgeEntry_attempt_001";
-
-    operations.mknode(RegistryPathUtils.parentOf(path), true);
-    operations.create(path, written, 0);
-
-    ZKPathDumper dump = registry.dumpPath();
-
-    LOG.info("Initial state {}", dump);
-
-    Future<Integer> future = registry.purgeRecordsAsync("/",
-        written.id,
-        PersistencePolicies.CONTAINER);
-
-    int opcount = future.get();
-    assertPathExists(path);
-    assertEquals(0, opcount);
-
-
-    // now all matching entries
-    future = registry.purgeRecordsAsync("/",
-        written.id,
-        -1);
-    opcount = future.get();
-    LOG.info("Final state {}", dump);
-
-    assertPathNotFound(path);
-    assertEquals("wrong no of delete operations in " + dump, 1, opcount);
-    // and validate the callback event
-
-  }
-  
 
   @Test
   public void testPutGetContainerPersistenceServiceEntry() throws Throwable {
@@ -452,5 +235,5 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     validateEntry(resolved);
     assertMatches(written, resolved);
   }
-  
+
 }
