@@ -20,11 +20,15 @@ package org.apache.hadoop.yarn.registry.secure;
 
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.PathAccessDeniedException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
+import org.apache.hadoop.yarn.registry.client.api.RegistryOperationsFactory;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
+import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
+import org.apache.zookeeper.client.ZooKeeperSaslClient;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -49,6 +53,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestSecureRMRegistryOperations.class);
   private Configuration secureConf;
+  private Configuration zkClientConf;
   private UserGroupInformation zookeeperUGI;
 
 
@@ -58,6 +63,10 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     secureConf = new Configuration();
     secureConf.setBoolean(KEY_REGISTRY_SECURE, true);
 
+    // create client conf containing the ZK quorum
+    zkClientConf = new Configuration(secureZK.getConfig());
+    assertNotEmpty(zkClientConf.get(RegistryConstants.KEY_REGISTRY_ZK_QUORUM));
+    
     // ZK is in charge
     secureConf.set(KEY_REGISTRY_SYSTEM_ACCOUNTS, "sasl:zookeeper@");
     zookeeperUGI = loginUGI(ZOOKEEPER, keytab_zk);
@@ -73,7 +82,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
    * @throws LoginException
    * @throws FileNotFoundException
    */
-  public RMRegistryOperationsService createRMRegistryOperations() throws
+  public RMRegistryOperationsService startRMRegistryOperations() throws
       LoginException, IOException, InterruptedException {
     ktListRobust(keytab_zk);
 /*
@@ -91,6 +100,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
           public RMRegistryOperationsService run() throws Exception {
             RMRegistryOperationsService operations
                 = new RMRegistryOperationsService("rmregistry", secureZK);
+            addToTeardown(operations);
             operations.init(secureConf);
             LOG.info(operations.bindingDiagnosticDetails());
             operations.start();
@@ -99,10 +109,6 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
         }
     );
 
-    addToTeardown(registryOperations);
-    LOG.info(" Binding {}",
-        registryOperations.bindingDiagnosticDetails());
-    // should this be automatic?
 
     return registryOperations;
   }
@@ -132,13 +138,61 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
   public void testZookeeperCanWriteUnderSystem() throws Throwable {
 
     RMRegistryOperationsService rmRegistryOperations =
-        createRMRegistryOperations();
+        startRMRegistryOperations();
     RegistryOperations operations = rmRegistryOperations;
     operations.mknode(RegistryConstants.PATH_SYSTEM_SERVICES + "hdfs",
         false);
   }
 
 
+  @Test
+  public void testAnonReadAccess() throws Throwable {
+    RMRegistryOperationsService rmRegistryOperations =
+        startRMRegistryOperations();
+
+    RegistryOperations operations =
+        RegistryOperationsFactory.createAnonymousInstance(zkClientConf);
+    addToTeardown(operations);
+    operations.start();
+   
+    assertFalse("RegistrySecurity.isClientSASLEnabled()==true",
+        RegistrySecurity.isClientSASLEnabled());
+    assertFalse("ZooKeeperSaslClient.isEnabled()==true",
+        ZooKeeperSaslClient.isEnabled());
+    RegistryPathStatus[] stats =
+        operations.list(RegistryConstants.PATH_SYSTEM_SERVICES);
+  }
+  
+  @Test
+  public void testAnonNoWriteAccess() throws Throwable {
+    RMRegistryOperationsService rmRegistryOperations =
+        startRMRegistryOperations();
+
+    RegistryOperations operations =
+        RegistryOperationsFactory.createAnonymousInstance(zkClientConf);
+    addToTeardown(operations);
+    describe(LOG, "starting anon operations");
+    operations.start();
+    
+    try {
+      String servicePath = RegistryConstants.PATH_SYSTEM_SERVICES + "hdfs";
+      operations.mknode(servicePath,
+          false);
+      fail("should have failed to create a node under " + servicePath);
+    } catch (PathAccessDeniedException expected) {
+      // expected
+    }
+  }
+
+
+  @Test
+  public void testCreateAlicePath() throws Throwable {
+    RMRegistryOperationsService rmRegistryOperations =
+        startRMRegistryOperations();
+    String aliceHome = rmRegistryOperations.initUserRegistry(ALICE);
+    
+  }
+  
   /**
    * give the client credentials
    * @throws Throwable

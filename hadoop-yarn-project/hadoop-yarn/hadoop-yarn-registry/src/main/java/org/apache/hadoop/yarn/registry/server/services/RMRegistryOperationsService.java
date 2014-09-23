@@ -191,12 +191,14 @@ public class RMRegistryOperationsService extends RegistryOperationsService {
   /**
    * Perform the actual initialization actions
    * @param username user name of the user
+   * @return the path created
    * @throws IOException
    */
-  public void initUserRegistry(String username) throws IOException {
+  public String initUserRegistry(String username) throws IOException {
     String path = homeDir(username);
     maybeCreate(path, CreateMode.PERSISTENT,
         createAclForUser(username), false);
+    return path;
   }
 
 

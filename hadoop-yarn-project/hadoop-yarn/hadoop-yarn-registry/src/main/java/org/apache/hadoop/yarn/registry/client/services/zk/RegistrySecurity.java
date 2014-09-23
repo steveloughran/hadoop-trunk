@@ -643,12 +643,12 @@ public class RegistrySecurity extends AbstractService {
   
     switch (access) {
       case anon:
-        disableZookeeperSASL();
+        clearZKSaslClientProperties();
         break;
 
       case digest:
         // no SASL
-        disableZookeeperSASL();
+        clearZKSaslClientProperties();
         builder.authorization(SCHEME_DIGEST, digestAuthData);
         break;
         
@@ -670,35 +670,43 @@ public class RegistrySecurity extends AbstractService {
   public static void setZKSaslClientProperties(String username,
       String context)  {
     RegistrySecurity.validateContext(context);
-    enableZookeeperSASL();
+    enableZookeeperClientSASL();
     System.setProperty(PROP_ZK_SASL_CLIENT_USERNAME, username);
     System.setProperty(PROP_ZK_SASL_CLIENT_CONTEXT, context);
   }
 
   /**
+   * Clear all the ZK SASL Client properties
+   * <b>Important:</b>This is JVM-wide
+   */
+  public static void clearZKSaslClientProperties() {
+    disableZookeeperClientSASL();
+    System.clearProperty(PROP_ZK_SASL_CLIENT_CONTEXT);
+    System.clearProperty(PROP_ZK_SASL_CLIENT_USERNAME);
+  }
+  
+  /**
    * Turn ZK SASL on 
    * <b>Important:</b>This is JVM-wide
    */
-  protected static void enableZookeeperSASL() {
+  protected static void enableZookeeperClientSASL() {
     System.setProperty(PROP_ZK_ENABLE_SASL_CLIENT, "true");
-  }
-
-  /**
-   * Clear all the ZK Sasl properties
-   * <b>Important:</b>This is JVM-wide
-   */
-  public static void clearZKSaslProperties() {
-    disableZookeeperSASL();
-    System.clearProperty(PROP_ZK_SASL_CLIENT_CONTEXT);
-    System.clearProperty(PROP_ZK_SASL_CLIENT_USERNAME);
   }
 
   /**
    * Force disable ZK SASL bindings.
    * <b>Important:</b>This is JVM-wide
    */
-  public static void disableZookeeperSASL() {
-    System.clearProperty(ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY);
+  public static void disableZookeeperClientSASL() {
+    System.setProperty(ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY, "false");
+  }
+
+  /**
+   * Is the system property enabling the SASL client set?
+   * @return true if the SASL client system property is set.
+   */
+  public static boolean isClientSASLEnabled() {
+    return ZooKeeperSaslClient.isEnabled();
   }
 
   /**

@@ -56,7 +56,7 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
   @After
   public void afterTestSecureZKService() throws Throwable {
     disableKerberosDebugging();
-    RegistrySecurity.clearZKSaslProperties();
+    RegistrySecurity.clearZKSaslClientProperties();
   }
   
   @Test
@@ -69,7 +69,7 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
   public void testInsecureClientToZK() throws Throwable {
     startSecureZK();
     userZookeeperToCreateRoot();
-    RegistrySecurity.clearZKSaslProperties();
+    RegistrySecurity.clearZKSaslClientProperties();
     
     CuratorService curatorService =
         startCuratorServiceInstance("insecure client", false);
@@ -83,7 +83,7 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
   public void testAuthedClientToZKNoCredentials() throws Throwable {
     startSecureZK();
     userZookeeperToCreateRoot();
-    RegistrySecurity.clearZKSaslProperties();
+    RegistrySecurity.clearZKSaslClientProperties();
     registrySecurity.logCurrentHadoopUser();
     CuratorService curatorService =
         startCuratorServiceInstance("authed with no credentials", true);
@@ -144,7 +144,7 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
     System.setProperty("curator-log-events", "true");
     startSecureZK();
     userZookeeperToCreateRoot();
-    RegistrySecurity.clearZKSaslProperties();
+    RegistrySecurity.clearZKSaslClientProperties();
     LoginContext aliceLogin = login(ALICE_LOCALHOST, ALICE, keytab_alice);
     try {
       logLoginDetails(ALICE, aliceLogin);
