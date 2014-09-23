@@ -226,9 +226,10 @@ public interface RegistryConstants {
   String KEY_REGISTRY_SYSTEM_ACCOUNTS = REGISTRY_PREFIX + "system.accounts";
 
   /**
-   * Default system accounts: {@value}
+   * Default system accounts given global access to the registry: {@value}
    */
-  String DEFAULT_REGISTRY_SYSTEM_ACCOUNTS = "sasl:yarn@, sasl:mapred@, sasl:mapred@hdfs@";
+  String DEFAULT_REGISTRY_SYSTEM_ACCOUNTS =
+      "sasl:yarn@, sasl:mapred@, sasl:hdfs@";
 
 
   /**
