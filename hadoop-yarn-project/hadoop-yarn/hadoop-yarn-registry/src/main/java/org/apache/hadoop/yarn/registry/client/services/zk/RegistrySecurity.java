@@ -235,7 +235,9 @@ public class RegistrySecurity extends AbstractService {
       ACL self = null;
       if (UserGroupInformation.isSecurityEnabled()) {
         self = createSaslACLFromCurrentUser(ZooDefs.Perms.ALL);
-        userACLs.add(self);
+        if (self != null) {
+          userACLs.add(self);
+        }
       }
       
       // here check for UGI having secure on or digest + ID 
@@ -356,12 +358,16 @@ public class RegistrySecurity extends AbstractService {
   /**
    * Create a SASL ACL for the user
    * @param perms permissions
-   * @return an ACL for the current user
+   * @return an ACL for the current user or null if they aren't a kerberos user
    * @throws IOException
    */
   public ACL createSaslACLFromCurrentUser(int perms) throws IOException {
     UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
-    return createSaslACL(currentUser, perms);
+    if (currentUser.hasKerberosCredentials()) {
+      return createSaslACL(currentUser, perms);
+    } else {
+      return null;
+    }
   }
 
   /**
@@ -562,7 +568,6 @@ public class RegistrySecurity extends AbstractService {
       + " storeKey=true;\n"
       + "}; \n"
       ;
-
 
   /**
    * Create a JAAS entry for insertion

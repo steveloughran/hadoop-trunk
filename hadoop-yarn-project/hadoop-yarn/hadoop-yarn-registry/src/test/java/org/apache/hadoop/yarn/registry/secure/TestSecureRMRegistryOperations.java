@@ -177,15 +177,15 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
         RegistryOperationsFactory.createAnonymousInstance(zkClientConf);
     addToTeardown(operations);
     operations.start();
-
-    expectMkNodeFailure(operations, "/");
+    assertFalse("mknode(/)",operations.mknode("/", false));
+    expectMkNodeFailure(operations, "/sub");
   }
 
   /**
    * Expect a mknode operation to fail
    * @param operations operations instance
    * @param path path
-   * @throws IOException An IO failure other than PathAccessDeniedException
+   * @throws IOException An IO failure other than those permitted
    */
   public void expectMkNodeFailure(RegistryOperations operations,
       String path) throws IOException {
@@ -193,6 +193,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
       operations.mknode(path, false);
       fail("should have failed to create a node under " + path);
     } catch (PathPermissionException expected) {
+      // expected
     } catch (PathAccessDeniedException expected) {
       // expected
     }
@@ -262,6 +263,8 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
       }
     }
     assertNotNull("Did not find digest entry in ACLs " + aclset, found);
+    zkClientConf.set(RegistryConstants.KEY_REGISTRY_USER_ACCOUNTS, 
+        "sasl:somebody@EXAMPLE.COM, sasl:other");
     RegistryOperations operations =
         RegistryOperationsFactory.createAuthenticatedInstance(zkClientConf,
             id,
