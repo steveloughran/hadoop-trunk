@@ -145,11 +145,12 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
     startSecureZK();
     userZookeeperToCreateRoot();
     RegistrySecurity.clearZKSaslClientProperties();
-    LoginContext aliceLogin = login(ALICE_LOCALHOST, ALICE, keytab_alice);
+    LoginContext aliceLogin = login(ALICE_LOCALHOST, ALICE_CLIENT_CONTEXT,
+        keytab_alice);
     try {
       logLoginDetails(ALICE, aliceLogin);
       ktList(keytab_alice);
-      RegistrySecurity.setZKSaslClientProperties(ALICE, ALICE);
+      RegistrySecurity.setZKSaslClientProperties(ALICE, ALICE_CLIENT_CONTEXT);
       describe(LOG, "Starting Alice Curator");
       CuratorService alice =
           startCuratorServiceInstance("alice's", true);
@@ -176,7 +177,7 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
     // alice
     CuratorService alice = null;
     LoginContext aliceLogin =
-        login(ALICE_LOCALHOST, ALICE, keytab_alice);
+        login(ALICE_LOCALHOST, ALICE_CLIENT_CONTEXT, keytab_alice);
     try {
       alice = startCuratorServiceInstance("alice's", true);
       alice.zkList("/");
@@ -192,7 +193,7 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
     }
     CuratorService bobCurator = null;
     LoginContext bobLogin =
-        login(BOB_LOCALHOST, BOB, keytab_bob);
+        login(BOB_LOCALHOST, BOB_CLIENT_CONTEXT, keytab_bob);
 
     try {
       bobCurator = startCuratorServiceInstance("bob's", true);

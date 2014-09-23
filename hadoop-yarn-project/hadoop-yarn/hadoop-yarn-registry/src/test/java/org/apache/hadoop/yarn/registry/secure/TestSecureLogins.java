@@ -94,14 +94,16 @@ public class TestSecureLogins extends AbstractSecureRegistryTest {
   
   @Test
   public void testClientLogin() throws Throwable {
-    LoginContext client = login(ALICE_LOCALHOST, ALICE, keytab_alice);
+    LoginContext client = login(ALICE_LOCALHOST,
+                                ALICE_CLIENT_CONTEXT,
+                                keytab_alice);
     
     logLoginDetails(ALICE_LOCALHOST, client);
     String confFilename = System.getProperty(Environment.JAAS_CONF_KEY);
     assertNotNull("Unset: "+ Environment.JAAS_CONF_KEY, confFilename);
     String config = FileUtils.readFileToString(new File(confFilename));
     LOG.info("{}=\n{}", confFilename, config);
-    RegistrySecurity.setZKSaslClientProperties(ALICE, ALICE);
+    RegistrySecurity.setZKSaslClientProperties(ALICE, ALICE_CLIENT_CONTEXT);
     client.logout();
   }
 

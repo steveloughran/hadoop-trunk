@@ -67,8 +67,10 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   public static final String ZOOKEEPER_LOCALHOST_REALM = 
       ZOOKEEPER_LOCALHOST + "@" + REALM;
   public static final String ALICE = "alice";
+  public static final String ALICE_CLIENT_CONTEXT = "alice";
   public static final String ALICE_LOCALHOST = "alice/localhost";
   public static final String BOB = "bob";
+  public static final String BOB_CLIENT_CONTEXT = "bob";
   public static final String BOB_LOCALHOST = "bob/localhost";
   public static final String SASL_AUTH_PROVIDER =
       "org.apache.hadoop.yarn.registry.secure.ExtendedSASLAuthenticationProvider";
@@ -210,9 +212,9 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
         ZOOKEEPER, keytab_zk));
     jaas.append(registrySecurity.createJAASEntry(ZOOKEEPER_SERVER_CONTEXT,
         ZOOKEEPER_LOCALHOST, keytab_zk));
-    jaas.append(registrySecurity.createJAASEntry(ALICE, 
+    jaas.append(registrySecurity.createJAASEntry(ALICE_CLIENT_CONTEXT, 
         ALICE_LOCALHOST , keytab_alice));
-    jaas.append(registrySecurity.createJAASEntry(BOB,
+    jaas.append(registrySecurity.createJAASEntry(BOB_CLIENT_CONTEXT,
         BOB_LOCALHOST, keytab_bob));
 
     jaasFile = new File(kdcWorkDir, "jaas.txt");
