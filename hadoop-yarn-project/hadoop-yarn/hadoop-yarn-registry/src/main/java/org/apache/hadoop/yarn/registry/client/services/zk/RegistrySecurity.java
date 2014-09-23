@@ -786,9 +786,9 @@ public class RegistrySecurity extends AbstractService {
                           : "insecure registry; ");
     builder.append("Access policy: ").append(access);
 
-    builder.append("System ACLs: ").append(aclsToString(systemACLs));
+    builder.append(", System ACLs: ").append(aclsToString(systemACLs));
     builder.append(UgiInfo.fromCurrentUser());
-    builder.append("Kerberos Realm: ").append(kerberosRealm).append(" ; ");
+    builder.append(" Kerberos Realm: ").append(kerberosRealm).append(" ; ");
     builder.append(describeProperty(Environment.JAAS_CONF_KEY));
     String sasl =
         System.getProperty(PROP_ZK_ENABLE_SASL_CLIENT,
@@ -797,13 +797,13 @@ public class RegistrySecurity extends AbstractService {
     builder.append(describeProperty(PROP_ZK_ENABLE_SASL_CLIENT,
         DEFAULT_ZK_ENABLE_SASL_CLIENT));
     if (saslEnabled) {
+      builder.append("JAAS Client Identity")
+             .append("=")
+             .append(jaasClientIdentity)
+             .append("; ");
       builder.append(KEY_REGISTRY_CLIENT_JAAS_CONTEXT)
              .append("=")
              .append(jaasClientContext)
-             .append("; ");
-      builder.append("jaasClientIdentity")
-             .append("=")
-             .append(jaasClientIdentity)
              .append("; ");
       builder.append(describeProperty(PROP_ZK_SASL_CLIENT_USERNAME));
       builder.append(describeProperty(PROP_ZK_SASL_CLIENT_CONTEXT));
