@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.server.services;
+package org.apache.hadoop.yarn.registry.server.integration;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.curator.framework.api.BackgroundCallback;
@@ -32,6 +32,8 @@ import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import org.apache.hadoop.yarn.registry.server.services.DeleteCompletionCallback;
+import org.apache.hadoop.yarn.registry.server.services.RegistryAdminService;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;

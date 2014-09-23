@@ -19,8 +19,6 @@
 package org.apache.hadoop.yarn.registry.secure;
 
 
-import com.google.common.base.Preconditions;
-import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathAccessDeniedException;
 import org.apache.hadoop.fs.PathPermissionException;
@@ -33,7 +31,7 @@ import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsClient;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
-import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
+import org.apache.hadoop.yarn.registry.server.integration.RMRegistryOperationsService;
 import org.apache.zookeeper.client.ZooKeeperSaslClient;
 import org.apache.zookeeper.data.ACL;
 import org.junit.After;
@@ -177,7 +175,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
         RegistryOperationsFactory.createAnonymousInstance(zkClientConf);
     addToTeardown(operations);
     operations.start();
-    assertFalse("mknode(/)",operations.mknode("/", false));
+    assertFalse("mknode(/)", operations.mknode("/", false));
     expectMkNodeFailure(operations, "/sub");
   }
 

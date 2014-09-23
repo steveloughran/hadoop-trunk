@@ -139,7 +139,6 @@ public class RegistryAdminService extends RegistryOperationsService {
         return null;
       }
     });
-    
   }
 
   /**
@@ -150,7 +149,6 @@ public class RegistryAdminService extends RegistryOperationsService {
     FailOnChildren,
     SkipOnChildren
   }
-
 
   /**
    * Recursive operation to purge all matching records under a base path.
@@ -250,7 +248,6 @@ public class RegistryAdminService extends RegistryOperationsService {
         ServiceRecord serviceRecord);
   }
 
-
   /**
    * An async registry purge action taking 
    * a selector which decides what to delete
@@ -271,7 +268,6 @@ public class RegistryAdminService extends RegistryOperationsService {
       this.path = path;
       this.purgePolicy = purgePolicy;
     }
-
 
     @Override
     public Integer call() throws Exception {

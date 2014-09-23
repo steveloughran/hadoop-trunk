@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.operations;
+package org.apache.hadoop.yarn.registry.integration;
 
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
@@ -31,7 +31,6 @@ import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.server.services.DeleteCompletionCallback;
-import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
 import org.apache.hadoop.yarn.registry.server.services.RegistryAdminService;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -102,7 +101,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
       IOException,
       ExecutionException,
       InterruptedException {
-    
+
     Future<Integer> future = registry.purgeRecordsAsync(path,
         id, policyMatch, purgePolicy, callback);
     try {
@@ -194,7 +193,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
         -1,
         RegistryAdminService.PurgePolicy.PurgeAll,
         deletions);
-    
+
     dump = registry.dumpPath();
     LOG.info("Final state {}", dump);
 
@@ -344,7 +343,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     ServiceRecord container = new ServiceRecord("container1",
         "container",
         PersistencePolicies.CONTAINER, null);
-    
+
     operations.create("/app", app, CreateFlags.OVERWRITE);
     operations.create("/app/container", container, CreateFlags.OVERWRITE);
 
@@ -359,6 +358,6 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     }
 
   }
-  
+
 }
 

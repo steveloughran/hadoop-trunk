@@ -21,7 +21,7 @@ package org.apache.hadoop.yarn.registry.integration;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
-import org.apache.hadoop.yarn.registry.server.services.RMRegistryOperationsService;
+import org.apache.hadoop.yarn.registry.server.integration.RMRegistryOperationsService;
 import org.apache.hadoop.yarn.registry.server.services.RegistryAdminService;
 import org.junit.Assert;
 import org.junit.Test;
