@@ -26,7 +26,6 @@ import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
-import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 
@@ -150,4 +149,16 @@ public interface RegistryOperations extends Service {
       InvalidPathnameException,
       IOException;
 
+  /**
+   * Add a new write access entry for all future write operations.
+   * @param id ID to use
+   * @param pass password
+   * @throws IOException on any failure to build the digest
+   */
+  void addWriteAccessor(String id, String pass) throws IOException ;
+
+  /**
+   * Clear all write accessors
+   */
+  public void clearWriteAccessors();
 }
