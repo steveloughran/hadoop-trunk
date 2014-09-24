@@ -19,19 +19,15 @@
 package org.apache.hadoop.yarn.registry.server.integration;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.lang.StringUtils;
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
-import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
-import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.server.services.DeleteCompletionCallback;
 import org.apache.hadoop.yarn.registry.server.services.RegistryAdminService;
 import org.slf4j.Logger;
@@ -71,15 +67,7 @@ public class RMRegistryOperationsService extends RegistryAdminService {
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
 
-    if (isSecure()) {
-      String realm = getRegistrySecurity().getKerberosRealm();
-      if (StringUtils.isEmpty(realm)) {
-        throw new ServiceStateException("Cannot determine service realm");
-      }
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Started Registry operations in realm {}", realm);
-      }
-    }
+    verifyRealmValidity();
   }
 
   public PurgePolicy getPurgeOnCompletionPolicy() {
@@ -241,37 +229,9 @@ public class RMRegistryOperationsService extends RegistryAdminService {
         path, id, persistencePolicyMatch);
     return submit(
         new AsyncPurge(path,
-            new ByYarnPersistence(id, persistencePolicyMatch),
+            new SelectByYarnPersistence(id, persistencePolicyMatch),
             purgePolicy,
             callback));
   }
 
-  /**
-   * Select an entry by the YARN persistence policy
-   */
-  public static class ByYarnPersistence implements NodeSelector {
-    private final String id;
-    private final int targetPolicy;
-
-    public ByYarnPersistence(String id, int targetPolicy) {
-      this.id = id;
-      this.targetPolicy = targetPolicy;
-    }
-
-    @Override
-    public boolean shouldSelect(String path,
-        RegistryPathStatus registryPathStatus,
-        ServiceRecord serviceRecord) {
-      return serviceRecord.id.equals(id)
-             && (targetPolicy < 0 || serviceRecord.persistence == targetPolicy);
-    }
-
-    @Override
-    public String toString() {
-      return String.format(
-          "Select by ID %s and policy %d: {}",
-          id, targetPolicy);
-    }
-  }
-  
 }

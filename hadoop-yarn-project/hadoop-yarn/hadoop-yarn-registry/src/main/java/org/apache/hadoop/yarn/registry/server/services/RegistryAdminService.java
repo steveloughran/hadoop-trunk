@@ -20,9 +20,11 @@ package org.apache.hadoop.yarn.registry.server.services;
 
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang.StringUtils;
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
@@ -282,6 +284,25 @@ public class RegistryAdminService extends RegistryOperationsService {
     }
 
     return homeDir(username);
+  }
+
+  /**
+   * Method to validate the validity of the kerberos realm.
+   * <ul>
+   *   <li>Insecure: not needed.</li>
+   *   <li>Secure: must have been determined.</li>
+   * </ul>
+   */
+  protected void verifyRealmValidity() throws ServiceStateException {
+    if (isSecure()) {
+      String realm = getRegistrySecurity().getKerberosRealm();
+      if (StringUtils.isEmpty(realm)) {
+        throw new ServiceStateException("Cannot determine service realm");
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Started Registry operations in realm {}", realm);
+      }
+    }
   }
 
   /**

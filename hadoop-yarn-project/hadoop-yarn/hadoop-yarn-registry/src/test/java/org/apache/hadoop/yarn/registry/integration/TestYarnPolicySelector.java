@@ -21,7 +21,7 @@ package org.apache.hadoop.yarn.registry.integration;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
-import org.apache.hadoop.yarn.registry.server.integration.RMRegistryOperationsService;
+import org.apache.hadoop.yarn.registry.server.integration.SelectByYarnPersistence;
 import org.apache.hadoop.yarn.registry.server.services.RegistryAdminService;
 import org.junit.Assert;
 import org.junit.Test;
@@ -43,14 +43,14 @@ public class TestYarnPolicySelector extends Assert {
   @Test
   public void testByContainer() throws Throwable {
     assertSelected(false,
-        new RMRegistryOperationsService.ByYarnPersistence("1",
+        new SelectByYarnPersistence("1",
             PersistencePolicies.CONTAINER));
   }
 
   @Test
   public void testByApp() throws Throwable {
     assertSelected(true,
-        new RMRegistryOperationsService.ByYarnPersistence("1",
+        new SelectByYarnPersistence("1",
             PersistencePolicies.APPLICATION));
   }
 
@@ -58,7 +58,7 @@ public class TestYarnPolicySelector extends Assert {
   @Test
   public void testByAppName() throws Throwable {
     assertSelected(false,
-        new RMRegistryOperationsService.ByYarnPersistence("2",
+        new SelectByYarnPersistence("2",
             PersistencePolicies.APPLICATION));
   }
 
@@ -66,7 +66,7 @@ public class TestYarnPolicySelector extends Assert {
   @Test
   public void testByAny() throws Throwable {
     assertSelected(true,
-        new RMRegistryOperationsService.ByYarnPersistence("1",
+        new SelectByYarnPersistence("1",
             -1));
   }
 
