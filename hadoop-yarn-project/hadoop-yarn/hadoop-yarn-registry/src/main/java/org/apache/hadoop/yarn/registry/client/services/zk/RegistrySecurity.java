@@ -90,15 +90,15 @@ public class RegistrySecurity extends AbstractService {
       "Registry security is enabled -but Hadoop security is not enabled";
 
   /**
-  Access policy options
+   * Access policy options
    */
   private enum AccessPolicy {
     anon, sasl, digest
   }
 
   /**
-  Access mechanism
-  */
+   * Access mechanism
+   */
   private AccessPolicy access;
 
   /**
@@ -117,6 +117,7 @@ public class RegistrySecurity extends AbstractService {
    * Auth data used for digest auth
    */
   private byte[] digestAuthData;
+
   /**
    * flag set to true if the registry has security enabled.
    */
@@ -180,13 +181,18 @@ public class RegistrySecurity extends AbstractService {
     super(name);
   }
 
+  /**
+   * Init the service: this sets up security based on the configuration
+   * @param conf configuration
+   * @throws Exception
+   */
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
     String auth = conf.getTrimmed(KEY_REGISTRY_CLIENT_AUTH,
         REGISTRY_CLIENT_AUTH_ANONYMOUS);
 
-    // TODO JDK7
+    // TODO JDK7 SWITCH
     if (REGISTRY_CLIENT_AUTH_KERBEROS.equals(auth)) {
       access = AccessPolicy.sasl;
     } else if (REGISTRY_CLIENT_AUTH_DIGEST.equals(auth)) {
@@ -202,7 +208,7 @@ public class RegistrySecurity extends AbstractService {
 
   /**
    * Init security.
-
+   *
    * After this operation, the {@link #systemACLs} list is valid. 
    * @throws IOException
    */
@@ -214,9 +220,11 @@ public class RegistrySecurity extends AbstractService {
     if (secureRegistry) {
       addSystemACL(ALL_READ_ACCESS);
 
+      // determine the kerberos realm from JVM and settings
       kerberosRealm = getConfig().get(KEY_REGISTRY_KERBEROS_REALM,
           getDefaultRealmInJVM());
-      // SYSTEM Accounts
+      
+      // System Accounts
       String system = getOrFail(KEY_REGISTRY_SYSTEM_ACCOUNTS,
                                 DEFAULT_REGISTRY_SYSTEM_ACCOUNTS);
 
@@ -280,6 +288,7 @@ public class RegistrySecurity extends AbstractService {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Auth is anonymous");
           }
+          userACLs = new ArrayList<ACL>(0);
           break;
       }
       systemACLs.addAll(userACLs);
@@ -302,7 +311,7 @@ public class RegistrySecurity extends AbstractService {
   }
 
   /**
-   * Add another system ACL
+   * Add a digest ACL
    * @param acl add ACL
    */
   public boolean addDigestACL(ACL acl) {
@@ -314,7 +323,8 @@ public class RegistrySecurity extends AbstractService {
       return true;
     } else {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Ignoring added ACL - registry is insecure{}", aclToString(acl));
+        LOG.debug("Ignoring added ACL - registry is insecure{}",
+            aclToString(acl));
       }
       return false;
     }
@@ -412,6 +422,15 @@ public class RegistrySecurity extends AbstractService {
     return parts.length == 2 
            && !StringUtils.isEmpty(parts[0])
            && !StringUtils.isEmpty(parts[1]);
+  }
+
+  /**
+   * Get the derived kerberos realm.
+   * @return this is built from the JVM realm, or the configuration if it 
+   * overrides it. If "", it means "don't know".
+   */
+  public String getKerberosRealm() {
+    return kerberosRealm;
   }
 
   /**
@@ -555,14 +574,27 @@ public class RegistrySecurity extends AbstractService {
       throw new IOException("Parsing " + zkAclConf + " :" + e, e);
     }
   }
-  
+
+  /**
+   * Get the appropriate Kerberos Auth module for JAAS entries
+   * for this JVM.
+   * @return a JVM-specific kerberos login module classname.
+   */
+  public static String getKerberosAuthModuleForJVM() {
+    if (System.getProperty("java.vendor").contains("IBM")) {
+      return "com.ibm.security.auth.module.Krb5LoginModule";
+    } else {
+      return "com.sun.security.auth.module.Krb5LoginModule";
+    }
+  }
+
   /**
    * JAAS template: {@value}
    * Note the semicolon on the last entry
    */
   private static final String JAAS_ENTRY =
       "%s { \n"
-      + " com.sun.security.auth.module.Krb5LoginModule required\n"
+      + " %s required\n"
       // kerberos module
       + " keyTab=\"%s\"\n"
       + " principal=\"%s\"\n"
@@ -594,6 +626,7 @@ public class RegistrySecurity extends AbstractService {
         Locale.ENGLISH,
         JAAS_ENTRY,
         context,
+        getKerberosAuthModuleForJVM(),
         keytab.getAbsolutePath(),
         principal);
   }
@@ -877,29 +910,38 @@ public class RegistrySecurity extends AbstractService {
 
   /**
    * Create an ACL For a user.
-   * @param user
+   * @param ugi User identity
    * @return the ACL For the specified user. Ifthe username doesn't end
    * in "@" then the realm is added
    */
-  public ACL createACLForUser(UserGroupInformation user, int perms) {
+  public ACL createACLForUser(UserGroupInformation ugi, int perms) {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Creating ACL For ", new UgiInfo(user));
+      LOG.debug("Creating ACL For ", new UgiInfo(ugi));
     }
-
     if (!secureRegistry) {
       return ALL_READWRITE_ACCESS;
     } else {
-      String username = user.getUserName();
-      if (!username.contains("@")) {
-        username = username + "@" + kerberosRealm;
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Appending kerberos realm to make {}", username);
-        }
-      }
-      return new ACL(perms, new Id(SCHEME_SASL, username));
+      return createACLfromUsername(ugi.getUserName(), perms);
     }
   }
-  
+
+  /**
+   * Given a user name (short or long), create a SASL ACL
+   * @param username user name; if it doesn't contain an "@" symbol, the
+   * service's kerberos realm is added
+   * @param perms permissions
+   * @return an ACL for the user
+   */
+  public ACL createACLfromUsername(String username, int perms) {
+    if (!username.contains("@")) {
+      username = username + "@" + kerberosRealm;
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Appending kerberos realm to make {}", username);
+      }
+    }
+    return new ACL(perms, new Id(SCHEME_SASL, username));
+  }
+
 
   /**
    * On demand string-ifier for UGI with extra details

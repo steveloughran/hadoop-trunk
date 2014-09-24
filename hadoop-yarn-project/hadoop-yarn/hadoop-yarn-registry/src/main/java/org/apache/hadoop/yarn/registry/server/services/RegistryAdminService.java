@@ -52,15 +52,28 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Administrator service for the registry. This is the one with
  * permissions to create the base directories and those for users.
  * 
- * It also includes support for asynchronous operations, especially cleanup
- * actions.
+ * It also includes support for asynchronous operations, so that
+ * zookeeper connectivity problems do not hold up the server code
+ * performing the actions.
  * 
- * It does not contain any policy about when/how to invoke these.
+ * A key async action is the depth-first tree purge, which supports
+ * pluggable policies for deleting entries.
  */
 public class RegistryAdminService extends RegistryOperationsService {
+
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistryAdminService.class);
+  
+  /**
+   * The ACL permissions for the user's homedir ACL.
+   */
+  public static final int USER_HOMEDIR_ACL_PERMISSIONS =
+        ZooDefs.Perms.READ | ZooDefs.Perms.WRITE
+      | ZooDefs.Perms.CREATE | ZooDefs.Perms.DELETE;
 
+  /**
+   * Executor for async operations
+   */
   protected final ExecutorService executor;
   
   public RegistryAdminService(String name) {
@@ -166,7 +179,6 @@ public class RegistryAdminService extends RegistryOperationsService {
   @Override
   protected void serviceStart() throws Exception {
     super.serviceStart();
-
     // create the root directories
     createRootRegistryPaths();
   }
@@ -177,12 +189,10 @@ public class RegistryAdminService extends RegistryOperationsService {
    */
   @VisibleForTesting
   public void createRootRegistryPaths() throws IOException {
-    // create the root directories
-
+    
     List<ACL> systemACLs = getRegistrySecurity().getSystemACLs();
     LOG.info("System ACLs {}",
         RegistrySecurity.aclsToString(systemACLs));
-
     maybeCreate("", CreateMode.PERSISTENT, systemACLs, false);
     maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
         systemACLs, false);
@@ -205,29 +215,38 @@ public class RegistryAdminService extends RegistryOperationsService {
    * <b>Important: this must run client-side as it needs
    * to know the id:pass tuple for a user</b>
    * @param username user name
+   * @param perms
    * @return an ACL list
    * @throws IOException ACL creation/parsing problems
    */
-  protected List<ACL> aclsForUser(String username) throws IOException {
-    // todo, make more specific for that user. 
-    // 
-    return getClientAcls();
+  public List<ACL> aclsForUser(String username, int perms) throws IOException {
+    List<ACL> clientACLs = getClientAcls();
+    RegistrySecurity security = getRegistrySecurity();
+    if (security.isSecureRegistry()) {
+      clientACLs.add(security.createACLfromUsername(username, perms));
+    }
+    return clientACLs;
   }
 
   /**
    * Start an async operation to create the home path for a user
    * if it does not exist
-   * @param username username
+   * @param shortname username, without any @REALM in kerberos
    * @return the path created
    * @throws IOException any failure while setting up the operation
    * 
    */
-  public Future<Boolean> initUserRegistryAsync(final String username)
+  public Future<Boolean> initUserRegistryAsync(final String shortname)
       throws IOException {
 
-    String homeDir = homeDir(username);
+    String homeDir = homeDir(shortname);
     if (!exists(homeDir)) {
-      return createDirAsync(homeDir, aclsForUser(username), false);
+      
+      // create the directory. The user does not
+      return createDirAsync(homeDir, 
+          aclsForUser(shortname,
+              USER_HOMEDIR_ACL_PERMISSIONS),
+          false);
     }
     return null;
   } 

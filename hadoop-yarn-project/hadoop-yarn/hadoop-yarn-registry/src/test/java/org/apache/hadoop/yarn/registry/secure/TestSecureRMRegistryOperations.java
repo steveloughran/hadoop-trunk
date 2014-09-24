@@ -32,8 +32,10 @@ import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.server.integration.RMRegistryOperationsService;
+import org.apache.hadoop.yarn.registry.server.services.RegistryAdminService;
 import org.apache.zookeeper.client.ZooKeeperSaslClient;
 import org.apache.zookeeper.data.ACL;
+import org.apache.zookeeper.data.Id;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -46,14 +48,7 @@ import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.List;
 
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_CLIENT_AUTH;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_CLIENT_AUTHENTICATION_ID;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_CLIENT_AUTHENTICATION_PASSWORD;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_CLIENT_JAAS_CONTEXT;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_SECURE;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.KEY_REGISTRY_SYSTEM_ACCOUNTS;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.REGISTRY_CLIENT_AUTH_DIGEST;
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.REGISTRY_CLIENT_AUTH_KERBEROS;
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
 /**
  * Verify that the {@link RMRegistryOperationsService} works securely
@@ -65,7 +60,6 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
   private Configuration zkClientConf;
   private UserGroupInformation zookeeperUGI;
   private UserGroupInformation aliceUGI;
-
 
   @Before
   public void setupTestSecureRMRegistryOperations() throws Exception {
@@ -128,7 +122,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     RMRegistryOperationsService rmRegistryOperations =
         startRMRegistryOperations();
     RegistryOperations operations = rmRegistryOperations;
-    operations.mknode(RegistryConstants.PATH_SYSTEM_SERVICES + "hdfs",
+    operations.mknode(PATH_SYSTEM_SERVICES + "hdfs",
         false);
   }
 
@@ -147,7 +141,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     assertFalse("ZooKeeperSaslClient.isEnabled()==true",
         ZooKeeperSaslClient.isEnabled());
     RegistryPathStatus[] stats =
-        operations.list(RegistryConstants.PATH_SYSTEM_SERVICES);
+        operations.list(PATH_SYSTEM_SERVICES);
   }
   
   @Test
@@ -160,7 +154,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     addToTeardown(operations);
     operations.start();
 
-    String servicePath = RegistryConstants.PATH_SYSTEM_SERVICES + "hdfs";
+    String servicePath = PATH_SYSTEM_SERVICES + "hdfs";
     expectMkNodeFailure(operations, servicePath);
   }  
   
@@ -175,6 +169,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     operations.start();
     assertFalse("mknode(/)", operations.mknode("/", false));
     expectMkNodeFailure(operations, "/sub");
+    expectDeleteFailure(operations, PATH_SYSTEM_SERVICES, true);
   }
 
   /**
@@ -194,7 +189,26 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
       // expected
     }
   }
-
+  
+  /**
+   * Expect a delete operation to fail
+   * @param operations operations instance
+   * @param path path
+   * @param recursive
+   * @throws IOException An IO failure other than those permitted
+   */
+  public void expectDeleteFailure(RegistryOperations operations,
+      String path, boolean recursive) throws IOException {
+    try {
+      operations.delete(path, recursive);
+      fail("should have failed to delete the node " + path);
+    } catch (PathPermissionException expected) {
+      // expected
+    } catch (PathAccessDeniedException expected) {
+      // expected
+    }
+  }
+  
   @Test
   public void testAlicePathRestrictedAnonAccess() throws Throwable {
     RMRegistryOperationsService rmRegistryOperations =
@@ -206,7 +220,8 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     addToTeardown(anonOperations);
     anonOperations.start();
     RegistryPathStatus[] stats = anonOperations.list(aliceHome);
-    expectMkNodeFailure(anonOperations, aliceHome);
+    expectMkNodeFailure(anonOperations, aliceHome + "/anon");
+    expectDeleteFailure(anonOperations, aliceHome, true);
   }
 
   @Test
@@ -232,6 +247,31 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     RegistryPathStatus[] stats = operations.list(home);
     String path = home + "/subpath";
     operations.mknode(path, false);
+    operations.delete(path, true);
+  }
+
+  @Test
+  public void testUserHomedirsPermissionsRestricted() throws Throwable {
+    // test that the /users/$user permissions are restricted
+    RMRegistryOperationsService rmRegistryOperations =
+        startRMRegistryOperations();
+    // create Alice's dir, so it should have an ACL for Alice
+    final String home = rmRegistryOperations.initUserRegistry(ALICE);
+    List<ACL> acls = rmRegistryOperations.zkGetACLS(home);
+    ACL aliceACL = null;
+    for (ACL acl : acls) {
+      LOG.info(RegistrySecurity.aclToString(acl));
+      Id id = acl.getId();
+      if (id.getScheme().equals(ZookeeperConfigOptions.SCHEME_SASL)
+          && id.getId().startsWith(ALICE)) {
+        
+        aliceACL = acl;
+        break;
+      }
+    }
+    assertNotNull(aliceACL);
+    assertEquals(RegistryAdminService.USER_HOMEDIR_ACL_PERMISSIONS,
+        aliceACL.getPerms());
   }
 
   @Test
@@ -257,7 +297,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
       }
     }
     assertNotNull("Did not find digest entry in ACLs " + aclset, found);
-    zkClientConf.set(RegistryConstants.KEY_REGISTRY_USER_ACCOUNTS, 
+    zkClientConf.set(KEY_REGISTRY_USER_ACCOUNTS, 
         "sasl:somebody@EXAMPLE.COM, sasl:other");
     RegistryOperations operations =
         RegistryOperationsFactory.createAuthenticatedInstance(zkClientConf,

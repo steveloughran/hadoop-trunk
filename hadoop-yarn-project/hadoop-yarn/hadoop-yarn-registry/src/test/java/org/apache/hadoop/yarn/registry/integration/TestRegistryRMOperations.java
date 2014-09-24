@@ -49,23 +49,9 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
   protected static final Logger LOG =
       LoggerFactory.getLogger(TestRegistryRMOperations.class);
 
-  @Test
-  public void testDeleteNonEmpty() throws Throwable {
-    ServiceRecord written = putExampleServiceEntry(ENTRY_PATH, 0);
-    RegistryPathStatus stat = operations.stat(ENTRY_PATH);
-    try {
-      operations.delete(PARENT_PATH, false);
-      fail("Expected a failure");
-    } catch (PathIsNotEmptyDirectoryException e) {
-
-    }
-    operations.delete(PARENT_PATH, true);
-
-  }
-
   /**
    * trigger a purge operation
-   * @param path pathn
+   * @param path path
    * @param id yarn ID
    * @param policyMatch policy to match ID on
    * @param purgePolicy policy when there are children under a match

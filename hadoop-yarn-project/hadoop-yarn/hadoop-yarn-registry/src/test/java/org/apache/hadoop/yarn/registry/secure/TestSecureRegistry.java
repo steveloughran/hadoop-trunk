@@ -18,19 +18,11 @@
 
 package org.apache.hadoop.yarn.registry.secure;
 
-
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.PathAccessDeniedException;
 import org.apache.hadoop.service.ServiceOperations;
-import org.apache.hadoop.yarn.registry.client.exceptions.AuthenticationFailedException;
 import org.apache.hadoop.yarn.registry.client.services.zk.CuratorService;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
-
-import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
-
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.data.ACL;
-import org.apache.zookeeper.data.Stat;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -38,7 +30,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.security.auth.login.LoginContext;
-import java.util.List;
+
+import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
 /**
  * Verify that the Mini ZK service can be started up securely
@@ -50,7 +43,6 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
   @Before
   public void beforeTestSecureZKService() throws Throwable {
       enableKerberosDebugging();
-//    System.setProperty(ZookeeperConfigOptions.ZK_ENABLE_SASL_CLIENT, "true");
   }
   
   @After
@@ -79,28 +71,6 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
         RegistrySecurity.WorldReadWriteACL);
   }
 
-//  @Test
-  public void testAuthedClientToZKNoCredentials() throws Throwable {
-    startSecureZK();
-    userZookeeperToCreateRoot();
-    RegistrySecurity.clearZKSaslClientProperties();
-    registrySecurity.logCurrentHadoopUser();
-    CuratorService curatorService =
-        startCuratorServiceInstance("authed with no credentials", true);
-    LOG.info("Started curator client {}", curatorService);
-    // read only operations MUST work
-    curatorService.zkStat("");
-    curatorService.zkStat("");
-    try {
-      curatorService.zkMkPath("", CreateMode.PERSISTENT, false,
-          RegistrySecurity.WorldReadWriteACL);
-      fail("expected to be unauthenticated, but was allowed write access" +
-           " with binding " + curatorService);
-    } catch (AuthenticationFailedException expected) {
-    // expected
-    }
-  }
-
   /**
    * test that ZK can write as itself
    * @throws Throwable
@@ -111,9 +81,9 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
     System.setProperty("curator-log-events", "true");
     startSecureZK();
     CuratorService curator = null;
-    LoginContext login = login(ZOOKEEPER_LOCALHOST, 
-                              ZOOKEEPER_CLIENT_CONTEXT,
-                              keytab_zk);
+    LoginContext login = login(ZOOKEEPER_LOCALHOST,
+        ZOOKEEPER_CLIENT_CONTEXT,
+        keytab_zk);
     try {
       logLoginDetails(ZOOKEEPER, login);
       RegistrySecurity.setZKSaslClientProperties(ZOOKEEPER,
@@ -133,85 +103,12 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
     }
   }
 
-
   /**
-   * give the client credentials
-   * @throws Throwable
+   * Start a curator service instance
+   * @param name name
+   * @param secure flag to indicate the cluster is secure
+   * @return an inited and started curator service
    */
-//  @Test
-  public void testAliceCanWrite() throws Throwable {
-
-    System.setProperty("curator-log-events", "true");
-    startSecureZK();
-    userZookeeperToCreateRoot();
-    RegistrySecurity.clearZKSaslClientProperties();
-    LoginContext aliceLogin = login(ALICE_LOCALHOST, ALICE_CLIENT_CONTEXT,
-        keytab_alice);
-    try {
-      logLoginDetails(ALICE, aliceLogin);
-      ktList(keytab_alice);
-      RegistrySecurity.setZKSaslClientProperties(ALICE, ALICE_CLIENT_CONTEXT);
-      describe(LOG, "Starting Alice Curator");
-      CuratorService alice =
-          startCuratorServiceInstance("alice's", true);
-      LOG.info(alice.toString());
-
-      addToTeardown(alice);
-      
-      // stat must work
-      alice.zkStat("");
-
-      alice.zkList("/");
-      alice.zkMkPath("/alice", CreateMode.PERSISTENT, false,
-          RegistrySecurity.WorldReadWriteACL);
-    } finally {
-      logout(aliceLogin);
-    }
-
-  }
-
-
-//  @Test
-  public void testAliceCanWriteButNotBob() throws Throwable {
-    startSecureZK();
-    // alice
-    CuratorService alice = null;
-    LoginContext aliceLogin =
-        login(ALICE_LOCALHOST, ALICE_CLIENT_CONTEXT, keytab_alice);
-    try {
-      alice = startCuratorServiceInstance("alice's", true);
-      alice.zkList("/");
-      alice.zkMkPath("/alice", CreateMode.PERSISTENT, false,
-          RegistrySecurity.WorldReadWriteACL);
-      Stat stat = alice.zkStat("/alice");
-      LOG.info("stat /alice = {}", stat);
-      List<ACL> acls = alice.zkGetACLS("/alice");
-      LOG.info(RegistrySecurity.aclsToString(acls));
-    } finally {
-      ServiceOperations.stop(alice);
-      aliceLogin.logout();
-    }
-    CuratorService bobCurator = null;
-    LoginContext bobLogin =
-        login(BOB_LOCALHOST, BOB_CLIENT_CONTEXT, keytab_bob);
-
-    try {
-      bobCurator = startCuratorServiceInstance("bob's", true);
-      bobCurator.zkMkPath("/alice/bob", CreateMode.PERSISTENT, false,
-          RegistrySecurity.WorldReadWriteACL);
-      fail("Expected a failure —but bob could create a path under /alice");
-      bobCurator.zkDelete("/alice", false, null);
-    } catch (PathAccessDeniedException expected) {
-      // expected
-    } finally {
-      ServiceOperations.stop(bobCurator);
-      bobLogin.logout();
-    }
-
-
-  }
-
-
   protected CuratorService startCuratorServiceInstance(String name,
       boolean secure) {
     Configuration clientConf = new Configuration();

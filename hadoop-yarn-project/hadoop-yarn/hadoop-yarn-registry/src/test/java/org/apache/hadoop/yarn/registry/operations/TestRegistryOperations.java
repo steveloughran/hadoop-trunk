@@ -97,7 +97,6 @@ public class TestRegistryOperations extends AbstractRegistryTest {
 
     }
     operations.delete(PARENT_PATH, true);
-
   }
 
   @Test(expected = PathNotFoundException.class)

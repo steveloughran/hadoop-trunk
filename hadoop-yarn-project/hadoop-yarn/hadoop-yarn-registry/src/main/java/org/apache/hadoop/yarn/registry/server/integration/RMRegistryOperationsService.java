@@ -19,9 +19,12 @@
 package org.apache.hadoop.yarn.registry.server.integration;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang.StringUtils;
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -61,6 +64,22 @@ public class RMRegistryOperationsService extends RegistryAdminService {
   public RMRegistryOperationsService(String name,
       RegistryBindingSource bindingSource) {
     super(name, bindingSource);
+  }
+
+
+  @Override
+  protected void serviceInit(Configuration conf) throws Exception {
+    super.serviceInit(conf);
+
+    if (isSecure()) {
+      String realm = getRegistrySecurity().getKerberosRealm();
+      if (StringUtils.isEmpty(realm)) {
+        throw new ServiceStateException("Cannot determine service realm");
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Started Registry operations in realm {}", realm);
+      }
+    }
   }
 
   public PurgePolicy getPurgeOnCompletionPolicy() {
