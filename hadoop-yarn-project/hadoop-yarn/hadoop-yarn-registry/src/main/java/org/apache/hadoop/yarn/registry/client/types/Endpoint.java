@@ -39,7 +39,7 @@ import java.util.List;
 @InterfaceStability.Evolving
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
-public class Endpoint {
+public final class Endpoint implements Cloneable {
 
   /**
    * API implemented at the end of the binding
@@ -66,6 +66,21 @@ public class Endpoint {
   public Endpoint() {
   }
 
+  /**
+   * Create an endpoint from another endpoint.
+   * This is a deep clone with a new list of addresses.
+   * @param that the endpoint to copy from
+   */
+  public Endpoint(Endpoint that) {
+    this.api = that.api;
+    this.addressType = that.addressType;
+    this.protocolType = that.protocolType;
+    this.addresses = new ArrayList<List<String>>(that.addresses.size());
+    for (List<String> address : addresses) {
+      List<String> addr2 = new ArrayList<String>(address.size());
+      Collections.copy(address, addr2);
+    }
+  }
 
   /**
    * Build an endpoint with a list of addresses
@@ -133,5 +148,15 @@ public class Endpoint {
     Preconditions.checkNotNull(addressType, "null addressType field");
     Preconditions.checkNotNull(protocolType, "null protocolType field");
     Preconditions.checkNotNull(addresses, "null addresses field");
+  }
+
+  /**
+   * Shallow clone: the lists of addresses are shared
+   * @return a cloned instance
+   * @throws CloneNotSupportedException
+   */
+  @Override
+  protected Object clone() throws CloneNotSupportedException {
+    return super.clone();
   }
 }

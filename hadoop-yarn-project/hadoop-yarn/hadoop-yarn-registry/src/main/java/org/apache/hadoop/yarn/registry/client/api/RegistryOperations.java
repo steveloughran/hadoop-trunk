@@ -30,6 +30,7 @@ import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Registry Operations
@@ -124,13 +125,13 @@ public interface RegistryOperations extends Service {
   /**
    * List children of a directory
    * @param path path
-   * @return a possibly empty array of child entries
+   * @return a possibly empty list of child entries
    * @throws PathNotFoundException path is not in the registry.
    * @throws AccessControlException security restriction.
    * @throws InvalidPathnameException the path is invalid.
    * @throws IOException Any other IO Exception
    */
-  RegistryPathStatus[] list(String path)
+  List<RegistryPathStatus> list(String path)
       throws PathNotFoundException,
       AccessControlException,
       InvalidPathnameException,

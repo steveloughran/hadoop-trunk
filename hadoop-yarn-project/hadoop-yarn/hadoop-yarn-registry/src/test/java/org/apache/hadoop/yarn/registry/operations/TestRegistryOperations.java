@@ -33,6 +33,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Map;
 
 public class TestRegistryOperations extends AbstractRegistryTest {
@@ -74,10 +75,10 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     ServiceRecord written = putExampleServiceEntry(ENTRY_PATH, 0);
     RegistryPathStatus stat = operations.stat(ENTRY_PATH);
 
-    RegistryPathStatus[] statuses =
+    List<RegistryPathStatus> statuses =
         operations.list(PARENT_PATH);
-    assertEquals(1, statuses.length);
-    assertEquals(stat, statuses[0]);
+    assertEquals(1, statuses.size());
+    assertEquals(stat, statuses.get(0));
 
     Map<String, ServiceRecord> records =
         RecordOperations.extractServiceRecords(operations, statuses);
@@ -106,8 +107,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
 
   @Test(expected = PathNotFoundException.class)
   public void testLsEmptyPath() throws Throwable {
-    RegistryPathStatus[] statuses =
-        operations.list(PARENT_PATH);
+    operations.list(PARENT_PATH);
   }
 
   @Test(expected = PathNotFoundException.class)

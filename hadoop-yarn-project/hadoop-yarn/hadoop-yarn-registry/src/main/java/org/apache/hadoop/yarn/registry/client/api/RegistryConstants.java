@@ -270,10 +270,17 @@ public interface RegistryConstants {
    *  path to system services off the root : {@value}
    */
   String PATH_SYSTEM_SERVICES = "/services/";
+
+  
+  /**
+   *  path to system services under a user's home path : {@value}
+   */
+  String PATH_USER_SERVICES = "/services/";
+
   
   /**
    *  path under a service record to point to components of that service:
    *  {@value}
    */
-  String SUBPATH_COMPONENTS = "/components";
+  String SUBPATH_COMPONENTS = "/components/";
 }

@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -56,8 +57,8 @@ public class RecordOperations {
    * @throws IOException for any IO Operation that wasn't ignored.
    */
   public static Map<String, ServiceRecord> extractServiceRecords(RegistryOperations operations,
-      RegistryPathStatus[] stats) throws IOException {
-    Map<String, ServiceRecord> results = new HashMap<String, ServiceRecord>(stats.length);
+      List<RegistryPathStatus> stats) throws IOException {
+    Map<String, ServiceRecord> results = new HashMap<String, ServiceRecord>(stats.size());
     for (RegistryPathStatus stat : stats) {
       if (stat.size > ServiceRecordHeader.getLength()) {
         // maybe has data

@@ -163,7 +163,7 @@ public class RegistryOperationsService extends CuratorService
   }
 
   @Override
-  public RegistryPathStatus[] list(String path) throws
+  public List<RegistryPathStatus> list(String path) throws
       PathNotFoundException,
       AccessControlException,
       InvalidPathnameException,
@@ -176,7 +176,7 @@ public class RegistryOperationsService extends CuratorService
     for (String childName : childNames) {
       childList.add(stat(join(path, childName)));
     }
-    return childList.toArray(new RegistryPathStatus[size]);
+    return childList;
   }
 
   @Override

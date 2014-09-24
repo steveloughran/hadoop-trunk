@@ -23,7 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
-import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -207,7 +208,7 @@ public class RegistryAdminService extends RegistryOperationsService {
    * @return a path for services underneath
    */
   protected String homeDir(String username) {
-    return BindingUtils.userPath(username);
+    return RegistryOperationUtils.homePathForUser(username);
   }
 
   /**
@@ -319,7 +320,7 @@ public class RegistryAdminService extends RegistryOperationsService {
       BackgroundCallback callback) throws IOException {
 
     // list this path's children
-    RegistryPathStatus[] entries = list(path);
+    List<RegistryPathStatus> entries = list(path);
     RegistryPathStatus registryPathStatus = stat(path);
 
     boolean toDelete = false;
@@ -334,7 +335,7 @@ public class RegistryAdminService extends RegistryOperationsService {
       // ignore
     }
 
-    if (toDelete && entries.length > 0) {
+    if (toDelete && !entries.isEmpty()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Match on record @ {} with children ", path);
       }
@@ -353,7 +354,7 @@ public class RegistryAdminService extends RegistryOperationsService {
             LOG.debug("Scheduling for deletion with children");
           }
           toDelete = true;
-          entries = new RegistryPathStatus[0];
+          entries = new ArrayList<RegistryPathStatus>(0); 
           break;
         case FailOnChildren:
           if (LOG.isDebugEnabled()) {

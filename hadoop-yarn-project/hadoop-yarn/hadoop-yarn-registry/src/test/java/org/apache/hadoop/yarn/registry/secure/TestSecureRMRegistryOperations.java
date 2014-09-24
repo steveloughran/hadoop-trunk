@@ -140,8 +140,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
         RegistrySecurity.isClientSASLEnabled());
     assertFalse("ZooKeeperSaslClient.isEnabled()==true",
         ZooKeeperSaslClient.isEnabled());
-    RegistryPathStatus[] stats =
-        operations.list(PATH_SYSTEM_SERVICES);
+    operations.list(PATH_SYSTEM_SERVICES);
   }
   
   @Test
@@ -219,7 +218,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
         RegistryOperationsFactory.createAnonymousInstance(zkClientConf);
     addToTeardown(anonOperations);
     anonOperations.start();
-    RegistryPathStatus[] stats = anonOperations.list(aliceHome);
+    anonOperations.list(aliceHome);
     expectMkNodeFailure(anonOperations, aliceHome + "/anon");
     expectDeleteFailure(anonOperations, aliceHome, true);
   }
@@ -244,7 +243,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
             return operations;
           }
         });
-    RegistryPathStatus[] stats = operations.list(home);
+    operations.list(home);
     String path = home + "/subpath";
     operations.mknode(path, false);
     operations.delete(path, true);

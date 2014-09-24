@@ -95,7 +95,7 @@ import org.apache.hadoop.yarn.client.api.async.impl.NMClientAsyncImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
 import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
@@ -601,11 +601,12 @@ public class ApplicationMaster {
       // if this service offered external RPC/Web access, they
       // can be added to the service record
 
-      String username = BindingUtils.currentUser();
+      String username = RegistryOperationUtils.currentUser();
       String serviceClass = DSConstants.SERVICE_CLASS_DISTRIBUTED_SHELL;
       String serviceName = RegistryPathUtils.encodeYarnID(appId);
       String path =
-          BindingUtils.servicePath(username, serviceClass, serviceName);
+          RegistryOperationUtils.servicePath(username, serviceClass,
+              serviceName);
       registryOperations.mknode(RegistryPathUtils.parentOf(path), true);
       // app attempt entry
       registryOperations.create(path + "-attempt", serviceRecord,

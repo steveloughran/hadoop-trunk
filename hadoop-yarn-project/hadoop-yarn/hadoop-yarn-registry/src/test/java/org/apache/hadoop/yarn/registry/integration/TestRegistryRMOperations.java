@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -240,7 +241,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
 
     operations.mknode(USERPATH, false);
     operations.create(appPath, webapp, CreateFlags.OVERWRITE);
-    String components = appPath + RegistryConstants.SUBPATH_COMPONENTS + "/";
+    String components = appPath + RegistryConstants.SUBPATH_COMPONENTS;
     operations.mknode(components, false);
     String dns1 = RegistryPathUtils.encodeYarnID(cid1);
     String dns1path = components + dns1;
@@ -260,8 +261,8 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     assertEquals("Persistence policies on resolved entry",
         PersistencePolicies.CONTAINER, dns1resolved.persistence);
 
-    RegistryPathStatus[] componentStats = operations.list(components);
-    assertEquals(2, componentStats.length);
+    List<RegistryPathStatus> componentStats = operations.list(components);
+    assertEquals(2, componentStats.size());
     Map<String, ServiceRecord> records =
         RecordOperations.extractServiceRecords(operations, componentStats);
     assertEquals(2, records.size());
@@ -272,8 +273,9 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
 
     // create a listing under components/
     operations.mknode(components + "subdir", false);
-    RegistryPathStatus[] componentStatsUpdated = operations.list(components);
-    assertEquals(3, componentStatsUpdated.length);
+    List<RegistryPathStatus> componentStatsUpdated =
+        operations.list(components);
+    assertEquals(3, componentStatsUpdated.size());
     Map<String, ServiceRecord> recordsUpdated =
         RecordOperations.extractServiceRecords(operations, componentStats);
     assertEquals(2, recordsUpdated.size());

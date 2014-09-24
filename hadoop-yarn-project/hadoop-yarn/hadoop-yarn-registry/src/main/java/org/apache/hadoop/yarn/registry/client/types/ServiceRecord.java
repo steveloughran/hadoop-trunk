@@ -39,7 +39,7 @@ import java.util.Map;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public class ServiceRecord {
+public class ServiceRecord implements Cloneable {
 
   /**
    * Attribute name of the yarn persistence option: {@value}
@@ -125,6 +125,34 @@ public class ServiceRecord {
     this.data = data;
   }
 
+  /**
+   * Deep cloning constructor
+   * @param that service record source
+   */
+  public ServiceRecord(ServiceRecord that) {
+    this.id = that.id;
+    this.description = that.description;
+    this.persistence = that.persistence;
+    this.registrationTime = that.registrationTime;
+    this.data = that.data;
+    // endpoints
+    List<Endpoint> src = that.internal;
+    if (src != null) {
+      internal = new ArrayList<Endpoint>(src.size());
+      for (Endpoint endpoint : src) {
+        internal.add(new Endpoint(endpoint));
+      }
+    }
+    src = that.external;
+    if (src != null) {
+      external = new ArrayList<Endpoint>(src.size());
+      for (Endpoint endpoint : src) {
+        external.add(new Endpoint(endpoint));
+      }
+    }
+    
+  }
+  
   /**
    * Add an external endpoint
    * @param endpoint endpoint to set
@@ -221,4 +249,13 @@ public class ServiceRecord {
     return sb.toString();
   }
 
+  /**
+   * Shallow clone: all endpoints will be shared across instances
+   * @return a clone of the instance
+   * @throws CloneNotSupportedException
+   */
+  @Override
+  protected Object clone() throws CloneNotSupportedException {
+    return super.clone();
+  }
 }
