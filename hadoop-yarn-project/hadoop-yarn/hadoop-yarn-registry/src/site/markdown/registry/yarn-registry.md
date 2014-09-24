@@ -627,14 +627,12 @@ assume that some operations may not be immediately visible to them.
        * @param path path to create
        * @param createParents also create the parents.
        * @throws PathNotFoundException parent path is not in the registry.
-       * @throws AccessControlException access permission failure.
        * @throws InvalidPathnameException path name is invalid.
        * @throws IOException Any other IO Exception.
        * @return true if the path was created, false if it existed.
        */
       boolean mknode(String path, boolean createParents)
           throws PathNotFoundException,
-          AccessControlException,
           InvalidPathnameException,
           IOException;
     
@@ -646,30 +644,25 @@ assume that some operations may not be immediately visible to them.
        * @throws PathNotFoundException the parent path does not exist
        * @throws FileAlreadyExistsException path exists but create flags
        * do not include "overwrite"
-       * @throws AccessControlException access permission failure.
        * @throws InvalidPathnameException path name is invalid.
        * @throws IOException Any other IO Exception.
        */
       void create(String path, ServiceRecord record, int createFlags)
           throws PathNotFoundException,
           FileAlreadyExistsException,
-          AccessControlException,
           InvalidPathnameException,
           IOException;
-    
     
       /**
        * Resolve the record at a path
        * @param path path to service record
        * @return the record
        * @throws PathNotFoundException path is not in the registry.
-       * @throws AccessControlException security restriction.
        * @throws InvalidPathnameException the path is invalid.
        * @throws IOException Any other IO Exception
        */
       
       ServiceRecord resolve(String path) throws PathNotFoundException,
-          AccessControlException,
           InvalidPathnameException,
           IOException;
     
@@ -678,16 +671,14 @@ assume that some operations may not be immediately visible to them.
        * @param path path to query
        * @return the status of the path
        * @throws PathNotFoundException path is not in the registry.
-       * @throws AccessControlException security restriction.
        * @throws InvalidPathnameException the path is invalid.
        * @throws IOException Any other IO Exception
        */
       RegistryPathStatus stat(String path)
           throws PathNotFoundException,
-          AccessControlException,
           InvalidPathnameException,
           IOException;
-       
+    
       /**
        * Probe for a path existing.
        * This is equivalent to {@link #stat(String)} with
@@ -697,19 +688,17 @@ assume that some operations may not be immediately visible to them.
        * @throws IOException
        */
       boolean exists(String path) throws IOException;
-       
+      
       /**
        * List children of a directory
        * @param path path
-       * @return a possibly empty array of child entries
+       * @return a possibly empty list of child entries
        * @throws PathNotFoundException path is not in the registry.
-       * @throws AccessControlException security restriction.
        * @throws InvalidPathnameException the path is invalid.
        * @throws IOException Any other IO Exception
        */
-      RegistryPathStatus[] list(String path)
+      List<RegistryPathStatus> list(String path)
           throws PathNotFoundException,
-          AccessControlException,
           InvalidPathnameException,
           IOException;
     
@@ -721,7 +710,6 @@ assume that some operations may not be immediately visible to them.
        * @param path path delete recursively
        * @param recursive recursive flag
        * @throws PathNotFoundException path is not in the registry.
-       * @throws AccessControlException security restriction.
        * @throws InvalidPathnameException the path is invalid.
        * @throws PathIsNotEmptyDirectoryException path has child entries, but
        * recursive is false.
@@ -731,10 +719,9 @@ assume that some operations may not be immediately visible to them.
       void delete(String path, boolean recursive)
           throws PathNotFoundException,
           PathIsNotEmptyDirectoryException,
-          AccessControlException,
           InvalidPathnameException,
           IOException;
-        
+    
       /**
        * Add a new write access entry to be added to node permissions in all 
        * future write operations of a session connected to a secure registry.
@@ -749,7 +736,7 @@ assume that some operations may not be immediately visible to them.
        * uses permissions to manage access
        * @throws IOException on any failure to build the digest
        */
-      boolean addWriteAccessor(String id, String pass) throws IOException ;
+      boolean addWriteAccessor(String id, String pass) throws IOException;
     
       /**
        * Clear all write accessors.
@@ -761,8 +748,6 @@ assume that some operations may not be immediately visible to them.
        */
       public void clearWriteAccessors();
     }
-
-
 
 ## Security
 

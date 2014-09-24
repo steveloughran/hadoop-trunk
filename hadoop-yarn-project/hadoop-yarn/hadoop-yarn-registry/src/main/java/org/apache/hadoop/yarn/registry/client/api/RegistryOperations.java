@@ -52,14 +52,12 @@ public interface RegistryOperations extends Service {
    * @param path path to create
    * @param createParents also create the parents.
    * @throws PathNotFoundException parent path is not in the registry.
-   * @throws AccessControlException access permission failure.
    * @throws InvalidPathnameException path name is invalid.
    * @throws IOException Any other IO Exception.
    * @return true if the path was created, false if it existed.
    */
   boolean mknode(String path, boolean createParents)
       throws PathNotFoundException,
-      AccessControlException,
       InvalidPathnameException,
       IOException;
 
@@ -71,14 +69,12 @@ public interface RegistryOperations extends Service {
    * @throws PathNotFoundException the parent path does not exist
    * @throws FileAlreadyExistsException path exists but create flags
    * do not include "overwrite"
-   * @throws AccessControlException access permission failure.
    * @throws InvalidPathnameException path name is invalid.
    * @throws IOException Any other IO Exception.
    */
   void create(String path, ServiceRecord record, int createFlags)
       throws PathNotFoundException,
       FileAlreadyExistsException,
-      AccessControlException,
       InvalidPathnameException,
       IOException;
 
@@ -87,13 +83,11 @@ public interface RegistryOperations extends Service {
    * @param path path to service record
    * @return the record
    * @throws PathNotFoundException path is not in the registry.
-   * @throws AccessControlException security restriction.
    * @throws InvalidPathnameException the path is invalid.
    * @throws IOException Any other IO Exception
    */
   
   ServiceRecord resolve(String path) throws PathNotFoundException,
-      AccessControlException,
       InvalidPathnameException,
       IOException;
 
@@ -102,13 +96,11 @@ public interface RegistryOperations extends Service {
    * @param path path to query
    * @return the status of the path
    * @throws PathNotFoundException path is not in the registry.
-   * @throws AccessControlException security restriction.
    * @throws InvalidPathnameException the path is invalid.
    * @throws IOException Any other IO Exception
    */
   RegistryPathStatus stat(String path)
       throws PathNotFoundException,
-      AccessControlException,
       InvalidPathnameException,
       IOException;
 
@@ -127,13 +119,11 @@ public interface RegistryOperations extends Service {
    * @param path path
    * @return a possibly empty list of child entries
    * @throws PathNotFoundException path is not in the registry.
-   * @throws AccessControlException security restriction.
    * @throws InvalidPathnameException the path is invalid.
    * @throws IOException Any other IO Exception
    */
   List<RegistryPathStatus> list(String path)
       throws PathNotFoundException,
-      AccessControlException,
       InvalidPathnameException,
       IOException;
 
@@ -145,7 +135,6 @@ public interface RegistryOperations extends Service {
    * @param path path delete recursively
    * @param recursive recursive flag
    * @throws PathNotFoundException path is not in the registry.
-   * @throws AccessControlException security restriction.
    * @throws InvalidPathnameException the path is invalid.
    * @throws PathIsNotEmptyDirectoryException path has child entries, but
    * recursive is false.
@@ -155,7 +144,6 @@ public interface RegistryOperations extends Service {
   void delete(String path, boolean recursive)
       throws PathNotFoundException,
       PathIsNotEmptyDirectoryException,
-      AccessControlException,
       InvalidPathnameException,
       IOException;
 
