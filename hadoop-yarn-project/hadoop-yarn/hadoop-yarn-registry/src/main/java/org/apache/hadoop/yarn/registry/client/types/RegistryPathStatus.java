@@ -21,12 +21,15 @@ package org.apache.hadoop.yarn.registry.client.types;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 /**
  * Output of a stat() call
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
+@JsonIgnoreProperties(ignoreUnknown = true)
 public final class RegistryPathStatus {
 
   /**
