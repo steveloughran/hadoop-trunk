@@ -36,7 +36,6 @@ public interface RegistryConstants {
    */
   String REGISTRY_PREFIX = "hadoop.registry.";
 
-
   /**
    * Prefix for zookeeper-specific options: {@value}
    * 
@@ -54,7 +53,6 @@ public interface RegistryConstants {
    * Defaut value for enabling the registry in the RM: {@value}
    */
   boolean DEFAULT_REGISTRY_ENABLED = false;
-
 
   /**
    * Key to set if the registry is secure: {@value}.
@@ -79,9 +77,6 @@ public interface RegistryConstants {
    * Default root of the yarn registry: {@value}
    */
   String DEFAULT_ZK_REGISTRY_ROOT = "/registry";
-
-
- 
 
   /**
    * Registry client authentication policy.
@@ -113,7 +108,6 @@ public interface RegistryConstants {
    */
   String REGISTRY_CLIENT_AUTH_ANONYMOUS = "";
 
-
   /**
    * Registry client authentication ID
    *
@@ -125,7 +119,6 @@ public interface RegistryConstants {
   String KEY_REGISTRY_CLIENT_AUTHENTICATION_ID =
       KEY_REGISTRY_CLIENT_AUTH + ".id";
 
-
   /**
    * Registry client authentication password
    *
@@ -136,7 +129,6 @@ public interface RegistryConstants {
    */
   String KEY_REGISTRY_CLIENT_AUTHENTICATION_PASSWORD =
       KEY_REGISTRY_CLIENT_AUTH + ".password";
-
 
   /**
    * List of hostname:port pairs defining the
@@ -182,13 +174,11 @@ public interface RegistryConstants {
    */
   int DEFAULT_ZK_RETRY_TIMES = 5;
 
-
   /**
    * Zookeeper connect interval in milliseconds: {@value}
    */
   String KEY_REGISTRY_ZK_RETRY_INTERVAL =
       ZK_PREFIX + "retry.interval.ms";
-  
 
   /**
    * The default interval between connection retries: {@value}
@@ -213,7 +203,6 @@ public interface RegistryConstants {
    */
   int DEFAULT_ZK_RETRY_CEILING = 60000;
 
-
   /**
    * A comma separated list of Zookeeper ACL identifiers with
    * system access to the registry in a secure cluster: {@value}.
@@ -230,7 +219,6 @@ public interface RegistryConstants {
    */
   String DEFAULT_REGISTRY_SYSTEM_ACCOUNTS =
       "sasl:yarn@, sasl:mapred@, sasl:hdfs@";
-
 
   /**
    * A comma separated list of Zookeeper ACL identifiers with
@@ -262,7 +250,6 @@ public interface RegistryConstants {
    * service/client will fail.
    */
   String KEY_REGISTRY_KERBEROS_REALM = REGISTRY_PREFIX + "kerberos.realm";
-
 
   /**
    * Key to define the JAAS context. Used in secure registries: {@value}.

@@ -45,7 +45,6 @@ public class BindingUtils {
     if (user.isEmpty()) {
       return RegistryConstants.PATH_SYSTEM_SERVICES;
     }
-
     return RegistryPathUtils.join(RegistryConstants.PATH_USERS,
         RegistryPathUtils.encodeForRegistry(user));
   }
@@ -58,12 +57,10 @@ public class BindingUtils {
    */
   public static String serviceclassPath(String user,
       String serviceClass) {
-
     return RegistryPathUtils.join(userPath(user),
         serviceClass);
   }
   
-
   /**
    * Get the current user path formatted for the registry
    * @return the encoded shortname of the current user
@@ -119,6 +116,5 @@ public class BindingUtils {
         componentListPath(user, serviceClass, serviceName),
         componentName);
   }
-
 
 }

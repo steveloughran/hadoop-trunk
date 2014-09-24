@@ -29,7 +29,7 @@ public interface MicroZookeeperServiceKeys {
   public static final String ZKSERVICE_PREFIX =
       RegistryConstants.REGISTRY_PREFIX + "zk.service.";
   /**
-   * Key to define the JAAS context for the ZK service
+   * Key to define the JAAS context for the ZK service: {@value}.
    */
   public static final String KEY_REGISTRY_ZKSERVICE_JAAS_CONTEXT = 
       ZKSERVICE_PREFIX + "service.jaas.context";
@@ -41,12 +41,12 @@ public interface MicroZookeeperServiceKeys {
       ZKSERVICE_PREFIX + "ticktime";
   
   /**
-   * host to register on
+   * host to register on: {@value}.
    */
   public static final String KEY_ZKSERVICE_HOST = ZKSERVICE_PREFIX + "host";
   /**
    * Default host to serve on -this is "localhost" as it
-   * is the only one guaranteed to be available.
+   * is the only one guaranteed to be available: {@value}.
    */
   public static final String DEFAULT_ZKSERVICE_HOST = "localhost";
   /**

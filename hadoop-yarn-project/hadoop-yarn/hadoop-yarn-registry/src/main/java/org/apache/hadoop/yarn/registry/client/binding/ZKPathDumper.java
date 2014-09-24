@@ -53,6 +53,10 @@ public class ZKPathDumper {
     this.root = root;
   }
 
+  /**
+   * Trigger the recursive registry dump.
+   * @return a string view of the registry
+   */
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
@@ -99,9 +103,14 @@ public class ZKPathDumper {
     } catch (Exception e) {
       builder.append(e.toString()).append("\n");
     }
-
   }
 
+  /**
+   * Append the specified indentation to a builder
+   * @param builder string build to append to
+   * @param indent current indentation
+   * @param c charactor to use for indentation
+   */
   private void append(StringBuilder builder, int indent, char c) {
     for (int i = 0; i < indent; i++) {
       builder.append(c);

@@ -72,8 +72,6 @@ public class CuratorService extends CompositeService
   private static final Logger LOG =
       LoggerFactory.getLogger(CuratorService.class);
 
-  protected List<ACL> systemACLs;
-
   /**
    * the Curator binding
    */
@@ -92,8 +90,16 @@ public class CuratorService extends CompositeService
    * the connection binding text for messages
    */
   private String connectionDescription;
+
+  /**
+   * Security connection diagnostics
+   */
   private String securityConnectionDiagnostics = "";
 
+  /**
+   * Provider of curator "ensemble"; offers a basis for
+   * more flexible bonding in future.
+   */
   private EnsembleProvider ensembleProvider;
 
   /**
@@ -133,7 +139,7 @@ public class CuratorService extends CompositeService
         DEFAULT_ZK_REGISTRY_ROOT);
 
     // create and add the registy service
-    registrySecurity = new RegistrySecurity("registry security for " + getName());
+    registrySecurity = new RegistrySecurity("registry security");
     addService(registrySecurity);
 
     if (LOG.isDebugEnabled()) {
@@ -312,7 +318,6 @@ public class CuratorService extends CompositeService
                             + " " + securityConnectionDiagnostics;
     ensembleProvider = binding.ensembleProvider;
   }
-
 
   /**
    * Supply the binding information.
@@ -538,7 +543,6 @@ public class CuratorService extends CompositeService
         LOG.debug("path already present: {}", path, e);
       }
       return false;
-
     } catch (Exception e) {
       throw operationFailure(path, "mkdir() ", e, acls);
     }

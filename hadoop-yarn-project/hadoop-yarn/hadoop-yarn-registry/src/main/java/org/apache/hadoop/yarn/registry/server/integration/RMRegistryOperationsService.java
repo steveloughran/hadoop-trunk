@@ -38,9 +38,8 @@ import java.io.IOException;
 import java.util.concurrent.Future;
 
 /**
- * Extends the registry operations with extra support for resource management
- * operations, including creating and cleaning up the registry. 
- *
+ * Handle RM events by updating the registry
+ * 
  * These actions are all implemented as event handlers to operations
  * which come from the RM.
  *
@@ -62,25 +61,6 @@ public class RMRegistryOperationsService extends RegistryAdminService {
   public RMRegistryOperationsService(String name,
       RegistryBindingSource bindingSource) {
     super(name, bindingSource);
-
-  }
-
-  /**
-   * Start an async operation to create the home path for a user
-   * if it does not exist
-   * @param username username
-   * @return the path created
-   * @throws IOException any failure
-   */
-  @VisibleForTesting
-  public String initUserRegistryAsync(final String username)
-      throws IOException {
-
-    String homeDir = homeDir(username);
-    if (!exists(homeDir)) {
-      createDirAsync(homeDir, aclsForUser(username), false);
-    }
-    return homeDir;
   }
 
   public PurgePolicy getPurgeOnCompletionPolicy() {

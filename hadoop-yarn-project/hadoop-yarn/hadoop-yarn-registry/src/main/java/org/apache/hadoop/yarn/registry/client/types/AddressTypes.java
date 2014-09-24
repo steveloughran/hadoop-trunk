@@ -30,22 +30,22 @@ import org.apache.hadoop.classification.InterfaceStability;
 public interface AddressTypes {
 
   /**
-   * Any other address
-   */
-  public static final String ADDRESS_OTHER = "";
-
-  /**
-   * URI entries
-   */
-  public static final String ADDRESS_URI = "uri";
-
-  /**
-   * hostname/FQDN and port tuple. 
+   * hostname/FQDN and port tuple: {@value}.
    */
   public static final String ADDRESS_HOSTNAME_AND_PORT = "host/port";
 
   /**
-   * path /a/b/c style
+   * Any other address: {@value}.
+   */
+  public static final String ADDRESS_OTHER = "";
+
+  /**
+   * path /a/b/c style: {@value}.
    */
   public static final String ADDRESS_PATH = "path";
+
+  /**
+   * URI entries: {@value}.
+   */
+  public static final String ADDRESS_URI = "uri";
 }

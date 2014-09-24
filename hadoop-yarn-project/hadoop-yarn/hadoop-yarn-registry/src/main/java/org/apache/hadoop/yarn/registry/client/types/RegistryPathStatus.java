@@ -32,32 +32,36 @@ public final class RegistryPathStatus {
   /**
    * Path in the registry to this entry
    */
-  public final String path; 
-  public final long time;
-  public final long size;
-  public final int children;
-  
-  /**
-   * implementation-specific details for diagnostic purposes
-   */
-  public final String details;
+  public final String path;
 
+  /**
+   * Timestamp
+   */
+  public final long time;
+
+  /**
+   * Entry size
+   */
+  public final long size;
+
+  /**
+   * Number of child nodes 
+   */
+  public final int children;
 
   public RegistryPathStatus(String path,
       long time,
       long size,
-      int children,
-      String details) {
+      int children) {
     this.path = path;
     this.time = time;
     this.size = size;
     this.children = children;
-    this.details = details;
   }
 
   /**
    * Equality operator checks size, time and path of the entries.
-   * It does <i>not</i> check {@link #children} or {@link #details}
+   * It does <i>not</i> check {@link #children}.
    * @param other the other entry
    * @return true if the entries are considered equal.
    */
@@ -81,7 +85,6 @@ public final class RegistryPathStatus {
     if (path != null ? !path.equals(status.path) : status.path != null) {
       return false;
     }
-
     return true;
   }
 
@@ -102,7 +105,6 @@ public final class RegistryPathStatus {
     sb.append(", time=").append(time);
     sb.append(", size=").append(size);
     sb.append(", children=").append(children);
-    sb.append(", details=").append(details);
     sb.append('}');
     return sb.toString();
   }

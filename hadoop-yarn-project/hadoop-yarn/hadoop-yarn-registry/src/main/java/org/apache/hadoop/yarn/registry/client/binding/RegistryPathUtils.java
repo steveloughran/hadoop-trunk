@@ -39,7 +39,6 @@ import java.util.regex.Pattern;
 @InterfaceStability.Evolving
 public class RegistryPathUtils {
 
-
   private static final Pattern HOSTNAME =
       Pattern.compile(RegistryInternalConstants.HOSTNAME_PATTERN);
 
@@ -77,12 +76,12 @@ public class RegistryPathUtils {
     return path;
   }
 
-  /*
- * Create a full path from the registry root and the supplied subdir
- * @param path path of operation
- * @return an absolute path
- * @throws IllegalArgumentException if the path is invalide
- */
+  /**
+   * Create a full path from the registry root and the supplied subdir
+   * @param path path of operation
+   * @return an absolute path
+   * @throws IllegalArgumentException if the path is invalide
+   */
   public static String createFullPath(String base, String path) throws
       IOException {
     Preconditions.checkArgument(path != null, "null path");
@@ -151,7 +150,7 @@ public class RegistryPathUtils {
 
   /**
    * Get the parent of a path
-   * @param path
+   * @param path path to look at
    * @return the parent path
    * @throws PathNotFoundException if the path was at root.
    */

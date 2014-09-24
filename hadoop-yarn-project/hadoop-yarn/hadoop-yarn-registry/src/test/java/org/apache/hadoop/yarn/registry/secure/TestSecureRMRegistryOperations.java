@@ -115,7 +115,6 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
           }
         });
 
-
     return registryOperations;
   }
 
@@ -132,7 +131,6 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     operations.mknode(RegistryConstants.PATH_SYSTEM_SERVICES + "hdfs",
         false);
   }
-
 
   @Test
   public void testAnonReadAccess() throws Throwable {
@@ -197,12 +195,11 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     }
   }
 
-
   @Test
   public void testAlicePathRestrictedAnonAccess() throws Throwable {
     RMRegistryOperationsService rmRegistryOperations =
         startRMRegistryOperations();
-    String aliceHome = rmRegistryOperations.initUserRegistryAsync(ALICE);
+    String aliceHome = rmRegistryOperations.initUserRegistry(ALICE);
     describe(LOG, "Creating anonymous accessor");
     RegistryOperations anonOperations =
         RegistryOperationsFactory.createAnonymousInstance(zkClientConf);
@@ -212,12 +209,11 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     expectMkNodeFailure(anonOperations, aliceHome);
   }
 
-
   @Test
   public void testUserZookeeperHomePathAccess() throws Throwable {
     RMRegistryOperationsService rmRegistryOperations =
         startRMRegistryOperations();
-    final String home = rmRegistryOperations.initUserRegistryAsync(ZOOKEEPER);
+    final String home = rmRegistryOperations.initUserRegistry(ZOOKEEPER);
     describe(LOG, "Creating ZK client");
 
     RegistryOperations operations = zookeeperUGI.doAs(
@@ -276,7 +272,6 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
         RegistrySecurity.aclsToString(digestClientACLs));
     operations.stat(base);
     operations.mknode(base + "/subdir", false);
-
   }
 
   @Test(expected = IllegalArgumentException.class)

@@ -32,7 +32,7 @@ public class TestYarnPolicySelector extends Assert {
   private ServiceRecord record = new ServiceRecord("1",
       "one",
       PersistencePolicies.APPLICATION, null);
-  RegistryPathStatus status = new RegistryPathStatus("/", 0, 0, 1, "");
+  RegistryPathStatus status = new RegistryPathStatus("/", 0, 0, 1);
 
   public void assertSelected(boolean outcome,
       RegistryAdminService.NodeSelector selector) {

@@ -50,7 +50,8 @@ import java.util.List;
 /**
  * The YARN ZK registry operations service.
  *
- * It's a YARN service: ephemeral nodes last as long as the client exists
+ * It implements the {@link RegistryOperations} API by mapping the commands
+ * to zookeeper operations.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -154,7 +155,7 @@ public class RegistryOperationsService extends CuratorService
         path,
         stat.getCtime(),
         stat.getDataLength(),
-        stat.getNumChildren(), "");
+        stat.getNumChildren());
     if (LOG.isDebugEnabled()) {
       LOG.debug("Stat {} => {}", path, status);
     }
@@ -170,8 +171,8 @@ public class RegistryOperationsService extends CuratorService
     validatePath(path);
     List<String> childNames = zkList(path);
     int size = childNames.size();
-    ArrayList<RegistryPathStatus> childList = new ArrayList<RegistryPathStatus>(
-        size);
+    List<RegistryPathStatus> childList =
+        new ArrayList<RegistryPathStatus>(size);
     for (String childName : childNames) {
       childList.add(stat(join(path, childName)));
     }

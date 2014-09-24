@@ -21,7 +21,6 @@ package org.apache.hadoop.yarn.registry.client.services.zk;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -90,7 +89,7 @@ public class RegistrySecurity extends AbstractService {
   public static final String E_NO_KERBEROS =
       "Registry security is enabled -but Hadoop security is not enabled";
 
-  /*
+  /**
   Access policy options
    */
   private enum AccessPolicy {
@@ -187,7 +186,7 @@ public class RegistrySecurity extends AbstractService {
     String auth = conf.getTrimmed(KEY_REGISTRY_CLIENT_AUTH,
         REGISTRY_CLIENT_AUTH_ANONYMOUS);
 
-    // JDK7
+    // TODO JDK7
     if (REGISTRY_CLIENT_AUTH_KERBEROS.equals(auth)) {
       access = AccessPolicy.sasl;
     } else if (REGISTRY_CLIENT_AUTH_DIGEST.equals(auth)) {
@@ -198,7 +197,6 @@ public class RegistrySecurity extends AbstractService {
       throw new ServiceStateException(E_UNKNOWN_AUTHENTICATION_MECHANISM
                                       + "\"" + auth + "\"");
     }
-
     initSecurity();
   }
 
@@ -273,9 +271,7 @@ public class RegistrySecurity extends AbstractService {
           String authPair = id + ":" + pass;
           digestAuthData = authPair.getBytes("UTF-8");
           if (LOG.isDebugEnabled()) {
-            LOG.debug("Auth is digest with ID \"{}\" pass length={}", id,
-                pass.length());
-            LOG.debug("Digest ACL={}", acl);
+            LOG.debug("Auth is Digest ACL: {}", aclToString(acl));
           }
           break;
         
@@ -530,9 +526,10 @@ public class RegistrySecurity extends AbstractService {
    * @param realm realm to add
    * @param perms permissions
    * @return the relevant ACLs
+   * @throws IOException
    */
-  public List<ACL> buildACLs(String principalList, String realm, int perms) throws
-      IOException {
+  public List<ACL> buildACLs(String principalList, String realm, int perms)
+      throws IOException {
     List<String> aclPairs = splitAclPairs(principalList, realm);
     List<ACL> ids = new ArrayList<ACL>(aclPairs.size());
     for (String aclPair : aclPairs) {
@@ -602,21 +599,6 @@ public class RegistrySecurity extends AbstractService {
   }
 
   /**
-   * Create and save a JAAS config file
-   * @param dest destination
-   * @param principal kerberos principal
-   * @param keytab  keytab
-   * @throws IOException trouble
-   */
-  public void buildJAASFile(File dest, String principal, File keytab) throws
-      IOException {
-    StringBuilder jaasBinding = new StringBuilder(256);
-    jaasBinding.append(createJAASEntry("Server", principal, keytab));
-    jaasBinding.append(createJAASEntry("Client", principal, keytab));
-    FileUtils.write(dest, jaasBinding.toString());
-  }
-
-  /**
    * Bind the JVM JAS setting to the specified JAAS file.
    * 
    * <b>Important:</b> once a file has been loaded the JVM doesn't pick up
@@ -661,7 +643,7 @@ public class RegistrySecurity extends AbstractService {
       throw new RuntimeException("Null context argument");
     }
     if (context.isEmpty()) {
-      throw new RuntimeException("empty context argument");
+      throw new RuntimeException("Empty context argument");
     }
     javax.security.auth.login.Configuration configuration =
         javax.security.auth.login.Configuration.getConfiguration();

@@ -62,20 +62,19 @@ public interface ZookeeperConfigOptions {
       "zookeeper.maintain_connection_despite_sasl_failure";
 
   /**
-   * Allow failed SASL clients: {@value}
+   * Allow failed SASL clients: {@value}.
    */
   String PROP_ZK_ALLOW_FAILED_SASL_CLIENTS =
       "zookeeper.allowSaslFailedClients";
 
   /**
-   * Kerberos realm of the server
+   * Kerberos realm of the server: {@value}.
    */
   String PROP_ZK_SERVER_REALM = "zookeeper.server.realm";
 
-
   /**
-   * Path to a kinit binary; defaults to
-   * <code>"/usr/bin/kinit"</code>
+   * Path to a kinit binary: {@value}.
+   * Defaults to <code>"/usr/bin/kinit"</code>
    */
   String PROP_ZK_KINIT_PATH = "zookeeper.kinit";
   

@@ -77,8 +77,6 @@ public class RecordOperations {
       }
     }
     return results;
-
   }
-
 
 }

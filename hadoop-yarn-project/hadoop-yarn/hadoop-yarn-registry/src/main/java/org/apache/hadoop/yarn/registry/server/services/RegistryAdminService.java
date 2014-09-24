@@ -20,9 +20,7 @@ package org.apache.hadoop.yarn.registry.server.services;
 
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.api.BackgroundCallback;
-import org.apache.curator.framework.api.CuratorEvent;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.yarn.registry.client.binding.BindingUtils;
@@ -32,7 +30,6 @@ import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
-import org.apache.hadoop.yarn.registry.server.integration.RMRegistryOperationsService;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
@@ -41,8 +38,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -131,17 +130,18 @@ public class RegistryAdminService extends RegistryOperationsService {
    * @param acls ACL list
    * @param createParents flag to indicate parent dirs should be created
    * as needed
+   * @return the future which will indicate whether or not the operation
+   * succeeded —and propagate any exceptions
    * @throws IOException
    */
-  public void createDirAsync(final String path,
+  public Future<Boolean> createDirAsync(final String path,
       final List<ACL> acls,
       final boolean createParents) throws IOException {
-    submit(new Callable<Object>() {
+    return submit(new Callable<Boolean>() {
       @Override
-      public Object call() throws Exception {
-        maybeCreate(path, CreateMode.PERSISTENT,
+      public Boolean call() throws Exception {
+        return maybeCreate(path, CreateMode.PERSISTENT,
             acls, createParents);
-        return null;
       }
     });
   }
@@ -179,7 +179,7 @@ public class RegistryAdminService extends RegistryOperationsService {
   public void createRootRegistryPaths() throws IOException {
     // create the root directories
 
-    systemACLs = getRegistrySecurity().getSystemACLs();
+    List<ACL> systemACLs = getRegistrySecurity().getSystemACLs();
     LOG.info("System ACLs {}",
         RegistrySecurity.aclsToString(systemACLs));
 
@@ -212,6 +212,56 @@ public class RegistryAdminService extends RegistryOperationsService {
     // todo, make more specific for that user. 
     // 
     return getClientAcls();
+  }
+
+  /**
+   * Start an async operation to create the home path for a user
+   * if it does not exist
+   * @param username username
+   * @return the path created
+   * @throws IOException any failure while setting up the operation
+   * 
+   */
+  public Future<Boolean> initUserRegistryAsync(final String username)
+      throws IOException {
+
+    String homeDir = homeDir(username);
+    if (!exists(homeDir)) {
+      return createDirAsync(homeDir, aclsForUser(username), false);
+    }
+    return null;
+  } 
+  
+  /**
+   * Create the home path for a user if it does not exist.
+   * 
+   * This uses {@link #initUserRegistryAsync(String)} and then waits for the
+   * result ... the code path is the same as the async operation; this just
+   * picks up and relays/converts exceptions
+   * @param username username
+   * @return the path created
+   * @throws IOException any failure
+   * 
+   */
+  public String initUserRegistry(final String username)
+      throws IOException {
+
+    try {
+      Future<Boolean> future = initUserRegistryAsync(username);
+      future.get();
+    } catch (InterruptedException e) {
+      throw (InterruptedIOException)
+          (new InterruptedIOException(e.toString()).initCause(e));
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof IOException) {
+        throw (IOException) (cause);
+      } else {
+        throw new IOException(cause.toString(), cause);
+      }
+    }
+
+    return homeDir(username);
   }
 
   /**

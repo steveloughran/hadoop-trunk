@@ -42,7 +42,6 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceStability.Evolving
 public class RegistryOperationsClient extends RegistryOperationsService {
 
-
   public RegistryOperationsClient(String name) {
     super(name);
   }

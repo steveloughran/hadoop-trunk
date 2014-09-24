@@ -183,7 +183,6 @@ public class JsonSerDeser<T> {
     return fromBytes(path.toString(), b, 0);
   }
 
-
   /**
    * Save a cluster description to a hadoop filesystem
    * @param fs filesystem
@@ -239,7 +238,6 @@ public class JsonSerDeser<T> {
     buffer.put(body);
     return buffer.array();
   }
-
 
   /**
    * Deserialize from a byte array

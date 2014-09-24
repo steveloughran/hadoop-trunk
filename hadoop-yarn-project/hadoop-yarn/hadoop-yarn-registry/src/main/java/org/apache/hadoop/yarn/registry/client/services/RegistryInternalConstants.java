@@ -41,9 +41,8 @@ public interface RegistryInternalConstants {
   /**
    * Permissions for system services: {@value}
    */
-
-  int PERMISSIONS_REGISTRY_SYSTEM_SERVICES =
-      ZooDefs.Perms.ALL;
+  int PERMISSIONS_REGISTRY_SYSTEM_SERVICES = ZooDefs.Perms.ALL;
+  
   /**
    * Permissions for a user's root entry: {@value}.
    * All except the admin permissions (ACL access) on a node
@@ -54,14 +53,16 @@ public interface RegistryInternalConstants {
 
   /**
    * Name of the SASL auth provider which has to be added to ZK server to enable
-   * sasl: auth patterns. Without this callers can connect via SASL, but
+   * sasl: auth patterns: {@value}.
+   * 
+   * Without this callers can connect via SASL, but
    * they can't use it in ACLs
    */
   String SASLAUTHENTICATION_PROVIDER =
       "org.apache.zookeeper.server.auth.SASLAuthenticationProvider";
 
   /**
-   * String to use as the prefix when declaring a new auth provide.
+   * String to use as the prefix when declaring a new auth provider: {@value}.
    */
   String ZOOKEEPER_AUTH_PROVIDER = "zookeeper.authProvider";
 }

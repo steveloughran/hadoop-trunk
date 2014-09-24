@@ -40,21 +40,49 @@ import java.util.List;
 @InterfaceStability.Evolving
 public class RegistryTypeUtils {
 
+  /**
+   * Create a URL endpoint from a list of URIs
+   * @param api implemented API
+   * @param protocolType protocol type
+   * @param uris URIs
+   * @return a new endpoint
+   */
   public static Endpoint urlEndpoint(String api,
       String protocolType,
-      URI... urls) {
-    return new Endpoint(api, protocolType, urls);
+      URI... uris) {
+    return new Endpoint(api, protocolType, uris);
   }
 
+  /**
+   * Create a REST endpoint from a list of URIs
+   * @param api implemented API
+   * @param uris URIs
+   * @return a new endpoint
+   */
   public static Endpoint restEndpoint(String api,
-      URI... urls) {
-    return urlEndpoint(api, ProtocolTypes.PROTOCOL_REST, urls);
+      URI... uris) {
+    return urlEndpoint(api, ProtocolTypes.PROTOCOL_REST, uris);
   }
 
+  /**
+   * Create a Web UI endpoint from a list of URIs
+   * @param api implemented API
+   * @param uris URIs
+   * @return a new endpoint
+   */
   public static Endpoint webEndpoint(String api,
-      URI... urls) {
-    return urlEndpoint(api, ProtocolTypes.PROTOCOL_WEBUI, urls);
+      URI... uris) {
+    return urlEndpoint(api, ProtocolTypes.PROTOCOL_WEBUI, uris);
   }
+
+  /**
+   * Create an internet address endpoint from a list of URIs
+   * @param api implemented API
+   * @param protocolType protocol type
+   * @param hostname hostname/FQDN
+   * @param port port
+   * @return a new endpoint
+   */
 
   public static Endpoint inetAddrEndpoint(String api,
       String protocolType,
@@ -66,6 +94,14 @@ public class RegistryTypeUtils {
         tuplelist(hostname, Integer.toString(port)));
   }
 
+  /**
+   * Create an IPC endpoint
+   * @param api API
+   * @param protobuf flag to indicate whether or not the IPC uses protocol
+   * buffers
+   * @param address the address as a tuple of (hostname, port)
+   * @return
+   */
   public static Endpoint ipcEndpoint(String api,
       boolean protobuf, List<String> address) {
     ArrayList<List<String>> addressList = new ArrayList<List<String>>();
@@ -77,16 +113,37 @@ public class RegistryTypeUtils {
         addressList);
   }
 
+  /**
+   * Create a single-element list of tuples from the input.
+   * that is, an input ("a","b","c") is converted into a list
+   * in the form [["a","b","c"]]
+   * @param t1 tuple elements
+   * @return a list containing a single tuple
+   */
   public static List<List<String>> tuplelist(String... t1) {
-    ArrayList<List<String>> outer = new ArrayList<List<String>>();
+    List<List<String>> outer = new ArrayList<List<String>>();
     outer.add(tuple(t1));
     return outer;
   }
-  
+
+  /**
+   * Create a tuples from the input.
+   * that is, an input ("a","b","c") is converted into a list
+   * in the form ["a","b","c"]
+   * @param t1 tuple elements
+   * @return a single tuple as a list
+   */
   public static List<String> tuple(String... t1) {
     return Arrays.asList(t1);
   }
 
+  /**
+   * Create a tuples from the input, converting all to Strings in the process
+   * that is, an input ("a", 7, true) is converted into a list
+   * in the form ["a","7,"true"]
+   * @param t1 tuple elements
+   * @return a single tuple as a list
+   */
   public static List<String> tuple(Object... t1) {
     List<String> l = new ArrayList<String>(t1.length);
     for (Object t : t1) {
@@ -97,7 +154,7 @@ public class RegistryTypeUtils {
 
   /**
    * Convert a socket address pair into a string tuple, (host, port).
-   * JDK7: move to InetAddress.getHostString() to avoid DNS lookups.
+   * TODO JDK7: move to InetAddress.getHostString() to avoid DNS lookups.
    * @param address an address
    * @return an element for the address list
    */
@@ -120,7 +177,6 @@ public class RegistryTypeUtils {
           + " does not match required type of "
           + required);
     }
-
   }
 
   /**
@@ -131,8 +187,8 @@ public class RegistryTypeUtils {
    * @throws InvalidRecordException if the type is wrong, there are no addresses
    * or the payload ill-formatted
    */
-  public static List<String> retrieveAddressesUriType(Endpoint epr) throws
-      InvalidRecordException {
+  public static List<String> retrieveAddressesUriType(Endpoint epr)
+      throws InvalidRecordException {
     if (epr == null) {
       return null;
     }
@@ -146,7 +202,7 @@ public class RegistryTypeUtils {
     for (List<String> address : addresses) {
       if (address.size() != 1) {
         throw new InvalidRecordException(epr.toString(),
-            "Address payload invalid: wrong many element count: " +
+            "Address payload invalid: wrong element count: " +
             address.size());
       }
       results.add(address.get(0));
@@ -162,9 +218,8 @@ public class RegistryTypeUtils {
    * or the payload ill-formatted
    * @throws MalformedURLException address can't be turned into a URL
    */
-  public static List<URL> retrieveAddressURLs(Endpoint epr) throws
-      InvalidRecordException,
-      MalformedURLException {
+  public static List<URL> retrieveAddressURLs(Endpoint epr)
+      throws InvalidRecordException, MalformedURLException {
     if (epr == null) {
       throw new InvalidRecordException("", "Null endpoint");
     }

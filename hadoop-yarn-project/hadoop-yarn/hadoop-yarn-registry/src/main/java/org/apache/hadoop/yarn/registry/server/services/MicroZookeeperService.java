@@ -73,7 +73,6 @@ public class MicroZookeeperService
   private static final Logger
       LOG = LoggerFactory.getLogger(MicroZookeeperService.class);
 
-
   private File instanceDir;
   private File dataDir;
   private int tickTime;

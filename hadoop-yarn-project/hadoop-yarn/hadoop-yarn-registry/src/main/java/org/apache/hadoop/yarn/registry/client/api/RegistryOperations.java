@@ -81,7 +81,6 @@ public interface RegistryOperations extends Service {
       InvalidPathnameException,
       IOException;
 
-
   /**
    * Resolve the record at a path
    * @param path path to service record
@@ -173,7 +172,7 @@ public interface RegistryOperations extends Service {
    * uses permissions to manage access
    * @throws IOException on any failure to build the digest
    */
-  boolean addWriteAccessor(String id, String pass) throws IOException ;
+  boolean addWriteAccessor(String id, String pass) throws IOException;
 
   /**
    * Clear all write accessors.
