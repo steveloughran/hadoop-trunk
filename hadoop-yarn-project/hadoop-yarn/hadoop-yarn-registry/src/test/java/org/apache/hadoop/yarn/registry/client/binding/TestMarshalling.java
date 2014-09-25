@@ -50,8 +50,8 @@ public class TestMarshalling extends Assert {
     ServiceRecord record = new ServiceRecord("01", "description", 0, null);
     byte[] bytes = marshal.toBytes(record);
     ServiceRecord r2 = marshal.fromBytes("", bytes, 0);
-    assertEquals(record.id, r2.id);
-    assertEquals(record.persistence, r2.persistence);
+    assertEquals(record.yarn_id, r2.yarn_id);
+    assertEquals(record.yarn_persistence, r2.yarn_persistence);
     assertEquals(record.description, r2.description);
   }
 
@@ -60,8 +60,8 @@ public class TestMarshalling extends Assert {
     ServiceRecord record = new ServiceRecord("01", "description", 1, null);
     byte[] bytes = marshal.toByteswithHeader(record);
     ServiceRecord r2 = marshal.fromBytesWithHeader("", bytes);
-    assertEquals(record.id, r2.id);
-    assertEquals(record.persistence, r2.persistence);
+    assertEquals(record.yarn_id, r2.yarn_id);
+    assertEquals(record.yarn_persistence, r2.yarn_persistence);
     assertEquals(record.description, r2.description);
   }
 

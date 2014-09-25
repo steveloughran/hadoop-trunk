@@ -14,11 +14,18 @@
   
 # Registry Security
 
+This document describes how security is implemented in the service registry
+
+In a non-Kerberos-enabled Hadoop cluster, the Registry does not offer any
+security at all: the registry is world writeable.
+
+This document is therefore relevant only to secure clusters.
+
 ## Security Model
 
 The security model of the registry is designed to meet the following goals
-
-1. Deliver functional security on a secure ZK installation.
+a secur
+1. Deliver functional security on e ZK installation.
 1. Allow the RM to create per-user regions of the registration space
 1. Allow applications belonging to a user to write registry entries 
 into their part of the space. These may be short-lived or long-lived 
@@ -80,26 +87,23 @@ unintentionally wrong values for the accounts of the system services
 
 ### Automatic domain extension
 
-*work in progress*
+In a kerberos domain, it is possible for a kerberized client to determine the
+realm of a cluster at run time from the local
+user's kerberos credentials as used to talk to YARN or HDFS. 
 
-It may be possible to determine the realm of a cluster at run time from a local
-user's kerberos tokens as used to talk to YARN or HDFS. This could be used to
-auto-generate account names with the correct realm for the system accounts
-from a string such as `hadoop@, yarn@, mapred@`. This would aid having
-valid constants.
+This can be used to auto-generate account names with the correct realm for the
+system accounts hence aid having valid constants.
+
+This allows the registry to support a default configuration value for
+`hadoop.registry.system.accounts` of: 
+
+      "sasl:yarn@, sasl:mapred@, sasl:hdfs@, sasl:hadoop@";
 
 #### In-registry publishing of core binding data
 
 Another strategy could be to have a `ServiceRecord` at the root
 of the registry that actually defines the registry —including listing
 those default binding values in the `data` field..
-
-### IP address restriction
-Read access to the registry may be restricted by IP address. 
-This allows access to the registry to be restricted to the Hadoop cluster
-and any nodes explicitly named as having access
-
-    <ip:10.10.0.0/16 , READ>
 
 ### Auditing
 

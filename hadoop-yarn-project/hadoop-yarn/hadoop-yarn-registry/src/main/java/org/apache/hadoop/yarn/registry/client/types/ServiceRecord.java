@@ -23,14 +23,12 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.codehaus.jackson.annotate.JsonAnySetter;
 import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.annotate.JsonProperty;
+import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 
 /**
  * JSON-marshallable description of a single component.
@@ -39,17 +37,8 @@ import java.util.Map;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
+@JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
 public class ServiceRecord implements Cloneable {
-
-  /**
-   * Attribute name of the yarn persistence option: {@value}
-   */
-  public static final String YARN_PERSISTENCE = "yarn:persistence";
-
-  /**
-   * Attribute name of the yarn ID option used with yarn:persistence: {@value}
-   */
-  public static final String YARN_ID = "yarn:id";
 
   /**
    * The time the service was registered -as seen by the service making
@@ -65,16 +54,14 @@ public class ServiceRecord implements Cloneable {
   /**
    * ID. For containers: container ID. For application instances, application ID.
    */
-  @JsonProperty(YARN_ID)
-  public String id;
+  public String yarn_id;
 
   /**
    *   The persistence attribute defines when a record and any child 
    *   entries may be deleted.
    *   {@link PersistencePolicies}
    */
-  @JsonProperty(YARN_PERSISTENCE)
-  public int persistence = PersistencePolicies.PERMANENT;
+  public int yarn_persistence = PersistencePolicies.PERMANENT;
 
   /**
    * map to handle unknown attributes.
@@ -109,18 +96,18 @@ public class ServiceRecord implements Cloneable {
   /**
    * Create a service record ... sets the registration time to the current
    * system time.
-   * @param id service ID
+   * @param yarn_id service ID
    * @param description description
-   * @param persistence persistence policy
+   * @param yarn_persistence persistence policy
    * @param data a small amount of data to be associated with the record
    */
-  public ServiceRecord(String id,
+  public ServiceRecord(String yarn_id,
       String description,
-      int persistence,
+      int yarn_persistence,
       String data) {
-    this.id = id;
+    this.yarn_id = yarn_id;
     this.description = description;
-    this.persistence = persistence;
+    this.yarn_persistence = yarn_persistence;
     this.registrationTime = System.currentTimeMillis();
     this.data = data;
   }
@@ -130,9 +117,9 @@ public class ServiceRecord implements Cloneable {
    * @param that service record source
    */
   public ServiceRecord(ServiceRecord that) {
-    this.id = that.id;
+    this.yarn_id = that.yarn_id;
     this.description = that.description;
-    this.persistence = that.persistence;
+    this.yarn_persistence = that.yarn_persistence;
     this.registrationTime = that.registrationTime;
     this.data = that.data;
     // endpoints
@@ -232,8 +219,8 @@ public class ServiceRecord implements Cloneable {
   public String toString() {
     final StringBuilder sb =
         new StringBuilder("ServiceRecord{");
-    sb.append("id='").append(id).append('\'');
-    sb.append(", persistence='").append(persistence).append('\'');
+    sb.append("id='").append(yarn_id).append('\'');
+    sb.append(", persistence=").append(yarn_persistence);
     sb.append(", description='").append(description).append('\'');
     sb.append(", external endpoints: {");
     for (Endpoint endpoint : external) {

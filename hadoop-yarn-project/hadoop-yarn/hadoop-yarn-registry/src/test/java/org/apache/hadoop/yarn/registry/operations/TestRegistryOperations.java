@@ -139,7 +139,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   @Test
   public void testPutNoParent() throws Throwable {
     ServiceRecord record = new ServiceRecord();
-    record.id = "testPutNoParent";
+    record.yarn_id = "testPutNoParent";
     String path = "/path/without/parent";
     try {
       operations.create(path, record, 0);
@@ -154,7 +154,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   @Test(expected = PathNotFoundException.class)
   public void testPutNoParent2() throws Throwable {
     ServiceRecord record = new ServiceRecord();
-    record.id = "testPutNoParent";
+    record.yarn_id = "testPutNoParent";
     String path = "/path/without/parent";
     operations.create(path, record, 0);
   }

@@ -189,10 +189,10 @@ public class RegistryTestHelper extends Assert {
   public static void assertMatches(ServiceRecord source, ServiceRecord resolved) {
     assertNotNull("Null source record ", source);
     assertNotNull("Null resolved record ", resolved);
-    assertEquals(source.id, resolved.id);
+    assertEquals(source.yarn_id, resolved.yarn_id);
     assertEquals(source.registrationTime, resolved.registrationTime);
     assertEquals(source.description, resolved.description);
-    assertEquals(source.persistence, resolved.persistence);
+    assertEquals(source.yarn_persistence, resolved.yarn_persistence);
   }
 
   /**
@@ -248,8 +248,8 @@ public class RegistryTestHelper extends Assert {
       IOException,
       URISyntaxException {
     ServiceRecord record = new ServiceRecord();
-    record.id = "example-0001";
-    record.persistence = persistence;
+    record.yarn_id = "example-0001";
+    record.yarn_persistence = persistence;
     record.registrationTime = System.currentTimeMillis();
     addSampleEndpoints(record, "namenode");
     return record;

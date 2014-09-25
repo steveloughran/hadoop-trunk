@@ -39,8 +39,8 @@ public class SelectByYarnPersistence
   public boolean shouldSelect(String path,
       RegistryPathStatus registryPathStatus,
       ServiceRecord serviceRecord) {
-    return serviceRecord.id.equals(id)
-           && (targetPolicy < 0 || serviceRecord.persistence == targetPolicy);
+    return serviceRecord.yarn_id.equals(id)
+           && (targetPolicy < 0 || serviceRecord.yarn_persistence == targetPolicy);
   }
 
   @Override

@@ -19,7 +19,7 @@
 package org.apache.hadoop.yarn.registry.client.types;
 
 /**
- * Persistence policies for {@link ServiceRecord#persistence}
+ * Persistence policies for {@link ServiceRecord#yarn_persistence}
  */
 
 public interface PersistencePolicies {

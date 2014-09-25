@@ -25,7 +25,6 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
-import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 
 import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
@@ -113,7 +112,7 @@ public class RegistryOperationsService extends CuratorService
       InvalidPathnameException,
       IOException {
     Preconditions.checkArgument(record != null, "null record");
-    Preconditions.checkArgument(!Strings.isNullOrEmpty(record.id), 
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(record.yarn_id), 
         "empty record ID");
     validatePath(path);
     LOG.info("Registered at {} : {}", path, record);

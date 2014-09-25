@@ -361,11 +361,11 @@ application.
     <td>Registration time as a `System.getTimeMillis()` value seen at the service.</td>
   </tr>
   <tr>
-    <td>yarn:id: String/td>
+    <td>yarn_id: String/td>
     <td>YARN application or container ID (missing/empty for statically deployed services).</td>
   </tr>
   <tr>
-    <td>yarn:persistence: int</td>
+    <td>yarn_persistence: int</td>
     <td>Persistence policy.</td>
   </tr>
   <tr>
@@ -379,7 +379,7 @@ application.
 </table>
 
 
-The optional `yarn:persistence` and `yarn:id` attributes defines when a record
+The optional `yarn_persistence` and `yarn_id` attributes defines when a record
 *and any child entries* may be deleted.
 
 
@@ -414,12 +414,12 @@ The optional `yarn:persistence` and `yarn:id` attributes defines when a record
 
 
 The policies which clean up when an application, application attempt or
-container terminates require the `yarn:id` field to match that of the
+container terminates require the `yarn_id` field to match that of the
 application, attempt or container. If the wrong ID is set, the cleanup does not
 take place —and if set to a different application or container, will be cleaned
 up according the lifecycle of that application.
 
-These attributes use the prefix "`yarn:`" to indicate that their reliance on
+These attributes use the prefix "`yarn_`" to indicate that their reliance on
 the YARN layer of the Hadoop cluster to implement the policy. If the registry
 were to run standalone —which is entirely possible— all records would be
 implicitly persistent.
@@ -526,8 +526,8 @@ load balancer. It's persistence is 0; permanent.
     {
       "description" : "tomcat-based web application",
       "registrationTime" : 1408638082444,
-      "yarn:id" : "application_1408631738011_0001",
-      "yarn:persistence" : "0",
+      "yarn_id" : "application_1408631738011_0001",
+      "yarn_persistence" : "0",
       "external" : [ {
         "api" : "www",
         "addressType" : "uri",
@@ -542,15 +542,15 @@ their container ID converted into a DNS-compatible hostname. The entries are
 marked as ephemeral. If the entries were set within the container, then when
 that container is released or if the component fails, the entries will be
 automatically removed. Accordingly, it's persistence policy is declared to be
-"3", container. The `yarn:id` field identifies the container whose completion
+"3", container. The `yarn_id` field identifies the container whose completion
 will trigger the deletion of this entry
 
     /users/devteam/org-apache-tomcat/test1/components/container-1408631738011-0001-01-000001
     
     {
       "registrationTime" : 1408638082445,
-      "yarn:id" : "container_1408631738011_0001_01_000001",
-      "yarn:persistence" : "3",
+      "yarn_id" : "container_1408631738011_0001_01_000001",
+      "yarn_persistence" : "3",
       "description" : null,
       "external" : [ {
         "api" : "www",
@@ -573,8 +573,8 @@ external endpoint, the JMX addresses as internal.
 
     {
       "registrationTime" : 1408638082445,
-      "yarn:id" : "container_1408631738011_0001_01_000002",
-      "yarn:persistence" : "3",
+      "yarn_id" : "container_1408631738011_0001_01_000002",
+      "yarn_persistence" : "3",
       "description" : null,
       "external" : [ {
         "api" : "www",
@@ -791,6 +791,8 @@ update the tokens of an instance of the registry operations class.
 
 ### Security Policy Summary
 
+In an a non-Kerberos Zookeeper Cluster, no security policy is implemented.
+
 The registry is designed to be secured *on a kerberos-managed cluster*. 
 
 * The registry root grants full rights to "system accounts":
@@ -809,7 +811,7 @@ SHALL create an entry for that user `/users/${username}`.
 their home node, —or alter its permissions.
 
 * Applications wishing to write to the registry must use a SASL connection
-to authenticate via Zookeeper.
+to authenticate via Zookeeper, 
 
 * Applications creating nodes in the user path MUST include the site-specified
 system accounts in the ACL list, with full access.

@@ -108,7 +108,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     String path = "/users/example/hbase/hbase1/";
     ServiceRecord written = buildExampleServiceEntry(
         PersistencePolicies.APPLICATION_ATTEMPT);
-    written.id = "testAsyncPurgeEntry_attempt_001";
+    written.yarn_id = "testAsyncPurgeEntry_attempt_001";
 
     operations.mknode(RegistryPathUtils.parentOf(path), true);
     operations.create(path, written, 0);
@@ -120,7 +120,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
 
     // container query
     int opcount = purge("/",
-        written.id,
+        written.yarn_id,
         PersistencePolicies.CONTAINER,
         RegistryAdminService.PurgePolicy.PurgeAll,
         events);
@@ -130,7 +130,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
 
     // now the application attempt
     opcount = purge("/",
-        written.id,
+        written.yarn_id,
         -1,
         RegistryAdminService.PurgePolicy.PurgeAll,
         events);
@@ -149,7 +149,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     String path = "/users/example/hbase/hbase1/";
     ServiceRecord written = buildExampleServiceEntry(
         PersistencePolicies.APPLICATION_ATTEMPT);
-    written.id = "testAsyncPurgeEntry_attempt_001";
+    written.yarn_id = "testAsyncPurgeEntry_attempt_001";
 
     operations.mknode(RegistryPathUtils.parentOf(path), true);
     operations.create(path, written, 0);
@@ -160,7 +160,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
 
     DeleteCompletionCallback deletions = new DeleteCompletionCallback();
     int opcount = purge("/",
-        written.id,
+        written.yarn_id,
         PersistencePolicies.CONTAINER,
         RegistryAdminService.PurgePolicy.PurgeAll,
         deletions);
@@ -176,7 +176,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     // now all matching entries
     deletions = new DeleteCompletionCallback();
     opcount = purge("/",
-        written.id,
+        written.yarn_id,
         -1,
         RegistryAdminService.PurgePolicy.PurgeAll,
         deletions);
@@ -259,7 +259,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
 
     ServiceRecord dns1resolved = operations.resolve(dns1path);
     assertEquals("Persistence policies on resolved entry",
-        PersistencePolicies.CONTAINER, dns1resolved.persistence);
+        PersistencePolicies.CONTAINER, dns1resolved.yarn_persistence);
 
     List<RegistryPathStatus> componentStats = operations.listFull(components);
     assertEquals(2, componentStats.size());
@@ -267,9 +267,9 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
         RecordOperations.extractServiceRecords(operations, componentStats);
     assertEquals(2, records.size());
     ServiceRecord retrieved1 = records.get(dns1path);
-    logRecord(retrieved1.id, retrieved1);
+    logRecord(retrieved1.yarn_id, retrieved1);
     assertMatches(dns1resolved, retrieved1);
-    assertEquals(PersistencePolicies.CONTAINER, retrieved1.persistence);
+    assertEquals(PersistencePolicies.CONTAINER, retrieved1.yarn_persistence);
 
     // create a listing under components/
     operations.mknode(components + "subdir", false);

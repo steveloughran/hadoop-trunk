@@ -27,7 +27,6 @@ import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -129,10 +128,20 @@ public final class Endpoint implements Cloneable {
     sb.append("api='").append(api).append('\'');
     sb.append(", addressType='").append(addressType).append('\'');
     sb.append(", protocolType='").append(protocolType).append('\'');
+
+    sb.append(", addresses=");
     if (addresses != null) {
-      sb.append(", address count=").append(addresses.size());
+      sb.append("[ ");
+      for (List<String> address : addresses) {
+        sb.append("[ ");
+        for (String elt : address) {
+          sb.append('"').append(elt).append("\" ");
+        }
+        sb.append("] ");
+      };
+      sb.append("] ");
     } else {
-      sb.append(", null address list=");
+      sb.append("(null) ");
     }
     sb.append('}');
     return sb.toString();
