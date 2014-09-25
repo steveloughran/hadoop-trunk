@@ -268,6 +268,7 @@ public class JsonSerDeser<T> {
    * @param buffer buffer
    * @return the parsed structure
    * @throws IOException on a failure
+   * @throws InvalidRecordException if there is not a service record
    */
   @SuppressWarnings("unchecked")
   public T fromBytesWithHeader(String path, byte[] buffer) throws IOException {
