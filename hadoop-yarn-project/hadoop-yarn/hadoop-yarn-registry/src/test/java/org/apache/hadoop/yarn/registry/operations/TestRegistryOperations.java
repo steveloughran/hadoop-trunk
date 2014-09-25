@@ -76,7 +76,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     RegistryPathStatus stat = operations.stat(ENTRY_PATH);
 
     List<RegistryPathStatus> statuses =
-        operations.list(PARENT_PATH);
+        operations.listFull(PARENT_PATH);
     assertEquals(1, statuses.size());
     assertEquals(stat, statuses.get(0));
 
@@ -107,7 +107,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
 
   @Test(expected = PathNotFoundException.class)
   public void testLsEmptyPath() throws Throwable {
-    operations.list(PARENT_PATH);
+    operations.listFull(PARENT_PATH);
   }
 
   @Test(expected = PathNotFoundException.class)

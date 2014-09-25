@@ -22,6 +22,7 @@ package org.apache.hadoop.yarn.registry.client.types;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+import org.codehaus.jackson.annotate.JsonProperty;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 /**
@@ -52,10 +53,18 @@ public final class RegistryPathStatus {
    */
   public final int children;
 
-  public RegistryPathStatus(String path,
-      long time,
-      long size,
-      int children) {
+  /**
+   * Construct an instance
+   * @param path full path
+   * @param time time
+   * @param size entry size
+   * @param children number of children
+   */
+  public RegistryPathStatus(
+      @JsonProperty("path") String path,
+      @JsonProperty("time") long time,
+      @JsonProperty("size") long size,
+      @JsonProperty("children") int children) {
     this.path = path;
     this.time = time;
     this.size = size;

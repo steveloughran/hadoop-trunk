@@ -30,7 +30,6 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryOperationsFactory;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsClient;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
-import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.server.integration.RMRegistryOperationsService;
 import org.apache.hadoop.yarn.registry.server.services.RegistryAdminService;
 import org.apache.zookeeper.client.ZooKeeperSaslClient;
@@ -140,7 +139,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
         RegistrySecurity.isClientSASLEnabled());
     assertFalse("ZooKeeperSaslClient.isEnabled()==true",
         ZooKeeperSaslClient.isEnabled());
-    operations.list(PATH_SYSTEM_SERVICES);
+    operations.listFull(PATH_SYSTEM_SERVICES);
   }
   
   @Test
@@ -218,7 +217,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
         RegistryOperationsFactory.createAnonymousInstance(zkClientConf);
     addToTeardown(anonOperations);
     anonOperations.start();
-    anonOperations.list(aliceHome);
+    anonOperations.listFull(aliceHome);
     expectMkNodeFailure(anonOperations, aliceHome + "/anon");
     expectDeleteFailure(anonOperations, aliceHome, true);
   }
@@ -243,7 +242,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
             return operations;
           }
         });
-    operations.list(home);
+    operations.listFull(home);
     String path = home + "/subpath";
     operations.mknode(path, false);
     operations.delete(path, true);

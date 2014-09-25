@@ -113,16 +113,31 @@ public interface RegistryOperations extends Service {
    * @throws IOException
    */
   boolean exists(String path) throws IOException;
+
+  /**
+   * List all entries under a registry path
+   * @param path path to query
+   * @return a possibly empty list of the full path names of
+   * child entries
+   * @throws PathNotFoundException
+   * @throws InvalidPathnameException
+   * @throws IOException
+   */
+   List<String> list(String path) throws
+      PathNotFoundException,
+      InvalidPathnameException,
+      IOException;
   
   /**
-   * List children of a directory
+   * List children of a directory and retrieve their
+   * {@link RegistryPathStatus} values.
    * @param path path
    * @return a possibly empty list of child entries
    * @throws PathNotFoundException path is not in the registry.
    * @throws InvalidPathnameException the path is invalid.
    * @throws IOException Any other IO Exception
    */
-  List<RegistryPathStatus> list(String path)
+  List<RegistryPathStatus> listFull(String path)
       throws PathNotFoundException,
       InvalidPathnameException,
       IOException;

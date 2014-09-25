@@ -261,7 +261,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     assertEquals("Persistence policies on resolved entry",
         PersistencePolicies.CONTAINER, dns1resolved.persistence);
 
-    List<RegistryPathStatus> componentStats = operations.list(components);
+    List<RegistryPathStatus> componentStats = operations.listFull(components);
     assertEquals(2, componentStats.size());
     Map<String, ServiceRecord> records =
         RecordOperations.extractServiceRecords(operations, componentStats);
@@ -274,7 +274,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     // create a listing under components/
     operations.mknode(components + "subdir", false);
     List<RegistryPathStatus> componentStatsUpdated =
-        operations.list(components);
+        operations.listFull(components);
     assertEquals(3, componentStatsUpdated.size());
     Map<String, ServiceRecord> recordsUpdated =
         RecordOperations.extractServiceRecords(operations, componentStats);

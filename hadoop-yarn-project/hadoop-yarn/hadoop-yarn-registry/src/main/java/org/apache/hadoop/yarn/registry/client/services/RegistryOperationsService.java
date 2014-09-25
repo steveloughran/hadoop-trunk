@@ -98,7 +98,6 @@ public class RegistryOperationsService extends CuratorService
   @Override
   public boolean mknode(String path, boolean createParents) throws
       PathNotFoundException,
-      AccessControlException,
       InvalidPathnameException,
       IOException {
     validatePath(path);
@@ -111,7 +110,6 @@ public class RegistryOperationsService extends CuratorService
       int createFlags) throws
       PathNotFoundException,
       FileAlreadyExistsException,
-      AccessControlException,
       InvalidPathnameException,
       IOException {
     Preconditions.checkArgument(record != null, "null record");
@@ -129,7 +127,6 @@ public class RegistryOperationsService extends CuratorService
   @Override
   public ServiceRecord resolve(String path) throws
       PathNotFoundException,
-      AccessControlException,
       InvalidPathnameException,
       IOException {
     byte[] bytes = zkRead(path);
@@ -145,7 +142,6 @@ public class RegistryOperationsService extends CuratorService
   @Override
   public RegistryPathStatus stat(String path) throws
       PathNotFoundException,
-      AccessControlException,
       InvalidPathnameException,
       IOException {
     validatePath(path);
@@ -163,18 +159,31 @@ public class RegistryOperationsService extends CuratorService
   }
 
   @Override
-  public List<RegistryPathStatus> list(String path) throws
+  public List<String> list(String path) throws
       PathNotFoundException,
-      AccessControlException,
       InvalidPathnameException,
       IOException {
     validatePath(path);
     List<String> childNames = zkList(path);
+    List<String> childList =
+        new ArrayList<String>(childNames.size());
+    for (String childName : childNames) {
+      childList.add(join(path, childName));
+    }
+    return childList;
+  }
+  
+  @Override
+  public List<RegistryPathStatus> listFull(String path) throws
+      PathNotFoundException,
+      InvalidPathnameException,
+      IOException {
+    List<String> childNames = list(path);
     int size = childNames.size();
     List<RegistryPathStatus> childList =
         new ArrayList<RegistryPathStatus>(size);
     for (String childName : childNames) {
-      childList.add(stat(join(path, childName)));
+      childList.add(stat(childName));
     }
     return childList;
   }
@@ -183,7 +192,6 @@ public class RegistryOperationsService extends CuratorService
   public void delete(String path, boolean recursive) throws
       PathNotFoundException,
       PathIsNotEmptyDirectoryException,
-      AccessControlException,
       InvalidPathnameException,
       IOException {
     validatePath(path);

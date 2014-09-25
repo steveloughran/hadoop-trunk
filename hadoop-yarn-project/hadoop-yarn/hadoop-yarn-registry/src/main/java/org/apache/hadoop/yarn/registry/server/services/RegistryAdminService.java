@@ -341,7 +341,7 @@ public class RegistryAdminService extends RegistryOperationsService {
       BackgroundCallback callback) throws IOException {
 
     // list this path's children
-    List<RegistryPathStatus> entries = list(path);
+    List<RegistryPathStatus> entries = listFull(path);
     RegistryPathStatus registryPathStatus = stat(path);
 
     boolean toDelete = false;

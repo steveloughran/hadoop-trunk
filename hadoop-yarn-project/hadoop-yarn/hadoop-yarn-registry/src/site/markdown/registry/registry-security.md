@@ -85,7 +85,7 @@ unintentionally wrong values for the accounts of the system services
 It may be possible to determine the realm of a cluster at run time from a local
 user's kerberos tokens as used to talk to YARN or HDFS. This could be used to
 auto-generate account names with the correct realm for the system accounts
-from a string such as `hadoop@,yarn@,mapred@`. This would aid having
+from a string such as `hadoop@, yarn@, mapred@`. This would aid having
 valid constants.
 
 #### In-registry publishing of core binding data

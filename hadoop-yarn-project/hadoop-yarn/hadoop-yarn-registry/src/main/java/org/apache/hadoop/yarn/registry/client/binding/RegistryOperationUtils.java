@@ -134,7 +134,7 @@ public class RegistryOperationUtils {
   public static Map<String, ServiceRecord> listServiceRecords(
       RegistryOperations registryOperations,
       String path) throws IOException {
-    List<RegistryPathStatus> stats = registryOperations.list(path);
+    List<RegistryPathStatus> stats = registryOperations.listFull(path);
     return RecordOperations.extractServiceRecords(registryOperations, stats);
   }
 
