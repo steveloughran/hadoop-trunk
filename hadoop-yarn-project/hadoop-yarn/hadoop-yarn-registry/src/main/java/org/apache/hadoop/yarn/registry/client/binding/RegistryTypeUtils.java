@@ -100,7 +100,7 @@ public class RegistryTypeUtils {
    * @param protobuf flag to indicate whether or not the IPC uses protocol
    * buffers
    * @param address the address as a tuple of (hostname, port)
-   * @return
+   * @return the new endpoint
    */
   public static Endpoint ipcEndpoint(String api,
       boolean protobuf, List<String> address) {
