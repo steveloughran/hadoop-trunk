@@ -26,6 +26,7 @@ import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
+import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
@@ -194,7 +195,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     try {
       ServiceRecord record = operations.resolve(empty);
       fail("expected an exception");
-    } catch (InvalidRecordException expected) {
+    } catch (NoRecordException expected) {
 
     }
   }
@@ -219,7 +220,6 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     ServiceRecord resolved3 = operations.resolve(ENTRY_PATH);
     assertMatches(resolved1, resolved3);
   }
-
 
   @Test
   public void testPutGetContainerPersistenceServiceEntry() throws Throwable {

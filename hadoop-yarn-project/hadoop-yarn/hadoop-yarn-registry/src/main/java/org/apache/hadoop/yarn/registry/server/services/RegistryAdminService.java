@@ -27,6 +27,7 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
+import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
@@ -353,6 +354,8 @@ public class RegistryAdminService extends RegistryOperationsService {
     } catch (EOFException ignored) {
       // ignore
     } catch (InvalidRecordException ignored) {
+      // ignore
+    } catch (NoRecordException ignored) {
       // ignore
     }
 

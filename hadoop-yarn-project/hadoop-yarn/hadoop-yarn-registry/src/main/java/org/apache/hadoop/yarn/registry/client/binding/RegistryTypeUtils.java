@@ -166,7 +166,7 @@ public class RegistryTypeUtils {
    * Require a specific address type on an endpoint
    * @param required required type
    * @param epr endpoint
-   * @throws IllegalStateException if the type is wrong
+   * @throws InvalidRecordException if the type is wrong
    */
   public static void requireAddressType(String required, Endpoint epr) throws
       InvalidRecordException {

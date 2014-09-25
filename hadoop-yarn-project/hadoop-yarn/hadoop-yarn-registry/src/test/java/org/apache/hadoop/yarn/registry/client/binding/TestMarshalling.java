@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.registry.client.binding;
 
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
+import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecordHeader;
 import org.junit.Assert;
@@ -65,7 +66,7 @@ public class TestMarshalling extends Assert {
     assertEquals(record.description, r2.description);
   }
 
-  @Test(expected = InvalidRecordException.class)
+  @Test(expected = NoRecordException.class)
   public void testRoundTripBadHeaders() throws Throwable {
     ServiceRecord record = new ServiceRecord("01", "description", 0, null);
     byte[] bytes = marshal.toByteswithHeader(record);
@@ -73,7 +74,7 @@ public class TestMarshalling extends Assert {
     marshal.fromBytesWithHeader("src", bytes);
   }
 
-  @Test(expected = InvalidRecordException.class)
+  @Test(expected = NoRecordException.class)
   public void testUnmarshallHeaderTooShort() throws Throwable {
     marshal.fromBytesWithHeader("src", new byte[]{'a'});
   }

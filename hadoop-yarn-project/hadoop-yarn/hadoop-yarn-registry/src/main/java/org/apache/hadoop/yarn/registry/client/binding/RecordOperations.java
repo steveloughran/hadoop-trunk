@@ -22,6 +22,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
+import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecordHeader;
@@ -70,6 +71,10 @@ public class RecordOperations {
             LOG.debug("data too short for {}", stat.path);
           }
         } catch (InvalidRecordException record) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Invalid record at {}", stat.path);
+          }
+        } catch (NoRecordException record) {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Invalid record at {}", stat.path);
           }

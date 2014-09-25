@@ -230,8 +230,18 @@ public class ServiceRecord implements Cloneable {
     for (Endpoint endpoint : internal) {
       sb.append(endpoint).append("; ");
     }
-
     sb.append('}');
+
+    if (!otherAttributes.isEmpty()) {
+      sb.append(", other attributes: {");
+      for (Map.Entry<String, Object> attr : otherAttributes.entrySet()) {
+        sb.append("\"").append(attr.getKey()).append("\"=\"")
+          .append(attr.getValue()).append("\" ");
+      }
+      sb.append(", other attributes: {");
+      sb.append('}');
+    }
+    
     sb.append('}');
     return sb.toString();
   }

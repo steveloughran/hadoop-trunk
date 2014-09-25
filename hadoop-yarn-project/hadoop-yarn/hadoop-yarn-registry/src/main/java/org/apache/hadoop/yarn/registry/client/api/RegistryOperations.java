@@ -27,6 +27,7 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
+import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 
@@ -81,15 +82,18 @@ public interface RegistryOperations extends Service {
 
   /**
    * Resolve the record at a path
-   * @param path path to service record
+   * @param path path to an entry containing a {@link ServiceRecord}
    * @return the record
    * @throws PathNotFoundException path is not in the registry.
-   * @throws InvalidRecordException if there is not a service record
+   * @throws NoRecordException if there is not a service record
+   * @throws InvalidRecordException if there was a service record but it could
+   * not be parsed.
    * @throws IOException Any other IO Exception
    */
   
   ServiceRecord resolve(String path) 
       throws PathNotFoundException,
+      NoRecordException,
       InvalidRecordException,
       IOException;
 

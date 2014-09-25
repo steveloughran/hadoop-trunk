@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
+import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.JsonProcessingException;
@@ -267,8 +268,10 @@ public class JsonSerDeser<T> {
    * @param path source of data
    * @param buffer buffer
    * @return the parsed structure
+   * Null if the record was too short or the header did not match
    * @throws IOException on a failure
-   * @throws InvalidRecordException if there is not a service record
+   * @throws NoRecordException if header checks implied there was no record
+   * @throws InvalidRecordException if record parsing failed
    */
   @SuppressWarnings("unchecked")
   public T fromBytesWithHeader(String path, byte[] buffer) throws IOException {
@@ -276,13 +279,11 @@ public class JsonSerDeser<T> {
     int blen = buffer.length;
     if (hlen > 0) {
       if (blen < hlen) {
-        throw new InvalidRecordException(path,
-            "Record too short for header of " + getName());
+        throw new NoRecordException(path, "No record header");
       }
       byte[] magic = Arrays.copyOfRange(buffer, 0, hlen);
       if (!Arrays.equals(header, magic)) {
-        throw new InvalidRecordException(path,
-            "Entry header does not match header of " + getName());
+        throw new NoRecordException(path, "Non-matching record header");
       }
     }
     return fromBytes(path, buffer, hlen);

@@ -22,19 +22,17 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Raised if there is no record at the end of the path.
- * This means there was no data or a header mismatch ... it is raised
- * before any attempt to parse
+ * Raised if the entry doesn't match what was expected at the path.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public class InvalidRecordException extends RegistryIOException {
+public class NoRecordException extends RegistryIOException {
 
-  public InvalidRecordException(String path, String error) {
+  public NoRecordException(String path, String error) {
     super(path, error);
   }
 
-  public InvalidRecordException(String path,
+  public NoRecordException(String path,
       String error,
       Throwable cause) {
     super(path, error, cause);
