@@ -648,13 +648,13 @@ public class RegistrySecurity extends AbstractService {
 
   /**
    * Set the Zookeeper server property
-   * {@link ZookeeperConfigOptions#PROP_ZK_SASL_SERVER_CONTEXT}
+   * {@link ZookeeperConfigOptions#PROP_ZK_SERVER_SASL_CONTEXT}
    * to the SASL context. When the ZK server starts, this is the context
    * which it will read in
    * @param contextName the name of the context
    */
   public static void bindZKToServerJAASContext(String contextName) {
-    System.setProperty(PROP_ZK_SASL_SERVER_CONTEXT, contextName);
+    System.setProperty(PROP_ZK_SERVER_SASL_CONTEXT, contextName);
   }
 
   /**
@@ -873,7 +873,7 @@ public class RegistrySecurity extends AbstractService {
     builder.append(describeProperty(PROP_ZK_ALLOW_FAILED_SASL_CLIENTS,
         "(undefined but defaults to true)"));
     builder.append(describeProperty(
-        PROP_ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE));
+        PROP_ZK_SERVER_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE));
     return builder.toString();
   }
 

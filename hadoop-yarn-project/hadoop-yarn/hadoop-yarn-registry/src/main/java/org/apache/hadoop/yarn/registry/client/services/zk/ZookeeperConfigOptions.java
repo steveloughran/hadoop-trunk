@@ -22,12 +22,29 @@ import org.apache.zookeeper.client.ZooKeeperSaslClient;
 import org.apache.zookeeper.server.ZooKeeperSaslServer;
 
 /**
- * Some ZK-internal configuration options which 
- * are usually set via system properties, as well as some other ZK constants
+ * Configuration options which are internal to Zookeeper,
+ * as well as some other ZK constants
+ * <p>
+ * Zookeeper options are passed via system properties prior to the ZK
+ * Methods/classes being invoked. This implies that:
+ * <ol>
+ *   <li>There can only be one instance of a ZK client or service class
+ *   in a single JVM —else their configuration options will conflict.</li>
+ *   <li>It is safest to set these properties immediately before
+ *   invoking ZK operations.</li>
+ * </ol>
+ * 
  */
 public interface ZookeeperConfigOptions {
   /**
-   * This is a property which must be set to enable secure clients: {@value}
+   * Enable SASL secure clients: {@value}. 
+   * This is usually set to true, with ZK set to fall back to
+   * non-SASL authentication if the SASL auth fails
+   * by the property
+   * {@link #PROP_ZK_SERVER_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE}.
+   * <p>
+   * As a result, clients will default to attempting SASL-authentication,
+   * but revert to classic authentication/anonymous access on failure.
    */
   String PROP_ZK_ENABLE_SASL_CLIENT =
       ZooKeeperSaslClient.ENABLE_CLIENT_SASL_KEY;
@@ -39,30 +56,42 @@ public interface ZookeeperConfigOptions {
 
   /**
    * System property for the JAAS client context : {@value}.
+   * 
+   * For SASL authentication to work, this must point to a 
+   * context within the 
+   * 
+   * <p>
+   *   Default value is derived from 
+   *   {@link ZooKeeperSaslClient#LOGIN_CONTEXT_NAME_KEY}
    */
   String PROP_ZK_SASL_CLIENT_CONTEXT =
       ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY;
 
   /**
+   * The SASL client username: {@value}.
+   * <p>
    * Set this to the <i>short</i> name of the client, e.g, "user",
-   * not "user/host", or "user/host@realm": {@value}.
+   * not <code>user/host</code>, or <code>user/host@REALM</code>
    */
   String PROP_ZK_SASL_CLIENT_USERNAME = "zookeeper.sasl.client.username";
 
   /**
-   * Set this to the <i>short</i> name of the client: {@value}
+   * The SASL Server context, referring to a context in the JVM's
+   * JAAS context file: {@value}
+   * <p>
    */
-  String PROP_ZK_SASL_SERVER_CONTEXT =
+  String PROP_ZK_SERVER_SASL_CONTEXT =
       ZooKeeperSaslServer.LOGIN_CONTEXT_NAME_KEY;
 
   /**
-   * Should ZK downgrade on an auth failure? {@value}
+   * Should ZK Server allow failed SASL clients to downgrade to classic
+   * authentication on a SASL auth failure: {@value}.
    */
-  String PROP_ZK_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE =
+  String PROP_ZK_SERVER_MAINTAIN_CONNECTION_DESPITE_SASL_FAILURE =
       "zookeeper.maintain_connection_despite_sasl_failure";
 
   /**
-   * Allow failed SASL clients: {@value}.
+   * should the ZK Server Allow failed SASL clients: {@value}.
    */
   String PROP_ZK_ALLOW_FAILED_SASL_CLIENTS =
       "zookeeper.allowSaslFailedClients";

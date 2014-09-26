@@ -207,7 +207,7 @@ public class MicroZookeeperService
       System.setProperty(RegistryInternalConstants.ZOOKEEPER_AUTH_PROVIDER +".1",
           RegistryInternalConstants.SASLAUTHENTICATION_PROVIDER);
       String serverContext =
-          System.getProperty(PROP_ZK_SASL_SERVER_CONTEXT);
+          System.getProperty(PROP_ZK_SERVER_SASL_CONTEXT);
       addDiagnostics("Server JAAS context s = %s", serverContext);
       return true;
     } else {
