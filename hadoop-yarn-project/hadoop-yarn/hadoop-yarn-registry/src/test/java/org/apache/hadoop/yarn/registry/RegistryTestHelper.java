@@ -237,7 +237,6 @@ public class RegistryTestHelper extends Assert {
     LOG.info(" {} = \n{}\n", name, recordMarshal.toJson(record));
   }
 
-
   /**
    * Create a service entry with the sample endpoints
    * @param persistence persistence policy
@@ -294,7 +293,6 @@ public class RegistryTestHelper extends Assert {
     log.info(text, args);
     log.info("=======================================\n");
   }
-
 
   /**
    * log out from a context if non-null ... exceptions are caught and logged
@@ -362,10 +360,11 @@ public class RegistryTestHelper extends Assert {
    * @return the UGI
    * @throws IOException
    */
-  protected UserGroupInformation loginUGI(String user, File keytab) throws
+  public static UserGroupInformation loginUGI(String user, File keytab) throws
       IOException {
     LOG.info("Logging in as {} from {}", user, keytab);
     return UserGroupInformation.loginUserFromKeytabAndReturnUGI(user,
         keytab.getAbsolutePath());
   }
+  
 }
