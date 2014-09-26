@@ -16,13 +16,12 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.binding;
+package org.apache.hadoop.yarn.registry.client.services.zk;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.api.GetChildrenBuilder;
-import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
@@ -30,7 +29,7 @@ import java.util.List;
 
 /**
  * This class dumps a registry tree to a string.
- * It does this in the toString() method, so it
+ * It does this in the <code>toString()</code> method, so it
  * can be used in a log statement -the operation
  * will only take place if the method is evaluated.
  *
@@ -87,7 +86,7 @@ public class ZKPathDumper {
       List<String> children = childrenBuilder.forPath(path);
       for (String child : children) {
         String childPath = path + "/" + child;
-        String body = "";
+        String body;
         Stat stat = curator.checkExists().forPath(childPath);
         StringBuilder bodyBuilder = new StringBuilder(256);
         bodyBuilder.append("  [")

@@ -29,7 +29,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceStability.Evolving
 public class ServiceRecordHeader {
   /**
-   * Header of a service record:  "jsonservicrec"
+   * Header of a service record:  "jsonservicerec"
    * By making this over 12 bytes long, we can auto-determine which entries
    * in a listing are too short to contain a record without getting their data
    */

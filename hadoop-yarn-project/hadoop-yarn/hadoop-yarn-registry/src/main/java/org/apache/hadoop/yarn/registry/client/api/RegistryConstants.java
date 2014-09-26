@@ -38,7 +38,7 @@ public interface RegistryConstants {
 
   /**
    * Prefix for zookeeper-specific options: {@value}
-   * 
+   *  <p>
    * For clients using other protocols, these options are not supported.
    */
   String ZK_PREFIX = REGISTRY_PREFIX + "zk.";
@@ -80,9 +80,9 @@ public interface RegistryConstants {
 
   /**
    * Registry client authentication policy.
-   * 
+   *  <p>
    * This is only used in secure clusters.
-   * 
+   *  <p>
    * If the Factory methods of {@link RegistryOperationsFactory}
    * are used, this key does not need to be set: it is set
    * up based on the factory method used.
@@ -110,7 +110,7 @@ public interface RegistryConstants {
 
   /**
    * Registry client authentication ID
-   *
+   * <p>
    * This is only used in secure clusters with
    * {@link #KEY_REGISTRY_CLIENT_AUTH} set to
    * {@link #REGISTRY_CLIENT_AUTH_DIGEST}
@@ -120,10 +120,12 @@ public interface RegistryConstants {
       KEY_REGISTRY_CLIENT_AUTH + ".id";
 
   /**
-   * Registry client authentication password
-   *
-   * This is only used in secure clusters with
-   * {@link #KEY_REGISTRY_CLIENT_AUTH} set to
+   * Registry client authentication password.
+   * <p>
+   * This is only used in secure clusters with the client set to
+   * use digest (not SASL or anonymouse) authentication.
+   *  <p>
+   * Specifically, {@link #KEY_REGISTRY_CLIENT_AUTH} set to
    * {@link #REGISTRY_CLIENT_AUTH_DIGEST}
    * 
    */
@@ -148,46 +150,45 @@ public interface RegistryConstants {
       ZK_PREFIX + "session.timeout.ms";
 
   /**
-  * The default ZK session timeout: {@value}
+  * The default ZK session timeout: {@value}.
   */
   int DEFAULT_ZK_SESSION_TIMEOUT = 60000;
 
   /**
-   * Zookeeper connection timeout in milliseconds: {@value}
+   * Zookeeper connection timeout in milliseconds: {@value}.
    */
-
   String KEY_REGISTRY_ZK_CONNECTION_TIMEOUT =
       ZK_PREFIX + "connection.timeout.ms";
   
   /**
-   * The default ZK connection timeout: {@value}
+   * The default ZK connection timeout: {@value}.
    */
   int DEFAULT_ZK_CONNECTION_TIMEOUT = 15000;
 
   /**
-   * Zookeeper connection retry count before failing: {@value}
+   * Zookeeper connection retry count before failing: {@value}.
    */
   String KEY_REGISTRY_ZK_RETRY_TIMES = ZK_PREFIX + "retry.times";
 
   /**
-   * The default # of times to retry a ZK connection: {@value}
+   * The default # of times to retry a ZK connection: {@value}.
    */
   int DEFAULT_ZK_RETRY_TIMES = 5;
 
   /**
-   * Zookeeper connect interval in milliseconds: {@value}
+   * Zookeeper connect interval in milliseconds: {@value}.
    */
   String KEY_REGISTRY_ZK_RETRY_INTERVAL =
       ZK_PREFIX + "retry.interval.ms";
 
   /**
-   * The default interval between connection retries: {@value}
+   * The default interval between connection retries: {@value}.
    */
   int DEFAULT_ZK_RETRY_INTERVAL = 1000;
   
   /**
    * Zookeeper retry limit in milliseconds, during
-   * exponential backoff: {@value}
+   * exponential backoff: {@value}.
    * 
    * This places a limit even
    * if the retry times and interval limit, combined
@@ -199,7 +200,7 @@ public interface RegistryConstants {
       ZK_PREFIX + "retry.ceiling.ms";
 
   /**
-   * Default limit on retries: {@value}
+   * Default limit on retries: {@value}.
    */
   int DEFAULT_ZK_RETRY_CEILING = 60000;
 
@@ -210,12 +211,13 @@ public interface RegistryConstants {
    * These are given full access to all entries.
    * 
    * If there is an "@" at the end of an entry it 
-   * instructs the registry client to append the default kerberos domain.
+   * instructs the registry client to append the kerberos realm as
+   * derived from the login and {@link #KEY_REGISTRY_KERBEROS_REALM}.
    */
   String KEY_REGISTRY_SYSTEM_ACCOUNTS = REGISTRY_PREFIX + "system.accounts";
 
   /**
-   * Default system accounts given global access to the registry: {@value}
+   * Default system accounts given global access to the registry: {@value}.
    */
   String DEFAULT_REGISTRY_SYSTEM_ACCOUNTS =
       "sasl:yarn@, sasl:mapred@, sasl:hdfs@, sasl:hadoop@";
@@ -232,7 +234,7 @@ public interface RegistryConstants {
   String KEY_REGISTRY_USER_ACCOUNTS = REGISTRY_PREFIX + "user.accounts";
 
   /**
-   * Default system acls: {@value}
+   * Default system acls: {@value}.
    */
   String DEFAULT_REGISTRY_USER_ACCOUNTS = "";
 
@@ -262,25 +264,23 @@ public interface RegistryConstants {
   String DEFAULT_REGISTRY_CLIENT_JAAS_CONTEXT = "Client";
 
   /**
-   *  path to users off the root: {@value}
+   *  path to users off the root: {@value}.
    */
   String PATH_USERS = "/users/";
   
   /**
-   *  path to system services off the root : {@value}
+   *  path to system services off the root : {@value}.
    */
   String PATH_SYSTEM_SERVICES = "/services/";
 
-  
   /**
-   *  path to system services under a user's home path : {@value}
+   *  path to system services under a user's home path : {@value}.
    */
   String PATH_USER_SERVICES = "/services/";
 
-  
   /**
    *  path under a service record to point to components of that service:
-   *  {@value}
+   *  {@value}.
    */
   String SUBPATH_COMPONENTS = "/components/";
 }

@@ -32,7 +32,14 @@ import java.util.List;
 
 /**
  * Description of a single service/component endpoint.
- * It is designed to be marshalled as JSON
+ * It is designed to be marshalled as JSON.
+ * <p>
+ * Every endpoint can have more than one address entry, such as 
+ * a list of URLs to a replicated service, or a (hostname, port)
+ * pair. Each of these address entries is represented as a string list,
+ * as that is the only reliably marshallable form of a tuple JSON can represent.
+ * 
+ * 
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -62,6 +69,9 @@ public final class Endpoint implements Cloneable {
    */
   public List<List<String>> addresses;
 
+  /**
+   * Create an empty instance.
+   */
   public Endpoint() {
   }
 

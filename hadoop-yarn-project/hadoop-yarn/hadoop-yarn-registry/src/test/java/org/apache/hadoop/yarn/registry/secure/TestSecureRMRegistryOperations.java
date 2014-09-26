@@ -27,7 +27,7 @@ import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperationsFactory;
-import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
+import org.apache.hadoop.yarn.registry.client.services.zk.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsClient;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;

@@ -165,13 +165,7 @@ public class RegistryOperationsService extends CuratorService
       InvalidPathnameException,
       IOException {
     validatePath(path);
-    List<String> childNames = zkList(path);
-    List<String> childList =
-        new ArrayList<String>(childNames.size());
-    for (String childName : childNames) {
-      childList.add(join(path, childName));
-    }
-    return childList;
+    return zkList(path);
   }
   
   @Override
@@ -184,7 +178,7 @@ public class RegistryOperationsService extends CuratorService
     List<RegistryPathStatus> childList =
         new ArrayList<RegistryPathStatus>(size);
     for (String childName : childNames) {
-      childList.add(stat(childName));
+      childList.add(stat(join(path, childName)));
     }
     return childList;
   }

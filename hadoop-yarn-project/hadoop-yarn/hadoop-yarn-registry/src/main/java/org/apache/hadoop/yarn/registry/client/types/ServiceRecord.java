@@ -41,12 +41,6 @@ import java.util.Map;
 public class ServiceRecord implements Cloneable {
 
   /**
-   * The time the service was registered -as seen by the service making
-   * the registration request.
-   */
-  public long registrationTime;
-
-  /**
    * Description string
    */
   public String description;
@@ -108,7 +102,6 @@ public class ServiceRecord implements Cloneable {
     this.yarn_id = yarn_id;
     this.description = description;
     this.yarn_persistence = yarn_persistence;
-    this.registrationTime = System.currentTimeMillis();
     this.data = data;
   }
 
@@ -120,7 +113,6 @@ public class ServiceRecord implements Cloneable {
     this.yarn_id = that.yarn_id;
     this.description = that.description;
     this.yarn_persistence = that.yarn_persistence;
-    this.registrationTime = that.registrationTime;
     this.data = that.data;
     // endpoints
     List<Endpoint> src = that.internal;
@@ -137,7 +129,6 @@ public class ServiceRecord implements Cloneable {
         external.add(new Endpoint(endpoint));
       }
     }
-    
   }
   
   /**

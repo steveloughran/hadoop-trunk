@@ -24,7 +24,16 @@ import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.service.Service;
 
 /**
- * Composite service that exports the add/remove methods
+ * Composite service that exports the add/remove methods.
+ * <p>
+ * This allows external classes to add services to these methods, after which
+ * they follow the same lifecyce.
+ * <p>
+ * It is essential that any service added is in a state where it can be moved
+ * on with that of the parent services. Specifically, do not add an uninited
+ * service to a parent that is already inited —as the <code>start</code>
+ * operation will then fail
+ *      
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving

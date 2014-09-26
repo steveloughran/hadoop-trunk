@@ -16,25 +16,11 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.exceptions;
-
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-
 /**
- * A path name was invalid. This is raised when a path string has
- * characters in it that are not permitted.
+ * Registry client services
+ * <p>
+ * These are classes which follow the YARN lifecycle and which implement
+ * the {@link org.apache.hadoop.yarn.registry.client.api.RegistryOperations}
+ * API.
  */
-@InterfaceAudience.Public
-@InterfaceStability.Evolving
-public class InvalidPathnameException extends RegistryIOException {
-  public InvalidPathnameException(String path, String message) {
-    super(path, message);
-  }
-
-  public InvalidPathnameException(String path,
-      String message,
-      Throwable cause) {
-    super(path, message, cause);
-  }
-}
+package org.apache.hadoop.yarn.registry.client.services;

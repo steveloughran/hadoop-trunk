@@ -56,8 +56,8 @@ import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 /**
  * Implement the registry security ... a self contained service for
  * testability.
- * 
- * This class contains
+ * <p>
+ * This class contains:
  * <ol>
  *   <li>
  *     The registry security policy implementation, configuration reading, ACL
@@ -536,7 +536,6 @@ public class RegistrySecurity extends AbstractService {
       id = id + realm;
     }
     return new Id(scheme, id);
-
   }
 
   /**
@@ -951,7 +950,6 @@ public class RegistrySecurity extends AbstractService {
       } catch (IOException e) {
         LOG.info("Failed to get current user {}", e, e);
         return new UgiInfo(null);
-
       }
     }
     
@@ -961,7 +959,6 @@ public class RegistrySecurity extends AbstractService {
       this.ugi = ugi;
     }
 
-    
     @Override
     public String toString() {
       if (ugi==null) {
@@ -974,7 +971,6 @@ public class RegistrySecurity extends AbstractService {
           ugi.hasKerberosCredentials());
       builder.append(" isFromKeytab=").append(ugi.isFromKeytab());
       builder.append(" kerberos is enabled in Hadoop =").append(UserGroupInformation.isSecurityEnabled());
-      
       return builder.toString();
     }
 

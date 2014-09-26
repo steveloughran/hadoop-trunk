@@ -25,7 +25,6 @@ import org.apache.hadoop.yarn.registry.AbstractRegistryTest;
 import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
-import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
@@ -34,6 +33,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -64,7 +64,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
 
   @Test
   public void testStat() throws Throwable {
-    ServiceRecord written = putExampleServiceEntry(ENTRY_PATH, 0);
+    putExampleServiceEntry(ENTRY_PATH, 0);
     RegistryPathStatus stat = operations.stat(ENTRY_PATH);
     assertTrue(stat.size > 0);
     assertTrue(stat.time > 0);
@@ -90,20 +90,19 @@ public class TestRegistryOperations extends AbstractRegistryTest {
 
   @Test
   public void testDeleteNonEmpty() throws Throwable {
-    ServiceRecord written = putExampleServiceEntry(ENTRY_PATH, 0);
-    RegistryPathStatus stat = operations.stat(ENTRY_PATH);
+    putExampleServiceEntry(ENTRY_PATH, 0);
     try {
       operations.delete(PARENT_PATH, false);
       fail("Expected a failure");
-    } catch (PathIsNotEmptyDirectoryException e) {
-
+    } catch (PathIsNotEmptyDirectoryException expected) {
+      // expected; ignore
     }
     operations.delete(PARENT_PATH, true);
   }
 
   @Test(expected = PathNotFoundException.class)
   public void testStatEmptyPath() throws Throwable {
-    RegistryPathStatus stat = operations.stat(ENTRY_PATH);
+    operations.stat(ENTRY_PATH);
   }
 
   @Test(expected = PathNotFoundException.class)
@@ -124,7 +123,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
       RegistryPathStatus stat = operations.stat(path);
       fail("Got a status " + stat);
     } catch (PathNotFoundException expected) {
-
+      // expected
     }
   }
 
@@ -133,7 +132,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     operations.mknode(USERPATH, false);
     String path = USERPATH + "newentry";
     assertTrue(operations.mknode(path, false));
-    RegistryPathStatus stat = operations.stat(path);
+    operations.stat(path);
     assertFalse(operations.mknode(path, false));
   }
 
@@ -149,6 +148,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
       RegistryPathStatus stat = operations.stat(path);
       fail("Got a status " + stat);
     } catch (PathNotFoundException expected) {
+      // expected
     }
   }
   
@@ -175,29 +175,29 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   public void testStatDirectory() throws Throwable {
     String empty = "/empty";
     operations.mknode(empty, false);
-    RegistryPathStatus stat = operations.stat(empty);
+    operations.stat(empty);
   }
 
   @Test
   public void testStatRootPath() throws Throwable {
     operations.mknode("/", false);
-    RegistryPathStatus stat = operations.stat("/");
+    operations.stat("/");
+    operations.list("/");
+    operations.listFull("/");
   }
 
   @Test
   public void testStatOneLevelDown() throws Throwable {
     operations.mknode("/subdir", true);
-    RegistryPathStatus stat = operations.stat("/subdir");
+    operations.stat("/subdir");
   }
-
 
   @Test
   public void testLsRootPath() throws Throwable {
     String empty = "/";
     operations.mknode(empty, false);
-    RegistryPathStatus stat = operations.stat(empty);
+    operations.stat(empty);
   }
-
 
   @Test
   public void testResolvePathThatHasNoEntry() throws Throwable {
@@ -205,12 +205,11 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     operations.mknode(empty, false);
     try {
       ServiceRecord record = operations.resolve(empty);
-      fail("expected an exception");
+      fail("expected an exception, got " + record);
     } catch (NoRecordException expected) {
-
+      // expected
     }
   }
-
 
   @Test
   public void testOverwrite() throws Throwable {
@@ -221,7 +220,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
       operations.create(ENTRY_PATH, resolved1, 0);
       fail("overwrite succeeded when it should have failed");
     } catch (FileAlreadyExistsException expected) {
-
+      // expected
     }
 
     // verify there's no changed
@@ -253,4 +252,46 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     operations.clearWriteAccessors();
   }
 
+  @Test
+  public void testListListFully() throws Throwable {
+    ServiceRecord r1 = new ServiceRecord();
+    ServiceRecord r2 = new ServiceRecord("i", "r2", 0,"0x4444");
+    
+    String path = USERPATH + SC_HADOOP + "/listing" ;
+    operations.mknode(path, true);
+    String r1path = path + "/r1";
+    operations.create(r1path, r1, 0);
+    String r2path = path + "/r2";
+    operations.create(r2path, r2, 0);
+
+    RegistryPathStatus r1stat = operations.stat(r1path);
+    assertEquals(r1path, r1stat.path);
+    RegistryPathStatus r2stat = operations.stat(r2path);
+    assertEquals(r2path, r2stat.path);
+    assertNotEquals(r1stat, r2stat);
+
+    // listings now
+    List<String> list = operations.list(path);
+    assertEquals("Wrong no. of children", 2, list.size());
+    // there's no order here, so create one
+    Map<String, String> names = new HashMap<String, String>();
+    String entries = "";
+    for (String child : list) {
+      names.put(child, child);
+      entries += child + " ";
+    }
+    assertTrue("No 'r1' in " + entries,
+        names.containsKey("r1"));
+    assertTrue("No 'r2' in " + entries,
+        names.containsKey("r2"));
+
+    List<RegistryPathStatus> statList = operations.listFull(path);
+    assertEquals("Wrong no. of children", 2, statList.size());
+    Map<String, RegistryPathStatus> stats = new HashMap<String, RegistryPathStatus>();
+    for (RegistryPathStatus status : statList) {
+      stats.put(status.path, status);
+    }
+    assertEquals(r1stat, stats.get(r1path));
+    assertEquals(r2stat, stats.get(r2path));
+  }  
 }

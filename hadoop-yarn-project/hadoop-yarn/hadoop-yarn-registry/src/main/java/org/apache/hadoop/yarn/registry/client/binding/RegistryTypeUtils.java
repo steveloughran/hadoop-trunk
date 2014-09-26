@@ -34,7 +34,8 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Utils to work with registry types
+ * Static methods to work with registry types —primarily endpoints and the
+ * list representation of addresses.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving

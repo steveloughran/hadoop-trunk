@@ -22,9 +22,12 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
+ * This is a manifestation of the Zookeeper restrictions about
+ * what nodes may act as parents.
+ * 
  * Children are not allowed under ephemeral nodes. This is an aspect
- * of ZK which isn't exposed to the registry API -ephemeral ZK nodes
- * do not support children.
+ * of ZK which isn't directly exposed to the registry API. It may
+ * surface if the registry is manipulated outside of the registry API.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving

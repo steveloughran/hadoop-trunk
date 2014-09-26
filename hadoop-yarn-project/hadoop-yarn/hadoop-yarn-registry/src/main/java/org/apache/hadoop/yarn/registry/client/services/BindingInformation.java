@@ -28,7 +28,14 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class BindingInformation {
-  
+
+  /**
+   * The Curator Ensemble Provider
+   */
   public EnsembleProvider ensembleProvider;
+
+  /**
+   * Any information that may be useful for diagnostics
+   */
   public String description;
 }

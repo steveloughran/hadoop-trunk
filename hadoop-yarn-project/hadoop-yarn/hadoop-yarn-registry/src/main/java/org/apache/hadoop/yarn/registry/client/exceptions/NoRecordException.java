@@ -20,9 +20,20 @@ package org.apache.hadoop.yarn.registry.client.exceptions;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecordHeader;
 
 /**
- * Raised if the entry doesn't match what was expected at the path.
+ * Raised if there is no {@link ServiceRecord} resolved at the end
+ * of the specified path, for reasons such as:
+ * <ul>
+ *   <li>There wasn't enough data to contain a Service Record.</li>
+ *   <li>The start of the data did not match the {@link ServiceRecordHeader}
+ *   header.</li>
+ * </ul>
+ * 
+ * There may be valid data of some form at the end of the path, but it does
+ * not appear to be a Service Record.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving

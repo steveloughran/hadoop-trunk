@@ -169,9 +169,11 @@ public class MicroZookeeperService
   }
 
   /**
-   * Add a formatted string to the diagnostics
-   * @param text
-   * @param args
+   * Append a formatted string to the diagnostics. 
+   * <p>
+   * A newline is appended afterwards. 
+   * @param text text including any format commands
+   * @param args arguments for the forma operation.
    */
   protected void addDiagnostics(String text, Object ... args) {
     diagnostics.append(String.format(text, args)).append('\n');

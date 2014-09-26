@@ -23,7 +23,6 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
-import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
@@ -121,10 +120,11 @@ public interface RegistryOperations extends Service {
   boolean exists(String path) throws IOException;
 
   /**
-   * List all entries under a registry path
+   * List all entries under a registry path, returning the relative names
+   * of the entries.
    * @param path path to query
-   * @return a possibly empty list of the full path names of
-   * child entries
+   * @return a possibly empty list of the short path names of
+   * child entries. 
    * @throws PathNotFoundException
    * @throws InvalidPathnameException
    * @throws IOException

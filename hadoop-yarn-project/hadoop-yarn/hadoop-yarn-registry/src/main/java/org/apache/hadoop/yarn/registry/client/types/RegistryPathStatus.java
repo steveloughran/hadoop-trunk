@@ -26,7 +26,7 @@ import org.codehaus.jackson.annotate.JsonProperty;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 /**
- * Output of a stat() call
+ * Output of a <code>RegistryOperations.stat()</code> call
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -34,7 +34,7 @@ import org.codehaus.jackson.map.annotate.JsonSerialize;
 public final class RegistryPathStatus {
 
   /**
-   * Full Path in the registry to this entry
+   * Absolute path in the registry to this entry
    */
   public final String path;
 
@@ -44,7 +44,8 @@ public final class RegistryPathStatus {
   public final long time;
 
   /**
-   * Entry size
+   * Entry size in bytes, as returned by the storage infrastructure.
+   * In zookeeper, even "empty" nodes appear to have a non-zero size.
    */
   public final long size;
 

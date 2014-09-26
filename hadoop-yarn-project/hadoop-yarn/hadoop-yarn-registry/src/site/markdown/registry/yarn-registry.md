@@ -353,21 +353,22 @@ application.
     <td>Description</td>
   </tr>
   <tr>
-    <td>description: String</td>
-    <td>Human-readable description.</td>
-  </tr>
-  <tr>
-    <td>registrationTime: long</td>
-    <td>Registration time as a `System.getTimeMillis()` value seen at the service.</td>
-  </tr>
-  <tr>
     <td>yarn_id: String/td>
-    <td>YARN application or container ID (missing/empty for statically deployed services).</td>
+    <td>YARN application or container ID (missing/empty for statically 
+    deployed services).</td>
   </tr>
   <tr>
     <td>yarn_persistence: int</td>
     <td>Persistence policy.</td>
   </tr>
+    <tr>
+      <td>description: String</td>
+      <td>Human-readable description.</td>
+    </tr>
+    <tr>
+      <td>data: String</td>
+      <td>holder of (implicitly small amounts of) service-specific data</td>
+    </tr>
   <tr>
     <td>external: List&lt;Endpoint&gt;</td>
     <td>A list of service endpoints for external callers.</td>

@@ -42,7 +42,6 @@ import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
-import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.exceptions.AuthenticationFailedException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.hadoop.yarn.registry.client.exceptions.RegistryIOException;
@@ -62,7 +61,7 @@ import java.util.List;
 /**
  * This service binds to Zookeeper via Apache Curator. It is more 
  * generic than just the YARN service registry; it does not implement
- * any of the RegistryOperations API. 
+ * any of the Registry Operations API. 
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -82,8 +81,15 @@ public class CuratorService extends CompositeService
    */
   private String registryRoot;
 
+  /**
+   * Supplied binding source. This defaults to being this
+   * service itself.
+   */
   private final RegistryBindingSource bindingSource;
 
+  /**
+   * Security service
+   */
   private RegistrySecurity registrySecurity;
 
   /**

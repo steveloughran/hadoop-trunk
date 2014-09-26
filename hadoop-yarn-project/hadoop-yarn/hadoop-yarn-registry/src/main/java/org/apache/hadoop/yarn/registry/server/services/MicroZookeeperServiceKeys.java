@@ -21,7 +21,7 @@ package org.apache.hadoop.yarn.registry.server.services;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 
 /**
- * Service keys for configuring the ZK service.
+ * Service keys for configuring the {@link MicroZookeeperService}.
  * These are not used in registry clients or the RM-side service,
  * so are kept separate.
  */
@@ -45,7 +45,7 @@ public interface MicroZookeeperServiceKeys {
    */
   public static final String KEY_ZKSERVICE_HOST = ZKSERVICE_PREFIX + "host";
   /**
-   * Default host to serve on -this is "localhost" as it
+   * Default host to serve on -this is <code>localhost</code> as it
    * is the only one guaranteed to be available: {@value}.
    */
   public static final String DEFAULT_ZKSERVICE_HOST = "localhost";
@@ -57,7 +57,7 @@ public interface MicroZookeeperServiceKeys {
   /**
    * Directory containing data: {@value}
    */
-  public static final String KEY_ZKSERVICE_DIR = ZKSERVICE_PREFIX + ".dir";
+  public static final String KEY_ZKSERVICE_DIR = ZKSERVICE_PREFIX + "dir";
 
   /**
    * Should failed SASL clients be allowed: {@value}?
@@ -65,5 +65,5 @@ public interface MicroZookeeperServiceKeys {
    * Default is the ZK default: true
    */
   public static final String KEY_ZKSERVICE_ALLOW_FAILED_SASL_CLIENTS =
-      ZKSERVICE_PREFIX + ".allow.failed.sasl.clients";
+      ZKSERVICE_PREFIX + "allow.failed.sasl.clients";
 }

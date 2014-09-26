@@ -22,9 +22,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Raised if there is no record at the end of the path.
- * This means there was no data or a header mismatch ... it is raised
- * before any attempt to parse
+ * Raised if an attempt to parse a record failed.
+ * 
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving

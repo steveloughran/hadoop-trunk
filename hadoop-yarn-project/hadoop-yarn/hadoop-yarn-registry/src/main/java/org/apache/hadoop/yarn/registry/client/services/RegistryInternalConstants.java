@@ -29,7 +29,7 @@ import org.apache.zookeeper.ZooDefs;
 public interface RegistryInternalConstants {
 
   /**
-   * Pattern of a hostname : {@value}
+   * Pattern of a hostname : {@value}.
    */
   String HOSTNAME_PATTERN =
       "([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])";

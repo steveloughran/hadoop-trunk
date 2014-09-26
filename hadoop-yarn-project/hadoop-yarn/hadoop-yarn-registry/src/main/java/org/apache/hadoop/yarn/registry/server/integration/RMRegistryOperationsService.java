@@ -38,10 +38,10 @@ import java.util.concurrent.Future;
 
 /**
  * Handle RM events by updating the registry
- * 
+ * <p>
  * These actions are all implemented as event handlers to operations
  * which come from the RM.
- *
+ * <p>
  * This service is expected to be executed by a user with the permissions
  * to manipulate the entire registry,
  */
@@ -63,6 +63,15 @@ public class RMRegistryOperationsService extends RegistryAdminService {
   }
 
 
+  /**
+   * Extend the parent service initialization by verifying that the 
+   * service knows —in a secure cluster— the realm in which it is executing.
+   * It needs this to properly build up the user names and hence their
+   * access rights.
+   * 
+   * @param conf configuration of the service
+   * @throws Exception
+   */
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);

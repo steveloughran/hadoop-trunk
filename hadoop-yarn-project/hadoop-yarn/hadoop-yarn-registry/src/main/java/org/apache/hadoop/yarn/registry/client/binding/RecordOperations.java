@@ -43,6 +43,9 @@ import java.util.Map;
 public class RecordOperations {
   private static final Logger LOG = LoggerFactory.getLogger(JsonSerDeser.class);
 
+  /**
+   * Static instance of service record marshalling
+   */
   public static class ServiceRecordMarshal extends JsonSerDeser<ServiceRecord> {
     public ServiceRecordMarshal() {
       super(ServiceRecord.class, ServiceRecordHeader.getData());
@@ -57,7 +60,8 @@ public class RecordOperations {
    * @return a possibly empty list
    * @throws IOException for any IO Operation that wasn't ignored.
    */
-  public static Map<String, ServiceRecord> extractServiceRecords(RegistryOperations operations,
+  public static Map<String, ServiceRecord> extractServiceRecords(
+      RegistryOperations operations,
       List<RegistryPathStatus> stats) throws IOException {
     Map<String, ServiceRecord> results = new HashMap<String, ServiceRecord>(stats.size());
     for (RegistryPathStatus stat : stats) {

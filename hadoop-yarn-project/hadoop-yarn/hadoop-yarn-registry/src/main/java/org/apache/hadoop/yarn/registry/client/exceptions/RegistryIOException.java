@@ -23,7 +23,10 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.PathIOException;
 
 /**
- * Exception for registry operations
+ * Base exception for registry operations. 
+ * <p>
+ * These exceptions include the path of the failing operation wherever possible;
+ * this can be retrieved via {@link PathIOException#getPath()}.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving

@@ -106,7 +106,7 @@ public class RegistryAdminService extends RegistryOperationsService {
     super(name, bindingSource);
     executor = Executors.newCachedThreadPool(
         new ThreadFactory() {
-          AtomicInteger counter = new AtomicInteger(1);
+          private AtomicInteger counter = new AtomicInteger(1);
 
           @Override
           public Thread newThread(Runnable r) {
@@ -215,6 +215,7 @@ public class RegistryAdminService extends RegistryOperationsService {
           bindingDiagnosticDetails(),
           dumpRegistryRobustly(true),
           e);
+      throw e;
     }
   }
 
@@ -250,7 +251,7 @@ public class RegistryAdminService extends RegistryOperationsService {
    * <b>Important: this must run client-side as it needs
    * to know the id:pass tuple for a user</b>
    * @param username user name
-   * @param perms
+   * @param perms permissions
    * @return an ACL list
    * @throws IOException ACL creation/parsing problems
    */
@@ -355,9 +356,9 @@ public class RegistryAdminService extends RegistryOperationsService {
    * </ol>
    *
    * @param path base path
-   * @param id ID for service record.id
    * @param selector selector for the purge policy
    * @param purgePolicy what to do if there is a matching record with children
+   * @param callback optional curator callback
    * @return the number of delete operations perfomed. As deletes may be for
    * everything under a path, this may be less than the number of records
    * actually deleted

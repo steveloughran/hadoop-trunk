@@ -168,7 +168,6 @@ public class RegistryOperationUtils {
     return homePathForUser(shortUserName);
   }
 
-
   /**
    * Get the current user path formatted for the registry
    * <p>

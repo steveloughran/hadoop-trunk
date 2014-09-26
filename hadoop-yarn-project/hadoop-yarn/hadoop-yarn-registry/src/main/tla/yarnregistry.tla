@@ -45,8 +45,9 @@ be considered immediate from the perspective of other registry clients. (assumpt
 
 Operations will still happen in the order received by the elected ZK master
 
-A stricter definition would try to state that all operations are eventually true excluding other changes
-happening during a sequence of action. This is left as an excercise for the reader.
+A stricter definition would try to state that all operations are eventually 
+true excluding other changes happening during a sequence of action.
+This is left as an excercise for the reader.
 
 The specification also omits all coverage of the permissions policy. This is something
 which can be tuned by the Resource Manager: who sets up
@@ -144,10 +145,10 @@ Endpoint == [
 *)
 ServiceRecord == [
     \* ID -used when applying the persistence policy
-    id: STRING,     
+    yarn_id: STRING,     
             
     \* the persistence policy
-    persistence: PersistPolicySet,
+    yarn_persistence: PersistPolicySet,
     
     \*A description
     description: STRING,
@@ -209,8 +210,8 @@ Registry Access Operations
 (* 
 Lookup all entries in a registry with a matching path
 *)
-lookup(Registry, path) == \A entry \in Registry: entry.path = path
 
+lookup(Registry, path) == \A entry \in Registry: entry.path = path
 
 (*
 A path exists in the registry iff there is an entry with that path
@@ -363,10 +364,10 @@ afterwards
 purge(R, path, id, persistence) == 
     /\ (persistence \in PersistPolicySet)
     /\ \A p2 \in pathAndDescendants(R, path) :
-         (p2.id = id /\ p2.persistence = persistence) => recursiveDelete(R, p2.path) 
+         (p2.yarn_id = id /\ p2.yarn_ = persistence) => recursiveDelete(R, p2.path) 
 
 (*
-Resolve() resolves the record at a path or fails.
+resolveRecord() resolves the record at a path or fails.
 
 It relies on the fact that if the cardinality of a set is 1, then the CHOOSE operator
 is guaranteed to return the single entry of that set, iff the choice predicate holds. 
@@ -386,7 +387,7 @@ resolveRecord(R, path) ==
 
 validRecordToPut(path, record) ==
       \* The root entry must have permanent persistence  
-    /\ (isRootPath(path) => (record.persistence = "PERMANENT" \/ record.persistence = "")
+    /\ (isRootPath(path) => (record.yarn_persistence = "PERMANENT" \/ record.yarn_persistence = "")
 
 
 (* 
@@ -412,8 +413,6 @@ putRecord(R, path, record) ==
         \/ (a \in DeleteActions /\ a.type="delete")
         \/ (a \in PurgeActions /\ a.type="purge")
         \/ (a \in MknodeActions /\ a.type="mknode")
-
-
 
 (*
     Applying queued actions

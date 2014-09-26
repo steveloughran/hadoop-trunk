@@ -33,7 +33,8 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * Low level zookeeper-related operations on paths
+ * Basic operations on paths: manipulating them and creating and validating
+ * path elements.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -46,6 +47,8 @@ public class RegistryPathUtils {
    * Validate ZK path with the path itself included in
    * the exception text
    * @param path path to validate
+   * @return the path parameter
+   * @throws InvalidPathnameException if the pathname is invalid.
    */
   public static String validateZKPath(String path) throws
       InvalidPathnameException {
@@ -60,9 +63,10 @@ public class RegistryPathUtils {
   }
 
   /**
-   * Validate ZK path with the path itself included in
-   * the exception text
+   * Validate ZK path as valid for a DNS hostname.
    * @param path path to validate
+   * @return the path parameter
+   * @throws InvalidPathnameException if the pathname is invalid.
    */
   public static String validateElementsAsDNS(String path) throws
       InvalidPathnameException {
@@ -80,10 +84,10 @@ public class RegistryPathUtils {
    * Create a full path from the registry root and the supplied subdir
    * @param path path of operation
    * @return an absolute path
-   * @throws IllegalArgumentException if the path is invalide
+   * @throws InvalidPathnameException if the path is invalid
    */
   public static String createFullPath(String base, String path) throws
-      IOException {
+      InvalidPathnameException {
     Preconditions.checkArgument(path != null, "null path");
     Preconditions.checkArgument(base != null, "null path");
     return validateZKPath(join(base, path));

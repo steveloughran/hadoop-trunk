@@ -25,7 +25,7 @@ import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
-import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
+import org.apache.hadoop.yarn.registry.client.services.zk.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.services.CuratorEventCatcher;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;

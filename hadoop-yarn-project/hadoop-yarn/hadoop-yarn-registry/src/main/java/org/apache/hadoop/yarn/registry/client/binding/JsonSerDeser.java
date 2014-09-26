@@ -50,10 +50,11 @@ import java.util.Arrays;
 
 /**
  * Support for marshalling objects to and from JSON.
+ *  <p>
  * It constructs an object mapper as an instance field.
  * and synchronizes access to those methods
  * which use the mapper
- * @param <T>
+ * @param <T> Type to marshal.
  */
 @InterfaceAudience.Private()
 @InterfaceStability.Evolving

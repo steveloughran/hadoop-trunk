@@ -28,7 +28,9 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Callback for delete operations completing
+ * Curator callback for delete operations completing.
+ * <p>
+ * This callback logs at debug and increments the event counter.  
  */
 public class DeleteCompletionCallback implements BackgroundCallback {
   private static final Logger LOG =

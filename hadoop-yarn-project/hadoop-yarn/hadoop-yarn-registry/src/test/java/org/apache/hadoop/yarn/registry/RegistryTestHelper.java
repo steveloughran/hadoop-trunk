@@ -181,8 +181,8 @@ public class RegistryTestHelper extends Assert {
   }
 
   /**
-   * Assert the records match. Only the ID, registration time,
-   * description and persistence are checked —not endpoints.
+   * Assert the records match. Only the ID, 
+   * description and persistence are checked.
    * @param source record that was written
    * @param resolved the one that resolved.
    */
@@ -190,9 +190,9 @@ public class RegistryTestHelper extends Assert {
     assertNotNull("Null source record ", source);
     assertNotNull("Null resolved record ", resolved);
     assertEquals(source.yarn_id, resolved.yarn_id);
-    assertEquals(source.registrationTime, resolved.registrationTime);
     assertEquals(source.description, resolved.description);
     assertEquals(source.yarn_persistence, resolved.yarn_persistence);
+    assertEquals(source.data, resolved.data);
   }
 
   /**
@@ -249,7 +249,6 @@ public class RegistryTestHelper extends Assert {
     ServiceRecord record = new ServiceRecord();
     record.yarn_id = "example-0001";
     record.yarn_persistence = persistence;
-    record.registrationTime = System.currentTimeMillis();
     addSampleEndpoints(record, "namenode");
     return record;
   }
