@@ -209,8 +209,10 @@ public class RegistryAdminService extends RegistryOperationsService {
     try {
       createRootRegistryPaths();
     } catch (PathAccessDeniedException e) {
-      LOG.warn("Failed to create registry paths {}; current registry is:\n{}\n",
+      LOG.warn("Failed to create registry paths {};" +
+               "\ndiagnostics={}\ncurrent registry is:\n{}\n",
           e,
+          bindingDiagnosticDetails(),
           dumpRegistryRobustly(true),
           e);
     }
@@ -226,11 +228,12 @@ public class RegistryAdminService extends RegistryOperationsService {
     List<ACL> systemACLs = getRegistrySecurity().getSystemACLs();
     LOG.info("System ACLs {}",
         RegistrySecurity.aclsToString(systemACLs));
+    maybeCreate("", CreateMode.PERSISTENT, systemACLs, false);
     maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
-        systemACLs, true);
+        systemACLs, false);
     maybeCreate(PATH_SYSTEM_SERVICES,
         CreateMode.PERSISTENT,
-        systemACLs, true);
+        systemACLs, false);
   }
 
   /**

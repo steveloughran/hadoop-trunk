@@ -27,6 +27,7 @@ import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperationsFactory;
+import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsClient;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions;
@@ -123,6 +124,8 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     RegistryOperations operations = rmRegistryOperations;
     operations.mknode(PATH_SYSTEM_SERVICES + "hdfs",
         false);
+    ZKPathDumper pathDumper = rmRegistryOperations.dumpPath(true);
+    LOG.info(pathDumper.toString());
   }
 
   @Test
@@ -310,6 +313,8 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
         RegistrySecurity.aclsToString(digestClientACLs));
     operations.stat(base);
     operations.mknode(base + "/subdir", false);
+    ZKPathDumper pathDumper = registryAdmin.dumpPath(true);
+    LOG.info(pathDumper.toString());
   }
 
   @Test(expected = IllegalArgumentException.class)

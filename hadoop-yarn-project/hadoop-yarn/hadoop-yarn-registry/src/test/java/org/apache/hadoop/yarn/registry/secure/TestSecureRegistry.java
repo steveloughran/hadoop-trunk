@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.registry.secure;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.ServiceOperations;
+import org.apache.hadoop.yarn.registry.client.binding.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.services.zk.CuratorService;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
 import org.apache.zookeeper.CreateMode;
@@ -146,6 +147,8 @@ public class TestSecureRegistry extends AbstractSecureRegistryTest {
       addToTeardown(curator);
       curator.zkMkPath("/", CreateMode.PERSISTENT, false,
           RegistrySecurity.WorldReadWriteACL);
+      ZKPathDumper pathDumper = curator.dumpPath(true);
+      LOG.info(pathDumper.toString());
     } finally {
       logout(login);
       ServiceOperations.stop(curator);
