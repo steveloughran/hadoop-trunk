@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.registry.client.services;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -47,10 +46,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The YARN ZK registry operations service.
- *
- * It implements the {@link RegistryOperations} API by mapping the commands
- * to zookeeper operations.
+ * The YARN registry operations service.
+ * <p>
+ * This is the core service, which implements the {@link RegistryOperations}
+ * API by mapping the commands to zookeeper operations, and translating
+ * results and exceptions back into those specified by the API.
+ * <p>
+ * Factory methods should hide the detail that this has been implemented via
+ * the {@link CuratorService} by returning it cast to that
+ * {@link RegistryOperations} interface, rather than this implementation class.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -112,8 +116,6 @@ public class RegistryOperationsService extends CuratorService
       InvalidPathnameException,
       IOException {
     Preconditions.checkArgument(record != null, "null record");
-    Preconditions.checkArgument(!Strings.isNullOrEmpty(record.yarn_id), 
-        "empty record ID");
     validatePath(path);
     LOG.info("Registered at {} : {}", path, record);
 

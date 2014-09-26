@@ -151,6 +151,17 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     } catch (PathNotFoundException expected) {
     }
   }
+  
+  @Test
+  public void testPutMinimalRecord() throws Throwable {
+    String path = "/path/with/minimal";
+    operations.mknode(path, true);
+    ServiceRecord record = new ServiceRecord();
+    operations.create(path, record, CreateFlags.OVERWRITE);
+    ServiceRecord resolve = operations.resolve(path);
+    assertMatches(record, resolve);
+
+  }
 
   @Test(expected = PathNotFoundException.class)
   public void testPutNoParent2() throws Throwable {
