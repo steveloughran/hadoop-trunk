@@ -237,7 +237,7 @@ public class RegistrySecurity extends AbstractService {
       List<ACL> userACLs = buildACLs(user, kerberosRealm, ZooDefs.Perms.ALL);
 
       // add self if the current user can be determined 
-      ACL self = null;
+      ACL self;
       if (UserGroupInformation.isSecurityEnabled()) {
         self = createSaslACLFromCurrentUser(ZooDefs.Perms.ALL);
         if (self != null) {
@@ -271,7 +271,7 @@ public class RegistrySecurity extends AbstractService {
             // 
             throw new ServiceStateException(E_NO_USER_DETERMINED_FOR_ACLS);
           }
-          String digestAuth = digest(id, pass);
+          digest(id, pass);
           ACL acl = new ACL(ZooDefs.Perms.ALL, toDigestId(id, pass));
           userACLs.add(acl);
           digestAuthUser = id;
@@ -825,7 +825,6 @@ public class RegistrySecurity extends AbstractService {
   public static String idToString(Id id) {
     String s;
     if (id.getScheme().equals(SCHEME_DIGEST)) {
-      s = id.toString();
       String ids = id.getId();
       int colon = ids.indexOf(':');
       if (colon > 0) {
@@ -877,7 +876,6 @@ public class RegistrySecurity extends AbstractService {
     return builder.toString();
   }
 
-
   private static String describeProperty(String name) {
     return describeProperty(name, "(undefined)");
   }
@@ -896,14 +894,14 @@ public class RegistrySecurity extends AbstractService {
     try {
       return KerberosUtil.getDefaultRealm();
       // JDK7
-    } catch (ClassNotFoundException e) {
-
-    } catch (NoSuchMethodException e) {
-
-    } catch (IllegalAccessException e) {
-
-    } catch (InvocationTargetException e) {
-
+    } catch (ClassNotFoundException ignored) {
+      // ignored
+    } catch (NoSuchMethodException ignored) {
+      // ignored
+    } catch (IllegalAccessException ignored) {
+      // ignored
+    } catch (InvocationTargetException ignored) {
+      // ignored
     }
     return "";
   }
@@ -941,7 +939,6 @@ public class RegistrySecurity extends AbstractService {
     }
     return new ACL(perms, new Id(SCHEME_SASL, username));
   }
-
 
   /**
    * On demand string-ifier for UGI with extra details
@@ -982,10 +979,12 @@ public class RegistrySecurity extends AbstractService {
     }
 
   }
-  
-  public static class AclListInfo {
-    final List<ACL> acls;
 
+  /**
+   * on-demand stringifier for a list of ACLs
+   */
+  public static class AclListInfo {
+    public final List<ACL> acls;
 
     public AclListInfo(List<ACL> acls) {
       this.acls = acls;

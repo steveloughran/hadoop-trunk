@@ -356,11 +356,11 @@ public class RegistryAdminService extends RegistryOperationsService {
    *
    * @param path base path
    * @param id ID for service record.id
-   * @param persistencePolicyMatch ID for the persistence policy to match: no match, no delete.
-   * If set to to -1 or below, " don't check"
+   * @param selector selector for the purge policy
    * @param purgePolicy what to do if there is a matching record with children
-   * @return the number of calls to the zkDelete() operation. This is purely for
-   * testing.
+   * @return the number of delete operations perfomed. As deletes may be for
+   * everything under a path, this may be less than the number of records
+   * actually deleted
    * @throws IOException problems
    * @throws PathIsNotEmptyDirectoryException if an entry cannot be deleted
    * as his children and the purge policy is FailOnChildren
