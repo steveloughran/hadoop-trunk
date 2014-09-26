@@ -810,15 +810,15 @@ public class RegistrySecurity extends AbstractService {
    * @return ACL string value
    */
   public static String aclToString(ACL acl) {
-    StringBuilder builder = new StringBuilder();
-    builder.append(acl.getPerms()).append(", ");
-    builder.append(idToString(acl.getId()));
-    return builder.toString();
+    return String.format(Locale.ENGLISH,
+        "[%s: 0x%02x]", 
+        idToString(acl.getId()),
+        acl.getPerms());
   }
 
   /**
-   * Convert an ID to a string, stripping out all but the first 4 characters
-   * of any digest auth for security reasons
+   * Convert an ID to a string, stripping out all but the first few characters
+   * of any digest auth hash for security reasons
    * @param id ID
    * @return a string description of a Zookeeper ID
    */
@@ -828,10 +828,10 @@ public class RegistrySecurity extends AbstractService {
       s = id.toString();
       String ids = id.getId();
       int colon = ids.indexOf(':');
-      if (colon>0) {
+      if (colon > 0) {
         ids = ids.substring(colon + 3);
       }
-      s = SCHEME_DIGEST +": " + ids;
+      s = SCHEME_DIGEST + ": " + ids;
     } else {
       s = id.toString();
     }

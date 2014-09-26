@@ -718,10 +718,10 @@ public class CuratorService extends CompositeService
    * of the registry tree in its <code>toString()</code>
    * operation
    * @return a class to dump the registry
+   * @param verbose verbose flag - includes more details (such as ACLs)
    */
-  @VisibleForTesting
-  public ZKPathDumper dumpPath() {
-    return new ZKPathDumper(curator, registryRoot);
+  public ZKPathDumper dumpPath(boolean verbose) {
+    return new ZKPathDumper(curator, registryRoot, verbose);
   }
 
   /**
@@ -742,5 +742,23 @@ public class CuratorService extends CompositeService
    */
   public void clearWriteAccessors() {
     getRegistrySecurity().resetDigestACLs();
+  }
+
+
+  /**
+   * Diagnostics method to dump a registry robustly.
+   * Any exception raised is swallowed
+   * @param verbose verbose path dump
+   * @return the registry tree
+   */
+  protected String dumpRegistryRobustly(boolean verbose) {
+    try {
+      ZKPathDumper pathDumper = dumpPath(verbose);
+      return pathDumper.toString();
+    } catch (Exception e) {
+      // ignore
+      LOG.debug("Ignoring exception:  {}", e);
+    }
+    return "";
   }
 }

@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang.StringUtils;
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.PathAccessDeniedException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
@@ -60,14 +61,20 @@ import java.util.concurrent.atomic.AtomicInteger;
  * zookeeper connectivity problems do not hold up the server code
  * performing the actions.
  * 
+ * Any action queued via {@link #submit(Callable)} will be 
+ * run asynchronously. The {@link #createDirAsync(String, List, boolean)}
+ * is an example of such an an action
+ * 
  * A key async action is the depth-first tree purge, which supports
- * pluggable policies for deleting entries.
+ * pluggable policies for deleting entries. The method
+ * {@link #purge(String, NodeSelector, PurgePolicy, BackgroundCallback)}
+ * implements the recursive purge operation —the class
+ * {{AsyncPurge}} provides the asynchronous scheduling of this.
  */
 public class RegistryAdminService extends RegistryOperationsService {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistryAdminService.class);
-  
   /**
    * The ACL permissions for the user's homedir ACL.
    */
@@ -79,11 +86,21 @@ public class RegistryAdminService extends RegistryOperationsService {
    * Executor for async operations
    */
   protected final ExecutorService executor;
-  
+
+  /**
+   * Construct an instance of the service
+   * @param name service name
+   */
   public RegistryAdminService(String name) {
     this(name, null);
   }
 
+  /**
+   * construct an instance of the service, using the 
+   * specified binding source to bond to ZK
+   * @param name service name
+   * @param bindingSource provider of ZK binding information
+   */
   public RegistryAdminService(String name,
       RegistryBindingSource bindingSource) {
     super(name, bindingSource);
@@ -163,6 +180,11 @@ public class RegistryAdminService extends RegistryOperationsService {
     });
   }
 
+  /**
+   * Init operation sets up the system ACLs.
+   * @param conf configuration of the service
+   * @throws Exception
+   */
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
@@ -184,7 +206,14 @@ public class RegistryAdminService extends RegistryOperationsService {
   protected void serviceStart() throws Exception {
     super.serviceStart();
     // create the root directories
-    createRootRegistryPaths();
+    try {
+      createRootRegistryPaths();
+    } catch (PathAccessDeniedException e) {
+      LOG.warn("Failed to create registry paths {}; current registry is:\n{}\n",
+          e,
+          dumpRegistryRobustly(true),
+          e);
+    }
   }
 
   /**
@@ -197,12 +226,11 @@ public class RegistryAdminService extends RegistryOperationsService {
     List<ACL> systemACLs = getRegistrySecurity().getSystemACLs();
     LOG.info("System ACLs {}",
         RegistrySecurity.aclsToString(systemACLs));
-    maybeCreate("", CreateMode.PERSISTENT, systemACLs, false);
     maybeCreate(PATH_USERS, CreateMode.PERSISTENT,
-        systemACLs, false);
+        systemACLs, true);
     maybeCreate(PATH_SYSTEM_SERVICES,
         CreateMode.PERSISTENT,
-        systemACLs, false);
+        systemACLs, true);
   }
 
   /**
@@ -245,7 +273,6 @@ public class RegistryAdminService extends RegistryOperationsService {
 
     String homeDir = homeDir(shortname);
     if (!exists(homeDir)) {
-      
       // create the directory. The user does not
       return createDirAsync(homeDir, 
           aclsForUser(shortname,

@@ -113,7 +113,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     operations.mknode(RegistryPathUtils.parentOf(path), true);
     operations.create(path, written, 0);
 
-    ZKPathDumper dump = registry.dumpPath();
+    ZKPathDumper dump = registry.dumpPath(false);
     CuratorEventCatcher events = new CuratorEventCatcher();
 
     LOG.info("Initial state {}", dump);
@@ -154,7 +154,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     operations.mknode(RegistryPathUtils.parentOf(path), true);
     operations.create(path, written, 0);
 
-    ZKPathDumper dump = registry.dumpPath();
+    ZKPathDumper dump = registry.dumpPath(false);
 
     LOG.info("Initial state {}", dump);
 
@@ -166,7 +166,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
         deletions);
     assertPathExists(path);
 
-    dump = registry.dumpPath();
+    dump = registry.dumpPath(false);
 
     assertEquals("wrong no of delete operations in " + dump, 0,
         deletions.getEventCount());
@@ -181,7 +181,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
         RegistryAdminService.PurgePolicy.PurgeAll,
         deletions);
 
-    dump = registry.dumpPath();
+    dump = registry.dumpPath(false);
     LOG.info("Final state {}", dump);
 
     assertPathNotFound(path);
@@ -250,7 +250,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     String dns2path = components + dns2;
     operations.create(dns2path, comp2, CreateFlags.CREATE);
 
-    ZKPathDumper pathDumper = registry.dumpPath();
+    ZKPathDumper pathDumper = registry.dumpPath(false);
     LOG.info(pathDumper.toString());
 
     logRecord("tomcat", webapp);

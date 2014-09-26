@@ -22,6 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.api.GetChildrenBuilder;
+import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
+import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
 import java.util.List;
@@ -39,18 +41,22 @@ public class ZKPathDumper {
   public static final int INDENT = 2;
   private final CuratorFramework curator;
   private final String root;
+  private final boolean verbose; 
 
   /**
    * Create a path dumper -but do not dump the path until asked
    * @param curator curator instance
    * @param root root
+   * @param verbose verbose flag - includes more details (such as ACLs)
    */
   public ZKPathDumper(CuratorFramework curator,
-      String root) {
+      String root,
+      boolean verbose) {
     Preconditions.checkArgument(curator != null);
     Preconditions.checkArgument(root != null);
     this.curator = curator;
     this.root = root;
+    this.verbose = verbose;
   }
 
   /**
@@ -83,15 +89,24 @@ public class ZKPathDumper {
         String childPath = path + "/" + child;
         String body = "";
         Stat stat = curator.checkExists().forPath(childPath);
-        StringBuilder verboseDataBuilder = new StringBuilder(64);
-        verboseDataBuilder.append("  [")
+        StringBuilder bodyBuilder = new StringBuilder(256);
+        bodyBuilder.append("  [")
                           .append(stat.getDataLength())
                           .append("]");
         if (stat.getEphemeralOwner() > 0) {
-          verboseDataBuilder.append("*");
+          bodyBuilder.append("*");
         }
-        body = verboseDataBuilder.toString();
-
+        if (verbose) {
+          // verbose: extract ACLs
+          builder.append(" -- ");
+          List<ACL> acls =
+              curator.getACL().forPath(childPath);
+          for (ACL acl : acls) {
+            builder.append(RegistrySecurity.aclToString(acl));
+            builder.append(" ");
+          }
+        }
+        body = bodyBuilder.toString();
         // print each child
         append(builder, indent, ' ');
         builder.append('/').append(child);
