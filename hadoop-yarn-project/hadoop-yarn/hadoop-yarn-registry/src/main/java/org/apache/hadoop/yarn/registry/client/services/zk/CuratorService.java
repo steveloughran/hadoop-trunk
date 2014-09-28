@@ -33,10 +33,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.fs.PathAccessDeniedException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
-import org.apache.hadoop.fs.PathPermissionException;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.service.ServiceStateException;
@@ -44,6 +42,7 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.AuthenticationFailedException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
+import org.apache.hadoop.yarn.registry.client.exceptions.NoPathPermissionsException;
 import org.apache.hadoop.yarn.registry.client.exceptions.RegistryIOException;
 import org.apache.hadoop.yarn.registry.client.services.BindingInformation;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
@@ -258,7 +257,6 @@ public class CuratorService extends CompositeService
     builder.ensembleProvider(ensembleProvider)
      .connectionTimeoutMs(connectionTimeout)
      .sessionTimeoutMs(sessionTimeout)
-        
 
      .retryPolicy(new BoundedExponentialBackoffRetry(retryInterval,
          retryCeiling,
@@ -272,7 +270,6 @@ public class CuratorService extends CompositeService
 
     return framework;
   }
-
 
   @Override
   public String toString() {
@@ -382,7 +379,8 @@ public class CuratorService extends CompositeService
     } else if (exception instanceof KeeperException.NodeExistsException) {
       ioe = new FileAlreadyExistsException(path);
     } else if (exception instanceof KeeperException.NoAuthException) {
-      ioe = new PathAccessDeniedException(path + " / " + aclList);
+      ioe = new NoPathPermissionsException(path, 
+          "Not authorized to access path; ACLs: " + aclList);
     } else if (exception instanceof KeeperException.NotEmptyException) {
       ioe = new PathIsNotEmptyDirectoryException(path);
     } else if (exception instanceof KeeperException.AuthFailedException) {
@@ -396,10 +394,10 @@ public class CuratorService extends CompositeService
       // this is a security exception of a kind
       // include the ACLs to help the diagnostics
       StringBuilder builder = new StringBuilder();
-      builder.append(path).append(" ").append(aclList);
+      builder.append("Path access failure ").append(aclList);
       builder.append(" ");
       builder.append(securityConnectionDiagnostics);
-      ioe = new PathPermissionException(builder.toString());
+      ioe = new NoPathPermissionsException(path, builder.toString());
     } else {
       ioe = new RegistryIOException(path,
           "Failure of " + operation + " on " + path + ": " +
@@ -526,8 +524,8 @@ public class CuratorService extends CompositeService
       throws IOException {
     checkServiceLive();
     path = createFullPath(path);
-    if (acls != null && acls.size() == 0) {
-      throw new PathPermissionException(path + ": empty ACL list");
+    if (acls == null || acls.isEmpty()) {
+      throw new NoPathPermissionsException(path, "Empty ACL list");
     }
 
     try {

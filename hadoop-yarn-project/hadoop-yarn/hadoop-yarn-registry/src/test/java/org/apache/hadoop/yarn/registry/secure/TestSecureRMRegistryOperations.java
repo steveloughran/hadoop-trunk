@@ -20,13 +20,13 @@ package org.apache.hadoop.yarn.registry.secure;
 
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.PathAccessDeniedException;
 import org.apache.hadoop.fs.PathPermissionException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperationsFactory;
+import org.apache.hadoop.yarn.registry.client.exceptions.NoPathPermissionsException;
 import org.apache.hadoop.yarn.registry.client.services.zk.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsClient;
 import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
@@ -59,7 +59,6 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
   private Configuration secureConf;
   private Configuration zkClientConf;
   private UserGroupInformation zookeeperUGI;
-  private UserGroupInformation aliceUGI;
 
   @Before
   public void setupTestSecureRMRegistryOperations() throws Exception {
@@ -75,7 +74,6 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
     // ZK is in charge
     secureConf.set(KEY_REGISTRY_SYSTEM_ACCOUNTS, "sasl:zookeeper@");
     zookeeperUGI = loginUGI(ZOOKEEPER, keytab_zk);
-    aliceUGI = loginUGI(ALICE, keytab_alice);
   }
 
   @After
@@ -186,7 +184,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
       fail("should have failed to create a node under " + path);
     } catch (PathPermissionException expected) {
       // expected
-    } catch (PathAccessDeniedException expected) {
+    } catch (NoPathPermissionsException expected) {
       // expected
     }
   }
@@ -205,7 +203,7 @@ public class TestSecureRMRegistryOperations extends AbstractSecureRegistryTest {
       fail("should have failed to delete the node " + path);
     } catch (PathPermissionException expected) {
       // expected
-    } catch (PathAccessDeniedException expected) {
+    } catch (NoPathPermissionsException expected) {
       // expected
     }
   }

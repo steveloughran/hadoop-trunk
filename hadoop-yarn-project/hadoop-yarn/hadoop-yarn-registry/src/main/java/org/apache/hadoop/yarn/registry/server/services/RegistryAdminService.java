@@ -23,11 +23,11 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang.StringUtils;
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.PathAccessDeniedException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
+import org.apache.hadoop.yarn.registry.client.exceptions.NoPathPermissionsException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -208,14 +209,23 @@ public class RegistryAdminService extends RegistryOperationsService {
     // create the root directories
     try {
       createRootRegistryPaths();
-    } catch (PathAccessDeniedException e) {
-      LOG.warn("Failed to create registry paths {};" +
-               "\ndiagnostics={}\ncurrent registry is:\n{}\n",
+    } catch (NoPathPermissionsException e) {
+
+      String message = String.format(Locale.ENGLISH,
+          "Failed to create root paths {%s};" +
+          "\ndiagnostics={%s}" +
+          "\ncurrent registry is:" +
+          "\n{%s}",
           e,
           bindingDiagnosticDetails(),
-          dumpRegistryRobustly(true),
-          e);
-      throw e;
+          dumpRegistryRobustly(true));
+
+      LOG.error(" Failure {}", e, e);
+      LOG.error(message);
+
+      // TODO: this is something temporary to deal with the problem
+      // that jenkins is failing this test
+      throw new NoPathPermissionsException(e.getPath().toString(), message, e);
     }
   }
 

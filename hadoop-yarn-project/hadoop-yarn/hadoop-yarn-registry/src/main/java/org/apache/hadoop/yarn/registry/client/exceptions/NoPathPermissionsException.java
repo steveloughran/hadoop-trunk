@@ -18,41 +18,28 @@
 
 package org.apache.hadoop.yarn.registry.client.exceptions;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.PathIOException;
 
 /**
- * Base exception for registry operations. 
+ * Raised on path permission exceptions.
  * <p>
- * These exceptions include the path of the failing operation wherever possible;
- * this can be retrieved via {@link PathIOException#getPath()}.
+ * This is similar to PathIOException, except that exception doesn't let
  */
-@InterfaceAudience.Public
-@InterfaceStability.Evolving
-public class RegistryIOException extends PathIOException {
-
-  /**
-   * Build an exception from any other Path IO Exception.
-   * This propagates the path of the original exception
-   * @param message more specific text
-   * @param cause cause
-   */
-  public RegistryIOException(String message, PathIOException cause) {
-    super(cause.getPath() != null ? cause.getPath().toString() : "",
-        message,
-        cause);
-  }  
-  
-  public RegistryIOException(String path, Throwable cause) {
+public class NoPathPermissionsException extends RegistryIOException {
+  public NoPathPermissionsException(String path, Throwable cause) {
     super(path, cause);
   }
 
-  public RegistryIOException(String path, String error) {
+  public NoPathPermissionsException(String path, String error) {
     super(path, error);
   }
 
-  public RegistryIOException(String path, String error, Throwable cause) {
+  public NoPathPermissionsException(String path, String error, Throwable cause) {
     super(path, error, cause);
+  }
+
+  public NoPathPermissionsException(String message,
+      PathIOException cause) {
+    super(message, cause);
   }
 }

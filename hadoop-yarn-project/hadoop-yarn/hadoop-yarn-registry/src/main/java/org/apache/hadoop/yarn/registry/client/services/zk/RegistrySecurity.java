@@ -810,9 +810,10 @@ public class RegistrySecurity extends AbstractService {
    */
   public static String aclToString(ACL acl) {
     return String.format(Locale.ENGLISH,
-        "[%s: 0x%02x]", 
-        idToString(acl.getId()),
-        acl.getPerms());
+        "0x%02x: %s",
+        acl.getPerms(),
+        idToString(acl.getId())
+    );
   }
 
   /**
