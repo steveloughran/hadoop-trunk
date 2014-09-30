@@ -38,11 +38,11 @@ public class TestMarshalling extends Assert {
   public final Timeout testTimeout = new Timeout(10000);
   @Rule
   public TestName methodName = new TestName();
-  private static RegistryOperationUtils.ServiceRecordMarshal marshal;
+  private static RegistryUtils.ServiceRecordMarshal marshal;
 
   @BeforeClass
   public static void setupClass() {
-    marshal = new RegistryOperationUtils.ServiceRecordMarshal();
+    marshal = new RegistryUtils.ServiceRecordMarshal();
   }
 
   @Test

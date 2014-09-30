@@ -26,9 +26,7 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 
-import static org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils.*;
-
-import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
@@ -42,13 +40,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
  * The YARN registry operations service.
  * <p>
- * This is the core service, which implements the {@link RegistryOperations}
+ * This service implements the {@link RegistryOperations}
  * API by mapping the commands to zookeeper operations, and translating
  * results and exceptions back into those specified by the API.
  * <p>
@@ -64,8 +61,8 @@ public class RegistryOperationsService extends CuratorService
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistryOperationsService.class);
 
-  private final RegistryOperationUtils.ServiceRecordMarshal serviceRecordMarshal
-      = new RegistryOperationUtils.ServiceRecordMarshal();
+  private final RegistryUtils.ServiceRecordMarshal serviceRecordMarshal
+      = new RegistryUtils.ServiceRecordMarshal();
 
   public RegistryOperationsService(String name) {
     this(name, null);
@@ -167,21 +164,6 @@ public class RegistryOperationsService extends CuratorService
       IOException {
     validatePath(path);
     return zkList(path);
-  }
-  
-  @Override
-  public List<RegistryPathStatus> listFull(String path) throws
-      PathNotFoundException,
-      InvalidPathnameException,
-      IOException {
-    List<String> childNames = list(path);
-    int size = childNames.size();
-    List<RegistryPathStatus> childList =
-        new ArrayList<RegistryPathStatus>(size);
-    for (String childName : childNames) {
-      childList.add(stat(join(path, childName)));
-    }
-    return childList;
   }
 
   @Override

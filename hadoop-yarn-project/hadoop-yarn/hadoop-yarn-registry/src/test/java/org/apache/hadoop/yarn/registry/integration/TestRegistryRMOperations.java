@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.yarn.registry.AbstractRegistryTest;
 import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.services.zk.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.services.CuratorEventCatcher;
@@ -262,12 +262,12 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
         PersistencePolicies.CONTAINER, dns1resolved.yarn_persistence);
 
     Map<String, RegistryPathStatus> children =
-        RegistryOperationUtils.statChildren(operations, componentsPath);
+        RegistryUtils.statChildren(operations, componentsPath);
     assertEquals(2, children.size());
     Collection<RegistryPathStatus>
         componentStats = children.values();
     Map<String, ServiceRecord> records =
-        RegistryOperationUtils.extractServiceRecords(operations,
+        RegistryUtils.extractServiceRecords(operations,
             componentsPath, componentStats);
     assertEquals(2, records.size());
     ServiceRecord retrieved1 = records.get(dns1path);
@@ -280,13 +280,13 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     
     // this shows up in the listing of child entries
     Map<String, RegistryPathStatus> childrenUpdated =
-        RegistryOperationUtils.statChildren(operations, componentsPath);
+        RegistryUtils.statChildren(operations, componentsPath);
     assertEquals(3, childrenUpdated.size());
     
     // the non-record child this is not picked up in the record listing
     Map<String, ServiceRecord> recordsUpdated =
         
-        RegistryOperationUtils.extractServiceRecords(operations,
+        RegistryUtils.extractServiceRecords(operations,
             componentsPath,
             childrenUpdated);
     assertEquals(2, recordsUpdated.size());

@@ -23,20 +23,20 @@ import org.junit.Assert;
 import org.junit.Test;
 
 /**
- * Tests for the {@link RegistryOperationUtils} class
+ * Tests for the {@link RegistryUtils} class
  */
 public class TestRegistryOperationUtils extends Assert {
 
   @Test
   public void testUsernameExtractionEnvVarOverrride() throws Throwable {
-    String whoami = RegistryOperationUtils.getCurrentUsernameUnencoded("drwho");
+    String whoami = RegistryUtils.getCurrentUsernameUnencoded("drwho");
     assertEquals("drwho", whoami);
 
   }
   
   @Test
   public void testUsernameExtractionCurrentuser() throws Throwable {
-    String whoami = RegistryOperationUtils.getCurrentUsernameUnencoded("");
+    String whoami = RegistryUtils.getCurrentUsernameUnencoded("");
     String ugiUser = UserGroupInformation.getCurrentUser().getShortUserName();
     
     assertEquals(ugiUser, whoami);

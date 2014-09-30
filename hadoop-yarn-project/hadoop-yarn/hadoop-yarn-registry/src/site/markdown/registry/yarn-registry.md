@@ -609,7 +609,10 @@ interface merely lists those that have special meaning.
 
 All write operations must assume that they are communicating with a registry
 service with the consistency view of a Zookeeper client; read-only clients must
-assume that some operations may not be immediately visible to them.
+assume that their view may be somewhat out of date.
+
+All clients must recognize that the registry is a shared resource and that
+it may change during a sequence of actions.
 
 ### Registry Operations
     
@@ -701,20 +704,6 @@ assume that some operations may not be immediately visible to them.
        */
        List<String> list(String path) throws
           PathNotFoundException,
-          InvalidPathnameException,
-          IOException;
-      
-      /**
-       * List children of a directory and retrieve their
-       * {@link RegistryPathStatus} values.
-       * @param path path
-       * @return a possibly empty list of child entries
-       * @throws PathNotFoundException path is not in the registry.
-       * @throws InvalidPathnameException the path is invalid.
-       * @throws IOException Any other IO Exception
-       */
-      List<RegistryPathStatus> listFull(String path)
-          throws PathNotFoundException,
           InvalidPathnameException,
           IOException;
 

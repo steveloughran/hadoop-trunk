@@ -26,7 +26,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.service.ServiceStateException;
-import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoPathPermissionsException;
@@ -257,7 +257,7 @@ public class RegistryAdminService extends RegistryOperationsService {
    * @return a path for services underneath
    */
   protected String homeDir(String username) {
-    return RegistryOperationUtils.homePathForUser(username);
+    return RegistryUtils.homePathForUser(username);
   }
 
   /**
@@ -397,7 +397,7 @@ public class RegistryAdminService extends RegistryOperationsService {
     Collection<RegistryPathStatus> entries;
     try {
       // list this path's children
-      childEntries = RegistryOperationUtils.statChildren(this, path);
+      childEntries = RegistryUtils.statChildren(this, path);
       entries = childEntries.values();
     } catch (PathNotFoundException e) {
       // there's no record here, it may have been deleted already.

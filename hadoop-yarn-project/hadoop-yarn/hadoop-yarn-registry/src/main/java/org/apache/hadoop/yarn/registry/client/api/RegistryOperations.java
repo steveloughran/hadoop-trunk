@@ -133,20 +133,6 @@ public interface RegistryOperations extends Service {
       PathNotFoundException,
       InvalidPathnameException,
       IOException;
-  
-  /**
-   * List children of a directory and retrieve their
-   * {@link RegistryPathStatus} values.
-   * @param path path
-   * @return a possibly empty list of child entries
-   * @throws PathNotFoundException path is not in the registry.
-   * @throws InvalidPathnameException the path is invalid.
-   * @throws IOException Any other IO Exception
-   */
-  List<RegistryPathStatus> listFull(String path)
-      throws PathNotFoundException,
-      InvalidPathnameException,
-      IOException;
 
   /**
    * Delete a path.

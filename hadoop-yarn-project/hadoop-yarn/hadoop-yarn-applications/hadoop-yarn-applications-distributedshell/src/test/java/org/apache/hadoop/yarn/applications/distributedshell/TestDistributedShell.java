@@ -37,7 +37,7 @@ import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
@@ -994,11 +994,11 @@ public class TestDistributedShell {
     protected boolean monitorApplication(ApplicationId appId)
         throws YarnException, IOException {
 
-      String username = RegistryOperationUtils.currentUser();
+      String username = RegistryUtils.currentUser();
       String serviceClass = DSConstants.SERVICE_CLASS_DISTRIBUTED_SHELL;
       String serviceName = RegistryPathUtils.encodeYarnID(appId.toString());
       servicePath =
-          RegistryOperationUtils.servicePath(username, serviceClass,
+          RegistryUtils.servicePath(username, serviceClass,
               serviceName);
       appAttemptPath = servicePath + "-attempt";
       ephemeralPath = servicePath + "-ephemeral";

@@ -51,9 +51,9 @@ import java.util.Map;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public class RegistryOperationUtils {
+public class RegistryUtils {
   private static final Logger LOG =
-      LoggerFactory.getLogger(RegistryOperationUtils.class);
+      LoggerFactory.getLogger(RegistryUtils.class);
 
   /**
    * Buld the user path -switches to the system path if the user is "".

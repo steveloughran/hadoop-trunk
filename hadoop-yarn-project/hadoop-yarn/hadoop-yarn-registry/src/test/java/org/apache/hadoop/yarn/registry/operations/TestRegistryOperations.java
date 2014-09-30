@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.yarn.registry.AbstractRegistryTest;
 import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
-import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
@@ -80,12 +80,12 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     assertEquals(1, children.size());
     assertEquals(NAME, children.get(0));
     Map<String, RegistryPathStatus> childStats =
-        RegistryOperationUtils.statChildren(operations, PARENT_PATH);
+        RegistryUtils.statChildren(operations, PARENT_PATH);
     assertEquals(1, childStats.size());
     assertEquals(stat, childStats.get(NAME));
     
     Map<String, ServiceRecord> records =
-        RegistryOperationUtils.extractServiceRecords(operations,
+        RegistryUtils.extractServiceRecords(operations,
             PARENT_PATH,
             childStats.values());
     assertEquals(1, records.size());
@@ -292,7 +292,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
         names.containsKey("r2"));
 
     Map<String, RegistryPathStatus> stats =
-        RegistryOperationUtils.statChildren(operations, path);
+        RegistryUtils.statChildren(operations, path);
     assertEquals("Wrong no. of children", 2, stats.size());
     assertEquals(r1stat, stats.get("r1"));
     assertEquals(r2stat, stats.get("r2"));
