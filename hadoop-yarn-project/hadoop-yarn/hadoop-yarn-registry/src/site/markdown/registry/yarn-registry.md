@@ -765,6 +765,36 @@ assume that some operations may not be immediately visible to them.
       public void clearWriteAccessors();
     }
 
+
+### `RegistryPathStatus`
+
+The `RegistryPathStatus` class summarizes the contents of a node in the registry. 
+
+    public class RegistryPathStatus {
+    
+      /**
+       * Short path in the registry to this entry
+       */
+      public String path;
+    
+      /**
+       * Timestamp
+       */
+      public long time;
+    
+      /**
+       * Entry size in bytes, as returned by the storage infrastructure.
+       * In zookeeper, even "empty" nodes have a non-zero size.
+       */
+      public long size;
+    
+      /**
+       * Number of child nodes 
+       */
+      public int children;
+    }
+
+
 ## Security
 
 The registry will allow a service instance can only be registered under the

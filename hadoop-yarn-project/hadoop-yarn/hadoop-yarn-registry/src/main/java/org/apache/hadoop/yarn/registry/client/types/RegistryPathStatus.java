@@ -23,7 +23,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.annotate.JsonProperty;
-import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 /**
  * Output of a <code>RegistryOperations.stat()</code> call
@@ -45,7 +44,7 @@ public final class RegistryPathStatus {
 
   /**
    * Entry size in bytes, as returned by the storage infrastructure.
-   * In zookeeper, even "empty" nodes appear to have a non-zero size.
+   * In zookeeper, even "empty" nodes have a non-zero size.
    */
   public final long size;
 
