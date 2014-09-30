@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -154,9 +155,37 @@ public class RegistryOperationUtils {
    * from the OS/kerberos.
    */
   public static String homePathForCurrentUser() {
+    String shortUserName = currentUsernameUnencoded();
+    return homePathForUser(shortUserName);
+  }
+
+  /**
+   * Get the current username, before any encoding has been applied.
+   * @return the current user from the kerberos identity, falling back
+   * to the user and/or env variables.
+   */
+  private static String currentUsernameUnencoded() {
+    String env_hadoop_username = System.getenv(HADOOP_USER_NAME);
+    return getCurrentUsernameUnencoded(env_hadoop_username);
+  }
+
+  /**
+   * Get the current username, using the value of the parameter
+   * <code>env_hadoop_username</code> if it is set on an insecure cluster.
+   * This ensures that the username propagates correctly across processes
+   * started by YARN.
+   * <p>
+   * This method is primarly made visible for testing.
+   * @param env_hadoop_username the environment variable
+   * @return the selected username
+   * @throws RuntimeException if there is a problem getting the short user
+   * name of the current user.
+   */
+  @VisibleForTesting
+  public static String getCurrentUsernameUnencoded(String env_hadoop_username) {
     String shortUserName = null;
     if (!UserGroupInformation.isSecurityEnabled()) {
-      shortUserName = System.getenv(HADOOP_USER_NAME);
+      shortUserName = env_hadoop_username;
     }
     if (StringUtils.isEmpty(shortUserName)) {
       try {
@@ -165,7 +194,7 @@ public class RegistryOperationUtils {
         throw new RuntimeException(e);
       }
     }
-    return homePathForUser(shortUserName);
+    return shortUserName;
   }
 
   /**
@@ -185,18 +214,7 @@ public class RegistryOperationUtils {
    * 
    */
   public static String currentUser() {
-    String shortUserName = null;
-    if (!UserGroupInformation.isSecurityEnabled()) {
-      shortUserName = System.getenv(HADOOP_USER_NAME);
-    }
-    if (StringUtils.isEmpty(shortUserName)) {
-      try {
-        shortUserName =
-            UserGroupInformation.getCurrentUser().getShortUserName();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
+    String shortUserName = currentUsernameUnencoded();
     return encodeForRegistry(shortUserName);
   }
 
