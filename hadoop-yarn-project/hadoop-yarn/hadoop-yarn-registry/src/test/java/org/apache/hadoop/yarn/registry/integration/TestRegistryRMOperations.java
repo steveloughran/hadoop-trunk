@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.yarn.registry.AbstractRegistryTest;
 import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.services.zk.ZKPathDumper;
 import org.apache.hadoop.yarn.registry.client.services.CuratorEventCatcher;
@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -261,10 +261,13 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     assertEquals("Persistence policies on resolved entry",
         PersistencePolicies.CONTAINER, dns1resolved.yarn_persistence);
 
-    List<RegistryPathStatus> componentStats = operations.listFull(componentsPath);
-    assertEquals(2, componentStats.size());
+    Map<String, RegistryPathStatus> children =
+        RegistryOperationUtils.statChildren(operations, componentsPath);
+    assertEquals(2, children.size());
+    Collection<RegistryPathStatus>
+        componentStats = children.values();
     Map<String, ServiceRecord> records =
-        RecordOperations.extractServiceRecords(operations,
+        RegistryOperationUtils.extractServiceRecords(operations,
             componentsPath, componentStats);
     assertEquals(2, records.size());
     ServiceRecord retrieved1 = records.get(dns1path);
@@ -274,13 +277,18 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
 
     // create a listing under components/
     operations.mknode(componentsPath + "subdir", false);
-    List<RegistryPathStatus> componentStatsUpdated =
-        operations.listFull(componentsPath);
-    assertEquals(3, componentStatsUpdated.size());
+    
+    // this shows up in the listing of child entries
+    Map<String, RegistryPathStatus> childrenUpdated =
+        RegistryOperationUtils.statChildren(operations, componentsPath);
+    assertEquals(3, childrenUpdated.size());
+    
+    // the non-record child this is not picked up in the record listing
     Map<String, ServiceRecord> recordsUpdated =
-        RecordOperations.extractServiceRecords(operations,
+        
+        RegistryOperationUtils.extractServiceRecords(operations,
             componentsPath,
-            componentStats);
+            childrenUpdated);
     assertEquals(2, recordsUpdated.size());
 
     // now do some deletions.

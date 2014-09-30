@@ -24,6 +24,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
@@ -45,8 +46,10 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -366,6 +369,10 @@ public class RegistryAdminService extends RegistryOperationsService {
    *   <li>Deletions will be asynchronous if a callback is provided</li>
    * </ol>
    *
+   * The code is designed to be robust against parallel deletions taking place;
+   * in such a case it will stop attempting that part of the tree. This
+   * avoid the situation of more than 1 purge happening in parallel and
+   * one of the purge operations deleteing the node tree above the other.
    * @param path base path
    * @param selector selector for the purge policy
    * @param purgePolicy what to do if there is a matching record with children
@@ -375,7 +382,7 @@ public class RegistryAdminService extends RegistryOperationsService {
    * actually deleted
    * @throws IOException problems
    * @throws PathIsNotEmptyDirectoryException if an entry cannot be deleted
-   * as his children and the purge policy is FailOnChildren
+   * as it has children and the purge policy is FailOnChildren
    */
   @VisibleForTesting
   public int purge(String path,
@@ -383,13 +390,23 @@ public class RegistryAdminService extends RegistryOperationsService {
       PurgePolicy purgePolicy,
       BackgroundCallback callback) throws IOException {
 
-    // list this path's children
-    List<RegistryPathStatus> entries = listFull(path);
-    RegistryPathStatus registryPathStatus = stat(path);
 
     boolean toDelete = false;
     // look at self to see if it has a service record
+    Map<String, RegistryPathStatus> childEntries;
+    Collection<RegistryPathStatus> entries;
     try {
+      // list this path's children
+      childEntries = RegistryOperationUtils.statChildren(this, path);
+      entries = childEntries.values();
+    } catch (PathNotFoundException e) {
+      // there's no record here, it may have been deleted already.
+      // exit
+      return 0;
+    }
+    
+    try {
+      RegistryPathStatus registryPathStatus = stat(path);
       ServiceRecord serviceRecord = resolve(path);
       // there is now an entry here.
       toDelete = selector.shouldSelect(path, registryPathStatus, serviceRecord);
@@ -399,6 +416,10 @@ public class RegistryAdminService extends RegistryOperationsService {
       // ignore
     } catch (NoRecordException ignored) {
       // ignore
+    } catch (PathNotFoundException e) {
+      // there's no record here, it may have been deleted already.
+      // exit
+      return 0;
     }
 
     if (toDelete && !entries.isEmpty()) {
@@ -420,7 +441,7 @@ public class RegistryAdminService extends RegistryOperationsService {
             LOG.debug("Scheduling for deletion with children");
           }
           toDelete = true;
-          entries = new ArrayList<RegistryPathStatus>(0); 
+          entries = new ArrayList<RegistryPathStatus>(0);
           break;
         case FailOnChildren:
           if (LOG.isDebugEnabled()) {
@@ -432,8 +453,14 @@ public class RegistryAdminService extends RegistryOperationsService {
 
     int deleteOps = 0;
     if (toDelete) {
+      try {
+        zkDelete(path, true, callback);
+      } catch (PathNotFoundException e) {
+        // sign that the path was deleted during the operation.
+        // this is a no-op, and all children can be skipped
+        return deleteOps;
+      }
       deleteOps++;
-      zkDelete(path, true, callback);
     }
 
     // now go through the children

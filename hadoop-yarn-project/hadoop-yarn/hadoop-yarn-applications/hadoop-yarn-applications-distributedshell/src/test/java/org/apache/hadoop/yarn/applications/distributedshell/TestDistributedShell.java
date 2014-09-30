@@ -876,11 +876,11 @@ public class TestDistributedShell {
     LOG.info("Registry Binding: " + regOps);
     
     // do a simple registry operation to verify that it is live
-    regOps.listFull("/");
+    regOps.list("/");
     // check the system dir is present
-    regOps.listFull(RegistryConstants.PATH_SYSTEM_SERVICES);
+    regOps.list(RegistryConstants.PATH_SYSTEM_SERVICES);
     // check the users dir is present
-    regOps.listFull(RegistryConstants.PATH_USERS);
+    regOps.list(RegistryConstants.PATH_USERS);
 
     try {
       String[] args = {

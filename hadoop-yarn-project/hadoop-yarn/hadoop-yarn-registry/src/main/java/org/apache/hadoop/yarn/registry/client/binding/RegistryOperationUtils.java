@@ -23,26 +23,37 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
+import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
+import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
+import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
+import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecordHeader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils.*;
 
+import java.io.EOFException;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Utility methods for working with a registry via a registry operations
- * instance.
+ * Utility methods for working with a registry.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class RegistryOperationUtils {
-
-  public static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RegistryOperationUtils.class);
 
   /**
    * Buld the user path -switches to the system path if the user is "".
@@ -129,23 +140,65 @@ public class RegistryOperationUtils {
    * @param registryOperations registry operations instance
    * @param path path to list
    * @return a mapping of the service records that were resolved, indexed
-   * by their name under the supplied path
+   * by their full path
    * @throws IOException
    */
   public static Map<String, ServiceRecord> listServiceRecords(
       RegistryOperations registryOperations,
       String path) throws IOException {
-    List<RegistryPathStatus> stats = registryOperations.listFull(path);
-    return RecordOperations.extractServiceRecords(registryOperations,
+    Map<String, RegistryPathStatus> children =
+        statChildren(registryOperations, path);
+    return extractServiceRecords(registryOperations,
         path,
-        stats);
+        children.values());
+  }
+
+  /**
+   * List children of a directory and retrieve their
+   * {@link RegistryPathStatus} values.
+   * <p>
+   * This is not an atomic operation; A child may be deleted
+   * during the iteration through the child entries. If this happens,
+   * the <code>PathNotFoundException</code> is caught and that child
+   * entry ommitted.
+   *
+   * @param path path
+   * @return a possibly empty map of child entries listed by
+   * their short name.
+   * @throws PathNotFoundException path is not in the registry.
+   * @throws InvalidPathnameException the path is invalid.
+   * @throws IOException Any other IO Exception
+   */
+  public static Map<String, RegistryPathStatus> statChildren(
+      RegistryOperations registryOperations,
+      String path)
+      throws PathNotFoundException,
+      InvalidPathnameException,
+      IOException {
+    List<String> childNames = registryOperations.list(path);
+    int size = childNames.size();
+    Map<String, RegistryPathStatus> results =
+        new HashMap<String, RegistryPathStatus>();
+    for (String childName : childNames) {
+      String child = join(path, childName);
+      try {
+        RegistryPathStatus stat = registryOperations.stat(child);
+        results.put(childName, stat);
+      } catch (PathNotFoundException pnfe) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("stat failed on {}: moved? {}", child, pnfe, pnfe);
+        }
+        // and continue
+      }
+    }
+    return results;
   }
 
   /**
    * Get the home path of the current user.
    * <p>
    *  In an insecure cluster, the environment variable 
-   *  {@link #HADOOP_USER_NAME} is queried <i>first</i>.
+   *  <code>HADOOP_USER_NAME</code> is queried <i>first</i>.
    * <p>
    * This means that in a YARN container where the creator set this 
    * environment variable to propagate their identity, the defined
@@ -167,7 +220,8 @@ public class RegistryOperationUtils {
    * to the user and/or env variables.
    */
   private static String currentUsernameUnencoded() {
-    String env_hadoop_username = System.getenv(HADOOP_USER_NAME);
+    String env_hadoop_username = System.getenv(
+        RegistryInternalConstants.HADOOP_USER_NAME);
     return getCurrentUsernameUnencoded(env_hadoop_username);
   }
 
@@ -203,7 +257,7 @@ public class RegistryOperationUtils {
    * Get the current user path formatted for the registry
    * <p>
    *  In an insecure cluster, the environment variable 
-   *  {@link #HADOOP_USER_NAME} is queried <i>first</i>.
+   *  <code>HADOOP_USER_NAME </code> is queried <i>first</i>.
    * <p>
    * This means that in a YARN container where the creator set this 
    * environment variable to propagate their identity, the defined
@@ -220,4 +274,90 @@ public class RegistryOperationUtils {
     return encodeForRegistry(shortUserName);
   }
 
+  /**
+   * Extract all service records under a list of stat operations...this
+   * skips entries that are too short or simply not matching
+   * @param operations operation support for fetches
+   * @param parentpath path of the parent of all the entries 
+   * @param stats Collection of stat results
+   * @return a possibly empty map of fullpath:record.
+   * @throws IOException for any IO Operation that wasn't ignored.
+   */
+  public static Map<String, ServiceRecord> extractServiceRecords(
+      RegistryOperations operations,
+      String parentpath,
+      Collection<RegistryPathStatus> stats) throws IOException {
+    Map<String, ServiceRecord> results = new HashMap<String, ServiceRecord>(stats.size());
+    for (RegistryPathStatus stat : stats) {
+      if (stat.size > ServiceRecordHeader.getLength()) {
+        // maybe has data
+        String path = join(parentpath, stat.path);
+        try {
+          ServiceRecord serviceRecord = operations.resolve(path);
+          results.put(path, serviceRecord);
+        } catch (EOFException ignored) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("data too short for {}", path);
+          }
+        } catch (InvalidRecordException record) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Invalid record at {}", path);
+          }
+        } catch (NoRecordException record) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("No record at {}", path);
+          }
+        }
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Extract all service records under a list of stat operations...this
+   * non-atomic action skips entries that are too short or simply not matching.
+   * <p>
+   * @param operations operation support for fetches
+   * @param parentpath path of the parent of all the entries 
+   * @param stats a map of name:value mappings.
+   * @return a possibly empty map of fullpath:record.
+   * @throws IOException for any IO Operation that wasn't ignored.
+   */
+  public static Map<String, ServiceRecord> extractServiceRecords(
+      RegistryOperations operations,
+      String parentpath,
+      Map<String , RegistryPathStatus> stats) throws IOException {
+    return extractServiceRecords(operations, parentpath, stats.values());
+  }
+
+  
+  /**
+   * Extract all service records under a list of stat operations...this
+   * non-atomic action skips entries that are too short or simply not matching.
+   * <p>
+   * @param operations operation support for fetches
+   * @param parentpath path of the parent of all the entries 
+   * @param stats a map of name:value mappings.
+   * @return a possibly empty map of fullpath:record.
+   * @throws IOException for any IO Operation that wasn't ignored.
+   */
+  public static Map<String, ServiceRecord> extractServiceRecords(
+      RegistryOperations operations,
+      String parentpath) throws IOException {
+    return 
+    extractServiceRecords(operations,
+        parentpath,
+        statChildren(operations, parentpath).values());
+  }
+
+  
+  
+  /**
+   * Static instance of service record marshalling
+   */
+  public static class ServiceRecordMarshal extends JsonSerDeser<ServiceRecord> {
+    public ServiceRecordMarshal() {
+      super(ServiceRecord.class, ServiceRecordHeader.getData());
+    }
+  }
 }

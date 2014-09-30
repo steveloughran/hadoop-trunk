@@ -26,9 +26,9 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 
-import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils.*;
 
+import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
@@ -64,8 +64,8 @@ public class RegistryOperationsService extends CuratorService
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistryOperationsService.class);
 
-  private final RecordOperations.ServiceRecordMarshal serviceRecordMarshal
-      = new RecordOperations.ServiceRecordMarshal();
+  private final RegistryOperationUtils.ServiceRecordMarshal serviceRecordMarshal
+      = new RegistryOperationUtils.ServiceRecordMarshal();
 
   public RegistryOperationsService(String name) {
     this(name, null);

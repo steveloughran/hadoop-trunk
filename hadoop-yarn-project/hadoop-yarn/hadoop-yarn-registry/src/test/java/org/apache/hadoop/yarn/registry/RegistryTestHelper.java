@@ -22,7 +22,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.binding.RecordOperations;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils;
 import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
@@ -69,8 +69,8 @@ public class RegistryTestHelper extends Assert {
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistryTestHelper.class);
   public static final String KTUTIL = "ktutil";
-  private static final RecordOperations.ServiceRecordMarshal recordMarshal =
-      new RecordOperations.ServiceRecordMarshal();
+  private static final RegistryOperationUtils.ServiceRecordMarshal recordMarshal =
+      new RegistryOperationUtils.ServiceRecordMarshal();
 
   /**
    * Assert the path is valid by ZK rules

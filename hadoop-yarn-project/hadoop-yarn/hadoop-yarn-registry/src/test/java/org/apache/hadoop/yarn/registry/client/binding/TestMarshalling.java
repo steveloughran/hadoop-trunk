@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
-import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecordHeader;
@@ -39,11 +38,11 @@ public class TestMarshalling extends Assert {
   public final Timeout testTimeout = new Timeout(10000);
   @Rule
   public TestName methodName = new TestName();
-  private static RecordOperations.ServiceRecordMarshal marshal;
+  private static RegistryOperationUtils.ServiceRecordMarshal marshal;
 
   @BeforeClass
   public static void setupClass() {
-    marshal = new RecordOperations.ServiceRecordMarshal();
+    marshal = new RegistryOperationUtils.ServiceRecordMarshal();
   }
 
   @Test

@@ -72,4 +72,10 @@ public interface RegistryInternalConstants {
    * String to use as the prefix when declaring a new auth provider: {@value}.
    */
   String ZOOKEEPER_AUTH_PROVIDER = "zookeeper.authProvider";
+  
+  /**
+   * This the Hadoop environment variable which propagates the identity
+   * of a user in an insecure cluster
+   */
+  String HADOOP_USER_NAME = "HADOOP_USER_NAME";
 }
