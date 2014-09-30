@@ -68,7 +68,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     RegistryPathStatus stat = operations.stat(ENTRY_PATH);
     assertTrue(stat.size > 0);
     assertTrue(stat.time > 0);
-    assertEquals(ENTRY_PATH, stat.path);
+    assertEquals(NAME, stat.path);
   }
 
   @Test
@@ -82,9 +82,11 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     assertEquals(stat, statuses.get(0));
 
     Map<String, ServiceRecord> records =
-        RecordOperations.extractServiceRecords(operations, statuses);
+        RecordOperations.extractServiceRecords(operations,
+            PARENT_PATH, statuses);
     assertEquals(1, records.size());
     ServiceRecord record = records.get(ENTRY_PATH);
+    assertNotNull(record);
     assertMatches(written, record);
   }
 
@@ -265,9 +267,9 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     operations.create(r2path, r2, 0);
 
     RegistryPathStatus r1stat = operations.stat(r1path);
-    assertEquals(r1path, r1stat.path);
+    assertEquals("r1", r1stat.path);
     RegistryPathStatus r2stat = operations.stat(r2path);
-    assertEquals(r2path, r2stat.path);
+    assertEquals("r2", r2stat.path);
     assertNotEquals(r1stat, r2stat);
 
     // listings now
@@ -291,7 +293,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     for (RegistryPathStatus status : statList) {
       stats.put(status.path, status);
     }
-    assertEquals(r1stat, stats.get(r1path));
-    assertEquals(r2stat, stats.get(r2path));
+    assertEquals(r1stat, stats.get("r1"));
+    assertEquals(r2stat, stats.get("r2"));
   }  
 }

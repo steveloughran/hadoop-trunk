@@ -26,6 +26,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryOperationUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoPathPermissionsException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
@@ -437,7 +438,9 @@ public class RegistryAdminService extends RegistryOperationsService {
 
     // now go through the children
     for (RegistryPathStatus status : entries) {
-      deleteOps += purge(status.path,
+      String childname = status.path;
+      String childpath = RegistryPathUtils.join(path, childname);
+      deleteOps += purge(childpath,
           selector,
           purgePolicy,
           callback);

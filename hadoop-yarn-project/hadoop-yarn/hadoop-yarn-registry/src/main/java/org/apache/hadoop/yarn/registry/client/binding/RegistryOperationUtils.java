@@ -136,7 +136,9 @@ public class RegistryOperationUtils {
       RegistryOperations registryOperations,
       String path) throws IOException {
     List<RegistryPathStatus> stats = registryOperations.listFull(path);
-    return RecordOperations.extractServiceRecords(registryOperations, stats);
+    return RecordOperations.extractServiceRecords(registryOperations,
+        path,
+        stats);
   }
 
   /**

@@ -34,7 +34,7 @@ import org.codehaus.jackson.map.annotate.JsonSerialize;
 public final class RegistryPathStatus {
 
   /**
-   * Absolute path in the registry to this entry
+   * Short path in the registry to this entry
    */
   public final String path;
 

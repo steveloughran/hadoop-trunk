@@ -56,34 +56,36 @@ public class RecordOperations {
    * Extract all service records under a list of stat operations...this
    * skips entries that are too short or simply not matching
    * @param operations operation support for fetches
+   * @param parentpath path of the parent of all the entries 
    * @param stats list of stat results
-   * @return a possibly empty list
+   * @return a possibly empty map of fullpath:record.
    * @throws IOException for any IO Operation that wasn't ignored.
    */
   public static Map<String, ServiceRecord> extractServiceRecords(
       RegistryOperations operations,
+      String parentpath,
       List<RegistryPathStatus> stats) throws IOException {
     Map<String, ServiceRecord> results = new HashMap<String, ServiceRecord>(stats.size());
     for (RegistryPathStatus stat : stats) {
       if (stat.size > ServiceRecordHeader.getLength()) {
         // maybe has data
+        String path = RegistryPathUtils.join(parentpath, stat.path);
         try {
-          ServiceRecord serviceRecord = operations.resolve(stat.path);
-          results.put(stat.path, serviceRecord);
+          ServiceRecord serviceRecord = operations.resolve(path);
+          results.put(path, serviceRecord);
         } catch (EOFException ignored) {
           if (LOG.isDebugEnabled()) {
-            LOG.debug("data too short for {}", stat.path);
+            LOG.debug("data too short for {}", path);
           }
         } catch (InvalidRecordException record) {
           if (LOG.isDebugEnabled()) {
-            LOG.debug("Invalid record at {}", stat.path);
+            LOG.debug("Invalid record at {}", path);
           }
         } catch (NoRecordException record) {
           if (LOG.isDebugEnabled()) {
-            LOG.debug("Invalid record at {}", stat.path);
+            LOG.debug("No record at {}", path);
           }
         }
-
       }
     }
     return results;

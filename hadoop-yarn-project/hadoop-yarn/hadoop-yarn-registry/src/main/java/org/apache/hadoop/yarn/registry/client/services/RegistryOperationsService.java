@@ -147,9 +147,10 @@ public class RegistryOperationsService extends CuratorService
       IOException {
     validatePath(path);
     Stat stat = zkStat(path);
-    
+
+    String name = RegistryPathUtils.lastPathEntry(path);
     RegistryPathStatus status = new RegistryPathStatus(
-        path,
+        name,
         stat.getCtime(),
         stat.getDataLength(),
         stat.getNumChildren());

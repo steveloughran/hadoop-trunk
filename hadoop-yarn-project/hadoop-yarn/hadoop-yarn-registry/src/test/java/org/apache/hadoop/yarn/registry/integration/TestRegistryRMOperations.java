@@ -241,13 +241,13 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
 
     operations.mknode(USERPATH, false);
     operations.create(appPath, webapp, CreateFlags.OVERWRITE);
-    String components = appPath + RegistryConstants.SUBPATH_COMPONENTS;
-    operations.mknode(components, false);
+    String componentsPath = appPath + RegistryConstants.SUBPATH_COMPONENTS;
+    operations.mknode(componentsPath, false);
     String dns1 = RegistryPathUtils.encodeYarnID(cid1);
-    String dns1path = components + dns1;
+    String dns1path = componentsPath + dns1;
     operations.create(dns1path, comp1, CreateFlags.CREATE);
     String dns2 = RegistryPathUtils.encodeYarnID(cid2);
-    String dns2path = components + dns2;
+    String dns2path = componentsPath + dns2;
     operations.create(dns2path, comp2, CreateFlags.CREATE);
 
     ZKPathDumper pathDumper = registry.dumpPath(false);
@@ -261,10 +261,11 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     assertEquals("Persistence policies on resolved entry",
         PersistencePolicies.CONTAINER, dns1resolved.yarn_persistence);
 
-    List<RegistryPathStatus> componentStats = operations.listFull(components);
+    List<RegistryPathStatus> componentStats = operations.listFull(componentsPath);
     assertEquals(2, componentStats.size());
     Map<String, ServiceRecord> records =
-        RecordOperations.extractServiceRecords(operations, componentStats);
+        RecordOperations.extractServiceRecords(operations,
+            componentsPath, componentStats);
     assertEquals(2, records.size());
     ServiceRecord retrieved1 = records.get(dns1path);
     logRecord(retrieved1.yarn_id, retrieved1);
@@ -272,12 +273,14 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     assertEquals(PersistencePolicies.CONTAINER, retrieved1.yarn_persistence);
 
     // create a listing under components/
-    operations.mknode(components + "subdir", false);
+    operations.mknode(componentsPath + "subdir", false);
     List<RegistryPathStatus> componentStatsUpdated =
-        operations.listFull(components);
+        operations.listFull(componentsPath);
     assertEquals(3, componentStatsUpdated.size());
     Map<String, ServiceRecord> recordsUpdated =
-        RecordOperations.extractServiceRecords(operations, componentStats);
+        RecordOperations.extractServiceRecords(operations,
+            componentsPath,
+            componentStats);
     assertEquals(2, recordsUpdated.size());
 
     // now do some deletions.

@@ -62,7 +62,6 @@ public class TestRegistryPathUtils extends Assert {
     assertEquals("Conversion of " + in, expected, out);
   }
 
-
   @Test
   public void testPaths() throws Throwable {
     assertCreatedPathEquals("/", "/", "");
@@ -131,6 +130,14 @@ public class TestRegistryPathUtils extends Assert {
     assertEquals("/a/b", parentOf("/a/b/c"));
   }
 
+  @Test
+  public void testLastPathEntry() throws Throwable {
+    assertEquals("",lastPathEntry("/"));  
+    assertEquals("",lastPathEntry("//"));  
+    assertEquals("c",lastPathEntry("/a/b/c"));  
+    assertEquals("c",lastPathEntry("/a/b/c/"));  
+  }
+  
   @Test(expected = PathNotFoundException.class)
   public void testParentOfRoot() throws Throwable {
     parentOf("/");

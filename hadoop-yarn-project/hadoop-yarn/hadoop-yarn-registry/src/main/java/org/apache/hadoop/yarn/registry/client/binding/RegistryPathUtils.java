@@ -155,6 +155,23 @@ public class RegistryPathUtils {
   }
 
   /**
+   * Get the last entry in a path; for an empty path
+   * returns "". The split logic is that of
+   * {@link #split(String)}
+   * @param path path of operation
+   * @return the last path entry or "" if none.
+   */
+  public static String lastPathEntry(String path) {
+    List<String> splits = split(path);
+    if (splits.isEmpty()) {
+      // empty path. Return ""
+      return "";
+    } else {
+      return splits.get(splits.size() - 1);
+    }
+  }
+
+  /**
    * Get the parent of a path
    * @param path path to look at
    * @return the parent path
