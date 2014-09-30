@@ -210,8 +210,8 @@ public class ServiceRecord implements Cloneable {
   public String toString() {
     final StringBuilder sb =
         new StringBuilder("ServiceRecord{");
-    sb.append("id='").append(yarn_id).append('\'');
-    sb.append(", persistence=").append(yarn_persistence);
+    sb.append("yarn_id='").append(yarn_id).append('\'');
+    sb.append(", yarn_persistence=").append(yarn_persistence);
     sb.append(", description='").append(description).append('\'');
     sb.append(", external endpoints: {");
     for (Endpoint endpoint : external) {
