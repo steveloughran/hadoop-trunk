@@ -26,7 +26,6 @@ import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameExceptio
 import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
 import org.apache.zookeeper.common.PathUtils;
 
-import java.io.IOException;
 import java.net.IDN;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,8 +39,11 @@ import java.util.regex.Pattern;
 @InterfaceStability.Evolving
 public class RegistryPathUtils {
 
-  private static final Pattern HOSTNAME =
-      Pattern.compile(RegistryInternalConstants.HOSTNAME_PATTERN);
+  /**
+   * Compiled down pattern to validate single entries in the path
+   */
+  private static final Pattern PATH_ENTRY_VALIDATION_PATTERN =
+      Pattern.compile(RegistryInternalConstants.VALID_PATH_ENTRY_PATTERN);
 
   /**
    * Validate ZK path with the path itself included in
@@ -72,7 +74,7 @@ public class RegistryPathUtils {
       InvalidPathnameException {
     List<String> splitpath = split(path);
     for (String fragment : splitpath) {
-      if (!HOSTNAME.matcher(fragment).matches()) {
+      if (!PATH_ENTRY_VALIDATION_PATTERN.matcher(fragment).matches()) {
         throw new InvalidPathnameException(path,
             "Invalid Path element \"" + fragment + "\"");
       }

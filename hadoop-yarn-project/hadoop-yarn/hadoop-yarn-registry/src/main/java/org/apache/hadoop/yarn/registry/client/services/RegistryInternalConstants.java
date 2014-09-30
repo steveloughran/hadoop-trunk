@@ -29,10 +29,17 @@ import org.apache.zookeeper.ZooDefs;
 public interface RegistryInternalConstants {
 
   /**
-   * Pattern of a hostname : {@value}.
+   * Pattern of a single entry in the registry path. : {@value}.
+   * <p>
+   * This is what constitutes a valid hostname according to current RFCs.
+   * Alphanumeric first two and last one digit, alphanumeric
+   * and hyphens allowed in between.
+   * <p>
+   * No upper limit is placed on the size of an entry.
    */
-  String HOSTNAME_PATTERN =
+  String VALID_PATH_ENTRY_PATTERN =
       "([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])";
+  
   /**
    * Permissions for readers: {@value}.
    */
