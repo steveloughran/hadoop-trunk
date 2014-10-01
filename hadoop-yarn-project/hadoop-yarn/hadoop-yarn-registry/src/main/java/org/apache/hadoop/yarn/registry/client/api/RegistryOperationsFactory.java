@@ -60,6 +60,7 @@ public final class RegistryOperationsFactory {
    * @throws ServiceStateException on any failure to initialize
    */
   public static RegistryOperations createInstance(String name, Configuration conf) {
+    Preconditions.checkArgument(conf != null, "Null configuration");
     RegistryOperationsClient operations =
         new RegistryOperationsClient(name);
     operations.init(conf);
@@ -76,6 +77,7 @@ public final class RegistryOperationsFactory {
    * @throws ServiceStateException on any failure to initialize
    */
   public static RegistryOperations createAnonymousInstance(Configuration conf) {
+    Preconditions.checkArgument(conf != null, "Null configuration");
     conf.set(KEY_REGISTRY_CLIENT_AUTH, REGISTRY_CLIENT_AUTH_ANONYMOUS);
     return createInstance("AnonymousRegistryOperations", conf);
   }
@@ -94,6 +96,7 @@ public final class RegistryOperationsFactory {
    */
   public static RegistryOperations createKerberosInstance(Configuration conf,
       String jaasContext) {
+    Preconditions.checkArgument(conf != null, "Null configuration");
     conf.set(KEY_REGISTRY_CLIENT_AUTH, REGISTRY_CLIENT_AUTH_KERBEROS);
     conf.set(KEY_REGISTRY_CLIENT_JAAS_CONTEXT, jaasContext);
     return createInstance("KerberosRegistryOperations", conf);
@@ -118,6 +121,7 @@ public final class RegistryOperationsFactory {
       String password) {
     Preconditions.checkArgument(!StringUtils.isEmpty(id), "empty Id");
     Preconditions.checkArgument(!StringUtils.isEmpty(password), "empty Password");
+    Preconditions.checkArgument(conf != null, "Null configuration");
     conf.set(KEY_REGISTRY_CLIENT_AUTH, REGISTRY_CLIENT_AUTH_DIGEST);
     conf.set(KEY_REGISTRY_CLIENT_AUTHENTICATION_ID, id);
     conf.set(KEY_REGISTRY_CLIENT_AUTHENTICATION_PASSWORD, password);
