@@ -20,9 +20,9 @@ package org.apache.hadoop.yarn.registry.secure;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.ServiceOperations;
-import org.apache.hadoop.yarn.registry.client.services.zk.ZKPathDumper;
-import org.apache.hadoop.yarn.registry.client.services.zk.CuratorService;
-import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
+import org.apache.hadoop.yarn.registry.client.impl.zk.ZKPathDumper;
+import org.apache.hadoop.yarn.registry.client.impl.zk.CuratorService;
+import org.apache.hadoop.yarn.registry.client.impl.zk.RegistrySecurity;
 import org.apache.zookeeper.CreateMode;
 import org.junit.After;
 import org.junit.Before;

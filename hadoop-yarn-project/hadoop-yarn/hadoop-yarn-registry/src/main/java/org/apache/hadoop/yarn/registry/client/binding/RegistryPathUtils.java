@@ -23,7 +23,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
-import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
+import org.apache.hadoop.yarn.registry.client.impl.zk.RegistryInternalConstants;
 import org.apache.zookeeper.common.PathUtils;
 
 import java.net.IDN;

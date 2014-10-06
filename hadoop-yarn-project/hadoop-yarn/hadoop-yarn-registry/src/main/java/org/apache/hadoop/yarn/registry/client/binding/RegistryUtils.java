@@ -30,7 +30,7 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
-import org.apache.hadoop.yarn.registry.client.services.RegistryInternalConstants;
+import org.apache.hadoop.yarn.registry.client.impl.zk.RegistryInternalConstants;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecordHeader;

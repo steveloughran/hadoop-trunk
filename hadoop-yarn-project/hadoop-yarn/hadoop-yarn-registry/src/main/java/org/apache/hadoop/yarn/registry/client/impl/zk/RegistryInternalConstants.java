@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.services;
+package org.apache.hadoop.yarn.registry.client.impl.zk;
 
 import org.apache.zookeeper.ZooDefs;
 

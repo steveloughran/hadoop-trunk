@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.services.zk;
+package org.apache.hadoop.yarn.registry.client.impl.zk;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -44,8 +44,6 @@ import org.apache.hadoop.yarn.registry.client.exceptions.AuthenticationFailedExc
 import org.apache.hadoop.yarn.registry.client.exceptions.NoChildrenForEphemeralsException;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoPathPermissionsException;
 import org.apache.hadoop.yarn.registry.client.exceptions.RegistryIOException;
-import org.apache.hadoop.yarn.registry.client.services.BindingInformation;
-import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooDefs;

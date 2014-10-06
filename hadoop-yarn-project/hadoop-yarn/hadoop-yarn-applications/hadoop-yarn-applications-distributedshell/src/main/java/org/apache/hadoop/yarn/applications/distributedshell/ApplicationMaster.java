@@ -94,11 +94,11 @@ import org.apache.hadoop.yarn.client.api.async.NMClientAsync;
 import org.apache.hadoop.yarn.client.api.async.impl.NMClientAsyncImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.registry.client.api.BindFlags;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
-import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
-import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
+import org.apache.hadoop.yarn.registry.client.impl.zk.RegistryOperationsService;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
@@ -609,20 +609,20 @@ public class ApplicationMaster {
               serviceName);
       registryOperations.mknode(RegistryPathUtils.parentOf(path), true);
       // app attempt entry
-      registryOperations.create(path + "-attempt", serviceRecord,
-          CreateFlags.OVERWRITE);
+      registryOperations.bind(path + "-attempt", serviceRecord,
+          BindFlags.OVERWRITE);
       LOG.info("Registered " + serviceRecord + " at " + path );
 
       serviceRecord.yarn_id = appId;
       serviceRecord.yarn_persistence = PersistencePolicies.APPLICATION;
-      registryOperations.create(path + "-app", serviceRecord,
-          CreateFlags.OVERWRITE);
+      registryOperations.bind(path + "-app", serviceRecord,
+          BindFlags.OVERWRITE);
 
       // register one that is not deleted
       serviceRecord.yarn_id = "";
       serviceRecord.yarn_persistence = PersistencePolicies.PERMANENT;
-      registryOperations.create(path + "-permanent", serviceRecord,
-          CreateFlags.OVERWRITE);
+      registryOperations.bind(path + "-permanent", serviceRecord,
+          BindFlags.OVERWRITE);
     }
 
     // Dump out information about cluster capability as seen by the

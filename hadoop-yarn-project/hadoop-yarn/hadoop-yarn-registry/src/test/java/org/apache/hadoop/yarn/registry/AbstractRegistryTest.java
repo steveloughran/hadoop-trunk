@@ -84,7 +84,7 @@ public class AbstractRegistryTest extends AbstractZKRegistryTest {
     ServiceRecord record = buildExampleServiceEntry(persistence);
 
     registry.mknode(RegistryPathUtils.parentOf(path), true);
-    operations.create(path, record, createFlags);
+    operations.bind(path, record, createFlags);
     return record;
   }
 

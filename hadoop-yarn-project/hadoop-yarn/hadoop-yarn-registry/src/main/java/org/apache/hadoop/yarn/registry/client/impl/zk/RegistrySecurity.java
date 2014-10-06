@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.services.zk;
+package org.apache.hadoop.yarn.registry.client.impl.zk;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
@@ -50,7 +50,7 @@ import java.util.ListIterator;
 import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import static org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions.*;
+import static org.apache.hadoop.yarn.registry.client.impl.zk.ZookeeperConfigOptions.*;
 import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
 
 /**
@@ -68,6 +68,7 @@ import static org.apache.hadoop.yarn.registry.client.api.RegistryConstants.*;
  */
 
 public class RegistrySecurity extends AbstractService {
+  
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistrySecurity.class);
 

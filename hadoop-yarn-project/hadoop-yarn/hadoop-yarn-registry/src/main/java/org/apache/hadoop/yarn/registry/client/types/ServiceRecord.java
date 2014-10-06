@@ -64,12 +64,12 @@ public class ServiceRecord implements Cloneable {
   private Map<String, Object> otherAttributes = new HashMap<String, Object>(4);
 
   /**
-   * List of endpoints intended to of use to external callers
+   * List of endpoints intended for use to external callers
    */
   public List<Endpoint> external = new ArrayList<Endpoint>();
 
   /**
-   * List of internal endpoints
+   * List of endpoints for use <i>within</i> an application.
    */
   public List<Endpoint> internal = new ArrayList<Endpoint>();
 

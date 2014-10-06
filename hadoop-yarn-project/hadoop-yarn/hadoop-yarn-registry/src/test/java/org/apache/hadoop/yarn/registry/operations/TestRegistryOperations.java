@@ -22,7 +22,7 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.yarn.registry.AbstractRegistryTest;
-import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
+import org.apache.hadoop.yarn.registry.client.api.BindFlags;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
@@ -148,7 +148,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     record.yarn_id = "testPutNoParent";
     String path = "/path/without/parent";
     try {
-      operations.create(path, record, 0);
+      operations.bind(path, record, 0);
       // didn't get a failure
       // trouble
       RegistryPathStatus stat = operations.stat(path);
@@ -163,7 +163,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     String path = "/path/with/minimal";
     operations.mknode(path, true);
     ServiceRecord record = new ServiceRecord();
-    operations.create(path, record, CreateFlags.OVERWRITE);
+    operations.bind(path, record, BindFlags.OVERWRITE);
     ServiceRecord resolve = operations.resolve(path);
     assertMatches(record, resolve);
 
@@ -174,7 +174,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     ServiceRecord record = new ServiceRecord();
     record.yarn_id = "testPutNoParent";
     String path = "/path/without/parent";
-    operations.create(path, record, 0);
+    operations.bind(path, record, 0);
   }
 
   @Test
@@ -223,7 +223,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     ServiceRecord resolved1 = operations.resolve(ENTRY_PATH);
     resolved1.description = "resolved1";
     try {
-      operations.create(ENTRY_PATH, resolved1, 0);
+      operations.bind(ENTRY_PATH, resolved1, 0);
       fail("overwrite succeeded when it should have failed");
     } catch (FileAlreadyExistsException expected) {
       // expected
@@ -232,7 +232,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     // verify there's no changed
     ServiceRecord resolved2 = operations.resolve(ENTRY_PATH);
     assertMatches(written, resolved2);
-    operations.create(ENTRY_PATH, resolved1, CreateFlags.OVERWRITE);
+    operations.bind(ENTRY_PATH, resolved1, BindFlags.OVERWRITE);
     ServiceRecord resolved3 = operations.resolve(ENTRY_PATH);
     assertMatches(resolved1, resolved3);
   }
@@ -245,7 +245,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
         PersistencePolicies.CONTAINER);
 
     operations.mknode(RegistryPathUtils.parentOf(path), true);
-    operations.create(path, written, CreateFlags.CREATE);
+    operations.bind(path, written, BindFlags.CREATE);
     ServiceRecord resolved = operations.resolve(path);
     validateEntry(resolved);
     assertMatches(written, resolved);
@@ -266,9 +266,9 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     String path = USERPATH + SC_HADOOP + "/listing" ;
     operations.mknode(path, true);
     String r1path = path + "/r1";
-    operations.create(r1path, r1, 0);
+    operations.bind(r1path, r1, 0);
     String r2path = path + "/r2";
-    operations.create(r2path, r2, 0);
+    operations.bind(r2path, r2, 0);
 
     RegistryPathStatus r1stat = operations.stat(r1path);
     assertEquals("r1", r1stat.path);

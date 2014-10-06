@@ -16,21 +16,18 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.services;
+package org.apache.hadoop.yarn.registry.client.impl.zk;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
+import org.apache.hadoop.yarn.registry.client.api.BindFlags;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 
 import org.apache.hadoop.yarn.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidPathnameException;
-import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
-import org.apache.hadoop.yarn.registry.client.services.zk.CuratorService;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.zookeeper.CreateMode;
@@ -43,7 +40,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * The YARN registry operations service.
+ * The Registry operations service.
  * <p>
  * This service implements the {@link RegistryOperations}
  * API by mapping the commands to zookeeper operations, and translating
@@ -96,37 +93,27 @@ public class RegistryOperationsService extends CuratorService
   }
   
   @Override
-  public boolean mknode(String path, boolean createParents) throws
-      PathNotFoundException,
-      InvalidPathnameException,
-      IOException {
+  public boolean mknode(String path, boolean createParents) throws IOException {
     validatePath(path);
     return zkMkPath(path, CreateMode.PERSISTENT, createParents, getClientAcls());
   }
 
   @Override
-  public void create(String path,
+  public void bind(String path,
       ServiceRecord record,
-      int createFlags) throws
-      PathNotFoundException,
-      FileAlreadyExistsException,
-      InvalidPathnameException,
-      IOException {
+      int flags) throws IOException {
     Preconditions.checkArgument(record != null, "null record");
     validatePath(path);
-    LOG.info("Registered at {} : {}", path, record);
+    LOG.info("Bound at {} : {}", path, record);
 
     CreateMode mode = CreateMode.PERSISTENT;
     byte[] bytes = serviceRecordMarshal.toByteswithHeader(record);
     zkSet(path, mode, bytes, getClientAcls(),
-        ((createFlags & CreateFlags.OVERWRITE) != 0));
+        ((flags & BindFlags.OVERWRITE) != 0));
   }
 
   @Override
-  public ServiceRecord resolve(String path) throws
-      PathNotFoundException,
-      InvalidPathnameException,
-      IOException {
+  public ServiceRecord resolve(String path) throws IOException {
     byte[] bytes = zkRead(path);
     return serviceRecordMarshal.fromBytesWithHeader(path, bytes);
   }
@@ -138,10 +125,7 @@ public class RegistryOperationsService extends CuratorService
   }
 
   @Override
-  public RegistryPathStatus stat(String path) throws
-      PathNotFoundException,
-      InvalidPathnameException,
-      IOException {
+  public RegistryPathStatus stat(String path) throws IOException {
     validatePath(path);
     Stat stat = zkStat(path);
 
@@ -158,20 +142,13 @@ public class RegistryOperationsService extends CuratorService
   }
 
   @Override
-  public List<String> list(String path) throws
-      PathNotFoundException,
-      InvalidPathnameException,
-      IOException {
+  public List<String> list(String path) throws IOException {
     validatePath(path);
     return zkList(path);
   }
 
   @Override
-  public void delete(String path, boolean recursive) throws
-      PathNotFoundException,
-      PathIsNotEmptyDirectoryException,
-      InvalidPathnameException,
-      IOException {
+  public void delete(String path, boolean recursive) throws IOException {
     validatePath(path);
     zkDelete(path, recursive, null);
   }

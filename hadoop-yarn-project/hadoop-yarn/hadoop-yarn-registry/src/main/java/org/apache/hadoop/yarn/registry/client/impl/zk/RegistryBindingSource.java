@@ -16,26 +16,21 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.api;
+package org.apache.hadoop.yarn.registry.client.impl.zk;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Combinable Flags to use when creating a service entry.
+ * Interface which can be implemented by a registry binding source
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public interface CreateFlags {
+public interface RegistryBindingSource {
 
   /**
-   * Create the entry.. This is just "0" and can be "or"ed with anything
+   * Supply the binding information for this registry
+   * @return the binding information data
    */
-  int CREATE = 0;
-  
-  /**
-   * The entry should be created even if an existing entry is there.
-   */
-  int OVERWRITE = 1;
-
+  BindingInformation supplyBindingInformation();
 }

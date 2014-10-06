@@ -16,13 +16,12 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.services;
+package org.apache.hadoop.yarn.registry.client.impl;
 
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperService;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.services;
+package org.apache.hadoop.yarn.registry.client.impl;
 
 import org.apache.curator.framework.api.CuratorEvent;
 import org.apache.hadoop.conf.Configuration;
@@ -25,9 +25,8 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.registry.AbstractZKRegistryTest;
-import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.services.zk.CuratorService;
-import org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity;
+import org.apache.hadoop.yarn.registry.client.impl.zk.CuratorService;
+import org.apache.hadoop.yarn.registry.client.impl.zk.RegistrySecurity;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.junit.After;

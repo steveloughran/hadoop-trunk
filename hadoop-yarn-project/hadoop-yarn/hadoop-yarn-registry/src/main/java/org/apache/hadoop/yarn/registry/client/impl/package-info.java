@@ -23,4 +23,4 @@
  * the {@link org.apache.hadoop.yarn.registry.client.api.RegistryOperations}
  * API.
  */
-package org.apache.hadoop.yarn.registry.client.services;
+package org.apache.hadoop.yarn.registry.client.impl;

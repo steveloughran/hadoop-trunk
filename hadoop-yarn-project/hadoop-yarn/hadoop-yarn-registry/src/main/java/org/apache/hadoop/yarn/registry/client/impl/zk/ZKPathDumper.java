@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.services.zk;
+package org.apache.hadoop.yarn.registry.client.impl.zk;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;

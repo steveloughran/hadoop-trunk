@@ -21,7 +21,7 @@ package org.apache.hadoop.yarn.server;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
+import org.apache.hadoop.yarn.registry.client.impl.zk.RegistryOperationsService;
 import org.apache.hadoop.yarn.registry.server.services.MicroZookeeperService;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.registry.RMRegistryService;

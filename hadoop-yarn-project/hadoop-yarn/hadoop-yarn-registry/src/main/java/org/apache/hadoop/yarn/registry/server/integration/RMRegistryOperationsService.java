@@ -26,7 +26,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.registry.client.services.RegistryBindingSource;
+import org.apache.hadoop.yarn.registry.client.impl.zk.RegistryBindingSource;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.server.services.DeleteCompletionCallback;
 import org.apache.hadoop.yarn.registry.server.services.RegistryAdminService;

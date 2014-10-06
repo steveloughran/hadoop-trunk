@@ -16,21 +16,26 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.services;
+package org.apache.hadoop.yarn.registry.client.impl.zk;
 
+import org.apache.curator.ensemble.EnsembleProvider;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Interface which can be implemented by a registry binding source
+ * Binding information provided by a {@link RegistryBindingSource}
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public interface RegistryBindingSource {
+public class BindingInformation {
 
   /**
-   * Supply the binding information for this registry
-   * @return the binding information data
+   * The Curator Ensemble Provider
    */
-  BindingInformation supplyBindingInformation();
+  public EnsembleProvider ensembleProvider;
+
+  /**
+   * Any information that may be useful for diagnostics
+   */
+  public String description;
 }

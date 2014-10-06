@@ -21,12 +21,12 @@ package org.apache.hadoop.yarn.registry.integration;
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.yarn.registry.AbstractRegistryTest;
-import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
+import org.apache.hadoop.yarn.registry.client.api.BindFlags;
 import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
-import org.apache.hadoop.yarn.registry.client.services.zk.ZKPathDumper;
-import org.apache.hadoop.yarn.registry.client.services.CuratorEventCatcher;
+import org.apache.hadoop.yarn.registry.client.impl.zk.ZKPathDumper;
+import org.apache.hadoop.yarn.registry.client.impl.CuratorEventCatcher;
 import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
@@ -111,7 +111,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     written.yarn_id = "testAsyncPurgeEntry_attempt_001";
 
     operations.mknode(RegistryPathUtils.parentOf(path), true);
-    operations.create(path, written, 0);
+    operations.bind(path, written, 0);
 
     ZKPathDumper dump = registry.dumpPath(false);
     CuratorEventCatcher events = new CuratorEventCatcher();
@@ -152,7 +152,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     written.yarn_id = "testAsyncPurgeEntry_attempt_001";
 
     operations.mknode(RegistryPathUtils.parentOf(path), true);
-    operations.create(path, written, 0);
+    operations.bind(path, written, 0);
 
     ZKPathDumper dump = registry.dumpPath(false);
 
@@ -200,7 +200,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
         PersistencePolicies.CONTAINER);
 
     operations.mknode(RegistryPathUtils.parentOf(path), true);
-    operations.create(path, written, CreateFlags.CREATE);
+    operations.bind(path, written, BindFlags.CREATE);
     ServiceRecord resolved = operations.resolve(path);
     validateEntry(resolved);
     assertMatches(written, resolved);
@@ -240,15 +240,15 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
         inetAddrEndpoint("jmx", "JMX", "rack1server28", 35882));
 
     operations.mknode(USERPATH, false);
-    operations.create(appPath, webapp, CreateFlags.OVERWRITE);
+    operations.bind(appPath, webapp, BindFlags.OVERWRITE);
     String componentsPath = appPath + RegistryConstants.SUBPATH_COMPONENTS;
     operations.mknode(componentsPath, false);
     String dns1 = RegistryPathUtils.encodeYarnID(cid1);
     String dns1path = componentsPath + dns1;
-    operations.create(dns1path, comp1, CreateFlags.CREATE);
+    operations.bind(dns1path, comp1, BindFlags.CREATE);
     String dns2 = RegistryPathUtils.encodeYarnID(cid2);
     String dns2path = componentsPath + dns2;
-    operations.create(dns2path, comp2, CreateFlags.CREATE);
+    operations.bind(dns2path, comp2, BindFlags.CREATE);
 
     ZKPathDumper pathDumper = registry.dumpPath(false);
     LOG.info(pathDumper.toString());
@@ -343,8 +343,8 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
         "container",
         PersistencePolicies.CONTAINER, null);
 
-    operations.create("/app", app, CreateFlags.OVERWRITE);
-    operations.create("/app/container", container, CreateFlags.OVERWRITE);
+    operations.bind("/app", app, BindFlags.OVERWRITE);
+    operations.bind("/app/container", container, BindFlags.OVERWRITE);
 
     try {
       int p = purge("/",

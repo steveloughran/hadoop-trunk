@@ -39,7 +39,7 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.registry.client.api.CreateFlags;
+import org.apache.hadoop.yarn.registry.client.api.BindFlags;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperations;
 import org.apache.hadoop.yarn.registry.client.api.RegistryOperationsFactory;
 import org.apache.hadoop.yarn.registry.client.exceptions.AuthenticationFailedException;
@@ -324,7 +324,7 @@ public class RegistryCli extends Configured implements Tool {
 			return -1;
 
 		try {
-			registry.create(argsList.get(1), sr, CreateFlags.OVERWRITE);
+			registry.bind(argsList.get(1), sr, BindFlags.OVERWRITE);
 			return 0;
     } catch (Exception e) {
       syserr.println(analyzeException("bind", e, argsList));

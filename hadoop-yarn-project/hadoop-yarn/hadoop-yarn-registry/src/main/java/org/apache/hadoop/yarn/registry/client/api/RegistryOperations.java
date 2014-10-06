@@ -63,17 +63,17 @@ public interface RegistryOperations extends Service {
       IOException;
 
   /**
-   * Set a service record to an entry
+   * Bind a path in the registry to a service record
    * @param path path to service record
    * @param record service record service record to create/update
-   * @param createFlags creation flags
+   * @param flags bind flags
    * @throws PathNotFoundException the parent path does not exist
    * @throws FileAlreadyExistsException path exists but create flags
    * do not include "overwrite"
    * @throws InvalidPathnameException path name is invalid.
    * @throws IOException Any other IO Exception.
    */
-  void create(String path, ServiceRecord record, int createFlags)
+  void bind(String path, ServiceRecord record, int flags)
       throws PathNotFoundException,
       FileAlreadyExistsException,
       InvalidPathnameException,

@@ -16,26 +16,26 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.services;
+package org.apache.hadoop.yarn.registry.client.api;
 
-import org.apache.curator.ensemble.EnsembleProvider;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Binding information provided by a {@link RegistryBindingSource}
+ * Combinable Flags to use when creating a service entry.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public class BindingInformation {
+public interface BindFlags {
 
   /**
-   * The Curator Ensemble Provider
+   * Create the entry.. This is just "0" and can be "or"ed with anything
    */
-  public EnsembleProvider ensembleProvider;
-
+  int CREATE = 0;
+  
   /**
-   * Any information that may be useful for diagnostics
+   * The entry should be created even if an existing entry is there.
    */
-  public String description;
+  int OVERWRITE = 1;
+
 }

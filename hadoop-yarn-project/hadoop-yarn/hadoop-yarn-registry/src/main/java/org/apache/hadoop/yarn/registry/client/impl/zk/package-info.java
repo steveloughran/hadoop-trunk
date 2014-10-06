@@ -22,18 +22,18 @@
  * This package contains the low-level bindings to Curator and Zookeeper,
  * including everything related to registry security.
  * <p>
- * The class {@link org.apache.hadoop.yarn.registry.client.services.zk.CuratorService}
+ * The class {@link org.apache.hadoop.yarn.registry.client.impl.zk.CuratorService}
  * is a YARN service which offers access to a Zookeeper instance via
  * Apache Curator.
  * <p>
- * The {@link org.apache.hadoop.yarn.registry.client.services.zk.RegistrySecurity}
+ * The {@link org.apache.hadoop.yarn.registry.client.impl.zk.RegistrySecurity}
  * implements the security support in the registry, though a set of 
  * static methods and as a YARN service.
  * <p>
  * To work with ZK, system properties need to be set before invoking
  * some operations/instantiating some objects. The definitions of these
- * are kept in {@link org.apache.hadoop.yarn.registry.client.services.zk.ZookeeperConfigOptions}.
+ * are kept in {@link org.apache.hadoop.yarn.registry.client.impl.zk.ZookeeperConfigOptions}.
  * 
  * 
  */
-package org.apache.hadoop.yarn.registry.client.services.zk;
+package org.apache.hadoop.yarn.registry.client.impl.zk;

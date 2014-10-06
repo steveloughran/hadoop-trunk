@@ -16,10 +16,12 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.services;
+package org.apache.hadoop.yarn.registry.client.impl;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.yarn.registry.client.impl.zk.RegistryBindingSource;
+import org.apache.hadoop.yarn.registry.client.impl.zk.RegistryOperationsService;
 
 
 /**

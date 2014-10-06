@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.yarn.registry.client.services.zk;
+package org.apache.hadoop.yarn.registry.client.impl.zk;
 
 import org.apache.zookeeper.client.ZooKeeperSaslClient;
 import org.apache.zookeeper.server.ZooKeeperSaslServer;
