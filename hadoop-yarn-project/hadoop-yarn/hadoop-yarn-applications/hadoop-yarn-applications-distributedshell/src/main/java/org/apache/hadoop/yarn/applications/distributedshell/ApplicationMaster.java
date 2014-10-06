@@ -619,14 +619,11 @@ public class ApplicationMaster {
           CreateFlags.OVERWRITE);
 
       // register one that is not deleted
-//      serviceRecord.id = appId;
-      serviceRecord.yarn_id = "persisting";
+      serviceRecord.yarn_id = "";
       serviceRecord.yarn_persistence = PersistencePolicies.PERMANENT;
       registryOperations.create(path + "-permanent", serviceRecord,
           CreateFlags.OVERWRITE);
     }
-
-
 
     // Dump out information about cluster capability as seen by the
     // resource manager
