@@ -68,7 +68,7 @@ CONSTANTS
     PutActions,     \* all possible put actions
     DeleteActions,  \* all possible delete actions
     PurgeActions,   \* all possible purge actions
-    MkdirActions    \* all possible mkdir actions
+    MknodeActions    \* all possible mkdir actions
 
 
 
@@ -92,7 +92,7 @@ vars == << registry, actions >>
 
 (* Persistence policy *)
 PersistPolicySet == {
-    ""                      \* Undefined; field not present. PERMANENT is implied.
+    "",                      \* Undefined; field not present. PERMANENT is implied.
     "PERMANENT",            \* persists until explicitly removed 
     "APPLICATION",          \* persists until the application finishes
     "APPLICATION-ATTEMPT",  \* persists until the application attempt finishes
@@ -325,7 +325,7 @@ It declares that the mkdirSimple state applies to the path and all its parents i
 
 *)
 mknodeWithParents(R, path) ==
-    /\ \A p2 \in ancestors(R, path) : mkdirSimple(R, p2)
+    /\ \A p2 \in ancestors(R, path) : mknodeSimple(R, p2)
     /\ mknodeSimple(R, path)
     
 
@@ -342,7 +342,6 @@ simpleDelete(R, path) ==
 (* recursive delete: neither the path or its descendants exists in the new registry *)
 
 recursiveDelete(R, path) ==
-
        \* Root path: the new registry is the initial registry again 
     /\ isRootPath(path) => R' = { [ path |-> <<>>, data |-> <<>> ] }
        \*  Any other entry: the new registry is a set with any existing
@@ -387,7 +386,7 @@ resolveRecord(R, path) ==
 
 validRecordToPut(path, record) ==
       \* The root entry must have permanent persistence  
-    /\ (isRootPath(path) => (record.yarn_persistence = "PERMANENT" \/ record.yarn_persistence = "")
+     isRootPath(path) => (record.yarn_persistence = "PERMANENT" \/ record.yarn_persistence = "")
 
 
 (* 
@@ -414,13 +413,14 @@ putRecord(R, path, record) ==
         \/ (a \in PurgeActions /\ a.type="purge")
         \/ (a \in MknodeActions /\ a.type="mknode")
 
+
 (*
     Applying queued actions
 *)
  
 applyAction(R, a) == 
     \/ (a \in PutActions /\ putRecord(R, a.path, a.record) )
-    \/ (a \in MkdirActions /\ mkdir(R, a.path, a.recursive) )
+    \/ (a \in MknodeActions /\ mknode(R, a.path, a.recursive) )
     \/ (a \in DeleteActions /\ delete(R, a.path, a.recursive) )
     \/ (a \in PurgeActions /\ purge(R, a.path, a.id, a.persistence))
  
