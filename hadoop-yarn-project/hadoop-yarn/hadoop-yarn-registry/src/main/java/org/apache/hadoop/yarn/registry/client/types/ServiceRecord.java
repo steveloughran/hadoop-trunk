@@ -21,6 +21,8 @@ package org.apache.hadoop.yarn.registry.client.types;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.yarn.registry.client.types.yarn.PersistencePolicies;
+import org.apache.hadoop.yarn.registry.client.types.yarn.YarnRegistryAttributes;
 import org.codehaus.jackson.annotate.JsonAnyGetter;
 import org.codehaus.jackson.annotate.JsonAnySetter;
 import org.codehaus.jackson.annotate.JsonIgnore;
@@ -46,16 +48,6 @@ public class ServiceRecord implements Cloneable {
    */
   public String description;
 
-  /**
-   * ID. For containers: container ID. For application instances, application ID.
-   */
-  public String yarn_id;
-
-  /**
-   *   The persistence attribute defines when a record and any child 
-   *   entries may be deleted.
-   *   {@link PersistencePolicies}
-   */
   public int yarn_persistence = PersistencePolicies.PERMANENT;
 
   /**
@@ -100,9 +92,9 @@ public class ServiceRecord implements Cloneable {
       String description,
       int yarn_persistence,
       String data) {
-    this.yarn_id = yarn_id;
+    this.setYarn_id(yarn_id);
     this.description = description;
-    this.yarn_persistence = yarn_persistence;
+    this.setYarn_persistence(yarn_persistence);
     this.data = data;
   }
 
@@ -111,9 +103,9 @@ public class ServiceRecord implements Cloneable {
    * @param that service record source
    */
   public ServiceRecord(ServiceRecord that) {
-    this.yarn_id = that.yarn_id;
+    this.setYarn_id(that.getYarn_id());
     this.description = that.description;
-    this.yarn_persistence = that.yarn_persistence;
+    this.setYarn_persistence(that.getYarn_persistence());
     this.data = that.data;
     // endpoints
     List<Endpoint> src = that.internal;
@@ -233,8 +225,8 @@ public class ServiceRecord implements Cloneable {
   public String toString() {
     final StringBuilder sb =
         new StringBuilder("ServiceRecord{");
-    sb.append("yarn_id='").append(yarn_id).append('\'');
-    sb.append(", yarn_persistence=").append(yarn_persistence);
+    sb.append("yarn_id='").append(getYarn_id()).append('\'');
+    sb.append(", yarn_persistence=").append(getYarn_persistence());
     sb.append(", description='").append(description).append('\'');
     sb.append(", external endpoints: {");
     for (Endpoint endpoint : external) {
@@ -268,5 +260,29 @@ public class ServiceRecord implements Cloneable {
   @Override
   protected Object clone() throws CloneNotSupportedException {
     return super.clone();
+  }
+
+  /**
+   * ID. For containers: container ID. For application instances, application ID.
+   */
+  public String getYarn_id() {
+    return get(YarnRegistryAttributes.YARN_ID, "").toString();
+  }
+
+  public void setYarn_id(String yarn_id) {
+    set(YarnRegistryAttributes.YARN_ID, yarn_id);
+  }
+
+  /**
+   *   The persistence attribute defines when a record and any child 
+   *   entries may be deleted.
+   *   {@link PersistencePolicies}
+   */
+  public int getYarn_persistence() {
+    return yarn_persistence;
+  }
+
+  public void setYarn_persistence(int yarn_persistence) {
+    this.yarn_persistence = yarn_persistence;
   }
 }

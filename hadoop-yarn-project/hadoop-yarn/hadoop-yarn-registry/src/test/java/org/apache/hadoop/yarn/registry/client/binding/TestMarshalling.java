@@ -50,8 +50,8 @@ public class TestMarshalling extends Assert {
     ServiceRecord record = new ServiceRecord("01", "description", 0, null);
     byte[] bytes = marshal.toBytes(record);
     ServiceRecord r2 = marshal.fromBytes("", bytes, 0);
-    assertEquals(record.yarn_id, r2.yarn_id);
-    assertEquals(record.yarn_persistence, r2.yarn_persistence);
+    assertEquals(record.getYarn_id(), r2.getYarn_id());
+    assertEquals(record.getYarn_persistence(), r2.getYarn_persistence());
     assertEquals(record.description, r2.description);
   }
 
@@ -60,8 +60,8 @@ public class TestMarshalling extends Assert {
     ServiceRecord record = new ServiceRecord("01", "description", 1, null);
     byte[] bytes = marshal.toByteswithHeader(record);
     ServiceRecord r2 = marshal.fromBytesWithHeader("", bytes);
-    assertEquals(record.yarn_id, r2.yarn_id);
-    assertEquals(record.yarn_persistence, r2.yarn_persistence);
+    assertEquals(record.getYarn_id(), r2.getYarn_id());
+    assertEquals(record.getYarn_persistence(), r2.getYarn_persistence());
     assertEquals(record.description, r2.description);
   }
 
@@ -93,11 +93,10 @@ public class TestMarshalling extends Assert {
     assertEquals("value", record.get("key"));
     assertEquals(2, record.get("intval"));
     assertNull(record.get("null"));
-    assertEquals("defval", record.get("null","defval"));
+    assertEquals("defval", record.get("null", "defval"));
     byte[] bytes = marshal.toByteswithHeader(record);
     ServiceRecord r2 = marshal.fromBytesWithHeader("", bytes);
     assertEquals("value", r2.get("key"));
     assertEquals(2, r2.get("intval"));
-
   }
 }

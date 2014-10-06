@@ -99,7 +99,7 @@ import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.impl.zk.RegistryOperationsService;
-import org.apache.hadoop.yarn.registry.client.types.PersistencePolicies;
+import org.apache.hadoop.yarn.registry.client.types.yarn.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.util.ConverterUtils;
@@ -595,8 +595,9 @@ public class ApplicationMaster {
       String attemptID = this.appAttemptID.toString();
       String appId = this.appAttemptID.getApplicationId().toString();
 
-      serviceRecord.yarn_id = attemptID;
-      serviceRecord.yarn_persistence = PersistencePolicies.APPLICATION_ATTEMPT;
+      serviceRecord.setYarn_id(attemptID);
+      serviceRecord.setYarn_persistence(
+          PersistencePolicies.APPLICATION_ATTEMPT);
       serviceRecord.description = "Distributed Shell";
       // if this service offered external RPC/Web access, they
       // can be added to the service record
@@ -613,14 +614,14 @@ public class ApplicationMaster {
           BindFlags.OVERWRITE);
       LOG.info("Registered " + serviceRecord + " at " + path );
 
-      serviceRecord.yarn_id = appId;
-      serviceRecord.yarn_persistence = PersistencePolicies.APPLICATION;
+      serviceRecord.setYarn_id(appId);
+      serviceRecord.setYarn_persistence(PersistencePolicies.APPLICATION);
       registryOperations.bind(path + "-app", serviceRecord,
           BindFlags.OVERWRITE);
 
       // register one that is not deleted
-      serviceRecord.yarn_id = "";
-      serviceRecord.yarn_persistence = PersistencePolicies.PERMANENT;
+      serviceRecord.setYarn_id("");
+      serviceRecord.setYarn_persistence(PersistencePolicies.PERMANENT);
       registryOperations.bind(path + "-permanent", serviceRecord,
           BindFlags.OVERWRITE);
     }

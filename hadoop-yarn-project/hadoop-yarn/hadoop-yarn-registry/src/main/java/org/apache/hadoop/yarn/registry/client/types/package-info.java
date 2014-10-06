@@ -27,7 +27,7 @@
  * Some adjacent interfaces exist to list attributes of the fields:
  * <ul>
  *   <li>{@link org.apache.hadoop.yarn.registry.client.types.AddressTypes}</li>
- *   <li>{@link org.apache.hadoop.yarn.registry.client.types.PersistencePolicies}</li>
+ *   <li>{@link org.apache.hadoop.yarn.registry.client.types.yarn.PersistencePolicies}</li>
  *   <li>{@link org.apache.hadoop.yarn.registry.client.types.ProtocolTypes}</li>
  * </ul>
  * 
