@@ -21,6 +21,7 @@ package org.apache.hadoop.yarn.registry.client.types;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.codehaus.jackson.annotate.JsonAnyGetter;
 import org.codehaus.jackson.annotate.JsonAnySetter;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
@@ -176,7 +177,7 @@ public class ServiceRecord implements Cloneable {
    * @param value attribute value.
    */
   @JsonAnySetter
-  public void setOtherAttribute(String key, Object value) {
+  public void set(String key, Object value) {
     otherAttributes.put(key, value);
   }
 
@@ -186,11 +187,33 @@ public class ServiceRecord implements Cloneable {
    * is generated.
    * @return a map of any unknown attributes in the deserialized JSON.
    */
-  @JsonIgnore
-  public Map<String, Object> getOtherAttributes() {
+  @JsonAnyGetter
+  public Map<String, Object> any() {
     return otherAttributes;
   }
 
+  /**
+   * Get the "other" attribute with a specific key
+   * @param key key to look up
+   * @return the value or null
+   */
+  @JsonIgnore
+  public Object get(String key) {
+    return otherAttributes.get(key);
+  }
+
+  /**
+   * Get the "other" attribute with a specific key
+   * @param key key to look up
+   * @param defVal default value
+   * @return the value or <code>defval</code> if the value was not present
+   */
+  @JsonIgnore
+  public Object get(String key, Object defVal) {
+    Object val = otherAttributes.get(key);
+    return val != null ? val: defVal;
+  }
+  
   /**
    * Find an endpoint by its API
    * @param list list

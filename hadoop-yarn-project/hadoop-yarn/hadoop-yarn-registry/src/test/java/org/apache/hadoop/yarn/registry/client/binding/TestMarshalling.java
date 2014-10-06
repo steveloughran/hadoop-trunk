@@ -85,4 +85,19 @@ public class TestMarshalling extends Assert {
   }
 
 
+  @Test
+  public void testUnknonwnFieldsRoundTrip() throws Throwable {
+    ServiceRecord record = new ServiceRecord("01", "description", 0, null);
+    record.set("key", "value");
+    record.set("intval", 2);
+    assertEquals("value", record.get("key"));
+    assertEquals(2, record.get("intval"));
+    assertNull(record.get("null"));
+    assertEquals("defval", record.get("null","defval"));
+    byte[] bytes = marshal.toByteswithHeader(record);
+    ServiceRecord r2 = marshal.fromBytesWithHeader("", bytes);
+    assertEquals("value", r2.get("key"));
+    assertEquals(2, r2.get("intval"));
+
+  }
 }
