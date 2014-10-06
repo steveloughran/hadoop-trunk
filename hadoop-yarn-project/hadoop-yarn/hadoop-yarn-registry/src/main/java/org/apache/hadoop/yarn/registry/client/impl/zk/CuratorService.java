@@ -244,27 +244,30 @@ public class CuratorService extends CompositeService
       LOG.debug("Creating CuratorService with connection {}",
           connectionDescription);
     }
+    CuratorFramework framework;
 
-    // set the security options
+    synchronized (CuratorService.class) {
+      // set the security options
 
-    //log them
-    securityConnectionDiagnostics = buildSecurityDiagnostics();
+      //log them
+      securityConnectionDiagnostics = buildSecurityDiagnostics();
 
-    // build up the curator itself
-    CuratorFrameworkFactory.Builder builder = CuratorFrameworkFactory.builder();
-    builder.ensembleProvider(ensembleProvider)
-     .connectionTimeoutMs(connectionTimeout)
-     .sessionTimeoutMs(sessionTimeout)
+      // build up the curator itself
+      CuratorFrameworkFactory.Builder builder = CuratorFrameworkFactory.builder();
+      builder.ensembleProvider(ensembleProvider)
+       .connectionTimeoutMs(connectionTimeout)
+       .sessionTimeoutMs(sessionTimeout)
+  
+       .retryPolicy(new BoundedExponentialBackoffRetry(retryInterval,
+           retryCeiling,
+           retryTimes));
 
-     .retryPolicy(new BoundedExponentialBackoffRetry(retryInterval,
-         retryCeiling,
-         retryTimes));
-    
-    // set up the builder AND any JVM context
-    registrySecurity.applySecurityEnvironment(builder);
+      // set up the builder AND any JVM context
+      registrySecurity.applySecurityEnvironment(builder);
 
-    CuratorFramework framework = builder.build();
-    framework.start();
+      framework = builder.build();
+      framework.start();
+    }
 
     return framework;
   }
