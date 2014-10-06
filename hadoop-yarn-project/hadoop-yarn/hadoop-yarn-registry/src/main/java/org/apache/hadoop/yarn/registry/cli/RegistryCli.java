@@ -243,7 +243,7 @@ public class RegistryCli extends Configured implements Tool {
 
 
     CommandLineParser parser = new GnuParser();
-    ServiceRecord sr = new ServiceRecord("NoID", "NoDescription", 0, "NoData");
+    ServiceRecord sr = new ServiceRecord("NoID", "NoDescription", "", "NoData");
     CommandLine line = null;
     if (args.length <= 1) {
       return usageError("Invalid syntax ", BIND_USAGE);

@@ -79,7 +79,7 @@ public class AbstractRegistryTest extends AbstractZKRegistryTest {
    */
   protected ServiceRecord putExampleServiceEntry(String path,
       int createFlags,
-      int persistence)
+      String persistence)
       throws IOException, URISyntaxException {
     ServiceRecord record = buildExampleServiceEntry(persistence);
 

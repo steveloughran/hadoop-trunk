@@ -61,7 +61,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
    */
   public int purge(String path,
       String id,
-      int policyMatch,
+      String policyMatch,
       RegistryAdminService.PurgePolicy purgePolicy) throws
       IOException,
       ExecutionException,
@@ -82,7 +82,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
    */
   public int purge(String path,
       String id,
-      int policyMatch,
+      String policyMatch,
       RegistryAdminService.PurgePolicy purgePolicy,
       BackgroundCallback callback) throws
       IOException,
@@ -131,7 +131,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     // now the application attempt
     opcount = purge("/",
         written.getYarn_id(),
-        -1,
+        PersistencePolicies.APPLICATION_ATTEMPT,
         RegistryAdminService.PurgePolicy.PurgeAll,
         events);
 
@@ -173,11 +173,11 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     assertEquals("wrong no of delete operations in " + dump, 0, opcount);
 
 
-    // now all matching entries
+    // now app attempt
     deletions = new DeleteCompletionCallback();
     opcount = purge("/",
         written.getYarn_id(),
-        -1,
+        PersistencePolicies.APPLICATION_ATTEMPT,
         RegistryAdminService.PurgePolicy.PurgeAll,
         deletions);
 

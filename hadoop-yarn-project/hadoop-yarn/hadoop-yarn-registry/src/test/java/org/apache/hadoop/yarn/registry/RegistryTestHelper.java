@@ -243,7 +243,7 @@ public class RegistryTestHelper extends Assert {
    * @return the record
    * @throws IOException on a failure
    */
-  public static ServiceRecord buildExampleServiceEntry(int persistence) throws
+  public static ServiceRecord buildExampleServiceEntry(String persistence) throws
       IOException,
       URISyntaxException {
     ServiceRecord record = new ServiceRecord();

@@ -29,22 +29,22 @@ public interface PersistencePolicies {
   /**
    * The record persists until removed manually: {@value}.
    */
-  int PERMANENT = 0;
+  String PERMANENT = "permanent";
 
   /**
    * Remove when the YARN application defined in the id field
    * terminates: {@value}.
    */
-  int APPLICATION = 1;
+  String APPLICATION = "application";
 
   /**
    * Remove when the current YARN application attempt ID finishes: {@value}.
    */
-  int APPLICATION_ATTEMPT = 2;
+  String APPLICATION_ATTEMPT = "attempt";
 
   /**
    * Remove when the YARN container in the ID field finishes: {@value}
    */
-  int CONTAINER = 3;
+  String CONTAINER = "container";
 
 }

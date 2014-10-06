@@ -204,7 +204,7 @@ public class RMRegistryOperationsService extends RegistryAdminService {
   @VisibleForTesting
   public Future<Integer> purgeRecordsAsync(String path,
       String id,
-      int persistencePolicyMatch) {
+      String persistencePolicyMatch) {
 
     return purgeRecordsAsync(path,
         id, persistencePolicyMatch,
@@ -231,7 +231,7 @@ public class RMRegistryOperationsService extends RegistryAdminService {
   @VisibleForTesting
   public Future<Integer> purgeRecordsAsync(String path,
       String id,
-      int persistencePolicyMatch,
+      String persistencePolicyMatch,
       PurgePolicy purgePolicy,
       BackgroundCallback callback) {
     LOG.info(" records under {} with ID {} and policy {}: {}",

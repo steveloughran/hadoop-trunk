@@ -48,7 +48,7 @@ public class ServiceRecord implements Cloneable {
    */
   public String description;
 
-  public int yarn_persistence = PersistencePolicies.PERMANENT;
+  public String yarn_persistence = PersistencePolicies.PERMANENT;
 
   /**
    * map to handle unknown attributes.
@@ -90,7 +90,7 @@ public class ServiceRecord implements Cloneable {
    */
   public ServiceRecord(String yarn_id,
       String description,
-      int yarn_persistence,
+      String yarn_persistence,
       String data) {
     this.setYarn_id(yarn_id);
     this.description = description;
@@ -278,11 +278,11 @@ public class ServiceRecord implements Cloneable {
    *   entries may be deleted.
    *   {@link PersistencePolicies}
    */
-  public int getYarn_persistence() {
+  public String getYarn_persistence() {
     return yarn_persistence;
   }
 
-  public void setYarn_persistence(int yarn_persistence) {
+  public void setYarn_persistence(String yarn_persistence) {
     this.yarn_persistence = yarn_persistence;
   }
 }

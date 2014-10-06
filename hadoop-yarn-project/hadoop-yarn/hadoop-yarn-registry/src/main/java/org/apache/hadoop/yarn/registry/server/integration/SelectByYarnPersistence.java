@@ -28,9 +28,9 @@ import org.apache.hadoop.yarn.registry.server.services.RegistryAdminService;
 public class SelectByYarnPersistence
     implements RegistryAdminService.NodeSelector {
   private final String id;
-  private final int targetPolicy;
+  private final String targetPolicy;
 
-  public SelectByYarnPersistence(String id, int targetPolicy) {
+  public SelectByYarnPersistence(String id, String targetPolicy) {
     this.id = id;
     this.targetPolicy = targetPolicy;
   }
@@ -40,13 +40,13 @@ public class SelectByYarnPersistence
       RegistryPathStatus registryPathStatus,
       ServiceRecord serviceRecord) {
     return serviceRecord.getYarn_id().equals(id)
-           && (targetPolicy < 0 || serviceRecord.getYarn_persistence() == targetPolicy);
+           && (targetPolicy.equals(serviceRecord.getYarn_persistence()));
   }
 
   @Override
   public String toString() {
     return String.format(
-        "Select by ID %s and policy %d: {}",
+        "Select by ID %s and policy %s: {}",
         id, targetPolicy);
   }
 }

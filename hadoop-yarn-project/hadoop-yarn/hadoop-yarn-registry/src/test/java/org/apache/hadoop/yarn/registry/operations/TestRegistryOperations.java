@@ -261,7 +261,8 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   @Test
   public void testListListFully() throws Throwable {
     ServiceRecord r1 = new ServiceRecord();
-    ServiceRecord r2 = new ServiceRecord("i", "r2", 0,"0x4444");
+    ServiceRecord r2 = new ServiceRecord("i", "r2",
+        PersistencePolicies.PERMANENT,"0x4444");
     
     String path = USERPATH + SC_HADOOP + "/listing" ;
     operations.mknode(path, true);
