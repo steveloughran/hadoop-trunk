@@ -32,29 +32,29 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.fs.PathNotFoundException;
-import org.apache.hadoop.service.ServiceOperations;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.exceptions.YarnException;
-import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
-import org.apache.hadoop.yarn.registry.client.binding.RegistryUtils;
-import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
-import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
-import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.junit.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.util.JarFinder;
 import org.apache.hadoop.util.Shell;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineEntities;
 import org.apache.hadoop.yarn.client.api.YarnClient;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.registry.client.api.RegistryConstants;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryUtils;
+import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
+import org.apache.hadoop.yarn.registry.client.services.RegistryOperationsService;
+import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.server.MiniYARNCluster;
 import org.apache.hadoop.yarn.server.nodemanager.NodeManager;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.ContainerManagerImpl;
@@ -857,10 +857,10 @@ public class TestDistributedShell {
     }
     return numOfWords;
   }
-  
+
   @Test(timeout = 90000)
   public void testRegistryOperations() throws Exception {
-    
+
     // create a client config with an aggressive timeout policy
     Configuration clientConf = new Configuration(yarnCluster.getConfig());
     clientConf.setInt(RegistryConstants.KEY_REGISTRY_ZK_CONNECTION_TIMEOUT, 1000);
@@ -868,13 +868,13 @@ public class TestDistributedShell {
     clientConf.setInt(RegistryConstants.KEY_REGISTRY_ZK_RETRY_CEILING, 1);
     clientConf.setInt(RegistryConstants.KEY_REGISTRY_ZK_RETRY_INTERVAL, 500);
     clientConf.setInt(RegistryConstants.KEY_REGISTRY_ZK_SESSION_TIMEOUT, 2000);
-    
+
     // create a registry operations instance
     RegistryOperationsService regOps = new RegistryOperationsService();
     regOps.init(clientConf);
     regOps.start();
     LOG.info("Registry Binding: " + regOps);
-    
+ 
     // do a simple registry operation to verify that it is live
     regOps.list("/");
     // check the system dir is present
@@ -910,7 +910,7 @@ public class TestDistributedShell {
       }
 
       LOG.info("Client run completed. Result=" + result);
-      
+
       // application should have found service records
       ServiceRecord serviceRecord = client.appAttemptRecord;
       LOG.info("Service record = " + serviceRecord);
@@ -921,16 +921,14 @@ public class TestDistributedShell {
                   + " failed with " + lookupException, lookupException);
         throw lookupException;
       }
-      
+
       // the app should have succeeded or returned a failure message
-      if (!result) {
-        Assert.fail("run returned false: " + client.failureText);
-      }
+      Assert.assertTrue("run returned false:" + client.failureText, result);
 
       // the app-level record must have been retrieved
       Assert.assertNotNull("No application record at " + client.appRecordPath,
           client.appRecord);
-      
+
       // sleep to let some async operations in the RM continue
       Thread.sleep(10000);
       // after the app finishes its records should have been purged
@@ -952,7 +950,6 @@ public class TestDistributedShell {
     }
   }
 
-
   /**
    * This is a subclass of the distributed shell client which
    * monitors the registry as well as the YARN app status
@@ -964,14 +961,8 @@ public class TestDistributedShell {
     private IOException lookupException;
     private ServiceRecord appAttemptRecord;
     private String appAttemptPath;
-
-    private ServiceRecord ephemeralRecord;
-    private String ephemeralPath;
-    
     private ServiceRecord appRecord;
     private String appRecordPath;
-    
-    
     private String failureText;
     private ApplicationReport report;
     private final RegistryOperationsService regOps;
@@ -988,8 +979,8 @@ public class TestDistributedShell {
     public void stop() {
       ServiceOperations.stopQuietly(regOps);
     }
-  
-    
+
+
     @Override
     protected boolean monitorApplication(ApplicationId appId)
         throws YarnException, IOException {
@@ -1001,14 +992,11 @@ public class TestDistributedShell {
           RegistryUtils.servicePath(username, serviceClass,
               serviceName);
       appAttemptPath = servicePath + "-attempt";
-      ephemeralPath = servicePath + "-ephemeral";
       appRecordPath = servicePath + "-app";
       permanentPath = servicePath + "-permanent";
-
       YarnClient yarnClient = getYarnClient();
 
       while (!timedOut()) {
-
         // Check app status every 1 second.
         try {
           Thread.sleep(500);
@@ -1019,10 +1007,7 @@ public class TestDistributedShell {
         // Get application report for the appId we are interested in 
         report = yarnClient.getApplicationReport(appId);
 
-        YarnApplicationState state =
-            report.getYarnApplicationState();
-        switch (state) {
-
+        switch (report.getYarnApplicationState()) {
           case NEW:
           case NEW_SAVING:
           case SUBMITTED:
@@ -1041,8 +1026,6 @@ public class TestDistributedShell {
             appRecord = maybeResolveQuietly(appRecord, appRecordPath);
             appAttemptRecord = maybeResolveQuietly(appAttemptRecord,
                 appAttemptPath);
-            ephemeralRecord = maybeResolveQuietly(ephemeralRecord,
-                ephemeralPath);
             continue;
 
           case FINISHED:
@@ -1066,7 +1049,6 @@ public class TestDistributedShell {
         }
 
       }
-
       if (timedOut()) {
         failureText = "Timed out: Killing application";
         forceKillApplication(appId);
@@ -1084,7 +1066,7 @@ public class TestDistributedShell {
     ServiceRecord maybeResolve(ServiceRecord r, String path) throws IOException {
       if (r == null) {
         ServiceRecord record = regOps.resolve(path);
-        LOG.info("Resolved at " + r +": " + record);
+        LOG.info("Resolved at " + path + ": " + record);
         return record;
       }
       return r;

@@ -213,8 +213,8 @@ public class Client {
    */
   public Client(Configuration conf) throws Exception  {
     this(
-        "org.apache.hadoop.yarn.applications.distributedshell.ApplicationMaster",
-        conf);
+      "org.apache.hadoop.yarn.applications.distributedshell.ApplicationMaster",
+      conf);
   }
 
   Client(String appMasterMainClass, Configuration conf) {
@@ -731,7 +731,7 @@ public class Client {
 
   /**
    * Get the YARN client
-   * @return the client 
+   * @return the client
    */
   public YarnClient getYarnClient() {
     return yarnClient;

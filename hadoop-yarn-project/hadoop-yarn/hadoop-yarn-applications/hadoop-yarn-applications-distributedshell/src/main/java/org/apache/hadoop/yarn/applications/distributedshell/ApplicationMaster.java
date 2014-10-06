@@ -280,7 +280,7 @@ public class ApplicationMaster {
 
   @VisibleForTesting
   RegistryOperationsService registryOperations;
-  
+
   /**
    * @param args Command line args
    */
@@ -581,7 +581,7 @@ public class ApplicationMaster {
     RegisterApplicationMasterResponse response = amRMClient
         .registerApplicationMaster(appMasterHostname, appMasterRpcPort,
             appMasterTrackingUrl);
-    
+
     // Register with the YARN registry if it is enabled
     boolean registryEnabled =
         conf.getBoolean(RegistryConstants.KEY_REGISTRY_ENABLED,
