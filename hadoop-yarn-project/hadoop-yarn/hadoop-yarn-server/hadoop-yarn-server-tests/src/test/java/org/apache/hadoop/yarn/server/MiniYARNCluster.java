@@ -207,7 +207,7 @@ public class MiniYARNCluster extends CompositeService {
     this(testName, numResourceManagers, numNodeManagers, numLocalDirs,
         numLogDirs, enableAHS, false);
   }
-  
+
   /**
    * @param testName name of the test
    * @param numResourceManagers the number of resource managers in the cluster
@@ -273,7 +273,7 @@ public class MiniYARNCluster extends CompositeService {
       conf.set(MicroZookeeperServiceKeys.KEY_ZKSERVICE_DIR,
           new File(testWorkDir, "zookeeper").getAbsolutePath());
     }
-    
+
     for (int i = 0; i < resourceManagers.length; i++) {
       resourceManagers[i] = createResourceManager();
       if (!useFixedPorts) {

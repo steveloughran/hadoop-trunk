@@ -80,8 +80,8 @@ public class RMRegistryService extends CompositeService {
   @Override
   protected void serviceStart() throws Exception {
     super.serviceStart();
-    
-    LOG.info("RM registry service started : {}", 
+
+    LOG.info("RM registry service started : {}",
         registryOperations.bindingDiagnosticDetails());
     // Register self as event handler for RM Events
     register(RMAppAttemptEventType.class, new AppEventHandler());
@@ -142,14 +142,14 @@ public class RMRegistryService extends CompositeService {
     RMAppAttemptEventType eventType = event.getType();
     ApplicationAttemptId appAttemptId =
         event.getApplicationAttemptId();
-    
+
     ApplicationId appId = appAttemptId.getApplicationId();
     switch (eventType) {
 
       case LAUNCHED:
         registryOperations.onApplicationLaunched(appId);
-        break;  
-      
+        break;
+
       case REGISTERED:
         RMAppAttemptRegistrationEvent evt =
             (RMAppAttemptRegistrationEvent) event;
