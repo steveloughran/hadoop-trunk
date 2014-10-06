@@ -62,6 +62,7 @@ public class JsonSerDeser<T> {
 
   private static final Logger LOG = LoggerFactory.getLogger(JsonSerDeser.class);
   private static final String UTF_8 = "UTF-8";
+  public static final String E_NO_SERVICE_RECORD = "No service record at path";
 
   private final Class<T> classType;
   private final ObjectMapper mapper;
@@ -280,11 +281,13 @@ public class JsonSerDeser<T> {
     int blen = buffer.length;
     if (hlen > 0) {
       if (blen < hlen) {
-        throw new NoRecordException(path, "No record header");
+        throw new NoRecordException(path, E_NO_SERVICE_RECORD);
       }
       byte[] magic = Arrays.copyOfRange(buffer, 0, hlen);
       if (!Arrays.equals(header, magic)) {
-        throw new NoRecordException(path, "Non-matching record header");
+        LOG.debug("start of entry does not match service record header at {}",
+            path);
+        throw new NoRecordException(path, E_NO_SERVICE_RECORD);
       }
     }
     return fromBytes(path, buffer, hlen);
