@@ -189,9 +189,7 @@ public class RegistryTestHelper extends Assert {
   public static void assertMatches(ServiceRecord source, ServiceRecord resolved) {
     assertNotNull("Null source record ", source);
     assertNotNull("Null resolved record ", resolved);
-    assertEquals(source.getYarn_id(), resolved.getYarn_id());
     assertEquals(source.description, resolved.description);
-    assertEquals(source.getYarn_persistence(), resolved.getYarn_persistence());
     assertEquals(source.data, resolved.data);
 
     Map<String, Object> srcAddrs = source.attributes();

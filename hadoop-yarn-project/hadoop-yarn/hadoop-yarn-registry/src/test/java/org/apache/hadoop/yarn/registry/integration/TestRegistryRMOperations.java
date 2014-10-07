@@ -119,8 +119,9 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     LOG.info("Initial state {}", dump);
 
     // container query
+    String id = written.getYarn_id();
     int opcount = purge("/",
-        written.getYarn_id(),
+        id,
         PersistencePolicies.CONTAINER,
         RegistryAdminService.PurgePolicy.PurgeAll,
         events);
@@ -130,7 +131,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
 
     // now the application attempt
     opcount = purge("/",
-        written.getYarn_id(),
+        id,
         PersistencePolicies.APPLICATION_ATTEMPT,
         RegistryAdminService.PurgePolicy.PurgeAll,
         events);
