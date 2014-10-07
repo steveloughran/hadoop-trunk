@@ -101,6 +101,7 @@ import org.apache.hadoop.yarn.registry.client.binding.RegistryPathUtils;
 import org.apache.hadoop.yarn.registry.client.impl.zk.RegistryOperationsService;
 import org.apache.hadoop.yarn.registry.client.types.yarn.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import org.apache.hadoop.yarn.registry.client.types.yarn.YarnRegistryAttributes;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.log4j.LogManager;
@@ -595,7 +596,7 @@ public class ApplicationMaster {
       String attemptID = this.appAttemptID.toString();
       String appId = this.appAttemptID.getApplicationId().toString();
 
-      serviceRecord.putYarn_id(attemptID);
+      serviceRecord.set(YarnRegistryAttributes.YARN_ID, attemptID);
       serviceRecord.putYarn_persistence(
           PersistencePolicies.APPLICATION_ATTEMPT);
       serviceRecord.description = "Distributed Shell";
@@ -614,13 +615,13 @@ public class ApplicationMaster {
           BindFlags.OVERWRITE);
       LOG.info("Registered " + serviceRecord + " at " + path );
 
-      serviceRecord.putYarn_id(appId);
+      serviceRecord.set(YarnRegistryAttributes.YARN_ID, appId);
       serviceRecord.putYarn_persistence(PersistencePolicies.APPLICATION);
       registryOperations.bind(path + "-app", serviceRecord,
           BindFlags.OVERWRITE);
 
       // register one that is not deleted
-      serviceRecord.putYarn_id("");
+      serviceRecord.set(YarnRegistryAttributes.YARN_ID, "");
       serviceRecord.putYarn_persistence(PersistencePolicies.PERMANENT);
       registryOperations.bind(path + "-permanent", serviceRecord,
           BindFlags.OVERWRITE);

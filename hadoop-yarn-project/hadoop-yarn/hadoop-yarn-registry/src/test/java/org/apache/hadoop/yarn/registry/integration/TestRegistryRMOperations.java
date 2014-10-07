@@ -30,6 +30,7 @@ import org.apache.hadoop.yarn.registry.client.impl.CuratorEventCatcher;
 import org.apache.hadoop.yarn.registry.client.types.yarn.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import org.apache.hadoop.yarn.registry.client.types.yarn.YarnRegistryAttributes;
 import org.apache.hadoop.yarn.registry.server.services.DeleteCompletionCallback;
 import org.apache.hadoop.yarn.registry.server.services.RegistryAdminService;
 import org.junit.Test;
@@ -108,7 +109,8 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     String path = "/users/example/hbase/hbase1/";
     ServiceRecord written = buildExampleServiceEntry(
         PersistencePolicies.APPLICATION_ATTEMPT);
-    written.putYarn_id("testAsyncPurgeEntry_attempt_001");
+    written.set(YarnRegistryAttributes.YARN_ID,
+        "testAsyncPurgeEntry_attempt_001");
 
     operations.mknode(RegistryPathUtils.parentOf(path), true);
     operations.bind(path, written, 0);
@@ -119,7 +121,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     LOG.info("Initial state {}", dump);
 
     // container query
-    String id = written.getYarn_id();
+    String id = written.get(YarnRegistryAttributes.YARN_ID, "");
     int opcount = purge("/",
         id,
         PersistencePolicies.CONTAINER,
@@ -150,7 +152,8 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     String path = "/users/example/hbase/hbase1/";
     ServiceRecord written = buildExampleServiceEntry(
         PersistencePolicies.APPLICATION_ATTEMPT);
-    written.putYarn_id("testAsyncPurgeEntry_attempt_001");
+    written.set(YarnRegistryAttributes.YARN_ID,
+        "testAsyncPurgeEntry_attempt_001");
 
     operations.mknode(RegistryPathUtils.parentOf(path), true);
     operations.bind(path, written, 0);
@@ -161,7 +164,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
 
     DeleteCompletionCallback deletions = new DeleteCompletionCallback();
     int opcount = purge("/",
-        written.getYarn_id(),
+        written.get(YarnRegistryAttributes.YARN_ID, ""),
         PersistencePolicies.CONTAINER,
         RegistryAdminService.PurgePolicy.PurgeAll,
         deletions);
@@ -177,7 +180,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     // now app attempt
     deletions = new DeleteCompletionCallback();
     opcount = purge("/",
-        written.getYarn_id(),
+        written.get(YarnRegistryAttributes.YARN_ID, ""),
         PersistencePolicies.APPLICATION_ATTEMPT,
         RegistryAdminService.PurgePolicy.PurgeAll,
         deletions);
@@ -274,7 +277,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
             componentsPath, componentStats);
     assertEquals(2, records.size());
     ServiceRecord retrieved1 = records.get(dns1path);
-    logRecord(retrieved1.getYarn_id(), retrieved1);
+    logRecord(retrieved1.get(YarnRegistryAttributes.YARN_ID, ""), retrieved1);
     assertMatches(dns1resolved, retrieved1);
     assertEquals(PersistencePolicies.CONTAINER,
         retrieved1.getYarn_persistence());

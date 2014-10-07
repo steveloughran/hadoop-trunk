@@ -237,18 +237,6 @@ public class ServiceRecord implements Cloneable {
   }
 
   /**
-   * ID. For containers: container ID. For application instances, application ID.
-   */
-  @JsonIgnore
-  public String getYarn_id() {
-    return get(YarnRegistryAttributes.YARN_ID, "");
-  }
-
-  public void putYarn_id(String yarn_id) {
-    set(YarnRegistryAttributes.YARN_ID, yarn_id);
-  }
-
-  /**
    *   The persistence attribute defines when a record and any child 
    *   entries may be deleted.
    *   {@link PersistencePolicies}

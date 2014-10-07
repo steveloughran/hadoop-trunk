@@ -29,6 +29,7 @@ import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.yarn.registry.client.types.yarn.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import org.apache.hadoop.yarn.registry.client.types.yarn.YarnRegistryAttributes;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -147,7 +148,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   @Test
   public void testPutNoParent() throws Throwable {
     ServiceRecord record = new ServiceRecord();
-    record.putYarn_id("testPutNoParent");
+    record.set(YarnRegistryAttributes.YARN_ID, "testPutNoParent");
     String path = "/path/without/parent";
     try {
       operations.bind(path, record, 0);
@@ -174,7 +175,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   @Test(expected = PathNotFoundException.class)
   public void testPutNoParent2() throws Throwable {
     ServiceRecord record = new ServiceRecord();
-    record.putYarn_id("testPutNoParent");
+    record.set(YarnRegistryAttributes.YARN_ID, "testPutNoParent");
     String path = "/path/without/parent";
     operations.bind(path, record, 0);
   }

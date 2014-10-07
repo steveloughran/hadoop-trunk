@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.registry.server.integration;
 
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import org.apache.hadoop.yarn.registry.client.types.yarn.YarnRegistryAttributes;
 import org.apache.hadoop.yarn.registry.server.services.RegistryAdminService;
 
 /**
@@ -39,7 +40,7 @@ public class SelectByYarnPersistence
   public boolean shouldSelect(String path,
       RegistryPathStatus registryPathStatus,
       ServiceRecord serviceRecord) {
-    return id.equals(serviceRecord.getYarn_id())
+    return id.equals(serviceRecord.get(YarnRegistryAttributes.YARN_ID, ""))
            && (targetPolicy.equals(serviceRecord.getYarn_persistence()));
   }
 

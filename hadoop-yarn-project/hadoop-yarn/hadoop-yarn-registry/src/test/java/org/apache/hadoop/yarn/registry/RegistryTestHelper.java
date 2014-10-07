@@ -28,6 +28,7 @@ import org.apache.hadoop.yarn.registry.client.types.AddressTypes;
 import org.apache.hadoop.yarn.registry.client.types.Endpoint;
 import org.apache.hadoop.yarn.registry.client.types.ProtocolTypes;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
+import org.apache.hadoop.yarn.registry.client.types.yarn.YarnRegistryAttributes;
 import org.apache.hadoop.yarn.registry.secure.AbstractSecureRegistryTest;
 import org.apache.zookeeper.common.PathUtils;
 import org.junit.Assert;
@@ -261,7 +262,7 @@ public class RegistryTestHelper extends Assert {
       IOException,
       URISyntaxException {
     ServiceRecord record = new ServiceRecord();
-    record.putYarn_id("example-0001");
+    record.set(YarnRegistryAttributes.YARN_ID, "example-0001");
     record.putYarn_persistence(persistence);
     addSampleEndpoints(record, "namenode");
     return record;
@@ -387,7 +388,7 @@ public class RegistryTestHelper extends Assert {
   public static ServiceRecord createRecord(String id, String persistence,
       String description) {
     ServiceRecord serviceRecord = new ServiceRecord();
-    serviceRecord.putYarn_id(id);
+    serviceRecord.set(YarnRegistryAttributes.YARN_ID, id);
     serviceRecord.description = description;
     serviceRecord.putYarn_persistence(persistence);
     return serviceRecord;
