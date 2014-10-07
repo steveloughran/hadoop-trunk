@@ -190,21 +190,28 @@ public class RegistryTestHelper extends Assert {
     assertNotNull("Null source record ", source);
     assertNotNull("Null resolved record ", resolved);
     assertEquals(source.description, resolved.description);
-    assertEquals(source.data, resolved.data);
 
-    Map<String, Object> srcAddrs = source.attributes();
-    Map<String, Object> resolvedAddrs = resolved.attributes();
-    assertEquals(srcAddrs.size(), resolvedAddrs.size());
-    for (Map.Entry<String, Object> entry : srcAddrs.entrySet()) {
+    Map<String, String> srcAttrs = source.attributes();
+    Map<String, String> resolvedAttrs = resolved.attributes();
+    String sourceAsString = source.toString();
+    String resolvedAsString = resolved.toString();
+    assertEquals("Wrong count of attrs in \n" + sourceAsString
+                 + "\nfrom\n" + resolvedAsString,
+        srcAttrs.size(),
+        resolvedAttrs.size());
+    for (Map.Entry<String, String> entry : srcAttrs.entrySet()) {
       String attr = entry.getKey();
       assertEquals("attribute "+ attr, entry.getValue(), resolved.get(attr));
-      
     }
+    assertEquals("wrong external endpoint count", 
+        source.external.size(), resolved.external.size());
+    assertEquals("wrong external endpoint count", 
+        source.internal.size(), resolved.internal.size());
   }
 
   /**
    * Find an endpoint in a record or fail,
-   * @param record   record
+   * @param record record
    * @param api API
    * @param external external?
    * @param addressElements expected # of address elements?
@@ -254,8 +261,8 @@ public class RegistryTestHelper extends Assert {
       IOException,
       URISyntaxException {
     ServiceRecord record = new ServiceRecord();
-    record.setYarn_id("example-0001");
-    record.setYarn_persistence(persistence);
+    record.putYarn_id("example-0001");
+    record.putYarn_persistence(persistence);
     addSampleEndpoints(record, "namenode");
     return record;
   }
@@ -266,14 +273,14 @@ public class RegistryTestHelper extends Assert {
    */
   public static void addSampleEndpoints(ServiceRecord entry, String hostname)
       throws URISyntaxException {
+    assertNotNull(hostname);
     entry.addExternalEndpoint(webEndpoint("web",
         new URI("http", hostname + ":80", "/")));
     entry.addExternalEndpoint(
         restEndpoint(API_WEBHDFS,
             new URI("http", hostname + ":8020", "/")));
 
-    Endpoint endpoint = ipcEndpoint(API_HDFS,
-        true, null);
+    Endpoint endpoint = ipcEndpoint(API_HDFS, true, null);
     endpoint.addresses.add(tuple(hostname, "8030"));
     entry.addInternalEndpoint(endpoint);
     InetSocketAddress localhost = new InetSocketAddress("localhost", 8050);
@@ -380,9 +387,9 @@ public class RegistryTestHelper extends Assert {
   public static ServiceRecord createRecord(String id, String persistence,
       String description) {
     ServiceRecord serviceRecord = new ServiceRecord();
-    serviceRecord.setYarn_id(id);
+    serviceRecord.putYarn_id(id);
     serviceRecord.description = description;
-    serviceRecord.setYarn_persistence(persistence);
+    serviceRecord.putYarn_persistence(persistence);
     return serviceRecord;
   }
 

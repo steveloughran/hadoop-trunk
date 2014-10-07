@@ -51,8 +51,7 @@ public class ServiceRecord implements Cloneable {
   /**
    * map to handle unknown attributes.
    */
-  @JsonIgnore
-  private Map<String, Object> attributes = new HashMap<String, Object>(4);
+  private Map<String, String> attributes = new HashMap<String, String>(4);
 
   /**
    * List of endpoints intended for use to external callers
@@ -63,13 +62,6 @@ public class ServiceRecord implements Cloneable {
    * List of endpoints for use <i>within</i> an application.
    */
   public List<Endpoint> internal = new ArrayList<Endpoint>();
-
-  /**
-   * A string of arbitrary data. This should only be used for small amounts of
-   * data related to the binding ... any large amounts of data
-   * should be published by registered service endpoints.
-   */
-  public String data;
 
   /**
    * Create a service record with no ID, description or registration time.
@@ -84,10 +76,9 @@ public class ServiceRecord implements Cloneable {
    */
   public ServiceRecord(ServiceRecord that) {
     this.description = that.description;
-    this.data = that.data;
     // others
-    Map<String, Object> thatAttrs = that.attributes;
-    for (Map.Entry<String, Object> entry : thatAttrs.entrySet()) {
+    Map<String, String> thatAttrs = that.attributes;
+    for (Map.Entry<String, String> entry : thatAttrs.entrySet()) {
       attributes.put(entry.getKey(), entry.getValue());
     }
     // endpoints
@@ -153,7 +144,7 @@ public class ServiceRecord implements Cloneable {
    */
   @JsonAnySetter
   public void set(String key, Object value) {
-    attributes.put(key, value);
+    attributes.put(key, value.toString());
   }
 
   /**
@@ -163,7 +154,7 @@ public class ServiceRecord implements Cloneable {
    * @return a map of any unknown attributes in the deserialized JSON.
    */
   @JsonAnyGetter
-  public Map<String, Object> attributes() {
+  public Map<String, String> attributes() {
     return attributes;
   }
 
@@ -172,23 +163,20 @@ public class ServiceRecord implements Cloneable {
    * @param key key to look up
    * @return the value or null
    */
-  @JsonIgnore
-  public Object get(String key) {
+  public String get(String key) {
     return attributes.get(key);
   }
 
   /**
-   * Get the "other" attribute with a specific key; assume this is a string
-   * and convert to a string even if it isn't.
+   * Get the "other" attribute with a specific key.
    * @param key key to look up
    * @param defVal default value
    * @return the value as a string,
    * or <code>defval</code> if the value was not present
    */
-  @JsonIgnore
   public String get(String key, String defVal) {
-    Object val = attributes.get(key);
-    return val != null ? val.toString(): defVal;
+    String val = attributes.get(key);
+    return val != null ? val: defVal;
   }
   
   /**
@@ -210,28 +198,27 @@ public class ServiceRecord implements Cloneable {
   public String toString() {
     final StringBuilder sb =
         new StringBuilder("ServiceRecord{");
-    sb.append("yarn_id='").append(getYarn_id()).append('\'');
-    sb.append(", yarn_persistence=").append(getYarn_persistence());
-    sb.append(", description='").append(description).append('\'');
-    sb.append(", external endpoints: {");
+    sb.append("description='").append(description).append('\'');
+    sb.append("; external endpoints: {");
     for (Endpoint endpoint : external) {
       sb.append(endpoint).append("; ");
     }
-    sb.append("}, internal endpoints: {");
+    sb.append("}; internal endpoints: {");
     for (Endpoint endpoint : internal) {
-      sb.append(endpoint).append("; ");
+      sb.append(endpoint != null ? endpoint.toString() : "NULL ENDPOINT");
+      sb.append("; ");
     }
     sb.append('}');
 
     if (!attributes.isEmpty()) {
-      sb.append(", other attributes: {");
-      for (Map.Entry<String, Object> attr : attributes.entrySet()) {
+      sb.append(", attributes: {");
+      for (Map.Entry<String, String> attr : attributes.entrySet()) {
         sb.append("\"").append(attr.getKey()).append("\"=\"")
           .append(attr.getValue()).append("\" ");
       }
     } else {
 
-      sb.append(", other attributes: {");
+      sb.append(", attributes: {");
     }
     sb.append('}');
 
@@ -252,11 +239,12 @@ public class ServiceRecord implements Cloneable {
   /**
    * ID. For containers: container ID. For application instances, application ID.
    */
+  @JsonIgnore
   public String getYarn_id() {
     return get(YarnRegistryAttributes.YARN_ID, "");
   }
 
-  public void setYarn_id(String yarn_id) {
+  public void putYarn_id(String yarn_id) {
     set(YarnRegistryAttributes.YARN_ID, yarn_id);
   }
 
@@ -265,12 +253,26 @@ public class ServiceRecord implements Cloneable {
    *   entries may be deleted.
    *   {@link PersistencePolicies}
    */
+  @JsonIgnore
   public String getYarn_persistence() {
     return get(YarnRegistryAttributes.YARN_PERSISTENCE, "");
   }
 
-  public void setYarn_persistence(String yarn_persistence) {
+  public void putYarn_persistence(String yarn_persistence) {
     set(YarnRegistryAttributes.YARN_PERSISTENCE, yarn_persistence);
   }
 
+  /**
+   * Validate the record by checking for null fields and other invalid
+   * conditions
+   * @throws NullPointerException if a field is null when it
+   * MUST be set.
+   * @throws RuntimeException on invalid entries
+   */
+  public void validate() {
+    for (Endpoint endpoint : external) {
+      Preconditions.checkNotNull("null endpoint", endpoint);
+      endpoint.validate();
+    }
+  }
 }

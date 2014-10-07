@@ -144,8 +144,12 @@ public final class Endpoint implements Cloneable {
       sb.append("[ ");
       for (List<String> address : addresses) {
         sb.append("[ ");
-        for (String elt : address) {
-          sb.append('"').append(elt).append("\" ");
+        if (address == null) {
+          sb.append("NULL entry in address list");
+        } else {
+          for (String elt : address) {
+            sb.append('"').append(elt).append("\" ");
+          }
         }
         sb.append("] ");
       };
@@ -158,15 +162,20 @@ public final class Endpoint implements Cloneable {
   }
 
   /**
-   * Validate the record by checking for null fields
+   * Validate the record by checking for null fields and other invalid
+   * conditions
    * @throws NullPointerException if a field is null when it
    * MUST be set.
+   * @throws RuntimeException on invalid entries
    */
   public void validate() {
     Preconditions.checkNotNull(api, "null API field");
     Preconditions.checkNotNull(addressType, "null addressType field");
     Preconditions.checkNotNull(protocolType, "null protocolType field");
     Preconditions.checkNotNull(addresses, "null addresses field");
+    for (List<String> address : addresses) {
+      Preconditions.checkNotNull(address, "null element in address");
+    }
   }
 
   /**

@@ -91,7 +91,9 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     assertEquals(1, records.size());
     ServiceRecord record = records.get(ENTRY_PATH);
     assertNotNull(record);
+    record.validate();
     assertMatches(written, record);
+    
   }
 
   @Test
@@ -145,7 +147,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   @Test
   public void testPutNoParent() throws Throwable {
     ServiceRecord record = new ServiceRecord();
-    record.setYarn_id("testPutNoParent");
+    record.putYarn_id("testPutNoParent");
     String path = "/path/without/parent";
     try {
       operations.bind(path, record, 0);
@@ -172,7 +174,7 @@ public class TestRegistryOperations extends AbstractRegistryTest {
   @Test(expected = PathNotFoundException.class)
   public void testPutNoParent2() throws Throwable {
     ServiceRecord record = new ServiceRecord();
-    record.setYarn_id("testPutNoParent");
+    record.putYarn_id("testPutNoParent");
     String path = "/path/without/parent";
     operations.bind(path, record, 0);
   }
@@ -263,7 +265,6 @@ public class TestRegistryOperations extends AbstractRegistryTest {
     ServiceRecord r1 = new ServiceRecord();
     ServiceRecord r2 = createRecord("i", 
         PersistencePolicies.PERMANENT, "r2");
-    r2.data = "0x4444";
     
     String path = USERPATH + SC_HADOOP + "/listing" ;
     operations.mknode(path, true);

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.yarn.registry.client.exceptions.InvalidRecordException;
@@ -89,6 +90,9 @@ public class RegistryTypeUtils {
       String protocolType,
       String hostname,
       int port) {
+    Preconditions.checkArgument(api != null, "null API");
+    Preconditions.checkArgument(protocolType != null, "null protocolType");
+    Preconditions.checkArgument(hostname != null, "null hostname");
     return new Endpoint(api,
         AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
         protocolType,
@@ -106,7 +110,9 @@ public class RegistryTypeUtils {
   public static Endpoint ipcEndpoint(String api,
       boolean protobuf, List<String> address) {
     ArrayList<List<String>> addressList = new ArrayList<List<String>>();
-    addressList.add(address);
+    if (address != null) {
+      addressList.add(address);
+    }
     return new Endpoint(api,
         AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
         protobuf ? ProtocolTypes.PROTOCOL_HADOOP_IPC_PROTOBUF

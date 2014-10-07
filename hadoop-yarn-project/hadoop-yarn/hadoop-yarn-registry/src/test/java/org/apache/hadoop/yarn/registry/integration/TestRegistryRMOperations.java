@@ -108,7 +108,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     String path = "/users/example/hbase/hbase1/";
     ServiceRecord written = buildExampleServiceEntry(
         PersistencePolicies.APPLICATION_ATTEMPT);
-    written.setYarn_id("testAsyncPurgeEntry_attempt_001");
+    written.putYarn_id("testAsyncPurgeEntry_attempt_001");
 
     operations.mknode(RegistryPathUtils.parentOf(path), true);
     operations.bind(path, written, 0);
@@ -150,7 +150,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     String path = "/users/example/hbase/hbase1/";
     ServiceRecord written = buildExampleServiceEntry(
         PersistencePolicies.APPLICATION_ATTEMPT);
-    written.setYarn_id("testAsyncPurgeEntry_attempt_001");
+    written.putYarn_id("testAsyncPurgeEntry_attempt_001");
 
     operations.mknode(RegistryPathUtils.parentOf(path), true);
     operations.bind(path, written, 0);

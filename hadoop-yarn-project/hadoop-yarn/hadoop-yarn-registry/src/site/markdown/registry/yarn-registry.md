@@ -347,37 +347,24 @@ one list for users of a service, one list for internal use within the
 application.
 
 
-<table>
-  <tr>
-    <td>Name</td>
-    <td>Description</td>
-  </tr>
-  <tr>
-    <td>yarn_id: String/td>
-    <td>YARN application or container ID (missing/empty for statically 
-    deployed services).</td>
-  </tr>
-  <tr>
-    <td>yarn_persistence: int</td>
-    <td>Persistence policy.</td>
-  </tr>
-    <tr>
-      <td>description: String</td>
-      <td>Human-readable description.</td>
-    </tr>
-    <tr>
-      <td>data: String</td>
-      <td>holder of (implicitly small amounts of) service-specific data</td>
-    </tr>
-  <tr>
-    <td>external: List&lt;Endpoint&gt;</td>
-    <td>A list of service endpoints for external callers.</td>
-  </tr>
-  <tr>
-    <td>internal: List&lt;Endpoint&gt;</td>
-    <td>A list of service endpoints for internal use within the service instance.</td>
-  </tr>
-</table>
+    <table>
+      <tr>
+        <td>Name</td>
+        <td>Description</td>
+      </tr>
+      <tr>
+        <td>description: String</td>
+        <td>Human-readable description.</td>
+      </tr>
+      <tr>
+        <td>external: List&lt;Endpoint&gt;</td>
+        <td>A list of service endpoints for external callers.</td>
+      </tr>
+      <tr>
+        <td>internal: List&lt;Endpoint&gt;</td>
+        <td>A list of service endpoints for internal use within the service instance.</td>
+      </tr>
+    </table>
 
 ### YARN Persistence policies
 
@@ -385,29 +372,29 @@ The optional `yarn_persistence` and `yarn_id` attributes defines when a record
 *and any child entries* may be deleted.
 
 
-<table>
-  <tr>
-    <td>Name</td>
-    <td>Description</td>
-  </tr>
-  <tr>
-    <td>permanent</td>
-    <td>The record persists until removed manually.</td>
-  </tr>
-  <tr>
-    <td>application</td>
-    <td>Remove when the YARN application defined in the id field terminates.</td>
-  </tr>
-  <tr>
-    <td>application-attempt</td>
-    <td>Remove when the current YARN application attempt finishes.</td>
-  </tr>
-  <tr>
-    <td>container</td>
-    <td>Remove when the YARN container in the ID field finishes</td>
-  </tr>
-
-</table>
+    <table>
+      <tr>
+        <td>Name</td>
+        <td>Description</td>
+      </tr>
+      <tr>
+        <td>permanent</td>
+        <td>The record persists until removed manually.</td>
+      </tr>
+      <tr>
+        <td>application</td>
+        <td>Remove when the YARN application defined in the id field terminates.</td>
+      </tr>
+      <tr>
+        <td>application-attempt</td>
+        <td>Remove when the current YARN application attempt finishes.</td>
+      </tr>
+      <tr>
+        <td>container</td>
+        <td>Remove when the YARN container in the ID field finishes</td>
+      </tr>
+    
+    </table>
 
 
 The policies which clean up when an application, application attempt or
@@ -518,14 +505,11 @@ After creation and registration of the application, the registry looks as follow
              /container-1408631738011-0001-01-000001
 
 The `/users/devteam/org-apache-tomcat/tomcat-test` service record describes the
-overall application. It lists the YARN application ID, and exports the URL to a
-load balancer. It's persistence is 0; permanent.
+overall application. It exports the URL to a load balancer. 
 
     {
       "description" : "tomcat-based web application",
       "registrationTime" : 1408638082444,
-      "yarn_id" : "application_1408631738011_0001",
-      "yarn_persistence" : "0",
       "external" : [ {
         "api" : "www",
         "addressType" : "uri",

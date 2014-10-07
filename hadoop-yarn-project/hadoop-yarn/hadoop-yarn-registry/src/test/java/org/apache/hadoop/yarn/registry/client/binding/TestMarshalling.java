@@ -28,6 +28,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.rules.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 
@@ -35,6 +37,9 @@ import java.io.EOFException;
  * Test record marshalling
  */
 public class TestMarshalling extends RegistryTestHelper {
+  private static final Logger
+      LOG = LoggerFactory.getLogger(TestMarshalling.class);
+
   @Rule
   public final Timeout testTimeout = new Timeout(10000);
   @Rule
@@ -50,11 +55,12 @@ public class TestMarshalling extends RegistryTestHelper {
   public void testRoundTrip() throws Throwable {
     String persistence = PersistencePolicies.PERMANENT;
     ServiceRecord record = createRecord(persistence);
+    record.set("customkey","customvalue");
+    record.set("customkey2","customvalue2");
+    LOG.info(marshal.toJson(record));
     byte[] bytes = marshal.toBytes(record);
     ServiceRecord r2 = marshal.fromBytes("", bytes, 0);
-    assertEquals(record.getYarn_id(), r2.getYarn_id());
-    assertEquals(record.getYarn_persistence(), r2.getYarn_persistence());
-    assertEquals(record.description, r2.description);
+    assertMatches(record, r2);
   }
 
   @Test
@@ -62,9 +68,8 @@ public class TestMarshalling extends RegistryTestHelper {
     ServiceRecord record = createRecord(PersistencePolicies.CONTAINER);
     byte[] bytes = marshal.toByteswithHeader(record);
     ServiceRecord r2 = marshal.fromBytesWithHeader("", bytes);
-    assertEquals(record.getYarn_id(), r2.getYarn_id());
-    assertEquals(record.getYarn_persistence(), r2.getYarn_persistence());
-    assertEquals(record.description, r2.description);
+    assertMatches(record, r2);
+
   }
 
   @Test(expected = NoRecordException.class)
@@ -88,19 +93,19 @@ public class TestMarshalling extends RegistryTestHelper {
 
 
   @Test
-  public void testUnknonwnFieldsRoundTrip() throws Throwable {
+  public void testUnknownFieldsRoundTrip() throws Throwable {
     ServiceRecord record =
         createRecord(PersistencePolicies.APPLICATION_ATTEMPT);
     record.set("key", "value");
-    record.set("intval", 2);
+    record.set("intval", "2");
     assertEquals("value", record.get("key"));
-    assertEquals(2, record.get("intval"));
+    assertEquals("2", record.get("intval"));
     assertNull(record.get("null"));
     assertEquals("defval", record.get("null", "defval"));
     byte[] bytes = marshal.toByteswithHeader(record);
     ServiceRecord r2 = marshal.fromBytesWithHeader("", bytes);
     assertEquals("value", r2.get("key"));
-    assertEquals(2, r2.get("intval"));
+    assertEquals("2", r2.get("intval"));
   }
 
   @Test
@@ -108,7 +113,7 @@ public class TestMarshalling extends RegistryTestHelper {
     ServiceRecord record =
         createRecord(PersistencePolicies.APPLICATION_ATTEMPT);
     record.set("key", "value");
-    record.set("intval", 2);
+    record.set("intval", "2");
     ServiceRecord that = new ServiceRecord(record);
     assertMatches(record, that);
   }
