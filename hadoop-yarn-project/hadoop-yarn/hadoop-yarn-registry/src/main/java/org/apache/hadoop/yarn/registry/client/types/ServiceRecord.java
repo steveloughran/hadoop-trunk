@@ -54,7 +54,7 @@ public class ServiceRecord implements Cloneable {
    * map to handle unknown attributes.
    */
   @JsonIgnore
-  private Map<String, Object> otherAttributes = new HashMap<String, Object>(4);
+  private Map<String, Object> attributes = new HashMap<String, Object>(4);
 
   /**
    * List of endpoints intended for use to external callers
@@ -107,6 +107,11 @@ public class ServiceRecord implements Cloneable {
     this.description = that.description;
     this.setYarn_persistence(that.getYarn_persistence());
     this.data = that.data;
+    // others
+    Map<String, Object> thatAttrs = that.attributes;
+    for (Map.Entry<String, Object> entry : thatAttrs.entrySet()) {
+      attributes.put(entry.getKey(), entry.getValue());
+    }
     // endpoints
     List<Endpoint> src = that.internal;
     if (src != null) {
@@ -164,13 +169,13 @@ public class ServiceRecord implements Cloneable {
 
   /**
    * Handle unknown attributes by storing them in the
-   * {@link #otherAttributes} map
+   * {@link #attributes} map
    * @param key attribute name
    * @param value attribute value.
    */
   @JsonAnySetter
   public void set(String key, Object value) {
-    otherAttributes.put(key, value);
+    attributes.put(key, value);
   }
 
   /**
@@ -180,8 +185,8 @@ public class ServiceRecord implements Cloneable {
    * @return a map of any unknown attributes in the deserialized JSON.
    */
   @JsonAnyGetter
-  public Map<String, Object> any() {
-    return otherAttributes;
+  public Map<String, Object> attributes() {
+    return attributes;
   }
 
   /**
@@ -191,7 +196,7 @@ public class ServiceRecord implements Cloneable {
    */
   @JsonIgnore
   public Object get(String key) {
-    return otherAttributes.get(key);
+    return attributes.get(key);
   }
 
   /**
@@ -202,7 +207,7 @@ public class ServiceRecord implements Cloneable {
    */
   @JsonIgnore
   public Object get(String key, Object defVal) {
-    Object val = otherAttributes.get(key);
+    Object val = attributes.get(key);
     return val != null ? val: defVal;
   }
   
@@ -238,16 +243,18 @@ public class ServiceRecord implements Cloneable {
     }
     sb.append('}');
 
-    if (!otherAttributes.isEmpty()) {
+    if (!attributes.isEmpty()) {
       sb.append(", other attributes: {");
-      for (Map.Entry<String, Object> attr : otherAttributes.entrySet()) {
+      for (Map.Entry<String, Object> attr : attributes.entrySet()) {
         sb.append("\"").append(attr.getKey()).append("\"=\"")
           .append(attr.getValue()).append("\" ");
       }
+    } else {
+
       sb.append(", other attributes: {");
-      sb.append('}');
     }
-    
+    sb.append('}');
+
     sb.append('}');
     return sb.toString();
   }
@@ -285,4 +292,5 @@ public class ServiceRecord implements Cloneable {
   public void setYarn_persistence(String yarn_persistence) {
     this.yarn_persistence = yarn_persistence;
   }
+
 }

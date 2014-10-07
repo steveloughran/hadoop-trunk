@@ -379,6 +379,7 @@ application.
   </tr>
 </table>
 
+### YARN Persistence policies
 
 The optional `yarn_persistence` and `yarn_id` attributes defines when a record
 *and any child entries* may be deleted.
@@ -386,28 +387,23 @@ The optional `yarn_persistence` and `yarn_id` attributes defines when a record
 
 <table>
   <tr>
-    <td>Policy #</td>
     <td>Name</td>
     <td>Description</td>
   </tr>
   <tr>
-    <td>0</td>
-    <td>Permanent</td>
+    <td>permanent</td>
     <td>The record persists until removed manually.</td>
   </tr>
   <tr>
-    <td>1</td>
-    <td>Application</td>
+    <td>application</td>
     <td>Remove when the YARN application defined in the id field terminates.</td>
   </tr>
   <tr>
-    <td>2</td>
-    <td>Application Attempt</td>
+    <td>application-attempt</td>
     <td>Remove when the current YARN application attempt finishes.</td>
   </tr>
   <tr>
-    <td>3</td>
-    <td>Container</td>
+    <td>container</td>
     <td>Remove when the YARN container in the ID field finishes</td>
   </tr>
 
@@ -424,6 +420,7 @@ These attributes use the prefix "`yarn_`" to indicate that their reliance on
 the YARN layer of the Hadoop cluster to implement the policy. If the registry
 were to run standalone —which is entirely possible— all records would be
 implicitly persistent.
+
 
 ### Endpoint:
 

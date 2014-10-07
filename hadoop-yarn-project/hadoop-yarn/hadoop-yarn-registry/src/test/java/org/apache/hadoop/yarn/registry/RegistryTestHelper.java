@@ -43,6 +43,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.inetAddrEndpoint;
 import static org.apache.hadoop.yarn.registry.client.binding.RegistryTypeUtils.ipcEndpoint;
@@ -181,8 +182,7 @@ public class RegistryTestHelper extends Assert {
   }
 
   /**
-   * Assert the records match. Only the ID, 
-   * description and persistence are checked.
+   * Assert the records match.
    * @param source record that was written
    * @param resolved the one that resolved.
    */
@@ -193,6 +193,15 @@ public class RegistryTestHelper extends Assert {
     assertEquals(source.description, resolved.description);
     assertEquals(source.getYarn_persistence(), resolved.getYarn_persistence());
     assertEquals(source.data, resolved.data);
+
+    Map<String, Object> srcAddrs = source.attributes();
+    Map<String, Object> resolvedAddrs = resolved.attributes();
+    assertEquals(srcAddrs.size(), resolvedAddrs.size());
+    for (Map.Entry<String, Object> entry : srcAddrs.entrySet()) {
+      String attr = entry.getKey();
+      assertEquals("attribute "+ attr, entry.getValue(), resolved.get(attr));
+      
+    }
   }
 
   /**

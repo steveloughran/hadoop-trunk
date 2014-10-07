@@ -40,7 +40,7 @@ public interface PersistencePolicies {
   /**
    * Remove when the current YARN application attempt ID finishes: {@value}.
    */
-  String APPLICATION_ATTEMPT = "attempt";
+  String APPLICATION_ATTEMPT = "application-attempt";
 
   /**
    * Remove when the YARN container in the ID field finishes: {@value}

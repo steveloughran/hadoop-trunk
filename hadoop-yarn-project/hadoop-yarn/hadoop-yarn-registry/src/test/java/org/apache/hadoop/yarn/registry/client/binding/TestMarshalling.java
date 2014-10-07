@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.registry.client.binding;
 
+import org.apache.hadoop.yarn.registry.RegistryTestHelper;
 import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecordHeader;
@@ -34,7 +35,7 @@ import java.io.EOFException;
 /**
  * Test record marshalling
  */
-public class TestMarshalling extends Assert {
+public class TestMarshalling extends RegistryTestHelper {
   @Rule
   public final Timeout testTimeout = new Timeout(10000);
   @Rule
@@ -104,4 +105,15 @@ public class TestMarshalling extends Assert {
     assertEquals("value", r2.get("key"));
     assertEquals(2, r2.get("intval"));
   }
+
+  @Test
+  public void testFieldPropagationInClone() throws Throwable {
+    ServiceRecord record = new ServiceRecord("01", "description",
+        PersistencePolicies.APPLICATION_ATTEMPT, null);
+    record.set("key", "value");
+    record.set("intval", 2);
+    ServiceRecord that = new ServiceRecord(record);
+    assertMatches(record, that);
+  }
+  
 }
