@@ -42,12 +42,12 @@ The registry cannot be used:-
 2. When launched, it creates a service record at a known path
 3. This record MAY have application attempt persistence policy of and an ID of the application attempt
 		
-		yarn:persistence = APPLICATION_ATTEMPT
+		yarn:persistence = "application_attempt"
 		yarn:id = ${application_attemptId}
 	This means that the record will be deleted when the application attempt completes, even if a new attempt is created. Every Application attempt will have to re-register the endpoint —which may be needed to locate the service anyway.
 4. Alternatively, the record MAY have the persistence policy of "application":
 
-		yarn:persistence = APPLICATION_ATTEMPT
+		yarn:persistence = "application_attempt"
 		yarn:id = application_attemptId
 	This means that the record will persist even between application attempts, albeit with out of date endpoint information.
 5. Client applications look up the service by way of the path.
@@ -84,7 +84,7 @@ Here all containers in a YARN application are publishing service endpoints for p
 		
 	This record should have the container persistence policy an ID of the container
 		
-		yarn:persistence = CONTAINER
+		yarn:persistence = "container"
 		yarn:id = containerId
 		
 	When the container is terminated, the entry will be automatically deleted.
@@ -135,14 +135,19 @@ Management ports and bindings are simply another endpoint to publish. These shou
 A client application wishes to locate all services implementing a specific API, such as `"org.apache.hbase"`
 
 1. The client starts from a path in the registry
-2. The client calls `RegistryOperations.list()` to list all entries directly under that path, getting an array `RegistryPathStatus[]`.
-3. For all status entries, if the size of the entry is > the value of `ServiceRecordHeader.getLength()`, it MAY contain a service record.
-4. The contents can be retrieved using the `resolve()` operation. If successful, it does contain a service record —so the client can enumerate the `external` endpoints and locate the one with the desired API.
-5. The `children` field of each `RegistryPathStatus` status entry should be examined. If it is >= 0, the enumeration should be performed recursively on the path of that entry.
-6. The operation ultimately completes with a list of all entries.
+1. The client calls `registryOperations.list(path)` to list all nodes directly under that path, getting a relative list of child nodes.
+1. the client enumerates the child record statuses by calling `stat()` on each child.
+1. For all status entries, if the size of the entry is > the value of `ServiceRecordHeader.getLength()`, it MAY contain a service record.
+1. The contents can be retrieved using the `resolve()` operation. If successful, it does contain a service record —so the client can enumerate the `external` endpoints and locate the one with the desired API.
+1. The `children` field of each `RegistryPathStatus` status entry should be examined. If it is >= 0, the enumeration should be performed recursively on the path of that entry.
+1. The operation ultimately completes with a list of all entries.
 
 This algorithm describes a depth first search of the registry tree. Variations are of course possible, including breadth first search, or immediately halting the search as soon as a single entry point. There is also the option of parallel searches of different subtrees —which may reduce search time, albeit at the price of a higher client load on the registry infrastructure.
 
+A Utility class `RegistryUtils` provides static utility methods for common registry operations,
+in particular, `RegistryUtils.listServiceRecords(registryOperations, path)` 
+performs the listing and collection of all immediate child record entries of
+a specified path.
 
 
 

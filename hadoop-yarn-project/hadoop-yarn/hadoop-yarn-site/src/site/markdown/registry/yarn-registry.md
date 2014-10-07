@@ -357,11 +357,11 @@ application.
         <td>Human-readable description.</td>
       </tr>
       <tr>
-        <td>external: List&lt;Endpoint&gt;</td>
+        <td>external: List[Endpoint]</td>
         <td>A list of service endpoints for external callers.</td>
       </tr>
       <tr>
-        <td>internal: List&lt;Endpoint&gt;</td>
+        <td>internal: List[Endpoint]</td>
         <td>A list of service endpoints for internal use within the service instance.</td>
       </tr>
     </table>
@@ -398,12 +398,12 @@ implicitly persistent.
   <tr>
     <td>permanent</td>
     <td>The record persists until removed manually.</td>
-    <td>(unused)</td
+    <td>(unused)</td>
   </tr>
   <tr>
     <td>application</td>
     <td>Remove when the YARN application defined in the id field terminates.</td>
-    <td>application ID</td
+    <td>application ID</td>
   </tr>
   <tr>
     <td>application-attempt</td>
@@ -432,7 +432,7 @@ up according the lifecycle of that application.
     <td>Description</td>
   </tr>
   <tr>
-    <td>addresses: List&lt;List&lt;String&gt;&gt;</td>
+    <td>addresses: List[List[String]]</td>
     <td>a list of address tuples whose format depends on the address type</td>
   </tr>
   <tr>

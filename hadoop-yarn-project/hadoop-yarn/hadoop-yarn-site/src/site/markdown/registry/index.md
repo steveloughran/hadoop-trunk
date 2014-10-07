@@ -23,6 +23,6 @@ communicating with them. Client applications can then locate services
 and use the binding information to connect with the services's network-accessible
 endpoints, be they REST, IPC, Web UI, Zookeeper quorum+path or some other protocol.
 
-* [Architecture](yarn-registry.md)
-* [Using the YARN Service registry](using-the-yarn-service-registry.md)
-* [Security](registry-security.md)
+* [Architecture](yarn-registry.html)
+* [Using the YARN Service registry](using-the-yarn-service-registry.html)
+* [Security](registry-security.html)
