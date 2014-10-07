@@ -65,7 +65,7 @@ CONSTANTS
     PersistPolicies,\* the set of persistence policies
     ServiceRecords, \* all service records
     Registries,     \* the set of all possile registries 
-    PutActions,     \* all possible put actions
+    BindActions,     \* all possible put actions
     DeleteActions,  \* all possible delete actions
     PurgeActions,   \* all possible purge actions
     MknodeActions    \* all possible mkdir actions
@@ -140,6 +140,12 @@ Endpoint == [
     addresses: Addresses
 ]
 
+(* Attributes are the set of all string to string mappings *)
+
+Attributes == [
+STRING |-> STRING
+]
+
 (*
     A service record
 *)
@@ -157,10 +163,10 @@ ServiceRecord == [
     external: Endpoints,
     
     \* Endpoints intended for use internally
-    internal: Endpoints
+    internal: Endpoints,
     
     \* Attributes are a function
-    attributes: STRING |-> STRING
+    attributes: Attributes
 ]
 
 
@@ -200,7 +206,9 @@ mkNodeAction == [
 
 *)
 
-(* parent is defined for non empty sequences *)
+(*
+Parent is defined for non empty sequences
+ *)
 
 parent(path) == SubSeq(path, 1, Len(path)-1)
 
@@ -210,6 +218,7 @@ isParent(path, c) == path = parent(c)
 (*
 Registry Access Operations
 *)
+
 (* 
 Lookup all entries in a registry with a matching path
 *)
@@ -222,17 +231,26 @@ A path exists in the registry iff there is an entry with that path
 
 exists(Registry, path) == resolve(Registry, path) /= {}
 
-(* parent entry, or an empty set if there is none *)
+(*
+A parent entry, or an empty set if there is none
+*)
 parentEntry(Registry, path) == resolve(Registry, parent(path)) 
 
+(*
+A root path is the empty sequence
+*)
 isRootPath(path) == path = <<>>
 
-(* the root entry *)
+(*
+The root entry is the entry whose path is the root path
+*)
 isRootEntry(entry) == entry.path = <<>>
 
 
-(* A path p is an ancestor of another path d if they are different, and the path d
-   starts with path p *) 
+(*
+A path p is an ancestor of another path d if they are different, and the path d
+starts with path p 
+*) 
    
 isAncestorOf(path, d) ==
     /\ path /= d 
@@ -242,18 +260,26 @@ isAncestorOf(path, d) ==
 ancestorPathOf(path) == 
     \A a \in Paths: isAncestorOf(a, path)
 
-(* the set of all children of a path in the registry *)
+(*
+The set of all children of a path in the registry
+*)
 
 children(R, path) == \A c \in R: isParent(path, c.path)
 
-(* a path has children if the children() function does not return the empty set *)
+(*
+A path has children if the children() function does not return the empty set
+*)
 hasChildren(R, path) == children(R, path) /= {}
 
-(* Descendant: a child of a path or a descendant of a child of a path *)
+(*
+Descendant: a child of a path or a descendant of a child of a path
+*)
 
 descendants(R, path) == \A e \in R: isAncestorOf(path, e.path)
 
-(* Ancestors: all entries in the registry whose path is an entry of the path argument *)
+(*
+Ancestors: all entries in the registry whose path is an entry of the path argument
+*)
 ancestors(R, path) == \A e \in R: isAncestorOf(e.path, path)
 
 (*
@@ -265,7 +291,6 @@ pathAndDescendants(R, path) ==
 
 
 (*
-
 For validity, all entries must match the following criteria
  *)
 
@@ -285,38 +310,39 @@ validRegistry(R) ==
 
 ----------------------------------------------------------------------------------------
 (*
-    Registry Manipulation
+Registry Manipulation
 *)
 
 (*
- An entry can be put into the registry iff 
- -its parent is present or it is the root entry
-
+An entry can be put into the registry iff 
+its parent is present or it is the root entry
 *)
-canPut(R, e) == 
+canBind(R, e) == 
     isRootEntry(e) \/ exists(R, parent(e.path))
 
-(* put adds/replaces an entry if permitted *)
+(*
+'bind() adds/replaces an entry if permitted
+*)
 
-put(R, e) ==
-    /\ canPut(R, e)
+bind(R, e) ==
+    /\ canBind(R, e)
     /\ R' = (R \ resolve(R, e.path)) \union {e}
     
 
 (*
-    mknode() adds a new empty entry where there was none before, iff
-    -the parent exists
-    -it meets the requirement for being "put"
+mknode() adds a new empty entry where there was none before, iff
+-the parent exists
+-it meets the requirement for being "bindable"
 *)
 
 mknodeSimple(R, path) ==
     LET record == [ path |-> path, data |-> <<>>  ]
     IN  \/ exists(R, path)
-        \/ (exists(R, parent(path))  /\ canPut(R, record) /\ (R' = R \union {record} ))
+        \/ (exists(R, parent(path))  /\ canBind(R, record) /\ (R' = R \union {record} ))
 
 
 (*
-For all parents, the mknodeSimple criteria must apply.
+For all parents, the mknodeSimpl() criteria must apply.
 This could be defined recursively, though as TLA+ does not support recursion,
 an alternative is required
 
@@ -335,14 +361,18 @@ mknodeWithParents(R, path) ==
 mknode(R, path, recursive) ==
    IF recursive THEN mknodeWithParents(R, path) ELSE mknodeSimple(R, path)
   
-(* Deletion is set difference on any existing entries *)
+(*
+Deletion is set difference on any existing entries
+*)
 
 simpleDelete(R, path) ==
     /\ ~isRootPath(path)
     /\ children(R, path) = {}
     /\ R' = R \ resolve(R, path)
 
-(* recursive delete: neither the path or its descendants exists in the new registry *)
+(*
+Recursive delete: neither the path or its descendants exists in the new registry
+*)
 
 recursiveDelete(R, path) ==
        \* Root path: the new registry is the initial registry again 
@@ -352,7 +382,9 @@ recursiveDelete(R, path) ==
     /\ ~isRootPath(path) => R' = R \ ( resolve(R, path) \union descendants(R, path))
 
 
-(* Delete operation which chooses the recursiveness policy based on an argument*)
+(*
+Delete operation which chooses the recursiveness policy based on an argument
+*)
 
 delete(R, path, recursive) == 
     IF recursive THEN recursiveDelete(R, path) ELSE simpleDelete(R, path) 
@@ -366,7 +398,8 @@ afterwards
 purge(R, path, id, persistence) == 
     /\ (persistence \in PersistPolicySet)
     /\ \A p2 \in pathAndDescendants(R, path) :
-         (p2.yarn_id = id /\ p2.yarn_ = persistence) => recursiveDelete(R, p2.path) 
+         (p2.attributes["yarn:id"] = id /\ p2.attributes["yarn:persistence"] = persistence)
+         => recursiveDelete(R, p2.path) 
 
 (*
 resolveRecord() resolves the record at a path or fails.
@@ -384,21 +417,22 @@ resolveRecord(R, path) ==
         /\ CHOOSE e \in l : TRUE
 
 (*
- The specific action of putting an entry into a record includes validating the record
+The specific action of putting an entry into a record includes validating the record
 *)
 
-validRecordToPut(path, record) ==
+validRecordToBind(path, record) ==
       \* The root entry must have permanent persistence  
-     isRootPath(path) => (record.yarn_persistence = "PERMANENT" \/ record.yarn_persistence = "")
+     isRootPath(path) => (record.attributes["yarn:persistence"] = "permanent" 
+     \/ record.attributes["yarn:persistence"] = "")
 
 
 (* 
- putting a service record involves validating it then putting it in the registry
- marshalled as the data in the entry
+Binding a service record involves validating it then putting it in the registry
+marshalled as the data in the entry
  *)
-putRecord(R, path, record) ==
-    /\ validRecordToPut(path, record)
-    /\ put(R, [path |-> path, data |-> record])
+bindRecord(R, path, record) ==
+    /\ validRecordToBind(path, record)
+    /\ bind(R, [path |-> path, data |-> record])
 
 
 ----------------------------------------------------------------------------------------
@@ -406,30 +440,30 @@ putRecord(R, path, record) ==
  
 
 (*
-    The action queue can only contain one of the sets of action types, and
-    by giving each a unique name, those sets are guaranteed to be disjoint
+The action queue can only contain one of the sets of action types, and
+by giving each a unique name, those sets are guaranteed to be disjoint
 *) 
  QueueInvariant ==   
     /\ \A a \in actions: 
-        \/ (a \in PutActions /\ a.type="put") 
+        \/ (a \in BindActions /\ a.type="bind") 
         \/ (a \in DeleteActions /\ a.type="delete")
         \/ (a \in PurgeActions /\ a.type="purge")
         \/ (a \in MknodeActions /\ a.type="mknode")
 
 
 (*
-    Applying queued actions
+Applying queued actions
 *)
  
 applyAction(R, a) == 
-    \/ (a \in PutActions /\ putRecord(R, a.path, a.record) )
+    \/ (a \in BindActions /\ bindRecord(R, a.path, a.record) )
     \/ (a \in MknodeActions /\ mknode(R, a.path, a.recursive) )
     \/ (a \in DeleteActions /\ delete(R, a.path, a.recursive) )
     \/ (a \in PurgeActions /\ purge(R, a.path, a.id, a.persistence))
  
  
 (*
-    Apply the first action in a list and then update the actions
+Apply the first action in a list and then update the actions
 *)
 applyFirstAction(R, a) ==
     /\ actions /= <<>>
