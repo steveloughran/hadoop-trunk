@@ -48,8 +48,6 @@ public class ServiceRecord implements Cloneable {
    */
   public String description;
 
-  public String yarn_persistence = PersistencePolicies.PERMANENT;
-
   /**
    * map to handle unknown attributes.
    */
@@ -200,15 +198,17 @@ public class ServiceRecord implements Cloneable {
   }
 
   /**
-   * Get the "other" attribute with a specific key
+   * Get the "other" attribute with a specific key; assume this is a string
+   * and convert to a string even if it isn't.
    * @param key key to look up
    * @param defVal default value
-   * @return the value or <code>defval</code> if the value was not present
+   * @return the value as a string,
+   * or <code>defval</code> if the value was not present
    */
   @JsonIgnore
-  public Object get(String key, Object defVal) {
+  public String get(String key, String defVal) {
     Object val = attributes.get(key);
-    return val != null ? val: defVal;
+    return val != null ? val.toString(): defVal;
   }
   
   /**
@@ -273,7 +273,7 @@ public class ServiceRecord implements Cloneable {
    * ID. For containers: container ID. For application instances, application ID.
    */
   public String getYarn_id() {
-    return get(YarnRegistryAttributes.YARN_ID, "").toString();
+    return get(YarnRegistryAttributes.YARN_ID, "");
   }
 
   public void setYarn_id(String yarn_id) {
@@ -286,11 +286,11 @@ public class ServiceRecord implements Cloneable {
    *   {@link PersistencePolicies}
    */
   public String getYarn_persistence() {
-    return yarn_persistence;
+    return get(YarnRegistryAttributes.YARN_PERSISTENCE, "");
   }
 
   public void setYarn_persistence(String yarn_persistence) {
-    this.yarn_persistence = yarn_persistence;
+    set(YarnRegistryAttributes.YARN_PERSISTENCE, yarn_persistence);
   }
 
 }

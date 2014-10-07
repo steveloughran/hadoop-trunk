@@ -107,7 +107,7 @@ public class TestMarshalling extends RegistryTestHelper {
   }
 
   @Test
-  public void testFieldPropagationInClone() throws Throwable {
+  public void testFieldPropagationInCopy() throws Throwable {
     ServiceRecord record = new ServiceRecord("01", "description",
         PersistencePolicies.APPLICATION_ATTEMPT, null);
     record.set("key", "value");
