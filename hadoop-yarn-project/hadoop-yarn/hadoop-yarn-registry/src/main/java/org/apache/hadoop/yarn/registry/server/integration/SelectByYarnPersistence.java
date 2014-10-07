@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.registry.server.integration;
 
+import com.google.common.base.Preconditions;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.client.types.yarn.YarnRegistryAttributes;
@@ -32,6 +34,9 @@ public class SelectByYarnPersistence
   private final String targetPolicy;
 
   public SelectByYarnPersistence(String id, String targetPolicy) {
+    Preconditions.checkArgument(!StringUtils.isEmpty(id), "id");
+    Preconditions.checkArgument(!StringUtils.isEmpty(targetPolicy), 
+        "targetPolicy");
     this.id = id;
     this.targetPolicy = targetPolicy;
   }
@@ -40,8 +45,10 @@ public class SelectByYarnPersistence
   public boolean shouldSelect(String path,
       RegistryPathStatus registryPathStatus,
       ServiceRecord serviceRecord) {
+    String policy =
+        serviceRecord.get(YarnRegistryAttributes.YARN_PERSISTENCE, "");
     return id.equals(serviceRecord.get(YarnRegistryAttributes.YARN_ID, ""))
-           && (targetPolicy.equals(serviceRecord.getYarn_persistence()));
+           && (targetPolicy.equals(policy));
   }
 
   @Override

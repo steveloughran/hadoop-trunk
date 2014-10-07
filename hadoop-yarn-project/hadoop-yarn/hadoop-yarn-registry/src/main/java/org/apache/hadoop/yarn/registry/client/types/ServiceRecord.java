@@ -21,11 +21,8 @@ package org.apache.hadoop.yarn.registry.client.types;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.yarn.registry.client.types.yarn.PersistencePolicies;
-import org.apache.hadoop.yarn.registry.client.types.yarn.YarnRegistryAttributes;
 import org.codehaus.jackson.annotate.JsonAnyGetter;
 import org.codehaus.jackson.annotate.JsonAnySetter;
-import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 import java.util.ArrayList;
@@ -234,20 +231,6 @@ public class ServiceRecord implements Cloneable {
   @Override
   protected Object clone() throws CloneNotSupportedException {
     return super.clone();
-  }
-
-  /**
-   *   The persistence attribute defines when a record and any child 
-   *   entries may be deleted.
-   *   {@link PersistencePolicies}
-   */
-  @JsonIgnore
-  public String getYarn_persistence() {
-    return get(YarnRegistryAttributes.YARN_PERSISTENCE, "");
-  }
-
-  public void putYarn_persistence(String yarn_persistence) {
-    set(YarnRegistryAttributes.YARN_PERSISTENCE, yarn_persistence);
   }
 
   /**

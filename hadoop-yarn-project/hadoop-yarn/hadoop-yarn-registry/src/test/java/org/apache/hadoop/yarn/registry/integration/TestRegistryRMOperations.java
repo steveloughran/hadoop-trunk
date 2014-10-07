@@ -265,7 +265,8 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
 
     ServiceRecord dns1resolved = operations.resolve(dns1path);
     assertEquals("Persistence policies on resolved entry",
-        PersistencePolicies.CONTAINER, dns1resolved.getYarn_persistence());
+        PersistencePolicies.CONTAINER,
+        dns1resolved.get(YarnRegistryAttributes.YARN_PERSISTENCE, ""));
 
     Map<String, RegistryPathStatus> children =
         RegistryUtils.statChildren(operations, componentsPath);
@@ -280,7 +281,7 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     logRecord(retrieved1.get(YarnRegistryAttributes.YARN_ID, ""), retrieved1);
     assertMatches(dns1resolved, retrieved1);
     assertEquals(PersistencePolicies.CONTAINER,
-        retrieved1.getYarn_persistence());
+        retrieved1.get(YarnRegistryAttributes.YARN_PERSISTENCE, ""));
 
     // create a listing under components/
     operations.mknode(componentsPath + "subdir", false);

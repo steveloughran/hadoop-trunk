@@ -597,7 +597,7 @@ public class ApplicationMaster {
       String appId = this.appAttemptID.getApplicationId().toString();
 
       serviceRecord.set(YarnRegistryAttributes.YARN_ID, attemptID);
-      serviceRecord.putYarn_persistence(
+      serviceRecord.set(YarnRegistryAttributes.YARN_PERSISTENCE,
           PersistencePolicies.APPLICATION_ATTEMPT);
       serviceRecord.description = "Distributed Shell";
       // if this service offered external RPC/Web access, they
@@ -616,13 +616,15 @@ public class ApplicationMaster {
       LOG.info("Registered " + serviceRecord + " at " + path );
 
       serviceRecord.set(YarnRegistryAttributes.YARN_ID, appId);
-      serviceRecord.putYarn_persistence(PersistencePolicies.APPLICATION);
+      serviceRecord.set(YarnRegistryAttributes.YARN_PERSISTENCE,
+          PersistencePolicies.APPLICATION);
       registryOperations.bind(path + "-app", serviceRecord,
           BindFlags.OVERWRITE);
 
       // register one that is not deleted
       serviceRecord.set(YarnRegistryAttributes.YARN_ID, "");
-      serviceRecord.putYarn_persistence(PersistencePolicies.PERMANENT);
+      serviceRecord.set(YarnRegistryAttributes.YARN_PERSISTENCE,
+          PersistencePolicies.PERMANENT);
       registryOperations.bind(path + "-permanent", serviceRecord,
           BindFlags.OVERWRITE);
     }

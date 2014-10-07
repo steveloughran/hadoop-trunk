@@ -263,7 +263,7 @@ public class RegistryTestHelper extends Assert {
       URISyntaxException {
     ServiceRecord record = new ServiceRecord();
     record.set(YarnRegistryAttributes.YARN_ID, "example-0001");
-    record.putYarn_persistence(persistence);
+    record.set(YarnRegistryAttributes.YARN_PERSISTENCE, persistence);
     addSampleEndpoints(record, "namenode");
     return record;
   }
@@ -390,7 +390,7 @@ public class RegistryTestHelper extends Assert {
     ServiceRecord serviceRecord = new ServiceRecord();
     serviceRecord.set(YarnRegistryAttributes.YARN_ID, id);
     serviceRecord.description = description;
-    serviceRecord.putYarn_persistence(persistence);
+    serviceRecord.set(YarnRegistryAttributes.YARN_PERSISTENCE, persistence);
     return serviceRecord;
   }
 
