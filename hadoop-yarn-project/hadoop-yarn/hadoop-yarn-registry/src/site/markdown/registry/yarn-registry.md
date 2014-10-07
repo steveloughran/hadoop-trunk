@@ -368,46 +368,61 @@ application.
 
 ### YARN Persistence policies
 
-The optional `yarn_persistence` and `yarn_id` attributes defines when a record
-*and any child entries* may be deleted.
+The YARN Resource Manager integration integrates cleanup of service records
+as an application, attempt or container is completed.
+
+This allows service to register entries which have a lifespan bound to one of
+these aspects of YARN applications' lifecycles. This is a feature which is only
+supported when the RM has enabled its support, and would not apply to
+any use of the registry without the RM's participation. 
+
+The attributes, `yarn:id` and `yarn:persistence` specify which records
+*and any child entries* may be deleted as the associated YARN components complete.
 
 
-    <table>
-      <tr>
-        <td>Name</td>
-        <td>Description</td>
-      </tr>
-      <tr>
-        <td>permanent</td>
-        <td>The record persists until removed manually.</td>
-      </tr>
-      <tr>
-        <td>application</td>
-        <td>Remove when the YARN application defined in the id field terminates.</td>
-      </tr>
-      <tr>
-        <td>application-attempt</td>
-        <td>Remove when the current YARN application attempt finishes.</td>
-      </tr>
-      <tr>
-        <td>container</td>
-        <td>Remove when the YARN container in the ID field finishes</td>
-      </tr>
-    
-    </table>
+The `yarn:id` field defines the application, attempt or container ID to match;
+the `yarn:persistence` attribute defines the trigger for record cleanup, and
+implicitly the type of the contents of the `yarn:id` field.
 
-
-The policies which clean up when an application, application attempt or
-container terminates require the `yarn_id` field to match that of the
-application, attempt or container. If the wrong ID is set, the cleanup does not
-take place —and if set to a different application or container, will be cleaned
-up according the lifecycle of that application.
-
-These attributes use the prefix "`yarn_`" to indicate that their reliance on
+These attributes use the prefix "`yarn:`" to indicate that their reliance on
 the YARN layer of the Hadoop cluster to implement the policy. If the registry
 were to run standalone —which is entirely possible— all records would be
 implicitly persistent.
 
+<table>
+  <tr>
+    <td>Name</td>
+    <td>Description</td>
+    <td>contents of `yarn:id` field</td>
+  </tr>
+  <tr>
+    <td>permanent</td>
+    <td>The record persists until removed manually.</td>
+    <td>(unused)</td
+  </tr>
+  <tr>
+    <td>application</td>
+    <td>Remove when the YARN application defined in the id field terminates.</td>
+    <td>application ID</td
+  </tr>
+  <tr>
+    <td>application-attempt</td>
+    <td>Remove when the current YARN application attempt finishes.</td>
+    <td>application attempt ID</td>
+  </tr>
+  <tr>
+    <td>container</td>
+    <td>Remove when the YARN container in the ID field finishes</td>
+    <td>container ID</td>
+  </tr>
+</table>
+
+
+The policies which clean up when an application, application attempt or
+container terminates require the `yarn:id` field to match that of the
+application, attempt or container. If the wrong ID is set, the cleanup does not
+take place —and if set to a different application or container, will be cleaned
+up according the lifecycle of that application.
 
 ### Endpoint:
 
@@ -524,15 +539,15 @@ their container ID converted into a DNS-compatible hostname. The entries are
 marked as ephemeral. If the entries were set within the container, then when
 that container is released or if the component fails, the entries will be
 automatically removed. Accordingly, it's persistence policy is declared to be
-"3", container. The `yarn_id` field identifies the container whose completion
+"3", container. The `yarn:id` field identifies the container whose completion
 will trigger the deletion of this entry
 
     /users/devteam/org-apache-tomcat/test1/components/container-1408631738011-0001-01-000001
     
     {
       "registrationTime" : 1408638082445,
-      "yarn_id" : "container_1408631738011_0001_01_000001",
-      "yarn_persistence" : "3",
+      "yarn:id" : "container_1408631738011_0001_01_000001",
+      "yarn:persistence" : "3",
       "description" : null,
       "external" : [ {
         "api" : "www",
@@ -555,8 +570,8 @@ external endpoint, the JMX addresses as internal.
 
     {
       "registrationTime" : 1408638082445,
-      "yarn_id" : "container_1408631738011_0001_01_000002",
-      "yarn_persistence" : "3",
+      "yarn:id" : "container_1408631738011_0001_01_000002",
+      "yarn:persistence" : "3",
       "description" : null,
       "external" : [ {
         "api" : "www",
@@ -632,7 +647,7 @@ it may change during a sequence of actions.
        * @throws InvalidPathnameException path name is invalid.
        * @throws IOException Any other IO Exception.
        */
-      void create(String path, ServiceRecord record, int createFlags)
+      void bind(String path, ServiceRecord record, int createFlags)
           throws PathNotFoundException,
           FileAlreadyExistsException,
           InvalidPathnameException,
