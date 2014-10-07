@@ -18,20 +18,20 @@
 
 package org.apache.hadoop.yarn.registry.integration;
 
+import org.apache.hadoop.yarn.registry.RegistryTestHelper;
 import org.apache.hadoop.yarn.registry.client.types.yarn.PersistencePolicies;
 import org.apache.hadoop.yarn.registry.client.types.RegistryPathStatus;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.server.integration.SelectByYarnPersistence;
 import org.apache.hadoop.yarn.registry.server.services.RegistryAdminService;
-import org.junit.Assert;
 import org.junit.Test;
 
-public class TestYarnPolicySelector extends Assert {
+public class TestYarnPolicySelector extends RegistryTestHelper {
 
 
-  private ServiceRecord record = new ServiceRecord("1",
-      "one",
-      PersistencePolicies.APPLICATION, null);
+  private ServiceRecord record = createRecord("1",
+      PersistencePolicies.APPLICATION, "one",
+      null);
   private RegistryPathStatus status = new RegistryPathStatus("/", 0, 0, 1);
 
   public void assertSelected(boolean outcome,

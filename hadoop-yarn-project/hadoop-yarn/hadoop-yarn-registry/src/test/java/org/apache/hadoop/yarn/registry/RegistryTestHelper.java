@@ -372,5 +372,22 @@ public class RegistryTestHelper extends Assert {
     return UserGroupInformation.loginUserFromKeytabAndReturnUGI(user,
         keytab.getAbsolutePath());
   }
+
+  public static ServiceRecord createRecord(String persistence) {
+    return createRecord("01", persistence, "description");
+  }
   
+  public static ServiceRecord createRecord(String id, String persistence,
+      String description) {
+    ServiceRecord serviceRecord = new ServiceRecord();
+    serviceRecord.setYarn_id(id);
+    serviceRecord.description = description;
+    serviceRecord.setYarn_persistence(persistence);
+    return serviceRecord;
+  }
+
+  public static ServiceRecord createRecord(String id, String persistence,
+      String description, String data) {
+    return createRecord(id, persistence, description);
+  }
 }

@@ -219,22 +219,24 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
     String cid2 = cid + "000002";
     String appPath = USERPATH + "tomcat";
 
-    ServiceRecord webapp = new ServiceRecord(appId,
-        "tomcat-based web application",
-        PersistencePolicies.APPLICATION, null);
+    ServiceRecord webapp = createRecord(appId,
+        PersistencePolicies.APPLICATION, "tomcat-based web application",
+        null);
     webapp.addExternalEndpoint(restEndpoint("www",
         new URI("http", "//loadbalancer/", null)));
 
-    ServiceRecord comp1 = new ServiceRecord(cid1, null,
-        PersistencePolicies.CONTAINER, null);
+    ServiceRecord comp1 = createRecord(cid1, PersistencePolicies.CONTAINER,
+        null,
+        null);
     comp1.addExternalEndpoint(restEndpoint("www",
         new URI("http", "//rack4server3:43572", null)));
     comp1.addInternalEndpoint(
         inetAddrEndpoint("jmx", "JMX", "rack4server3", 43573));
 
     // Component 2 has a container lifespan
-    ServiceRecord comp2 = new ServiceRecord(cid2, null,
-        PersistencePolicies.CONTAINER, null);
+    ServiceRecord comp2 = createRecord(cid2, PersistencePolicies.CONTAINER,
+        null,
+        null);
     comp2.addExternalEndpoint(restEndpoint("www",
         new URI("http", "//rack1server28:35881", null)));
     comp2.addInternalEndpoint(
@@ -338,12 +340,12 @@ public class TestRegistryRMOperations extends AbstractRegistryTest {
 
   @Test
   public void testChildDeletion() throws Throwable {
-    ServiceRecord app = new ServiceRecord("app1",
-        "app",
-        PersistencePolicies.APPLICATION, null);
-    ServiceRecord container = new ServiceRecord("container1",
-        "container",
-        PersistencePolicies.CONTAINER, null);
+    ServiceRecord app = createRecord("app1",
+        PersistencePolicies.APPLICATION, "app",
+        null);
+    ServiceRecord container = createRecord("container1",
+        PersistencePolicies.CONTAINER, "container",
+        null);
 
     operations.bind("/app", app, BindFlags.OVERWRITE);
     operations.bind("/app/container", container, BindFlags.OVERWRITE);

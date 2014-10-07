@@ -79,31 +79,11 @@ public class ServiceRecord implements Cloneable {
   }
 
   /**
-   * Create a service record ... sets the registration time to the current
-   * system time.
-   * @param yarn_id service ID
-   * @param description description
-   * @param yarn_persistence persistence policy
-   * @param data a small amount of data to be associated with the record
-   */
-  public ServiceRecord(String yarn_id,
-      String description,
-      String yarn_persistence,
-      String data) {
-    this.setYarn_id(yarn_id);
-    this.description = description;
-    this.setYarn_persistence(yarn_persistence);
-    this.data = data;
-  }
-
-  /**
    * Deep cloning constructor
    * @param that service record source
    */
   public ServiceRecord(ServiceRecord that) {
-    this.setYarn_id(that.getYarn_id());
     this.description = that.description;
-    this.setYarn_persistence(that.getYarn_persistence());
     this.data = that.data;
     // others
     Map<String, Object> thatAttrs = that.attributes;

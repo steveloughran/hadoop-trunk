@@ -23,7 +23,6 @@ import org.apache.hadoop.yarn.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecord;
 import org.apache.hadoop.yarn.registry.client.types.ServiceRecordHeader;
 import org.apache.hadoop.yarn.registry.client.types.yarn.PersistencePolicies;
-import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -49,8 +48,8 @@ public class TestMarshalling extends RegistryTestHelper {
 
   @Test
   public void testRoundTrip() throws Throwable {
-    ServiceRecord record = new ServiceRecord("01", "description",
-        PersistencePolicies.PERMANENT, null);
+    String persistence = PersistencePolicies.PERMANENT;
+    ServiceRecord record = createRecord(persistence);
     byte[] bytes = marshal.toBytes(record);
     ServiceRecord r2 = marshal.fromBytes("", bytes, 0);
     assertEquals(record.getYarn_id(), r2.getYarn_id());
@@ -60,8 +59,7 @@ public class TestMarshalling extends RegistryTestHelper {
 
   @Test
   public void testRoundTripHeaders() throws Throwable {
-    ServiceRecord record = new ServiceRecord("01", "description",
-        PersistencePolicies.CONTAINER, null);
+    ServiceRecord record = createRecord(PersistencePolicies.CONTAINER);
     byte[] bytes = marshal.toByteswithHeader(record);
     ServiceRecord r2 = marshal.fromBytesWithHeader("", bytes);
     assertEquals(record.getYarn_id(), r2.getYarn_id());
@@ -71,8 +69,7 @@ public class TestMarshalling extends RegistryTestHelper {
 
   @Test(expected = NoRecordException.class)
   public void testRoundTripBadHeaders() throws Throwable {
-    ServiceRecord record = new ServiceRecord("01", "description",
-        PersistencePolicies.APPLICATION, null);
+    ServiceRecord record = createRecord(PersistencePolicies.APPLICATION);
     byte[] bytes = marshal.toByteswithHeader(record);
     bytes[1] = 0x01;
     marshal.fromBytesWithHeader("src", bytes);
@@ -92,8 +89,8 @@ public class TestMarshalling extends RegistryTestHelper {
 
   @Test
   public void testUnknonwnFieldsRoundTrip() throws Throwable {
-    ServiceRecord record = new ServiceRecord("01", "description",
-        PersistencePolicies.APPLICATION_ATTEMPT, null);
+    ServiceRecord record =
+        createRecord(PersistencePolicies.APPLICATION_ATTEMPT);
     record.set("key", "value");
     record.set("intval", 2);
     assertEquals("value", record.get("key"));
@@ -108,8 +105,8 @@ public class TestMarshalling extends RegistryTestHelper {
 
   @Test
   public void testFieldPropagationInCopy() throws Throwable {
-    ServiceRecord record = new ServiceRecord("01", "description",
-        PersistencePolicies.APPLICATION_ATTEMPT, null);
+    ServiceRecord record =
+        createRecord(PersistencePolicies.APPLICATION_ATTEMPT);
     record.set("key", "value");
     record.set("intval", 2);
     ServiceRecord that = new ServiceRecord(record);
