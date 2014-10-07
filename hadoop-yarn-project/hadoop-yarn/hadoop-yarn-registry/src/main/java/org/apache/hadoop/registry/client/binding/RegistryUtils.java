@@ -176,7 +176,6 @@ public class RegistryUtils {
       InvalidPathnameException,
       IOException {
     List<String> childNames = registryOperations.list(path);
-    int size = childNames.size();
     Map<String, RegistryPathStatus> results =
         new HashMap<String, RegistryPathStatus>();
     for (String childName : childNames) {
