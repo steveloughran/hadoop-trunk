@@ -36,10 +36,11 @@ It assumes that
 3. changes are immediately visible to all other users of the registry. 
 4. This clearly implies that changes are visible in the sequence in which they happen.
 
-A Zookeeper-based registry does not meet all those assumptions
+A multi-server Zookeeper-based registry may not meet all those assumptions
 
 1. changes may take time to propagate across the ZK quorum, hence changes cannot 
-be considered immediate from the perspective of other registry clients. (assumptions (1) and (3)).
+be considered immediate from the perspective of other registry clients.
+(assumptions (1) and (3)).
 
 2. Selection operations may not be atomic. (assumption (2)).
 
@@ -49,8 +50,7 @@ A stricter definition would try to state that all operations are eventually
 true excluding other changes happening during a sequence of action.
 This is left as an excercise for the reader.
 
-The specification also omits all coverage of the permissions policy. This is something
-which can be tuned by the Resource Manager: who sets up
+The specification also omits all coverage of the permissions policy.
 *)
 
 
@@ -93,10 +93,10 @@ vars == << registry, actions >>
 (* Persistence policy *)
 PersistPolicySet == {
     "",                      \* Undefined; field not present. PERMANENT is implied.
-    "PERMANENT",            \* persists until explicitly removed 
-    "APPLICATION",          \* persists until the application finishes
-    "APPLICATION-ATTEMPT",  \* persists until the application attempt finishes
-    "CONTAINER"             \* persists until the container finishes 
+    "permanent",            \* persists until explicitly removed 
+    "application",          \* persists until the application finishes
+    "application-attempt",  \* persists until the application attempt finishes
+    "container"             \* persists until the container finishes 
   }
 
 (* Type invariants. *)
@@ -158,6 +158,9 @@ ServiceRecord == [
     
     \* Endpoints intended for use internally
     internal: Endpoints
+    
+    \* Attributes are a function
+    attributes: STRING |-> STRING
 ]
 
 
@@ -211,16 +214,16 @@ Registry Access Operations
 Lookup all entries in a registry with a matching path
 *)
 
-lookup(Registry, path) == \A entry \in Registry: entry.path = path
+resolve(Registry, path) == \A entry \in Registry: entry.path = path
 
 (*
 A path exists in the registry iff there is an entry with that path
 *)
 
-exists(Registry, path) == lookup(Registry, path) /= {}
+exists(Registry, path) == resolve(Registry, path) /= {}
 
 (* parent entry, or an empty set if there is none *)
-parentEntry(Registry, path) == lookup(Registry, parent(path)) 
+parentEntry(Registry, path) == resolve(Registry, parent(path)) 
 
 isRootPath(path) == path = <<>>
 
@@ -258,7 +261,7 @@ The set of entries that are a path and its descendants
 *)
 pathAndDescendants(R, path) ==
     \/ \A e \in R: isAncestorOf(path, e.path)
-    \/ lookup(R, path) 
+    \/ resolve(R, path) 
 
 
 (*
@@ -268,7 +271,7 @@ For validity, all entries must match the following criteria
 
 validRegistry(R) ==
         \* there can be at most one entry for a path.    
-        /\ \A e \in R: Cardinality(lookup(R, e.path)) = 1
+        /\ \A e \in R: Cardinality(resolve(R, e.path)) = 1
 
         \* There's at least one root entry 
         /\ \E e \in R: isRootEntry(e)                   
@@ -297,7 +300,7 @@ canPut(R, e) ==
 
 put(R, e) ==
     /\ canPut(R, e)
-    /\ R' = (R \ lookup(R, e.path)) \union {e}
+    /\ R' = (R \ resolve(R, e.path)) \union {e}
     
 
 (*
@@ -337,7 +340,7 @@ mknode(R, path, recursive) ==
 simpleDelete(R, path) ==
     /\ ~isRootPath(path)
     /\ children(R, path) = {}
-    /\ R' = R \ lookup(R, path)
+    /\ R' = R \ resolve(R, path)
 
 (* recursive delete: neither the path or its descendants exists in the new registry *)
 
@@ -346,7 +349,7 @@ recursiveDelete(R, path) ==
     /\ isRootPath(path) => R' = { [ path |-> <<>>, data |-> <<>> ] }
        \*  Any other entry: the new registry is a set with any existing
        \* entry for that path is removed, and the new entry added 
-    /\ ~isRootPath(path) => R' = R \ ( lookup(R, path) \union descendants(R, path))
+    /\ ~isRootPath(path) => R' = R \ ( resolve(R, path) \union descendants(R, path))
 
 
 (* Delete operation which chooses the recursiveness policy based on an argument*)
@@ -372,11 +375,11 @@ It relies on the fact that if the cardinality of a set is 1, then the CHOOSE ope
 is guaranteed to return the single entry of that set, iff the choice predicate holds. 
 
 Using a predicate of TRUE, it always succeeds, so this function selects 
-the sole entry of the lookup operation.
+the sole entry of the resolve operation.
 *)
 
 resolveRecord(R, path) ==
-    LET l == lookup(R, path) IN
+    LET l == resolve(R, path) IN
         /\ Cardinality(l) = 1
         /\ CHOOSE e \in l : TRUE
 
