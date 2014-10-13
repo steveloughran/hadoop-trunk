@@ -1412,6 +1412,7 @@
 
   <property>
     <description>
+      The root zookeeper node for the registry 
     </description>
     <name>hadoop.registry.zk.root</name>
     <value>/registry</value>
@@ -1427,7 +1428,7 @@
 
   <property>
     <description>
-      Zookeeper session timeout in milliseconds
+      Zookeeper connection timeout in milliseconds
     </description>
     <name>hadoop.registry.zk.connection.timeout.ms</name>
     <value>15000</value>
