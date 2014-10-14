@@ -22,18 +22,18 @@
 The Resource Manager manages user directory creation and record cleanup
 on YARN container/application attempt/application completion.
 
-
-
-    <property>
-      <description>
-        Is the registry enabled: does the RM start it up,
-        create the user and system paths, and purge
-        service records when containers, application attempts
-        and applications complete
-      </description>
-      <name>hadoop.registry.rm.enabled</name>
-      <value>false</value>
-    </property>
+```
+  <property>
+    <description>
+      Is the registry enabled: does the RM start it up,
+      create the user and system paths, and purge
+      service records when containers, application attempts
+      and applications complete
+    </description>
+    <name>hadoop.registry.rm.enabled</name>
+    <value>false</value>
+  </property>
+```
    
 ### Setting the Zookeeper Quorum: `hadoop.registry.zk.quorum`
  
@@ -41,15 +41,16 @@ This is an essential setting: it identifies the lists of zookeeper hosts
 and the ports on which the ZK services are listening.
 
 
-
-      <property>
-        <description>
-          List of hostname:port pairs defining the
-          zookeeper quorum binding for the registry
-        </description>
-        <name>hadoop.registry.zk.quorum</name>
-        <value>localhost:2181</value>
-      </property>
+```
+  <property>
+    <description>
+      List of hostname:port pairs defining the
+      zookeeper quorum binding for the registry
+    </description>
+    <name>hadoop.registry.zk.quorum</name>
+    <value>localhost:2181</value>
+  </property>
+```
 
 It takes a comma-separated list, such as `zk1:2181,zk2:2181,zk3:2181`
  
@@ -57,6 +58,7 @@ It takes a comma-separated list, such as `zk1:2181,zk2:2181,zk3:2181`
 
 This path sets the base zookeeper node for the registry
 
+```
   <property>
     <description>
       The root zookeeper node for the registry 
@@ -64,6 +66,7 @@ This path sets the base zookeeper node for the registry
     <name>hadoop.registry.zk.root</name>
     <value>/registry</value>
   </property>
+```
 
 The default value is normally sufficient.
 
@@ -72,8 +75,9 @@ The default value is normally sufficient.
 Registry security is enabled when the property `hadoop.registry.secure`
 is set to `true`. Once set, nodes are created with permissions, so that
 only a specific user *and the configured cluster "superuser" accounts*
-can write under their home path of `/users`. Only the superuser accounts
-will be able to manipulate the root path, including `/services` and `/users`.
+can write under their home path of `${hadoop.registry.zk.root}/users`. Only the superuser accounts
+will be able to manipulate the root path, including `${hadoop.registry.zk.root}/services`
+and `${hadoop.registry.zk.root}/users`.
 
 All write operations on the registry (including deleting entries and paths)
 must be authenticated. Read operations are still permitted by unauthenticated
@@ -81,8 +85,8 @@ callers.
 
 The key settings for secure registry support are:
 
-* enabling the secure mode:  `hadoop.registry.secure`.
-* listing the superuser zookeeper ACLs:  `hadoop.registry.system.acls`.
+* enabling the secure mode:  `hadoop.registry.secure`
+* listing the superuser zookeeper ACLs:  `hadoop.registry.system.acls`
 * listing the kerberos realm for the principals: `hadoop.registry.kerberos.realm`
 * identifying the JAAS context within the JAAS configuration which defines
 the user: `hadoop.registry.jaas.context`
@@ -90,31 +94,34 @@ the user: `hadoop.registry.jaas.context`
 
 ### Enabling security
 
-      <property>
-        <description>
-          Key to set if the registry is secure. Turning it on
-          changes the permissions policy from "open access"
-          to restrictions on kerberos with the option of
-          a user adding one or more auth key pairs down their
-          own tree.
-        </description>
-        <name>hadoop.registry.secure</name>
-        <value>false</value>
-      </property>
+```
+  <property>
+    <description>
+      Key to set if the registry is secure. Turning it on
+      changes the permissions policy from "open access"
+      to restrictions on kerberos with the option of
+      a user adding one or more auth key pairs down their
+      own tree.
+    </description>
+    <name>hadoop.registry.secure</name>
+    <value>false</value>
+  </property>
+```
 
 ### Identifying the client JAAS context
 
 The registry clients must identify the JAAS context which they use
 to authenticate to the registry.
     
-      <property>
-        <description>
-          Key to define the JAAS context. Used in secure
-          mode
-        </description>
-        <name>hadoop.registry.jaas.context</name>
-        <value>Client</value>
-      </property>
+```
+  <property>
+    <description>
+      Key to define the JAAS context. Used in secure mode
+    </description>
+    <name>hadoop.registry.jaas.context</name>
+    <value>Client</value>
+  </property>
+```
 
 *Note* as the Resource Manager is simply another client of the registry, it
 too must have this context defined.
@@ -125,52 +132,55 @@ too must have this context defined.
 These are the the accounts which are given full access to the base of the
 registry. The Resource Manager needs this option to create the root paths.
 
-Clients also need this option, so that the registry client can give those
+Clients also need this option so that the registry client can give those
 same accounts access to the nodes it creates. (This is a requirement of the
 ZK security model)
 
 1. The property `hadoop.registry.system.acls` takes a comma separate list
 of zookeeper `ACLs` which are given full access to created nodes; the permissions
 `READ | WRITE | CREATE | DELETE | ADMIN`. 
-1. Any zookeeper ACL scheme may be added to this, such as the `digest:` scheme.
-1. The SASL scheme, `sasl:` is used to identify which callers identified
+2. Any zookeeper ACL scheme may be added to this, such as the `digest:` scheme.
+3. The SASL scheme, `sasl:`, is used to identify which callers identified
 by sasl have full access. These are the superuser accounts.
-1. They may be identified by elements such as `sasl:yarn@REALM.COM`.
-1. To aid portability the setting, any sasl entry without the realm value —that
-is any entry that terminates in the "@" symbol— has the current realm appended
+4. They may be identified by elements such as `sasl:yarn@REALM.COM`.
+5. To aid portability the setting, any sasl entry without the realm value —that
+is, any entry that terminates in the "@" symbol— has the current realm appended
 to it.
-1. This realm is set to that of the current user.
-1. It may be overridden by the property `hadoop.registry.kerberos.realm`.
+6. This realm is set to that of the current user.
+7. It may be overridden by the property `hadoop.registry.kerberos.realm`.
 
-      <property>
-        <description>
-          A comma separated list of Zookeeper ACL identifiers with
-          system access to the registry in a secure cluster.
-    
-          These are given full access to all entries.
-    
-          If there is an "@" at the end of a SASL entry it
-          instructs the registry client to append the default kerberos domain.
-        </description>
-        <name>hadoop.registry.system.acls</name>
-        <value>sasl:yarn@, sasl:mapred@, sasl:mapred@hdfs@</value>
-      </property>
-    
-      <property>
-        <description>
-          The kerberos realm: used to set the realm of
-          system principals which do not declare their realm,
-          and any other accounts that need the value.
-    
-          If empty, the default realm of the running process
-          is used.
-    
-          If neither are known and the realm is needed, then the registry
-          service/client will fail.
-        </description>
-        <name>hadoop.registry.kerberos.realm</name>
-        <value></value>
-      </property>
+
+```
+  <property>
+    <description>
+      A comma separated list of Zookeeper ACL identifiers with
+      system access to the registry in a secure cluster.
+  
+      These are given full access to all entries.
+  
+      If there is an "@" at the end of a SASL entry it
+      instructs the registry client to append the default kerberos domain.
+    </description>
+    <name>hadoop.registry.system.acls</name>
+    <value>sasl:yarn@, sasl:mapred@, sasl:mapred@hdfs@</value>
+  </property>
+  
+  <property>
+    <description>
+      The kerberos realm: used to set the realm of
+      system principals which do not declare their realm,
+      and any other accounts that need the value.
+  
+      If empty, the default realm of the running process
+      is used.
+  
+      If neither are known and the realm is needed, then the registry
+      service/client will fail.
+    </description>
+    <name>hadoop.registry.kerberos.realm</name>
+    <value></value>
+  </property>
+```
 
 ## Zookeeper connection management options
 
@@ -182,185 +192,186 @@ a library which detects timeouts and attempts to reconnect to one of the
 servers which forms the zookeeper quorum. It is only after a timeout is detected
 that a retry is triggered.
         
-        
-      <property>
-        <description>
-          Zookeeper session timeout in milliseconds
-        </description>
-        <name>hadoop.registry.zk.session.timeout.ms</name>
-        <value>60000</value>
-      </property>
-    
-      <property>
-        <description>
-          Zookeeper connection timeout in milliseconds
-        </description>
-        <name>hadoop.registry.zk.connection.timeout.ms</name>
-        <value>15000</value>
-      </property>
-    
-      <property>
-        <description>
-          Zookeeper connection retry count before failing
-        </description>
-        <name>hadoop.registry.zk.retry.times</name>
-        <value>5</value>
-      </property>
-    
-      <property>
-        <description>
-        </description>
-        <name>hadoop.registry.zk.retry.interval.ms</name>
-        <value>1000</value>
-      </property>
-    
-      <property>
-        <description>
-          Zookeeper retry limit in milliseconds, during
-          exponential backoff: {@value}
-    
-          This places a limit even
-          if the retry times and interval limit, combined
-          with the backoff policy, result in a long retry
-          period
-        </description>
-        <name>hadoop.registry.zk.retry.ceiling.ms</name>
-        <value>60000</value>
-      </property>
+```
+  <property>
+    <description>
+      Zookeeper session timeout in milliseconds
+    </description>
+    <name>hadoop.registry.zk.session.timeout.ms</name>
+    <value>60000</value>
+  </property>
+
+  <property>
+    <description>
+      Zookeeper connection timeout in milliseconds
+    </description>
+    <name>hadoop.registry.zk.connection.timeout.ms</name>
+    <value>15000</value>
+  </property>
+
+  <property>
+    <description>
+      Zookeeper connection retry count before failing
+    </description>
+    <name>hadoop.registry.zk.retry.times</name>
+    <value>5</value>
+  </property>
+
+  <property>
+    <description>
+    </description>
+    <name>hadoop.registry.zk.retry.interval.ms</name>
+    <value>1000</value>
+  </property>
+
+  <property>
+    <description>
+      Zookeeper retry limit in milliseconds, during
+      exponential backoff: {@value}
+
+      This places a limit even
+      if the retry times and interval limit, combined
+      with the backoff policy, result in a long retry
+      period
+    </description>
+    <name>hadoop.registry.zk.retry.ceiling.ms</name>
+    <value>60000</value>
+  </property>
+```
     
 The retry strategy used in the registry client is 
 [`BoundedExponentialBackoffRetry`](https://curator.apache.org/apidocs/org/apache/curator/retry/BoundedExponentialBackoffRetry.html):
-This backs off exponentially on connection failures, before eventually
+This backs off exponentially on connection failures before eventually
 concluding that the quorum is unreachable and failing.
 
 ## Complete Set of Configuration Options
 
-    
-      <!-- YARN registry -->
-    
-      <property>
-        <description>
-          Is the registry enabled: does the RM start it up,
-          create the user and system paths, and purge
-          service records when containers, application attempts
-          and applications complete
-        </description>
-        <name>hadoop.registry.rm.enabled</name>
-        <value>false</value>
-      </property>
+```
+  <!-- YARN registry -->
 
-      <property>
-        <description>
-          List of hostname:port pairs defining the
-          zookeeper quorum binding for the registry
-        </description>
-        <name>hadoop.registry.zk.quorum</name>
-        <value>localhost:2181</value>
-      </property>
-    
-      <property>
-        <description>
-          The root zookeeper node for the registry 
-        </description>
-        <name>hadoop.registry.zk.root</name>
-        <value>/registry</value>
-      </property>
+  <property>
+    <description>
+      Is the registry enabled: does the RM start it up,
+      create the user and system paths, and purge
+      service records when containers, application attempts
+      and applications complete
+    </description>
+    <name>hadoop.registry.rm.enabled</name>
+    <value>false</value>
+  </property>
+
+  <property>
+    <description>
+      List of hostname:port pairs defining the
+      zookeeper quorum binding for the registry
+    </description>
+    <name>hadoop.registry.zk.quorum</name>
+    <value>localhost:2181</value>
+  </property>
+
+  <property>
+    <description>
+      The root zookeeper node for the registry 
+    </description>
+    <name>hadoop.registry.zk.root</name>
+    <value>/registry</value>
+  </property>
 
 
-      <property>
-        <description>
-          Key to set if the registry is secure. Turning it on
-          changes the permissions policy from "open access"
-          to restrictions on kerberos with the option of
-          a user adding one or more auth key pairs down their
-          own tree.
-        </description>
-        <name>hadoop.registry.secure</name>
-        <value>false</value>
-      </property>
-    
-      <property>
-        <description>
-          A comma separated list of Zookeeper ACL identifiers with
-          system access to the registry in a secure cluster.
-    
-          These are given full access to all entries.
-    
-          If there is an "@" at the end of a SASL entry it
-          instructs the registry client to append the default kerberos domain.
-        </description>
-        <name>hadoop.registry.system.acls</name>
-        <value>sasl:yarn@, sasl:mapred@, sasl:mapred@hdfs@</value>
-      </property>
-    
-      <property>
-        <description>
-          The kerberos realm: used to set the realm of
-          system principals which do not declare their realm,
-          and any other accounts that need the value.
-    
-          If empty, the default realm of the running process
-          is used.
-    
-          If neither are known and the realm is needed, then the registry
-          service/client will fail.
-        </description>
-        <name>hadoop.registry.kerberos.realm</name>
-        <value></value>
-      </property>
-    
-      <property>
-        <description>
-          Key to define the JAAS context. Used in secure
-          mode
-        </description>
-        <name>hadoop.registry.jaas.context</name>
-        <value>Client</value>
-      </property>
+  <property>
+    <description>
+      Key to set if the registry is secure. Turning it on
+      changes the permissions policy from "open access"
+      to restrictions on kerberos with the option of
+      a user adding one or more auth key pairs down their
+      own tree.
+    </description>
+    <name>hadoop.registry.secure</name>
+    <value>false</value>
+  </property>
 
-        
-      <property>
-        <description>
-          Zookeeper session timeout in milliseconds
-        </description>
-        <name>hadoop.registry.zk.session.timeout.ms</name>
-        <value>60000</value>
-      </property>
+  <property>
+    <description>
+      A comma separated list of Zookeeper ACL identifiers with
+      system access to the registry in a secure cluster.
+
+      These are given full access to all entries.
+
+      If there is an "@" at the end of a SASL entry it
+      instructs the registry client to append the default kerberos domain.
+    </description>
+    <name>hadoop.registry.system.acls</name>
+    <value>sasl:yarn@, sasl:mapred@, sasl:mapred@hdfs@</value>
+  </property>
+
+  <property>
+    <description>
+      The kerberos realm: used to set the realm of
+      system principals which do not declare their realm,
+      and any other accounts that need the value.
+
+      If empty, the default realm of the running process
+      is used.
+
+      If neither are known and the realm is needed, then the registry
+      service/client will fail.
+    </description>
+    <name>hadoop.registry.kerberos.realm</name>
+    <value></value>
+  </property>
+
+  <property>
+    <description>
+      Key to define the JAAS context. Used in secure
+      mode
+    </description>
+    <name>hadoop.registry.jaas.context</name>
+    <value>Client</value>
+  </property>
+
     
-      <property>
-        <description>
-          Zookeeper session timeout in milliseconds
-        </description>
-        <name>hadoop.registry.zk.connection.timeout.ms</name>
-        <value>15000</value>
-      </property>
-    
-      <property>
-        <description>
-          Zookeeper connection retry count before failing
-        </description>
-        <name>hadoop.registry.zk.retry.times</name>
-        <value>5</value>
-      </property>
-    
-      <property>
-        <description>
-        </description>
-        <name>hadoop.registry.zk.retry.interval.ms</name>
-        <value>1000</value>
-      </property>
-    
-      <property>
-        <description>
-          Zookeeper retry limit in milliseconds, during
-          exponential backoff: {@value}
-    
-          This places a limit even
-          if the retry times and interval limit, combined
-          with the backoff policy, result in a long retry
-          period
-        </description>
-        <name>hadoop.registry.zk.retry.ceiling.ms</name>
-        <value>60000</value>
-      </property>
-    
+  <property>
+    <description>
+      Zookeeper session timeout in milliseconds
+    </description>
+    <name>hadoop.registry.zk.session.timeout.ms</name>
+    <value>60000</value>
+  </property>
+
+  <property>
+    <description>
+      Zookeeper session timeout in milliseconds
+    </description>
+    <name>hadoop.registry.zk.connection.timeout.ms</name>
+    <value>15000</value>
+  </property>
+
+  <property>
+    <description>
+      Zookeeper connection retry count before failing
+    </description>
+    <name>hadoop.registry.zk.retry.times</name>
+    <value>5</value>
+  </property>
+
+  <property>
+    <description>
+    </description>
+    <name>hadoop.registry.zk.retry.interval.ms</name>
+    <value>1000</value>
+  </property>
+
+  <property>
+    <description>
+      Zookeeper retry limit in milliseconds, during
+      exponential backoff: {@value}
+
+      This places a limit even
+      if the retry times and interval limit, combined
+      with the backoff policy, result in a long retry
+      period
+    </description>
+    <name>hadoop.registry.zk.retry.ceiling.ms</name>
+    <value>60000</value>
+  </property>
+```
