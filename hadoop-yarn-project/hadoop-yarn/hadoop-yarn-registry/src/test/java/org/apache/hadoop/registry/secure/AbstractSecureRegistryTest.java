@@ -120,6 +120,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   protected MicroZookeeperService secureZK;
   protected static File jaasFile;
   private LoginContext zookeeperLogin;
+  private static String zkServerPrincipal;
 
   /**
    * All class initialization for this test class
@@ -205,12 +206,13 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     keytab_zk = createKeytab(ZOOKEEPER, "zookeeper.keytab");
     keytab_alice = createKeytab(ALICE, "alice.keytab");
     keytab_bob = createKeytab(BOB, "bob.keytab");
+    zkServerPrincipal = Shell.WINDOWS ? ZOOKEEPER_1270001 : ZOOKEEPER_LOCALHOST;
 
     StringBuilder jaas = new StringBuilder(1024);
     jaas.append(registrySecurity.createJAASEntry(ZOOKEEPER_CLIENT_CONTEXT,
         ZOOKEEPER, keytab_zk));
     jaas.append(registrySecurity.createJAASEntry(ZOOKEEPER_SERVER_CONTEXT,
-        ZOOKEEPER_LOCALHOST, keytab_zk));
+        zkServerPrincipal, keytab_zk));
     jaas.append(registrySecurity.createJAASEntry(ALICE_CLIENT_CONTEXT,
         ALICE_LOCALHOST , keytab_alice));
     jaas.append(registrySecurity.createJAASEntry(BOB_CLIENT_CONTEXT,
@@ -304,7 +306,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     File keytab = new File(kdcWorkDir, filename);
     kdc.createPrincipal(keytab,
         principal,
-        principal +"/localhost",
+        principal + "/localhost",
         principal + "/127.0.0.1");
     return keytab;
   }
@@ -356,10 +358,7 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
   protected synchronized void startSecureZK() throws Exception {
     assertNull("Zookeeper is already running", secureZK);
 
-    String principal = Shell.WINDOWS ?
-                       ZOOKEEPER_1270001
-                      : ZOOKEEPER_LOCALHOST;
-    zookeeperLogin = login(principal,
+    zookeeperLogin = login(zkServerPrincipal,
         ZOOKEEPER_SERVER_CONTEXT,
         keytab_zk);
     secureZK = createSecureZKInstance("test-" + methodName.getMethodName());
