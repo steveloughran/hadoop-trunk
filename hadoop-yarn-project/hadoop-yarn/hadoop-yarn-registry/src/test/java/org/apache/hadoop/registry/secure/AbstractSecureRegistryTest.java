@@ -300,7 +300,10 @@ public class AbstractSecureRegistryTest extends RegistryTestHelper {
     assertNotEmpty("empty host", filename);
     assertNotNull("Null KDC", kdc);
     File keytab = new File(kdcWorkDir, filename);
-    kdc.createPrincipal(keytab, principal, principal +"/localhost");
+    kdc.createPrincipal(keytab,
+        principal,
+        principal +"/localhost",
+        principal + "/127.0.0.1");
     return keytab;
   }
 
