@@ -46,11 +46,7 @@ import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.hadoop.registry.client.binding.RegistryTypeUtils.inetAddrEndpoint;
-import static org.apache.hadoop.registry.client.binding.RegistryTypeUtils.ipcEndpoint;
-import static org.apache.hadoop.registry.client.binding.RegistryTypeUtils.restEndpoint;
-import static org.apache.hadoop.registry.client.binding.RegistryTypeUtils.tuple;
-import static org.apache.hadoop.registry.client.binding.RegistryTypeUtils.webEndpoint;
+import static org.apache.hadoop.registry.client.binding.RegistryTypeUtils.*;
 
 /**
  * This is a set of static methods to aid testing the registry operations.
@@ -148,9 +144,9 @@ public class RegistryTestHelper extends Assert {
     assertEquals(API_WEBHDFS, webhdfs.api);
     assertEquals(AddressTypes.ADDRESS_URI, webhdfs.addressType);
     assertEquals(ProtocolTypes.PROTOCOL_REST, webhdfs.protocolType);
-    List<List<String>> addressList = webhdfs.addresses;
-    List<String> url = addressList.get(0);
-    String addr = url.get(0);
+    List<Map<String, String>> addressList = webhdfs.addresses;
+    Map<String, String> url = addressList.get(0);
+    String addr = url.get("uri");
     assertTrue(addr.contains("http"));
     assertTrue(addr.contains(":8020"));
 
@@ -281,8 +277,8 @@ public class RegistryTestHelper extends Assert {
         restEndpoint(API_WEBHDFS,
             new URI("http", hostname + ":8020", "/")));
 
-    Endpoint endpoint = ipcEndpoint(API_HDFS, true, null);
-    endpoint.addresses.add(tuple(hostname, "8030"));
+    Endpoint endpoint = ipcEndpoint(API_HDFS, null);
+    endpoint.addresses.add(RegistryTypeUtils.hostnamePortPair(hostname, 8030));
     entry.addInternalEndpoint(endpoint);
     InetSocketAddress localhost = new InetSocketAddress("localhost", 8050);
     entry.addInternalEndpoint(
@@ -290,9 +286,7 @@ public class RegistryTestHelper extends Assert {
             8050));
     entry.addInternalEndpoint(
         RegistryTypeUtils.ipcEndpoint(
-            IPC2,
-            true,
-            RegistryTypeUtils.marshall(localhost)));
+            IPC2, localhost));
   }
 
   /**

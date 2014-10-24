@@ -28,6 +28,8 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class ServiceRecordHeader {
+
+
   /**
    * Header of a service record:  "jsonservicerec"
    * By making this over 12 bytes long, we can auto-determine which entries

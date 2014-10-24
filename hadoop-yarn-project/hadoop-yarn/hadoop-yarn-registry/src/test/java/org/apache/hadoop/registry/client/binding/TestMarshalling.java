@@ -19,10 +19,11 @@
 package org.apache.hadoop.registry.client.binding;
 
 import org.apache.hadoop.registry.RegistryTestHelper;
+import org.apache.hadoop.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.registry.client.types.ServiceRecord;
-import org.apache.hadoop.registry.client.types.ServiceRecordHeader;
 import org.apache.hadoop.registry.client.types.yarn.PersistencePolicies;
+import org.codehaus.jackson.JsonProcessingException;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -30,8 +31,6 @@ import org.junit.rules.TestName;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.EOFException;
 
 /**
  * Test record marshalling
@@ -44,6 +43,7 @@ public class TestMarshalling extends RegistryTestHelper {
   public final Timeout testTimeout = new Timeout(10000);
   @Rule
   public TestName methodName = new TestName();
+
   private static RegistryUtils.ServiceRecordMarshal marshal;
 
   @BeforeClass
@@ -55,12 +55,14 @@ public class TestMarshalling extends RegistryTestHelper {
   public void testRoundTrip() throws Throwable {
     String persistence = PersistencePolicies.PERMANENT;
     ServiceRecord record = createRecord(persistence);
-    record.set("customkey","customvalue");
-    record.set("customkey2","customvalue2");
+    record.set("customkey", "customvalue");
+    record.set("customkey2", "customvalue2");
+    RegistryTypeUtils.validateServiceRecord("", record);
     LOG.info(marshal.toJson(record));
     byte[] bytes = marshal.toBytes(record);
     ServiceRecord r2 = marshal.fromBytes("", bytes, 0);
     assertMatches(record, r2);
+    RegistryTypeUtils.validateServiceRecord("", r2);
   }
 
   @Test
@@ -69,7 +71,6 @@ public class TestMarshalling extends RegistryTestHelper {
     byte[] bytes = marshal.toByteswithHeader(record);
     ServiceRecord r2 = marshal.fromBytesWithHeader("", bytes);
     assertMatches(record, r2);
-
   }
 
   @Test(expected = NoRecordException.class)
@@ -85,12 +86,26 @@ public class TestMarshalling extends RegistryTestHelper {
     marshal.fromBytesWithHeader("src", new byte[]{'a'});
   }
 
-  @Test(expected = EOFException.class)
+  @Test(expected = InvalidRecordException.class)
   public void testUnmarshallNoBody() throws Throwable {
-    byte[] bytes = ServiceRecordHeader.getData();
-    marshal.fromBytesWithHeader("src", bytes);
+    byte[] bytes = "this is not valid JSON at all and should fail".getBytes();
+    marshal.fromBytes("src", bytes);
   }
 
+  @Test(expected = InvalidRecordException.class)
+  public void testUnmarshallWrongType() throws Throwable {
+    byte[] bytes = "{'type':''}".getBytes();
+    ServiceRecord serviceRecord = marshal.fromBytes("marshalling", bytes);
+    RegistryTypeUtils.validateServiceRecord("validating", serviceRecord);
+  }
+
+  @Test(expected = InvalidRecordException.class)
+  public void testUnmarshallNoType() throws Throwable {
+    byte[] bytes = "{}".getBytes();
+    ServiceRecord serviceRecord = marshal.fromBytes("marshalling",
+        bytes, 0, ServiceRecord.RECORD_TYPE);
+    RegistryTypeUtils.validateServiceRecord("validating", serviceRecord);
+  }
 
   @Test
   public void testUnknownFieldsRoundTrip() throws Throwable {

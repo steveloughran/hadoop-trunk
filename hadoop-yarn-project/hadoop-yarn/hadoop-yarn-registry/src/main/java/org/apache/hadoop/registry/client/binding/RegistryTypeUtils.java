@@ -22,9 +22,10 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.registry.client.exceptions.InvalidRecordException;
-import org.apache.hadoop.registry.client.types.AddressTypes;
+import static org.apache.hadoop.registry.client.types.AddressTypes.*;
 import org.apache.hadoop.registry.client.types.Endpoint;
 import org.apache.hadoop.registry.client.types.ProtocolTypes;
+import org.apache.hadoop.registry.client.types.ServiceRecord;
 
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
@@ -32,7 +33,9 @@ import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Static methods to work with registry types —primarily endpoints and the
@@ -94,9 +97,9 @@ public class RegistryTypeUtils {
     Preconditions.checkArgument(protocolType != null, "null protocolType");
     Preconditions.checkArgument(hostname != null, "null hostname");
     return new Endpoint(api,
-        AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
+        ADDRESS_HOSTNAME_AND_PORT,
         protocolType,
-        tuplelist(hostname, Integer.toString(port)));
+        hostnamePortPair(hostname, port));
   }
 
   /**
@@ -107,66 +110,55 @@ public class RegistryTypeUtils {
    * @param address the address as a tuple of (hostname, port)
    * @return the new endpoint
    */
-  public static Endpoint ipcEndpoint(String api,
-      boolean protobuf, List<String> address) {
-    ArrayList<List<String>> addressList = new ArrayList<List<String>>();
-    if (address != null) {
-      addressList.add(address);
-    }
+  public static Endpoint ipcEndpoint(String api, InetSocketAddress address) {
     return new Endpoint(api,
-        AddressTypes.ADDRESS_HOSTNAME_AND_PORT,
-        protobuf ? ProtocolTypes.PROTOCOL_HADOOP_IPC_PROTOBUF
-                 : ProtocolTypes.PROTOCOL_HADOOP_IPC,
-        addressList);
+        ADDRESS_HOSTNAME_AND_PORT,
+        ProtocolTypes.PROTOCOL_HADOOP_IPC,
+        address== null ? null: hostnamePortPair(address));
   }
 
   /**
-   * Create a single-element list of tuples from the input.
-   * that is, an input ("a","b","c") is converted into a list
-   * in the form [["a","b","c"]]
-   * @param t1 tuple elements
-   * @return a list containing a single tuple
+   * Create a single entry map
+   * @param key map entry key
+   * @param val map entry value
+   * @return a 1 entry map.
    */
-  public static List<List<String>> tuplelist(String... t1) {
-    List<List<String>> outer = new ArrayList<List<String>>();
-    outer.add(tuple(t1));
-    return outer;
+  public static Map<String, String> map(String key, String val) {
+    Map<String, String> map = new HashMap<String, String>(1);
+    map.put(key, val);
+    return map;
   }
 
   /**
-   * Create a tuples from the input.
-   * that is, an input ("a","b","c") is converted into a list
-   * in the form ["a","b","c"]
-   * @param t1 tuple elements
-   * @return a single tuple as a list
+   * Create a URI
+   * @param uri value
+   * @return a 1 entry map.
    */
-  public static List<String> tuple(String... t1) {
-    return Arrays.asList(t1);
+  public static Map<String, String> uri(String uri) {
+    return map(ADDRESS_URI, uri);
   }
 
   /**
-   * Create a tuples from the input, converting all to Strings in the process
-   * that is, an input ("a", 7, true) is converted into a list
-   * in the form ["a","7,"true"]
-   * @param t1 tuple elements
-   * @return a single tuple as a list
+   * Create a hostname port address pair
+   * @param hostname
+   * @param port
+   * @return a 1 entry map.
    */
-  public static List<String> tuple(Object... t1) {
-    List<String> l = new ArrayList<String>(t1.length);
-    for (Object t : t1) {
-      l.add(t.toString());
-    }
-    return l;
+  public static Map<String, String> hostnamePortPair(String hostname, int port) {
+    Map<String, String> map =
+        map(ADDRESS_HOSTNAME_FIELD, hostname);
+    map.put(ADDRESS_PORT_FIELD, Integer.toString(port));
+    return map;
   }
 
   /**
-   * Convert a socket address pair into a string tuple, (host, port).
-   * TODO JDK7: move to InetAddress.getHostString() to avoid DNS lookups.
-   * @param address an address
-   * @return an element for the address list
+   * Create a hostname port address pair
+   * @param hostname
+   * @param port
+   * @return a 1 entry map.
    */
-  public static List<String> marshall(InetSocketAddress address) {
-    return tuple(address.getHostName(), address.getPort());
+  public static Map<String, String> hostnamePortPair(InetSocketAddress address) {
+    return hostnamePortPair(address.getHostName(), address.getPort());
   }
 
   /**
@@ -199,22 +191,26 @@ public class RegistryTypeUtils {
     if (epr == null) {
       return null;
     }
-    requireAddressType(AddressTypes.ADDRESS_URI, epr);
-    List<List<String>> addresses = epr.addresses;
+    requireAddressType(ADDRESS_URI, epr);
+    List<Map<String, String>> addresses = epr.addresses;
     if (addresses.size() < 1) {
       throw new InvalidRecordException(epr.toString(),
           "No addresses in endpoint");
     }
     List<String> results = new ArrayList<String>(addresses.size());
-    for (List<String> address : addresses) {
-      if (address.size() != 1) {
-        throw new InvalidRecordException(epr.toString(),
-            "Address payload invalid: wrong element count: " +
-            address.size());
-      }
-      results.add(address.get(0));
+    for (Map<String, String> address : addresses) {
+      results.add(getAddressField(address, ADDRESS_URI));
     }
     return results;
+  }
+
+  public static String getAddressField(Map<String, String> address,
+      String key) throws InvalidRecordException {
+    String val = address.get(key);
+    if (val == null) {
+      throw new InvalidRecordException("","missing address field " + key);
+    }
+    return val;
   }
 
   /**
@@ -237,4 +233,54 @@ public class RegistryTypeUtils {
     }
     return results;
   }
+
+  /**
+   * Validate the record by checking for null fields and other invalid
+   * conditions
+   * @param path path for exceptions
+   * @param record record to validate. May be null
+   * @throws InvalidRecordException on invalid entries
+   */
+  public static void validateServiceRecord(String path, ServiceRecord record)
+      throws InvalidRecordException {
+    if (record == null) {
+      throw new InvalidRecordException(path, "Null record");
+    }
+    if (!ServiceRecord.RECORD_TYPE.equals(record.type)) {
+      throw new InvalidRecordException(path,
+          "invalid record type field: \"" + record.type + "\"");
+    }
+
+    if (record.external != null) {
+      for (Endpoint endpoint : record.external) {
+        validateEndpoint(path, endpoint);
+      }
+    }
+    if (record.internal != null) {
+      for (Endpoint endpoint : record.internal) {
+        validateEndpoint(path, endpoint);
+      }
+    }
+  }
+
+  /**
+   * Validate the endpoint by checking for null fields and other invalid
+   * conditions
+   * @param path path for exceptions
+   * @param endpoint endpoint to validate. May be null
+   * @throws InvalidRecordException on invalid entries
+   */
+  public static void validateEndpoint(String path, Endpoint endpoint)
+      throws InvalidRecordException {
+    if (endpoint == null) {
+      throw new InvalidRecordException(path, "Null endpoint");
+    }
+    try {
+      endpoint.validate();
+    } catch (RuntimeException e) {
+      throw new InvalidRecordException(path, e.toString());
+    }
+  }
+
+
 }

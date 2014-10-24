@@ -19,6 +19,7 @@
 package org.apache.hadoop.registry.client.binding;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -75,15 +76,18 @@ public class JsonSerDeser<T> {
    */
   public JsonSerDeser(Class<T> classType, byte[] header) {
     Preconditions.checkArgument(classType != null, "null classType");
-    Preconditions.checkArgument(header != null, "null header");
     this.classType = classType;
     this.mapper = new ObjectMapper();
     mapper.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES,
         false);
     // make an immutable copy to keep findbugs happy.
-    byte[] h = new byte[header.length];
-    System.arraycopy(header, 0, h, 0, header.length);
-    this.header = h;
+    if (header != null) {
+      byte[] h = new byte[header.length];
+      System.arraycopy(header, 0, h, 0, header.length);
+      this.header = h;
+    } else {
+      this.header = null;
+    }
   }
 
   public String getName() {
@@ -234,6 +238,7 @@ public class JsonSerDeser<T> {
    * @throws IOException
    */
   public byte[] toByteswithHeader(T instance) throws IOException {
+    Preconditions.checkNotNull(header, "null header");
     byte[] body = toBytes(instance);
 
     ByteBuffer buffer = ByteBuffer.allocate(body.length + header.length);
@@ -246,6 +251,19 @@ public class JsonSerDeser<T> {
    * Deserialize from a byte array
    * @param path path the data came from
    * @param bytes byte array
+   * @throws IOException all problems
+   * @throws EOFException not enough data
+   * @throws InvalidRecordException if the parsing failed -the record is invalid
+   */
+  public T fromBytes(String path, byte[] bytes) throws IOException,
+      InvalidRecordException {
+    return fromBytes(path, bytes, 0, "");
+  }
+
+  /**
+   * Deserialize from a byte array with an offset
+   * @param path path the data came from
+   * @param bytes byte array
    * @return offset in the array to read from
    * @throws IOException all problems
    * @throws EOFException not enough data
@@ -253,11 +271,33 @@ public class JsonSerDeser<T> {
    */
   public T fromBytes(String path, byte[] bytes, int offset) throws IOException,
       InvalidRecordException {
+    return fromBytes(path, bytes, offset, "");
+  }
+
+  /**
+   * Deserialize from a byte array with an offset
+   * @param path path the data came from
+   * @param bytes byte array
+   * @return offset in the array to read from
+   * @param marker an optional string which, if set, MUST be present in the
+   * UTF-8 parsed payload.
+   * @throws IOException all problems
+   * @throws EOFException not enough data
+   * @throws InvalidRecordException if the parsing failed -the record is invalid
+   */
+  public T fromBytes(String path, byte[] bytes, int offset, String marker)
+      throws IOException,
+      InvalidRecordException {
     int data = bytes.length - offset;
     if (data <= 0) {
       throw new EOFException("No data at " + path);
     }
     String json = new String(bytes, offset, data, UTF_8);
+    if (StringUtils.isNotEmpty(marker)
+        && !json.contains(marker)) {
+      throw new InvalidRecordException(path,
+          "Missing marker string " + marker);
+    }
     try {
       return fromJson(json);
     } catch (JsonProcessingException e) {
@@ -277,6 +317,8 @@ public class JsonSerDeser<T> {
    */
   @SuppressWarnings("unchecked")
   public T fromBytesWithHeader(String path, byte[] buffer) throws IOException {
+    Preconditions.checkNotNull(header, "null header");
+
     int hlen = header.length;
     int blen = buffer.length;
     if (hlen > 0) {
@@ -324,4 +366,11 @@ public class JsonSerDeser<T> {
     return mapper.writeValueAsString(instance);
   }
 
+  public String toString(T instance) {
+    try {
+      return toJson(instance);
+    } catch (IOException e) {
+      return "failed to convert to a string: " + e;
+    }
+  }
 }
