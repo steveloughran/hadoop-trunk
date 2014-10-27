@@ -23,7 +23,6 @@ import org.apache.hadoop.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.registry.client.exceptions.NoRecordException;
 import org.apache.hadoop.registry.client.types.ServiceRecord;
 import org.apache.hadoop.registry.client.types.yarn.PersistencePolicies;
-import org.codehaus.jackson.JsonProcessingException;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -60,32 +59,23 @@ public class TestMarshalling extends RegistryTestHelper {
     RegistryTypeUtils.validateServiceRecord("", record);
     LOG.info(marshal.toJson(record));
     byte[] bytes = marshal.toBytes(record);
-    ServiceRecord r2 = marshal.fromBytes("", bytes, 0);
+    ServiceRecord r2 = marshal.fromBytes("", bytes);
     assertMatches(record, r2);
     RegistryTypeUtils.validateServiceRecord("", r2);
   }
 
-  @Test
-  public void testRoundTripHeaders() throws Throwable {
-    ServiceRecord record = createRecord(PersistencePolicies.CONTAINER);
-    byte[] bytes = marshal.toByteswithHeader(record);
-    ServiceRecord r2 = marshal.fromBytesWithHeader("", bytes);
-    assertMatches(record, r2);
+
+  @Test(expected = NoRecordException.class)
+  public void testUnmarshallNoData() throws Throwable {
+    marshal.fromBytes("src", new byte[]{});
   }
 
   @Test(expected = NoRecordException.class)
-  public void testRoundTripBadHeaders() throws Throwable {
-    ServiceRecord record = createRecord(PersistencePolicies.APPLICATION);
-    byte[] bytes = marshal.toByteswithHeader(record);
-    bytes[1] = 0x01;
-    marshal.fromBytesWithHeader("src", bytes);
+  public void testUnmarshallNotEnoughData() throws Throwable {
+    // this is nominally JSON -but without the service record header
+    marshal.fromBytes("src", new byte[]{'{','}'}, ServiceRecord.RECORD_TYPE);
   }
-
-  @Test(expected = NoRecordException.class)
-  public void testUnmarshallHeaderTooShort() throws Throwable {
-    marshal.fromBytesWithHeader("src", new byte[]{'a'});
-  }
-
+  
   @Test(expected = InvalidRecordException.class)
   public void testUnmarshallNoBody() throws Throwable {
     byte[] bytes = "this is not valid JSON at all and should fail".getBytes();
@@ -99,12 +89,29 @@ public class TestMarshalling extends RegistryTestHelper {
     RegistryTypeUtils.validateServiceRecord("validating", serviceRecord);
   }
 
-  @Test(expected = InvalidRecordException.class)
-  public void testUnmarshallNoType() throws Throwable {
-    byte[] bytes = "{}".getBytes();
+  @Test(expected = NoRecordException.class)
+  public void testUnmarshallWrongLongType() throws Throwable {
+    ServiceRecord record = new ServiceRecord();
+    record.type = "ThisRecordHasALongButNonMatchingType";
+    byte[] bytes = marshal.toBytes(record);
     ServiceRecord serviceRecord = marshal.fromBytes("marshalling",
-        bytes, 0, ServiceRecord.RECORD_TYPE);
-    RegistryTypeUtils.validateServiceRecord("validating", serviceRecord);
+        bytes, ServiceRecord.RECORD_TYPE);
+  }
+
+  @Test(expected = NoRecordException.class)
+  public void testUnmarshallNoType() throws Throwable {
+    ServiceRecord record = new ServiceRecord();
+    record.type = "NoRecord";
+    byte[] bytes = marshal.toBytes(record);
+    ServiceRecord serviceRecord = marshal.fromBytes("marshalling",
+        bytes, ServiceRecord.RECORD_TYPE);
+  }
+
+  @Test(expected = InvalidRecordException.class)
+  public void testRecordValidationWrongType() throws Throwable {
+    ServiceRecord record = new ServiceRecord();
+    record.type = "NotAServiceRecordType";
+    RegistryTypeUtils.validateServiceRecord("validating", record);
   }
 
   @Test
@@ -117,8 +124,8 @@ public class TestMarshalling extends RegistryTestHelper {
     assertEquals("2", record.get("intval"));
     assertNull(record.get("null"));
     assertEquals("defval", record.get("null", "defval"));
-    byte[] bytes = marshal.toByteswithHeader(record);
-    ServiceRecord r2 = marshal.fromBytesWithHeader("", bytes);
+    byte[] bytes = marshal.toBytes(record);
+    ServiceRecord r2 = marshal.fromBytes("", bytes);
     assertEquals("value", r2.get("key"));
     assertEquals("2", r2.get("intval"));
   }

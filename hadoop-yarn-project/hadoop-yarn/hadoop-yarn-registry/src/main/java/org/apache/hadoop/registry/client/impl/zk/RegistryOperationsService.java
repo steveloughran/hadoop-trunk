@@ -119,13 +119,8 @@ public class RegistryOperationsService extends CuratorService
   public ServiceRecord resolve(String path) throws IOException {
     byte[] bytes = zkRead(path);
 
-    // filter out any records which are clearly invalid
-    // by being too short for the mandatory record type field
-    if (bytes.length < ServiceRecord.RECORD_TYPE.length()) {
-      throw new NoRecordException(path, "No record found");
-    }
     ServiceRecord record = serviceRecordMarshal.fromBytes(path,
-        bytes, 0, ServiceRecord.RECORD_TYPE);
+        bytes, ServiceRecord.RECORD_TYPE);
     RegistryTypeUtils.validateServiceRecord(path, record);
     return record;
   }

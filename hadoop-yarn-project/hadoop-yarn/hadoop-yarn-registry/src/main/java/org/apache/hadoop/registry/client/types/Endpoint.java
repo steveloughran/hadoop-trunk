@@ -26,10 +26,8 @@ import org.apache.hadoop.registry.client.binding.RegistryTypeUtils;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
 
-import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,11 +115,10 @@ public final class Endpoint implements Cloneable {
   }
 
   /**
-   * Build an endpoint with a list of addresses
+   * Build an endpoint with an empty address list
    * @param api API name
    * @param addressType address type
    * @param protocolType protocol type
-   * @param addrs addresses
    */
   public Endpoint(String api,
       String addressType,
@@ -130,6 +127,29 @@ public final class Endpoint implements Cloneable {
     this.addressType = addressType;
     this.protocolType = protocolType;
     this.addresses = newAddresses(0);
+  }
+
+  /**
+   * Build an endpoint with a single address entry.
+   * <p>
+   * This constructor is superfluous given the varags constructor is equivalent
+   * for a single element argument. However, type-erasure in java generics
+   * causes javac to warn about unchecked generic array creation. This
+   * constructor, which represents the common "one address" case, does
+   * not generate compile-time warnings.
+   * @param api API name
+   * @param addressType address type
+   * @param protocolType protocol type
+   * @param addr address. May be null —in which case it is not added
+   */
+  public Endpoint(String api,
+      String addressType,
+      String protocolType,
+      Map<String, String> addr) {
+    this(api, addressType, protocolType);
+    if (addr != null) {
+      addresses.add(addr);
+    }
   }
 
   /**
@@ -151,8 +171,13 @@ public final class Endpoint implements Cloneable {
     }
   }
 
-  private List<Map<String, String>> newAddresses(int i) {
-    return new ArrayList<Map<String, String>>(0);
+  /**
+   * Create a new address structure of the requested size
+   * @param size size to create
+   * @return the new list
+   */
+  private List<Map<String, String>> newAddresses(int size) {
+    return new ArrayList<Map<String, String>>(size);
   }
 
   /**
@@ -214,7 +239,7 @@ public final class Endpoint implements Cloneable {
    */
   private static class Marshal extends JsonSerDeser<Endpoint> {
     private Marshal() {
-      super(Endpoint.class, null);
+      super(Endpoint.class);
     }
   }
 

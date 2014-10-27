@@ -32,7 +32,6 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -105,8 +104,6 @@ public class RegistryTypeUtils {
   /**
    * Create an IPC endpoint
    * @param api API
-   * @param protobuf flag to indicate whether or not the IPC uses protocol
-   * buffers
    * @param address the address as a tuple of (hostname, port)
    * @return the new endpoint
    */
@@ -139,9 +136,9 @@ public class RegistryTypeUtils {
   }
 
   /**
-   * Create a hostname port address pair
-   * @param hostname
-   * @param port
+   * Create a (hostname, port) address pair
+   * @param hostname hostname
+   * @param port port
    * @return a 1 entry map.
    */
   public static Map<String, String> hostnamePortPair(String hostname, int port) {
@@ -152,9 +149,9 @@ public class RegistryTypeUtils {
   }
 
   /**
-   * Create a hostname port address pair
-   * @param hostname
-   * @param port
+   * Create a (hostname, port) address pair
+   * @param address socket address whose hostname and port are used for the
+   * generated address.
    * @return a 1 entry map.
    */
   public static Map<String, String> hostnamePortPair(InetSocketAddress address) {
@@ -204,11 +201,19 @@ public class RegistryTypeUtils {
     return results;
   }
 
+  /**
+   * Get a specific field from an address -raising an exception if
+   * the field is not present
+   * @param address address to query
+   * @param field field to resolve
+   * @return the resolved value. Guaranteed to be non-null.
+   * @throws InvalidRecordException if the field did not resolve
+   */
   public static String getAddressField(Map<String, String> address,
-      String key) throws InvalidRecordException {
-    String val = address.get(key);
+      String field) throws InvalidRecordException {
+    String val = address.get(field);
     if (val == null) {
-      throw new InvalidRecordException("","missing address field " + key);
+      throw new InvalidRecordException("", "Missing address field: " + field);
     }
     return val;
   }
@@ -281,6 +286,5 @@ public class RegistryTypeUtils {
       throw new InvalidRecordException(path, e.toString());
     }
   }
-
 
 }

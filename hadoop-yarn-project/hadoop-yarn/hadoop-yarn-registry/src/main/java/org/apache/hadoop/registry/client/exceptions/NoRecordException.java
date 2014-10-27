@@ -21,7 +21,6 @@ package org.apache.hadoop.registry.client.exceptions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.registry.client.types.ServiceRecord;
-import org.apache.hadoop.registry.client.types.ServiceRecordHeader;
 
 /**
  * Raised if there is no {@link ServiceRecord} resolved at the end
