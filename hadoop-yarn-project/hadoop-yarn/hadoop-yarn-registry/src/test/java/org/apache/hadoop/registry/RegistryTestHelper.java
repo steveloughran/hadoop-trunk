@@ -20,7 +20,6 @@ package org.apache.hadoop.registry;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.registry.client.api.RegistryConstants;
 import org.apache.hadoop.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.registry.client.binding.RegistryTypeUtils;
@@ -57,18 +56,18 @@ public class RegistryTestHelper extends Assert {
   public static final String SC_HADOOP = "org-apache-hadoop";
   public static final String USER = "devteam/";
   public static final String NAME = "hdfs";
-  public static final String API_WEBHDFS = "org_apache_hadoop_namenode_webhdfs";
-  public static final String API_HDFS = "org_apache_hadoop_namenode_dfs";
+  public static final String API_WEBHDFS = "classpath:org.apache.hadoop.namenode.webhdfs";
+  public static final String API_HDFS = "classpath:org.apache.hadoop.namenode.dfs";
   public static final String USERPATH = RegistryConstants.PATH_USERS + USER;
   public static final String PARENT_PATH = USERPATH + SC_HADOOP + "/";
   public static final String ENTRY_PATH = PARENT_PATH + NAME;
-  public static final String NNIPC = "nnipc";
-  public static final String IPC2 = "IPC2";
+  public static final String NNIPC = "uuid:423C2B93-C927-4050-AEC6-6540E6646437";
+  public static final String IPC2 = "uuid:0663501D-5AD3-4F7E-9419-52F5D6636FCF";
   private static final Logger LOG =
       LoggerFactory.getLogger(RegistryTestHelper.class);
-  public static final String KTUTIL = "ktutil";
   private static final RegistryUtils.ServiceRecordMarshal recordMarshal =
       new RegistryUtils.ServiceRecordMarshal();
+  public static final String HTTP_API = "http://";
 
   /**
    * Assert the path is valid by ZK rules
@@ -155,8 +154,9 @@ public class RegistryTestHelper extends Assert {
         nnipc.protocolType);
 
     Endpoint ipc2 = findEndpoint(record, IPC2, false, 1,2);
+    assertNotNull(ipc2);
 
-    Endpoint web = findEndpoint(record, "web", true, 1, 1);
+    Endpoint web = findEndpoint(record, HTTP_API, true, 1, 1);
     assertEquals(1, web.addresses.size());
     assertEquals(1, web.addresses.get(0).size());
   }
@@ -271,7 +271,7 @@ public class RegistryTestHelper extends Assert {
   public static void addSampleEndpoints(ServiceRecord entry, String hostname)
       throws URISyntaxException {
     assertNotNull(hostname);
-    entry.addExternalEndpoint(webEndpoint("web",
+    entry.addExternalEndpoint(webEndpoint(HTTP_API,
         new URI("http", hostname + ":80", "/")));
     entry.addExternalEndpoint(
         restEndpoint(API_WEBHDFS,
