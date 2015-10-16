@@ -25,6 +25,7 @@ import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -35,7 +36,6 @@ import java.util.regex.Pattern;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.util.NativeCodeLoader;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.log4j.Layout;
@@ -480,5 +480,37 @@ public abstract class GenericTestUtils {
   public static void assumeInNativeProfile() {
     Assume.assumeTrue(
         Boolean.valueOf(System.getProperty("runningWithNative", "false")));
+  }
+
+  /**
+   * Formatted fail, via {@link String#format(String, Object...)}
+   * @param format format string
+   * @param args argument list. If the last argument is a throwable, it
+   * is used as the inner cause of the exception
+   * @throws AssertionError with the formatted message
+   */
+  public static void failFormatted(String format, Object... args) {
+    String message = String.format(Locale.ENGLISH, format, args);
+    AssertionError error = new AssertionError(message);
+    int len = args.length;
+    if (len > 0 && args[len - 1] instanceof Throwable) {
+      error.initCause((Throwable) args[len - 1]);
+    }
+    throw error;
+  }
+
+  /**
+   * Conditional formatted fail, via {@link String#format(String, Object...)}
+   * @param format format string
+   * @param args argument list. If the last argument is a throwable, it
+   * is used as the inner cause of the exception
+   * @throws AssertionError with the formatted message
+   */
+  public static void failFormattedIf(boolean condition,
+      String format,
+      Object... args) {
+    if (condition) {
+      failFormatted(format, args);
+    }
   }
 }
