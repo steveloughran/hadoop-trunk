@@ -34,6 +34,7 @@ import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Test;
 
 import javax.management.MBeanServer;
@@ -83,8 +84,14 @@ public class TestHostsFiles {
 
     // Configure an excludes file
     FileSystem localFileSys = FileSystem.getLocal(conf);
+<<<<<<< 9a0686823c88f5efc9d28baacbdca4f5f51a3fe5
     Path workingDir = new Path(MiniDFSCluster.getBaseDirectory());
     Path dir = new Path(workingDir, "temp/decommission");
+=======
+    Path workingDir = localFileSys.getWorkingDirectory();
+    Path dir = new Path(workingDir, GenericTestUtils.DEFAULT_TEST_DATA_PATH
+        + "temp/decommission");
+>>>>>>> HDFS-9263 hdft-tests
     Path excludeFile = new Path(dir, "exclude");
     Path includeFile = new Path(dir, "include");
     assertTrue(localFileSys.mkdirs(dir));
@@ -143,8 +150,14 @@ public class TestHostsFiles {
 
     // Configure an excludes file
     FileSystem localFileSys = FileSystem.getLocal(conf);
+<<<<<<< 9a0686823c88f5efc9d28baacbdca4f5f51a3fe5
     Path workingDir = new Path(MiniDFSCluster.getBaseDirectory());
     Path dir = new Path(workingDir, "temp/decommission");
+=======
+    Path workingDir = localFileSys.getWorkingDirectory();
+    Path dir = new Path(workingDir, GenericTestUtils.DEFAULT_TEST_DATA_PATH +
+        "temp/decommission");
+>>>>>>> HDFS-9263 hdft-tests
     Path excludeFile = new Path(dir, "exclude");
     Path includeFile = new Path(dir, "include");
     assertTrue(localFileSys.mkdirs(dir));
