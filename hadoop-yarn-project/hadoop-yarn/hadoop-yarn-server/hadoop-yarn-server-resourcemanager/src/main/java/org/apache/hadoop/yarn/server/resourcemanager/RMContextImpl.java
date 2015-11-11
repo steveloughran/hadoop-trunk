@@ -37,6 +37,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsMana
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMDelegatedNodeLabelsUpdater;
 import org.apache.hadoop.yarn.server.resourcemanager.placement.PlacementManager;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
+import org.apache.hadoop.yarn.server.resourcemanager.registry.RMRegistryService;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.ReservationSystem;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.AMLivelinessMonitor;
@@ -92,7 +93,8 @@ public class RMContextImpl implements RMContext {
       RMContainerTokenSecretManager containerTokenSecretManager,
       NMTokenSecretManagerInRM nmTokenSecretManager,
       ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager,
-      ResourceScheduler scheduler) {
+      ResourceScheduler scheduler, 
+      RMRegistryService registry) {
     this();
     this.setDispatcher(rmDispatcher);
     setActiveServiceContext(new RMActiveServiceContext(rmDispatcher,
@@ -100,7 +102,8 @@ public class RMContextImpl implements RMContext {
         delegationTokenRenewer, appTokenSecretManager,
         containerTokenSecretManager, nmTokenSecretManager,
         clientToAMTokenSecretManager,
-        scheduler));
+        scheduler,
+        registry));
 
     ConfigurationProvider provider = new LocalConfigurationProvider();
     setConfigurationProvider(provider);
@@ -126,7 +129,7 @@ public class RMContextImpl implements RMContext {
       appTokenSecretManager,
       containerTokenSecretManager,
       nmTokenSecretManager,
-      clientToAMTokenSecretManager, null);
+      clientToAMTokenSecretManager, null, null);
   }
 
   @Override
@@ -471,5 +474,14 @@ public class RMContextImpl implements RMContext {
   @Override
   public void setQueuePlacementManager(PlacementManager placementMgr) {
     this.activeServiceContext.setQueuePlacementManager(placementMgr);
+  }
+
+  @Override
+  public RMRegistryService getRegistry() {
+    return activeServiceContext.getRegistry();
+  }
+
+  void setRegistry(RMRegistryService registry) {
+    activeServiceContext.setRegistry(registry);
   }
 }

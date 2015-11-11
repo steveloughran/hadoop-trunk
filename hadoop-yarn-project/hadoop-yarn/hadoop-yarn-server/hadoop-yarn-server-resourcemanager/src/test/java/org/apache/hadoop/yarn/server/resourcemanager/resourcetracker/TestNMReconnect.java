@@ -88,7 +88,7 @@ public class TestNMReconnect {
         new TestRMNodeEventDispatcher());
 
     context = new RMContextImpl(dispatcher, null,
-        null, null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null);
     dispatcher.register(SchedulerEventType.class,
         new InlineDispatcher.EmptyEventHandler());
     dispatcher.register(RMNodeEventType.class,

@@ -434,7 +434,7 @@ public class TestCapacityScheduler {
     RMContextImpl rmContext =  new RMContextImpl(null, null, null, null, null,
         null, new RMContainerTokenSecretManager(conf),
         new NMTokenSecretManagerInRM(conf),
-        new ClientToAMTokenSecretManagerInRM(), null);
+        new ClientToAMTokenSecretManagerInRM());
     setupQueueConfiguration(conf);
     cs.setConf(new YarnConfiguration());
     cs.setRMContext(resourceManager.getRMContext());
@@ -543,7 +543,7 @@ public class TestCapacityScheduler {
     cs.reinitialize(conf, new RMContextImpl(null, null, null, null, null,
       null, new RMContainerTokenSecretManager(conf),
       new NMTokenSecretManagerInRM(conf),
-      new ClientToAMTokenSecretManagerInRM(), null));
+      new ClientToAMTokenSecretManagerInRM()));
   }
 
   @Test
@@ -559,7 +559,7 @@ public class TestCapacityScheduler {
     cs.reinitialize(csConf, new RMContextImpl(null, null, null, null,
       null, null, new RMContainerTokenSecretManager(csConf),
       new NMTokenSecretManagerInRM(csConf),
-      new ClientToAMTokenSecretManagerInRM(), null));
+      new ClientToAMTokenSecretManagerInRM()));
 
     RMNode n1 = MockNodes.newNodeInfo(0, MockNodes.newResource(4 * GB), 1);
     RMNode n2 = MockNodes.newNodeInfo(0, MockNodes.newResource(2 * GB), 2);
@@ -590,7 +590,7 @@ public class TestCapacityScheduler {
     cs.reinitialize(conf, new RMContextImpl(null, null, null, null, null,
       null, new RMContainerTokenSecretManager(conf),
       new NMTokenSecretManagerInRM(conf),
-      new ClientToAMTokenSecretManagerInRM(), null));
+      new ClientToAMTokenSecretManagerInRM()));
     checkQueueCapacities(cs, A_CAPACITY, B_CAPACITY);
 
     // Add a new queue b4
@@ -2227,7 +2227,7 @@ public class TestCapacityScheduler {
     RMContextImpl rmContext =  new RMContextImpl(null, null, null, null, null,
         null, new RMContainerTokenSecretManager(conf),
         new NMTokenSecretManagerInRM(conf),
-        new ClientToAMTokenSecretManagerInRM(), null);
+        new ClientToAMTokenSecretManagerInRM());
     setupQueueConfiguration(conf);
     cs.setConf(new YarnConfiguration());
     cs.setRMContext(resourceManager.getRMContext());
