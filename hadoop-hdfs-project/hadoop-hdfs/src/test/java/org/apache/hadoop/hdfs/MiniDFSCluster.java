@@ -2700,7 +2700,7 @@ public class MiniDFSCluster {
    * @return a directory for use as a miniDFS filesystem.
    */
   public static String getBaseDirectory() {
-    return GenericTestUtils.getRandomizedTestDir().getAbsolutePath();
+    return new File(GenericTestUtils.getTestDir(), "data").getAbsolutePath();
   }
 
   /**
